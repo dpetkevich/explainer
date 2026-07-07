@@ -33,12 +33,19 @@ export async function callModel(opts: CallOptions): Promise<string> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const res = await getClient().messages.create({
-        model: opts.model,
-        max_tokens: opts.maxTokens ?? 16000,
-        system: opts.system,
-        messages: opts.messages,
-      });
+      // Stream and accumulate: the SDK rejects non-streaming requests with
+      // large max_tokens because they can exceed its 10-minute ceiling.
+      const res = await getClient()
+        .messages.stream({
+          model: opts.model,
+          max_tokens: opts.maxTokens ?? 16000,
+          system: opts.system,
+          messages: opts.messages,
+        })
+        .finalMessage();
+      if (res.stop_reason === "max_tokens") {
+        console.warn(`⚠ model response truncated at max_tokens=${opts.maxTokens ?? 16000} (${opts.model})`);
+      }
       return res.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)

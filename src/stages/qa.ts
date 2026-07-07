@@ -8,6 +8,7 @@ import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import { QaReportSchema, type Storyboard, type StoryboardScene, type QaReport } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
+import { pool } from "./scenes.js";
 
 const MAX_REPAIRS = 2;
 const READY_TIMEOUT_MS = 10_000;
@@ -105,9 +106,15 @@ async function reviewScene(
         ],
       },
     ],
-    maxTokens: 2000,
+    maxTokens: 4000,
   });
-  const parsed = QaReportSchema.safeParse(JSON.parse(stripJsonFences(raw)));
+  let json: unknown;
+  try {
+    json = JSON.parse(stripJsonFences(raw));
+  } catch {
+    throw new StageError("qa", `reviewer did not return valid JSON: ${raw.slice(-200)}`, undefined, scene.id);
+  }
+  const parsed = QaReportSchema.safeParse(json);
   if (!parsed.success) {
     throw new StageError("qa", `reviewer returned invalid QaReport: ${parsed.error.message}`, undefined, scene.id);
   }
@@ -133,7 +140,7 @@ async function repairScene(
   const raw = await callModel({
     model: MODELS.codegen,
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 20000,
+    maxTokens: 32000,
   });
   const html = extractHtml(raw);
   if (!/<!doctype html>/i.test(html)) {
@@ -229,12 +236,27 @@ export async function runQa(ctx: Ctx, storyboard: Storyboard): Promise<QaSummary
   const browser = await chromium.launch();
   const results: SceneResult[] = [];
   try {
-    for (const scene of scenes) {
-      results.push(await qaOneScene(ctx, browser, scene));
-    }
+    // Scenes are independent; run their render→review→repair chains in parallel.
+    // A scene whose QA chain errors (reviewer glitch, render crash) is marked
+    // failed rather than killing the stage — the pipeline ships the rest.
+    await pool(scenes, 3, async (scene) => {
+      try {
+        results.push(await qaOneScene(ctx, browser, scene));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warn("qa", `${scene.id}: QA errored (${msg}) — marking failed`);
+        const result: SceneResult = { id: scene.id, status: "fail", attempts: 0, consoleErrors: [msg] };
+        writeFileSync(paths.qaReport(ctx, scene.id), JSON.stringify(result, null, 2));
+        results.push(result);
+      }
+    });
   } finally {
     await browser.close();
   }
+
+  // Parallel completion order is arbitrary — restore storyboard order.
+  const order = new Map(storyboard.scenes.map((s, i) => [s.id, i]));
+  results.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 
   // Merge with prior summary so --scene runs don't clobber other scenes' results.
   const summaryPath = paths.qaSummary(ctx);

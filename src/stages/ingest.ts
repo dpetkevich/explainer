@@ -96,7 +96,8 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
   try {
     parsed = JSON.parse(stripJsonFences(raw));
   } catch {
-    throw new StageError("ingest", "model did not return valid JSON", out);
+    writeFileSync(out + ".raw.txt", raw);
+    throw new StageError("ingest", "model did not return valid JSON (raw response saved)", out + ".raw.txt");
   }
   const result = ConceptMapSchema.safeParse(parsed);
   if (!result.success) {

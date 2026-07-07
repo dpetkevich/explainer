@@ -32,14 +32,15 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   const raw = await callModel({
     model: MODELS.planning,
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 8000,
+    maxTokens: 16000,
   });
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripJsonFences(raw));
   } catch {
-    throw new StageError("storyboard", "model did not return valid JSON", out);
+    writeFileSync(out + ".raw.txt", raw);
+    throw new StageError("storyboard", "model did not return valid JSON (raw response saved)", out + ".raw.txt");
   }
   const result = StoryboardSchema.safeParse(parsed);
   if (!result.success) {

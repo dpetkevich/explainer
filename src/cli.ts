@@ -12,6 +12,16 @@ import { runScenes } from "./stages/scenes.js";
 import { runQa } from "./stages/qa.js";
 import { runAssemble } from "./stages/assemble.js";
 
+// Minimal .env loader (KEY=value lines, no expansion) so the key can live in the project.
+(() => {
+  const envFile = resolve(".env");
+  if (!existsSync(envFile)) return;
+  for (const line of readFileSync(envFile, "utf8").split("\n")) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && m[1] && !(m[1] in process.env)) process.env[m[1]] = m[2]!.replace(/^["']|["']$/g, "");
+  }
+})();
+
 const STAGES = ["ingest", "storyboard", "scenes", "qa", "assemble"] as const;
 type StageName = (typeof STAGES)[number];
 

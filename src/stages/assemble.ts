@@ -58,11 +58,13 @@ export function runAssemble(
   }. Explainer generated ${generated}.`;
 
   const template = readFileSync(templatePath("explainer.html"), "utf8");
+  // Function replacements: string replacements interpret `$&`/`$'` patterns,
+  // which corrupts scene code containing dollar signs (e.g. `"$" + value`).
   const out = template
-    .replaceAll("{{title}}", escapeHtml(storyboard.title))
-    .replaceAll("{{hook}}", escapeHtml(storyboard.hook))
-    .replaceAll("{{scenes}}", sections)
-    .replaceAll("{{footer}}", footer);
+    .replaceAll("{{title}}", () => escapeHtml(storyboard.title))
+    .replaceAll("{{hook}}", () => escapeHtml(storyboard.hook))
+    .replaceAll("{{scenes}}", () => sections)
+    .replaceAll("{{footer}}", () => footer);
 
   const outPath = paths.explainer(ctx);
   writeFileSync(outPath, out);
