@@ -1,0 +1,30 @@
+{
+  "name": "explain-it",
+  "version": "0.1.0",
+  "description": "Turn a scientific paper (PDF) or technical article (URL) into a self-contained interactive HTML explainer",
+  "type": "module",
+  "bin": {
+    "explain-it": "./bin/explain-it.js"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/cli.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@mozilla/readability": "^0.5.0",
+    "commander": "^12.1.0",
+    "jsdom": "^24.1.0",
+    "playwright": "^1.48.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,84 @@
+import Anthropic from "@anthropic-ai/sdk";
+
+let client: Anthropic | null = null;
+
+export function getClient(): Anthropic {
+  if (!client) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not set");
+    }
+    client = new Anthropic();
+  }
+  return client;
+}
+
+export const MODELS = {
+  planning: process.env.PLANNING_MODEL ?? "claude-fable-5",
+  codegen: process.env.CODEGEN_MODEL ?? "claude-fable-5",
+  review: process.env.REVIEW_MODEL ?? "claude-fable-5",
+};
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 529]);
+const MAX_ATTEMPTS = 3;
+
+export interface CallOptions {
+  model: string;
+  system?: string;
+  messages: Anthropic.MessageParam[];
+  maxTokens?: number;
+}
+
+/** One model call, retried with exponential backoff on rate limits / overload. */
+export async function callModel(opts: CallOptions): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await getClient().messages.create({
+        model: opts.model,
+        max_tokens: opts.maxTokens ?? 16000,
+        system: opts.system,
+        messages: opts.messages,
+      });
+      return res.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+    } catch (err) {
+      lastErr = err;
+      const status = err instanceof Anthropic.APIError ? err.status : undefined;
+      const retryable =
+        (status !== undefined && RETRYABLE_STATUS.has(status)) ||
+        err instanceof Anthropic.APIConnectionError;
+      if (!retryable || attempt === MAX_ATTEMPTS) throw err;
+      const delay = 2000 * 2 ** (attempt - 1) + Math.random() * 1000;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Strip markdown fences and any prose surrounding the outermost JSON object,
+ * then return the JSON string ready for JSON.parse.
+ */
+export function stripJsonFences(text: string): string {
+  let t = text.trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence?.[1]) t = fence[1].trim();
+  const start = t.indexOf("{");
+  const end = t.lastIndexOf("}");
+  if (start >= 0 && end > start) t = t.slice(start, end + 1);
+  return t;
+}
+
+/** Extract a complete HTML document from a model response that may wrap it in fences or prose. */
+export function extractHtml(text: string): string {
+  let t = text.trim();
+  const fence = t.match(/```(?:html)?\s*([\s\S]*?)```/);
+  if (fence?.[1] && /<!doctype html>/i.test(fence[1])) t = fence[1].trim();
+  const start = t.search(/<!doctype html>/i);
+  if (start > 0) t = t.slice(start);
+  const end = t.lastIndexOf("</html>");
+  if (end >= 0) t = t.slice(0, end + "</html>".length);
+  return t;
+}

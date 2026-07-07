@@ -1,0 +1,46 @@
+You are analyzing the scientific paper or technical article provided above. Your job is to extract the *ideas* that a reader must understand to genuinely get the paper's claim — not to summarize the document.
+
+## Audience
+
+Calibrate everything to this specific reader. Skip what they already know; do not assume what they don't.
+
+{{audience}}
+
+## Your task
+
+For each core concept, ask yourself: **if the author were at a whiteboard with a smart colleague from an adjacent field, what would they draw and animate to make that colleague say "oh, I get it"?** Extract those animatable ideas.
+
+Rules:
+
+1. Extract **ideas, never document structure**. Concepts named "Introduction", "Methods", "Results", "Executive Summary", or anything resembling a section heading are a hard failure. A concept is a causal mechanism, a trade-off, a surprising quantitative relationship, or an enabling breakthrough — something with a *because* in it.
+2. Rank concepts by importance to the paper's central claim. Return at most {{maxConcepts}} concepts.
+3. `coreMechanism` must tell the causal story in 2–4 sentences: what drives what, and why.
+4. `whyItMatters` must connect the concept to the paper's main claim in 1–2 sentences.
+5. Include `keyEquation` (LaTeX) only if the equation is load-bearing for understanding — not decorative.
+6. Include `misconception` when there is a likely wrong intuition worth preempting for this audience.
+7. Keep the numbers. If the source gives specific quantities (temperatures, speeds, costs, timescales), preserve them in the mechanism text — they are what make an explanation concrete.
+8. Ignore anything about funding, team, business strategy, or deal terms. Extract the science and engineering only.
+
+## Output format
+
+Return **strict JSON only** — no markdown fences, no commentary before or after. The JSON must match exactly this shape:
+
+```
+{
+  "paper": { "title": string, "authors": string[], "oneSentenceClaim": string },
+  "prerequisites": string[],
+  "concepts": [
+    {
+      "id": string,              // kebab-case slug
+      "name": string,
+      "whyItMatters": string,
+      "coreMechanism": string,
+      "keyEquation": string?,    // LaTeX, only if load-bearing
+      "keyFigureRef": string?,   // e.g. "Fig. 3" if a paper figure is central
+      "misconception": string?
+    }
+  ]
+}
+```
+
+`prerequisites` lists what the paper assumes the reader knows (so downstream stages know what NOT to explain).
