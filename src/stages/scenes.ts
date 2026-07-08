@@ -1,13 +1,11 @@
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { callModel, MODELS, extractHtml } from "../lib/anthropic.js";
 import { stageHash, isFresh, recordHash } from "../lib/cache.js";
 import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
-import type { Storyboard, StoryboardScene } from "../lib/schemas.js";
+import type { StoryboardScene } from "../lib/schemas.js";
 import { info, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
-
-const CONCURRENCY = 3;
 
 export async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items];
@@ -27,7 +25,7 @@ export function sceneInputHash(ctx: Ctx, scene: StoryboardScene): string {
   });
 }
 
-async function generateScene(ctx: Ctx, scene: StoryboardScene): Promise<void> {
+export async function generateScene(ctx: Ctx, scene: StoryboardScene): Promise<void> {
   const htmlPath = paths.sceneHtml(ctx, scene.id);
   const hashFile = paths.sceneHash(ctx, scene.id);
   const hash = sceneInputHash(ctx, scene);
@@ -69,44 +67,4 @@ async function generateScene(ctx: Ctx, scene: StoryboardScene): Promise<void> {
   writeFileSync(htmlPath, html);
   recordHash(hashFile, hash);
   info("scenes", `${scene.id}: wrote ${htmlPath}`);
-}
-
-export async function runScenes(ctx: Ctx, storyboard: Storyboard): Promise<void> {
-  let scenes = storyboard.scenes;
-  if (ctx.onlyScene) {
-    scenes = scenes.filter((s) => s.id === ctx.onlyScene);
-    if (scenes.length === 0) {
-      throw new StageError(
-        "scenes",
-        `no scene with id "${ctx.onlyScene}" in storyboard (have: ${storyboard.scenes.map((s) => s.id).join(", ")})`,
-        paths.storyboard(ctx)
-      );
-    }
-  }
-  // Collect per-scene errors instead of failing fast, so sibling generations
-  // complete and get cached before we report.
-  const errors: StageError[] = [];
-  await pool(scenes, CONCURRENCY, async (scene) => {
-    try {
-      await generateScene(ctx, scene);
-    } catch (err) {
-      errors.push(
-        err instanceof StageError
-          ? err
-          : new StageError("scenes", err instanceof Error ? err.message : String(err), undefined, scene.id)
-      );
-    }
-  });
-  if (errors.length > 0) {
-    for (const e of errors.slice(1)) {
-      console.error(`✗ [scenes / scene "${e.sceneId}"] ${e.message}`);
-    }
-    throw errors[0]!;
-  }
-
-  for (const scene of scenes) {
-    if (!existsSync(paths.sceneHtml(ctx, scene.id))) {
-      throw new StageError("scenes", "scene HTML missing after generation", paths.sceneHtml(ctx, scene.id), scene.id);
-    }
-  }
 }

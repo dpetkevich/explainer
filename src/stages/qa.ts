@@ -1,14 +1,13 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import type Anthropic from "@anthropic-ai/sdk";
 import { callModel, MODELS, stripJsonFences, extractHtml } from "../lib/anthropic.js";
 import { stageHash, isFresh, recordHash } from "../lib/cache.js";
 import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
-import { QaReportSchema, type Storyboard, type StoryboardScene, type QaReport } from "../lib/schemas.js";
+import { QaReportSchema, type StoryboardScene, type QaReport } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
-import { pool } from "./scenes.js";
 
 const MAX_REPAIRS = 2;
 const READY_TIMEOUT_MS = 10_000;
@@ -67,6 +66,10 @@ async function renderScene(browser: Browser, htmlPath: string): Promise<RenderRe
       });
     });
     for (const button of await page.locator("button").all()) {
+      // Don't undo the perturbation we just made: a reset/clear button clicked
+      // last restores the default state and makes the scene look inert.
+      const label = ((await button.textContent().catch(() => "")) ?? "").trim();
+      if (/reset|clear|restart|undo/i.test(label)) continue;
       await button.click({ timeout: 2000 }).catch(() => {});
     }
     await page.waitForTimeout(700); // let the perturbed state render
@@ -106,7 +109,9 @@ async function reviewScene(
         ],
       },
     ],
-    maxTokens: 4000,
+    // Reviews are small JSON, but a verbose reviewer that hits the cap produces
+    // unparseable output and falsely fails the scene — leave generous headroom.
+    maxTokens: 8000,
   });
   let json: unknown;
   try {
@@ -149,7 +154,7 @@ async function repairScene(
   writeFileSync(paths.sceneHtml(ctx, scene.id), html);
 }
 
-async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardScene): Promise<SceneResult> {
+export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardScene): Promise<SceneResult> {
   const htmlPath = paths.sceneHtml(ctx, scene.id);
   if (!existsSync(htmlPath)) {
     throw new StageError("qa", "scene HTML not found — run the scenes stage first", htmlPath, scene.id);
@@ -225,51 +230,4 @@ async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardScene): P
   writeFileSync(reportPath, JSON.stringify(result, null, 2));
   warn("qa", `${scene.id}: FAILED after ${MAX_REPAIRS} repairs — will be excluded from the explainer (${reportPath})`);
   return result;
-}
-
-export async function runQa(ctx: Ctx, storyboard: Storyboard): Promise<QaSummary> {
-  mkdirSync(paths.qaDir(ctx), { recursive: true });
-  const scenes = ctx.onlyScene
-    ? storyboard.scenes.filter((s) => s.id === ctx.onlyScene)
-    : storyboard.scenes;
-
-  const browser = await chromium.launch();
-  const results: SceneResult[] = [];
-  try {
-    // Scenes are independent; run their render→review→repair chains in parallel.
-    // A scene whose QA chain errors (reviewer glitch, render crash) is marked
-    // failed rather than killing the stage — the pipeline ships the rest.
-    await pool(scenes, 3, async (scene) => {
-      try {
-        results.push(await qaOneScene(ctx, browser, scene));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        warn("qa", `${scene.id}: QA errored (${msg}) — marking failed`);
-        const result: SceneResult = { id: scene.id, status: "fail", attempts: 0, consoleErrors: [msg] };
-        writeFileSync(paths.qaReport(ctx, scene.id), JSON.stringify(result, null, 2));
-        results.push(result);
-      }
-    });
-  } finally {
-    await browser.close();
-  }
-
-  // Parallel completion order is arbitrary — restore storyboard order.
-  const order = new Map(storyboard.scenes.map((s, i) => [s.id, i]));
-  results.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-
-  // Merge with prior summary so --scene runs don't clobber other scenes' results.
-  const summaryPath = paths.qaSummary(ctx);
-  let summary: QaSummary = { scenes: results };
-  if (ctx.onlyScene && existsSync(summaryPath)) {
-    const prior = JSON.parse(readFileSync(summaryPath, "utf8")) as QaSummary;
-    const merged = new Map(prior.scenes.map((s) => [s.id, s]));
-    for (const r of results) merged.set(r.id, r);
-    summary = { scenes: storyboard.scenes.map((s) => merged.get(s.id)).filter((s): s is SceneResult => !!s) };
-  }
-  writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
-
-  const passed = summary.scenes.filter((s) => s.status === "pass").length;
-  info("qa", `${passed}/${summary.scenes.length} scenes passing`);
-  return summary;
 }

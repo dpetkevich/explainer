@@ -12,7 +12,8 @@ export interface Ctx {
   audience: AudienceProfile;
   /** Audience profile as pretty JSON, injected verbatim into prompts. */
   audienceRaw: string;
-  maxScenes: number;
+  /** Optional cap on scene count; unset means the storyboard uses as many scenes as it needs. */
+  maxScenes?: number;
   force: boolean;
   /** When set, scenes/qa run for this scene only (with force). */
   onlyScene?: string;
@@ -22,6 +23,7 @@ export const paths = {
   sourceText: (c: Ctx) => join(c.workDir, "source.md"),
   conceptMap: (c: Ctx) => join(c.workDir, "concept-map.json"),
   storyboard: (c: Ctx) => join(c.workDir, "storyboard.json"),
+  script: (c: Ctx) => join(c.workDir, "script.md"),
   sceneHtml: (c: Ctx, id: string) => join(c.workDir, "scenes", `${id}.html`),
   sceneHash: (c: Ctx, id: string) => join(c.workDir, "scenes", `${id}.hash`),
   qaDir: (c: Ctx) => join(c.workDir, "qa"),

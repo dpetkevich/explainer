@@ -13,13 +13,14 @@ For each core concept, ask yourself: **if the author were at a whiteboard with a
 Rules:
 
 1. Extract **ideas, never document structure**. Concepts named "Introduction", "Methods", "Results", "Executive Summary", or anything resembling a section heading are a hard failure. A concept is a causal mechanism, a trade-off, a surprising quantitative relationship, or an enabling breakthrough — something with a *because* in it.
-2. Rank concepts by importance to the paper's central claim. Return at most {{maxConcepts}} concepts.
-3. `coreMechanism` must tell the causal story in 2–4 sentences: what drives what, and why.
-4. `whyItMatters` must connect the concept to the paper's main claim in 1–2 sentences.
-5. Include `keyEquation` (LaTeX) only if the equation is load-bearing for understanding — not decorative.
-6. Include `misconception` when there is a likely wrong intuition worth preempting for this audience.
-7. Keep the numbers. If the source gives specific quantities (temperatures, speeds, costs, timescales), preserve them in the mechanism text — they are what make an explanation concrete.
-8. Ignore anything about funding, team, business strategy, or deal terms. Extract the science and engineering only.
+2. Rank concepts by importance to the paper's central claim. Return {{conceptBudget}}.
+3. Extract the **prerequisite ladder** too: foundational concepts the paper's ideas stand on are legitimate concepts even when the paper doesn't restate them (e.g. what thrust is, what a figure of merit actually measures). Mark these with `foundational: true`. For physics papers, run the ladder all the way down to first principles (F = ma, conservation laws, kinetic theory of temperature): include those rungs as `foundational: true` concepts even when the audience's `assumeKnown` technically covers them — the explainer opens with a Feynman-lectures refresher block built from them. The explainer must be able to ramp this audience from `assumeKnown` up to the paper's claim with no gaps — include every rung that ramp needs.
+4. `coreMechanism` must tell the causal story in 2–4 sentences: what drives what, and why.
+5. `whyItMatters` must connect the concept to the paper's main claim in 1–2 sentences.
+6. Include `keyEquation` (LaTeX) only if the equation is load-bearing for understanding — not decorative.
+7. Include `misconception` when there is a likely wrong intuition worth preempting for this audience.
+8. Keep the numbers. If the source gives specific quantities (temperatures, speeds, costs, timescales), preserve them in the mechanism text — they are what make an explanation concrete.
+9. Ignore anything about funding, team, business strategy, or deal terms. Extract the science and engineering only.
 
 ## Output format
 
@@ -37,7 +38,8 @@ Return **strict JSON only** — no markdown fences, no commentary before or afte
       "coreMechanism": string,
       "keyEquation": string?,    // LaTeX, only if load-bearing
       "keyFigureRef": string?,   // e.g. "Fig. 3" if a paper figure is central
-      "misconception": string?
+      "misconception": string?,
+      "foundational": boolean?   // true for prerequisite-ladder concepts the paper assumes
     }
   ]
 }

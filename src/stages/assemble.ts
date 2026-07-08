@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { templatePath } from "../lib/prompts.js";
+import { renderRichText, stripMath } from "../lib/mathml.js";
 import type { ConceptMap, Storyboard } from "../lib/schemas.js";
 import type { QaSummary } from "./qa.js";
 import { info, warn } from "../lib/log.js";
@@ -18,6 +19,15 @@ function escapeSrcdoc(html: string): string {
   return html.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+// Uniform math sizing across every scene, applied at assembly so cached scene
+// HTML never needs regenerating for a typography change.
+const MATH_SIZE_STYLE = `<style>math{font-size:1.25em}math[display="block"]{font-size:1.4em}</style>`;
+
+function injectMathSize(html: string): string {
+  const idx = html.search(/<\/head>/i);
+  return idx >= 0 ? html.slice(0, idx) + MATH_SIZE_STYLE + html.slice(idx) : html;
+}
+
 export function runAssemble(
   ctx: Ctx,
   conceptMap: ConceptMap,
@@ -34,18 +44,29 @@ export function runAssemble(
     warn("assemble", "no scenes passed QA — the explainer will contain text only");
   }
 
+  const ledes = new Map((storyboard.parts ?? []).map((p) => [p.title, p.lede]));
+  let currentPart: string | undefined;
   const sections = included
     .map((scene) => {
-      const html = readFileSync(paths.sceneHtml(ctx, scene.id), "utf8");
-      return `<section class="scene" id="${escapeHtml(scene.id)}">
-  <h2>${escapeHtml(scene.title)}</h2>
-  <p class="caption">${escapeHtml(scene.caption)}</p>
+      let partHeading = "";
+      if (scene.part !== undefined && scene.part !== currentPart) {
+        currentPart = scene.part;
+        const lede = ledes.get(scene.part);
+        partHeading = `<header class="part">
+  <h2>${renderRichText(scene.part)}</h2>${lede ? `\n  <p class="part-lede">${renderRichText(lede)}</p>` : ""}
+</header>
+`;
+      }
+      const html = injectMathSize(readFileSync(paths.sceneHtml(ctx, scene.id), "utf8"));
+      return `${partHeading}<section class="scene" id="${escapeHtml(scene.id)}">
+  <h3>${renderRichText(scene.title)}</h3>
+  <p class="caption">${renderRichText(scene.caption)}</p>
   <iframe
     class="scene-frame"
     data-scene-id="${escapeHtml(scene.id)}"
     srcdoc="${escapeSrcdoc(html)}"
     loading="lazy"
-    title="${escapeHtml(scene.title)}"
+    title="${escapeHtml(stripMath(scene.title))}"
   ></iframe>
 </section>`;
     })
@@ -62,7 +83,7 @@ export function runAssemble(
   // which corrupts scene code containing dollar signs (e.g. `"$" + value`).
   const out = template
     .replaceAll("{{title}}", () => escapeHtml(storyboard.title))
-    .replaceAll("{{hook}}", () => escapeHtml(storyboard.hook))
+    .replaceAll("{{hook}}", () => renderRichText(storyboard.hook))
     .replaceAll("{{scenes}}", () => sections)
     .replaceAll("{{footer}}", () => footer);
 

@@ -57,7 +57,7 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
   const promptRaw = loadPromptRaw("ingest");
   const sourceForHash = source.text ?? source.pdfBase64!;
   const hash = stageHash({
-    artifacts: [sourceForHash, ctx.audienceRaw, String(ctx.maxScenes)],
+    artifacts: [sourceForHash, ctx.audienceRaw, String(ctx.maxScenes ?? "uncapped")],
     prompt: promptRaw,
     model: MODELS.planning,
   });
@@ -71,7 +71,9 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
 
   const prompt = loadPrompt("ingest", {
     audience: ctx.audienceRaw,
-    maxConcepts: String(ctx.maxScenes + 2),
+    conceptBudget: ctx.maxScenes
+      ? `at most ${ctx.maxScenes + 2} concepts`
+      : "the concepts the ladder needs — typically 8–12 for a dense paper",
   });
 
   const content: Anthropic.ContentBlockParam[] = [];
@@ -111,7 +113,7 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
     );
   }
   let map = result.data;
-  if (map.concepts.length > ctx.maxScenes + 2) {
+  if (ctx.maxScenes && map.concepts.length > ctx.maxScenes + 2) {
     warn("ingest", `model returned ${map.concepts.length} concepts; keeping top ${ctx.maxScenes + 2}`);
     map = { ...map, concepts: map.concepts.slice(0, ctx.maxScenes + 2) };
   }

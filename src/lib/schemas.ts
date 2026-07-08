@@ -31,6 +31,7 @@ export const ConceptMapSchema = z.object({
         keyEquation: z.string().optional(),
         keyFigureRef: z.string().optional(),
         misconception: z.string().optional(),
+        foundational: z.boolean().optional(),
       })
     )
     .min(1),
@@ -40,7 +41,11 @@ export type ConceptMap = z.infer<typeof ConceptMapSchema>;
 export const StoryboardSceneSchema = z.object({
   id: kebab,
   conceptId: kebab,
+  /** Part (section) title this scene belongs to — must match an entry in Storyboard.parts. */
+  part: z.string().min(1).optional(),
   title: notSectionName("scene title"),
+  teaches: z.string().min(1),
+  requires: z.array(kebab),
   caption: z.string().min(1),
   visualMetaphor: z.string().min(1),
   animatedVariable: z.object({
@@ -54,11 +59,57 @@ export const StoryboardSceneSchema = z.object({
 });
 export type StoryboardScene = z.infer<typeof StoryboardSceneSchema>;
 
-export const StoryboardSchema = z.object({
-  title: z.string().min(1),
-  hook: z.string().min(1),
-  scenes: z.array(StoryboardSceneSchema).min(1),
-});
+export const StoryboardSchema = z
+  .object({
+    title: z.string().min(1),
+    hook: z.string().min(1),
+    /** Ordered sections; each has a one-line lede explaining what it builds on. */
+    parts: z
+      .array(z.object({ title: z.string().min(1), lede: z.string().min(1) }))
+      .optional(),
+    scenes: z.array(StoryboardSceneSchema).min(1),
+  })
+  .superRefine((board, ctx) => {
+    // The ramp invariant: a scene may only build on scenes that come before it.
+    const earlier = new Set<string>();
+    board.scenes.forEach((scene, i) => {
+      for (const req of scene.requires) {
+        if (!earlier.has(req)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["scenes", i, "requires"],
+            message: `scene "${scene.id}" requires "${req}", which is not an earlier scene`,
+          });
+        }
+      }
+      earlier.add(scene.id);
+    });
+    // Part invariants: every scene.part exists, and scenes appear grouped in part order.
+    if (board.parts) {
+      const order = new Map(board.parts.map((p, i) => [p.title, i]));
+      let last = -1;
+      board.scenes.forEach((scene, i) => {
+        if (scene.part === undefined) return;
+        const idx = order.get(scene.part);
+        if (idx === undefined) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["scenes", i, "part"],
+            message: `scene "${scene.id}" names unknown part "${scene.part}"`,
+          });
+          return;
+        }
+        if (idx < last) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["scenes", i, "part"],
+            message: `scene "${scene.id}" is out of part order — scenes must be grouped by part`,
+          });
+        }
+        last = idx;
+      });
+    }
+  });
 export type Storyboard = z.infer<typeof StoryboardSchema>;
 
 export const QaReportSchema = z.object({

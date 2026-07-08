@@ -1,6 +1,16 @@
 {
-  "background": "Yale physics BA, pre-med biology and chemistry coursework, professional investor in deep tech",
-  "assumeKnown": ["calculus", "classical mechanics", "basic thermodynamics", "gen chem", "linear algebra basics"],
-  "doNotAssume": ["graduate QFT", "measure theory", "domain jargon from the paper's subfield"],
+  "background": "Yale physics undergrad",
+  "assumeKnown": [
+    "calculus",
+    "classical mechanics",
+    "basic thermodynamics",
+    "gen chem",
+    "linear algebra basics"
+  ],
+  "doNotAssume": [
+    "graduate QFT",
+    "measure theory",
+    "domain jargon from the paper's subfield"
+  ],
   "tone": "direct, quantitative, no hand-holding, no pop-science analogies unless they are load-bearing"
 }
