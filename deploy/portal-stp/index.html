@@ -77,6 +77,7 @@
     border: 1px solid var(--rule);
     border-radius: 8px;
     background: transparent;
+    overflow: hidden;
   }
   footer {
     margin-top: 4rem;
@@ -93,8 +94,8 @@
   <p class="hook">There are plans on file for 1.2 million satellites — eighty times as many as fly today — and every one of them will have to dodge, reposition, and come down on command. For fifty years there has been an awkward bargain in space: you could push hard and run out of propellant almost immediately, or you could sip propellant and take a year and a half to get anywhere. What we want to understand is how a mirror and a tank of one-dollar-a-kilogram ammonia gets you out of the bargain. And to understand it honestly, we have to begin at the beginning — with force, with momentum, and with what temperature really is.</p>
 
 <header class="part">
-  <h2>Basic physics refresher</h2>
-  <p class="part-lede">Three facts from first-year physics — force, momentum, and temperature. Every claim in this explainer is built from them.</p>
+  <h2>The basic building blocks</h2>
+  <p class="part-lede">Three facts from first-year physics, then the rules of spaceflight they imply. This section ends at the fifty-year problem the paper attacks: an engine could be strong or efficient — never both.</p>
 </header>
 <section class="scene" id="f-equals-ma">
   <h3>Force changes velocity</h3>
@@ -156,7 +157,7 @@
   math{font-size:1.05rem;}
   .legend{font-size:0.76rem;color:var(--muted);margin:2px 0 4px;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;wrap&quot;>
   <h2>Force → acceleration → accumulated velocity</h2>
@@ -376,6 +377,7 @@
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Force changes velocity"
   ></iframe>
 </section>
@@ -441,7 +443,7 @@
   .legend{font-size:0.72rem; color:var(--muted); margin:2px 0 8px 0;}
   .note{font-size:0.7rem; color:var(--muted); text-align:right;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot;>
   <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;200&quot; role=&quot;img&quot; aria-label=&quot;Astronaut and wrench recoil diagram&quot;></canvas>
@@ -613,6 +615,7 @@
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="In space, you move by throwing mass"
   ></iframe>
 </section>
@@ -675,7 +678,7 @@
   .legend{ font-size:12px; color:var(--muted); margin:2px 0 10px 0; }
   .eqbox{ margin:8px 0; }
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot;>
 
@@ -841,14 +844,11 @@
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Temperature is molecular speed"
   ></iframe>
 </section>
 
-<header class="part">
-  <h2>The rules of rocket science</h2>
-  <p class="part-lede">Those three facts, applied in orbit, set the rules every spacecraft lives by: maneuvers spend a fixed budget of velocity change, the propellant cost compounds exponentially, and for fifty years an engine could be strong or efficient — never both.</p>
-</header>
 <section class="scene" id="dv-budget">
   <h3>Every maneuver spends from a fixed delta-v budget</h3>
   <p class="caption">On Earth a full tank means so many miles, because you burn fuel just to keep moving against friction. In space there is no friction: coasting is free, and a satellite will coast forever. What costs is changing your velocity — speeding up, slowing down, turning — so a spacecraft's fuel gauge does not read in miles; it reads in meters per second of velocity change. That is delta-v. Dodging a piece of debris costs about 100 m/s; climbing from low orbit to geostationary costs about 5,000. And when the gauge hits zero, the satellite is not stranded by the side of the road — it keeps sailing along whatever path it last had, forever, unable to change it.</p>
@@ -932,7 +932,7 @@ button.primary{border-color:var(--accent);}
 .eq{font-size:12px; color:var(--fg); opacity:.8; margin-top:6px;}
 #playBtn{display:none;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div id=&quot;wrap&quot;>
   <h2>Δv budget: a fixed cumulative allowance, not a top speed</h2>
@@ -1117,6 +1117,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Every maneuver spends from a fixed delta-v budget"
   ></iframe>
 </section>
@@ -1167,7 +1168,7 @@ __ro.observe(document.documentElement);
   .legend{color:var(--muted);font-size:12px;margin:2px 0 8px;}
   math{font-size:15px;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot;>
   <h2>LEO &amp;rarr; GEO: two prograde burns</h2>
@@ -1421,13 +1422,14 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Climbing to a higher orbit takes two forward burns"
   ></iframe>
 </section>
 
 <section class="scene" id="isp-is-exhaust-velocity">
   <h3>Specific impulse: the momentum a kilogram of propellant buys</h3>
-  <p class="caption">Every rocket is in the business of buying momentum with mass, so let us ask the natural question: how much momentum do you get for each kilogram you throw away? The answer is simply the exhaust velocity — a kilogram thrown out at <math><msub><mi>v</mi><mi>e</mi></msub></math> carries <math><msub><mi>v</mi><mi>e</mi></msub></math> of momentum, no more and no less. Engineers, by an old convention, divide by <math><msub><mi>g</mi><mn>0</mn></msub></math> and quote it in seconds: <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub><mo>=</mo><msub><mi>v</mi><mi>e</mi></msub><mo>/</mo><msub><mi>g</mi><mn>0</mn></msub></math>. A chemical propellant leaves the nozzle at 1.8 to 3.2 km/s (<math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> 180–330 s); an ion thruster — the workhorse type is called a Hall thruster — hurls its atoms at some 15 km/s (<math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> about 1,500 s) — five times the momentum for every kilogram spent.</p>
+  <p class="caption">Every rocket is in the business of buying momentum with mass, so let us ask the natural question: how much momentum do you get for each kilogram you throw away? The answer is simply the exhaust velocity — a kilogram thrown out at <math><msub><mi>v</mi><mi>e</mi></msub></math> carries <math><msub><mi>v</mi><mi>e</mi></msub></math> of momentum, no more and no less. Engineers, by an old convention, divide by <math><msub><mi>g</mi><mn>0</mn></msub></math> and quote it in seconds: <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub><mo>=</mo><msub><mi>v</mi><mi>e</mi></msub><mo>/</mo><msub><mi>g</mi><mn>0</mn></msub></math>. A typical chemical thruster leaves the nozzle near 2.2 km/s (<math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> about 220 s), and even an exceptionally good one only reaches ~2.9 km/s (300 s); an ion thruster — the workhorse type is called a Hall thruster — hurls its atoms at some 15 km/s (<math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> about 1,500 s) — roughly seven times the momentum of a typical chemical thruster for every kilogram spent.</p>
   <iframe
     class="scene-frame"
     data-scene-id="isp-is-exhaust-velocity"
@@ -1435,378 +1437,259 @@ __ro.observe(document.documentElement);
 <html lang=&quot;en&quot;>
 <head>
 <meta charset=&quot;utf-8&quot;>
-<title>Specific Impulse — Exhaust Velocity in Disguise</title>
+<title>Specific Impulse: Exhaust Velocity</title>
 <style>
 :root{
-  --bg:#f7f7f9;
+  --bg:#f7f7f5;
+  --fg:#1a1a1a;
+  --muted:#5a5a5a;
+  --accent:#c1440e;
+  --track:#888;
+  --ship:#2b4b6f;
+  --pellet:#c1440e;
   --panel:#ffffff;
-  --ink:#1a1c20;
-  --muted:#5b5f6a;
-  --accent:#1b6ef3;
-  --accent2:#e0692b;
-  --track:#c7cbd4;
-  --pellet:#e0692b;
-  --ship:#3a3f4b;
-  --line:#9aa0ad;
+  --border:#d8d8d4;
+  --mark:#7a4b2a;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#15171b;
-    --panel:#1e2126;
-    --ink:#e8eaef;
-    --muted:#a1a6b2;
-    --accent:#5b9dff;
-    --accent2:#ff9a5c;
-    --track:#3a3f4a;
-    --pellet:#ff9a5c;
-    --ship:#c7cbd4;
-    --line:#5b6070;
+    --bg:#15171a;
+    --fg:#e8e8e6;
+    --muted:#a3a3a0;
+    --accent:#ff8b4d;
+    --track:#666;
+    --ship:#7fa8d9;
+    --pellet:#ff8b4d;
+    --panel:#1f2226;
+    --border:#33363b;
+    --mark:#d9a06b;
   }
 }
 *{box-sizing:border-box;}
 body{
-  margin:0;
-  background:var(--bg);
-  color:var(--ink);
-  font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
-  padding:12px;
-}
-.scene{
+  margin:0; padding:12px; background:var(--bg); color:var(--fg);
+  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   max-width:680px;
-  margin:0 auto;
-  background:var(--panel);
-  border-radius:10px;
-  padding:14px 16px 16px;
 }
-h2{
-  font-size:15px;
-  margin:0 0 8px;
-  font-weight:600;
-  color:var(--ink);
-}
-canvas{
-  width:100%;
-  max-width:100%;
-  height:auto;
-  display:block;
-  background:transparent;
-}
-.controls{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  align-items:center;
-  margin:10px 0 4px;
-}
-.controls label{
-  font-size:13px;
-  color:var(--muted);
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  flex:1 1 260px;
-  min-width:180px;
-}
-input[type=range]{
-  width:100%;
-}
-button{
-  font-size:13px;
-  padding:6px 10px;
-  border-radius:6px;
-  border:1px solid var(--track);
-  background:var(--panel);
-  color:var(--ink);
-  cursor:pointer;
-}
+canvas{ max-width:100%; width:100%; height:auto; display:block; background:var(--panel); border:1px solid var(--border); border-radius:6px;}
+.controls{ margin-top:10px; }
+.slider-row{ position:relative; }
+.slider-row input[type=range]{ width:100%; }
+.tickmarks{ position:relative; height:10px; margin-top:2px; }
+.tickmark{ position:absolute; top:0; width:2px; height:8px; background:var(--mark); transform:translateX(-50%); }
+.marklist{ list-style:none; margin:6px 0 0 0; padding:0; font-size:0.78em; color:var(--muted); display:flex; flex-direction:column; gap:2px; }
+.marklist li{ display:flex; gap:6px; align-items:baseline; }
+.marklist .swatch{ display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--mark); flex:0 0 auto; }
 .readouts{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  margin-top:10px;
+  display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;
 }
 .readout{
-  flex:1 1 140px;
-  background:var(--bg);
-  border:1px solid var(--track);
-  border-radius:8px;
-  padding:8px 10px;
+  flex:1 1 150px; background:var(--panel); border:1px solid var(--border);
+  border-radius:6px; padding:8px 10px;
 }
-.readout .label{
-  font-size:11px;
-  color:var(--muted);
-  text-transform:uppercase;
-  letter-spacing:.03em;
-}
-.readout .value{
-  font-size:18px;
-  font-weight:600;
-  color:var(--accent);
-  margin-top:2px;
-}
-.marks{
-  position:relative;
-  height:14px;
-  font-size:10px;
-  color:var(--muted);
-  margin-top:-4px;
-}
-.marks span{
-  position:absolute;
-  transform:translateX(-50%);
-  white-space:nowrap;
-}
-.eqwrap{
-  margin-top:12px;
-  padding-top:8px;
-  border-top:1px solid var(--track);
-}
-math{
-  font-size:17px;
-  color:var(--ink);
-}
-.legend{
-  font-size:11.5px;
-  color:var(--muted);
-  margin-top:4px;
-  line-height:1.4;
-}
+.readout .val{ font-size:1.25em; font-weight:600; color:var(--accent);}
+.readout .lbl{ font-size:0.78em; color:var(--muted); }
+label.main{ font-size:0.9em; }
+.eq{ margin-top:14px; }
+.legend{ font-size:0.78em; color:var(--muted); margin-top:2px; }
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
-<div class=&quot;scene&quot;>
-  <h2>Specific impulse is exhaust velocity in disguise</h2>
-  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;190&quot; role=&quot;img&quot; aria-label=&quot;Spacecraft ejecting propellant pellets on a frictionless track&quot;></canvas>
 
-  <div class=&quot;controls&quot;>
-    <label>
-      Exhaust velocity v<sub>e</sub> (km/s): <span id=&quot;veLabel&quot;>2.90</span>
-      <input id=&quot;veSlider&quot; type=&quot;range&quot; min=&quot;1800&quot; max=&quot;15000&quot; step=&quot;10&quot; value=&quot;2900&quot;>
-    </label>
-    <button id=&quot;playBtn&quot;>Pause</button>
-  </div>
-  <div class=&quot;marks&quot; id=&quot;marks&quot;></div>
+<canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;150&quot; aria-label=&quot;Spacecraft ejecting propellant pellets&quot;></canvas>
 
-  <div class=&quot;readouts&quot;>
-    <div class=&quot;readout&quot;>
-      <div class=&quot;label&quot;>Specific impulse I<sub>sp</sub></div>
-      <div class=&quot;value&quot; id=&quot;ispVal&quot;>— s</div>
-    </div>
-    <div class=&quot;readout&quot;>
-      <div class=&quot;label&quot;>Momentum per kg expelled</div>
-      <div class=&quot;value&quot; id=&quot;pVal&quot;>— kg·m/s</div>
-    </div>
-    <div class=&quot;readout&quot;>
-      <div class=&quot;label&quot;>Flow rate for 1 N thrust</div>
-      <div class=&quot;value&quot; id=&quot;flowVal&quot;>— g/s</div>
+<div class=&quot;controls&quot;>
+  <label class=&quot;main&quot; for=&quot;ve&quot;>exhaust velocity v<sub>e</sub>: <span id=&quot;veVal&quot;>2.2</span> km/s</label>
+  <div class=&quot;slider-row&quot;>
+    <input type=&quot;range&quot; id=&quot;ve&quot; min=&quot;1.8&quot; max=&quot;15&quot; step=&quot;0.05&quot; value=&quot;2.2&quot;>
+    <div class=&quot;tickmarks&quot; id=&quot;tickmarks&quot;>
+      <div class=&quot;tickmark&quot; id=&quot;m1&quot;></div>
+      <div class=&quot;tickmark&quot; id=&quot;m2&quot;></div>
+      <div class=&quot;tickmark&quot; id=&quot;m3&quot;></div>
     </div>
   </div>
-
-  <div class=&quot;eqwrap&quot;>
-    <math display=&quot;block&quot;>
-      <msub><mi>I</mi><mtext>sp</mtext></msub>
-      <mo>=</mo>
-      <mfrac><msub><mi>v</mi><mtext>e</mtext></msub><msub><mi>g</mi><mn>0</mn></msub></mfrac>
-    </math>
-    <div class=&quot;legend&quot;>
-      I<sub>sp</sub> — specific impulse (s) · v<sub>e</sub> — exhaust velocity (m/s) · g<sub>0</sub> — standard gravity, 9.80665 m/s² (fixed reference constant, not a physical acceleration here)
-    </div>
-  </div>
+  <ul class=&quot;marklist&quot;>
+    <li><span class=&quot;swatch&quot;></span> typical chemical: ~2.2 km/s (220 s)</li>
+    <li><span class=&quot;swatch&quot;></span> best chemical: ~2.9 km/s (300 s)</li>
+    <li><span class=&quot;swatch&quot;></span> Hall thruster: ~15 km/s (1,500 s)</li>
+  </ul>
 </div>
 
+<div class=&quot;readouts&quot;>
+  <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;ispOut&quot;>-</div><div class=&quot;lbl&quot;>I_sp (s)</div></div>
+  <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;pOut&quot;>-</div><div class=&quot;lbl&quot;>momentum per kg expelled (kg·m/s)</div></div>
+  <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;mdotOut&quot;>-</div><div class=&quot;lbl&quot;>propellant flow for 1 N thrust (g/s)</div></div>
+</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>I</mi><mtext>sp</mtext></msub><mo>=</mo>
+  <mfrac><msub><mi>v</mi><mtext>e</mtext></msub><msub><mi>g</mi><mn>0</mn></msub></mfrac>
+</math>
+<div class=&quot;legend&quot;>I_sp — specific impulse (s) · v_e — exhaust velocity (m/s) · g₀ — standard gravity, 9.81 m/s²</div>
+
+<math display=&quot;block&quot;>
+  <mover><mi>m</mi><mo>˙</mo></mover><mo>=</mo>
+  <mfrac><mi>F</mi><msub><mi>v</mi><mtext>e</mtext></msub></mfrac>
+</math>
+<div class=&quot;legend&quot;>ṁ — propellant mass flow rate (kg/s) · F — thrust, fixed at 1 N here · v_e — exhaust velocity (m/s)</div>
+</div>
+
+<button id=&quot;playBtn&quot; style=&quot;display:none; margin-top:8px;&quot;>Play</button>
+
 <script>
-(function(){
-  const G0 = 9.80665; // m/s^2, standard gravity (definitional constant)
-  const F_REF = 1; // N, reference thrust for flow-rate readout
+const G0 = 9.81; // m/s^2, standard gravity
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const veSlider = document.getElementById('ve');
+const veVal = document.getElementById('veVal');
+const ispOut = document.getElementById('ispOut');
+const pOut = document.getElementById('pOut');
+const mdotOut = document.getElementById('mdotOut');
+const playBtn = document.getElementById('playBtn');
 
-  const cv = document.getElementById('cv');
-  const ctx = cv.getContext('2d');
-  const slider = document.getElementById('veSlider');
-  const veLabel = document.getElementById('veLabel');
-  const ispVal = document.getElementById('ispVal');
-  const pVal = document.getElementById('pVal');
-  const flowVal = document.getElementById('flowVal');
-  const playBtn = document.getElementById('playBtn');
-  const marksEl = document.getElementById('marks');
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
-  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+let ve_kms = parseFloat(veSlider.value); // km/s
+let pellets = []; // {x, born}
+let lastSpawn = 0;
+let running = true;
+let t = 0;
 
-  // marker labels on slider
-  function layoutMarks(){
-    const min = +slider.min, max = +slider.max;
-    const defs = [
-      {v:1800, label:'storable chemical'},
-      {v:3200, label:''},
-      {v:15000, label:'Hall thruster ~15 km/s'}
-    ];
-    marksEl.innerHTML = '';
-    // combined chemical range label placed at midpoint of 1800-3200
-    const chemMid = (1800+3200)/2;
-    const chemPct = (chemMid-min)/(max-min)*100;
-    const chemSpan = document.createElement('span');
-    chemSpan.style.left = chemPct+'%';
-    chemSpan.textContent = 'chemical 1.8–3.2 km/s';
-    marksEl.appendChild(chemSpan);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduceMotion){
+  running = false;
+  playBtn.style.display = 'inline-block';
+  playBtn.textContent = 'Play';
+}
+playBtn.addEventListener('click', () => {
+  running = !running;
+  playBtn.textContent = running ? 'Pause' : 'Play';
+  if (running) requestAnimationFrame(loop);
+});
 
-    const hallPct = (15000-min)/(max-min)*100;
-    const hallSpan = document.createElement('span');
-    hallSpan.style.left = hallPct+'%';
-    hallSpan.textContent = 'Hall ~15 km/s';
-    marksEl.appendChild(hallSpan);
-  }
-  layoutMarks();
+function updateReadouts(){
+  const ve_ms = ve_kms * 1000;
+  const isp = ve_ms / G0;
+  const momentumPerKg = ve_ms; // kg*m/s for 1 kg expelled
+  const mdot_gs = 1000 / (ve_kms * 1000); // = 1/ve_kms, kg/s->g/s for F=1N
 
-  let ve = +slider.value; // m/s
-  let playing = true;
-  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduceMotion){
-    playing = false;
-    playBtn.textContent = 'Play';
-  }
+  veVal.textContent = ve_kms.toFixed(2);
+  ispOut.textContent = Math.round(isp);
+  pOut.textContent = Math.round(momentumPerKg);
+  mdotOut.textContent = mdot_gs.toFixed(3);
+}
 
-  function updateReadouts(){
-    veLabel.textContent = (ve/1000).toFixed(2);
-    const isp = ve / G0;
-    ispVal.textContent = Math.round(isp) + ' s';
-    pVal.textContent = ve.toFixed(0) + ' kg·m/s';
-    const mdot = F_REF / ve; // kg/s
-    flowVal.textContent = (mdot*1000).toFixed(2) + ' g/s';
-  }
+function positionTicks(){
+  const min = parseFloat(veSlider.min), max = parseFloat(veSlider.max);
+  const w = veSlider.getBoundingClientRect().width;
+  function pos(v){ return ((v-min)/(max-min))*w; }
+  document.getElementById('m1').style.left = pos(2.2)+'px';
+  document.getElementById('m2').style.left = pos(2.9)+'px';
+  document.getElementById('m3').style.left = pos(15)+'px';
+}
 
-  slider.addEventListener('input', () => {
-    ve = +slider.value;
-    updateReadouts();
-  });
-
-  playBtn.addEventListener('click', () => {
-    playing = !playing;
-    playBtn.textContent = playing ? 'Pause' : 'Play';
-    if (playing) lastT = null, requestAnimationFrame(loop);
-  });
-
-  // --- animation: spacecraft on right, pellets ejected leftward ---
-  let pellets = []; // {x, born}
-  let spawnAcc = 0;
-  const SPAWN_INTERVAL = 0.55; // s
-  const shipX = () => cv.width * 0.82;
-  const shipY = () => cv.height * 0.55;
-  const trackY = () => shipY();
-
-  function pxPerMs(){
-    // maps m/s -> px/s of pellet travel, chosen so range is visually reasonable
-    return 0.024;
-  }
-
-  function draw(){
-    const w = cv.width, h = cv.height;
-    ctx.clearRect(0,0,w,h);
-
-    const trackColor = cssVar('--track');
-    const shipColor = cssVar('--ship');
-    const pelletColor = cssVar('--pellet');
-    const lineColor = cssVar('--line');
-    const inkColor = cssVar('--ink');
-
-    // track
-    ctx.strokeStyle = trackColor;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(20, trackY()+22);
-    ctx.lineTo(w-20, trackY()+22);
-    ctx.stroke();
-
-    // spacecraft body
-    const sx = shipX(), sy = shipY();
-    ctx.fillStyle = shipColor;
-    ctx.beginPath();
-    ctx.moveTo(sx+26, sy-16);
-    ctx.lineTo(sx-26, sy-16);
-    ctx.lineTo(sx-34, sy);
-    ctx.lineTo(sx-26, sy+16);
-    ctx.lineTo(sx+26, sy+16);
-    ctx.closePath();
-    ctx.fill();
-
-    // nozzle marker
-    ctx.fillStyle = lineColor;
-    ctx.fillRect(sx-40, sy-4, 8, 8);
-
-    // pellets + trails
-    const speedPx = ve * pxPerMs() / 1000 * (ve>0?1:0); // px per second baseline
-    const trailLenMax = 90;
-    const trailLen = Math.min(trailLenMax, 8 + (ve-1800)/(15000-1800) * (trailLenMax-8));
-
-    pellets.forEach(p => {
-      // trail
-      const grad = ctx.createLinearGradient(p.x+trailLen, sy, p.x, sy);
-      grad.addColorStop(0, pelletColor);
-      grad.addColorStop(1, 'transparent');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(Math.min(p.x+trailLen, sx-40), sy);
-      ctx.lineTo(p.x, sy);
-      ctx.stroke();
-
-      // pellet body
-      ctx.fillStyle = pelletColor;
-      ctx.beginPath();
-      ctx.arc(p.x, sy, 5, 0, Math.PI*2);
-      ctx.fill();
-    });
-
-    // axis label
-    ctx.fillStyle = inkColor;
-    ctx.font = '11px -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('1 kg pellets ejected leftward — trail length ∝ exhaust speed', 14, 18);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = cssVar('--muted');
-    ctx.fillText('spacecraft', w-14, sy-24);
-  }
-
-  let lastT = null;
-  function loop(t){
-    if (!playing){ draw(); return; }
-    if (lastT === null) lastT = t;
-    const dt = Math.min(0.05, (t - lastT)/1000);
-    lastT = t;
-
-    spawnAcc += dt;
-    if (spawnAcc >= SPAWN_INTERVAL){
-      spawnAcc = 0;
-      pellets.push({x: shipX()-40, born:t});
-    }
-
-    const speedPxPerSec = 40 + (ve/1000) * 22; // monotonic in ve, visually tuned
-    pellets.forEach(p => { p.x -= speedPxPerSec * dt; });
-    pellets = pellets.filter(p => p.x > -20);
-
-    draw();
-    requestAnimationFrame(loop);
-  }
-
+veSlider.addEventListener('input', () => {
+  ve_kms = parseFloat(veSlider.value);
   updateReadouts();
-  draw();
-  window.__sceneReady = true;
-  if (playing) requestAnimationFrame(loop);
+});
 
-  const __ro = new ResizeObserver(() => {
-    parent.postMessage({ explainItScene: &quot;isp-is-exhaust-velocity&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
-  });
-  __ro.observe(document.documentElement);
-})();
+window.addEventListener('resize', positionTicks);
+
+const W = cv.width, H = cv.height;
+const shipX = W - 90, shipY = H/2;
+
+function drawFrame(dt){
+  ctx.clearRect(0,0,W,H);
+  const bg = cssVar('--panel'), fg = cssVar('--fg'), track = cssVar('--track');
+  const shipColor = cssVar('--ship'), pelletColor = cssVar('--pellet');
+
+  // track line
+  ctx.strokeStyle = track;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(20, shipY+28);
+  ctx.lineTo(W-20, shipY+28);
+  ctx.stroke();
+  ctx.fillStyle = fg;
+  ctx.font = '11px sans-serif';
+  ctx.fillText('frictionless track', 22, shipY+42);
+
+  // ship
+  ctx.fillStyle = shipColor;
+  ctx.beginPath();
+  ctx.moveTo(shipX-25, shipY-14);
+  ctx.lineTo(shipX+25, shipY);
+  ctx.lineTo(shipX-25, shipY+14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = fg;
+  ctx.font = '11px sans-serif';
+  ctx.fillText('spacecraft', shipX-30, shipY-20);
+
+  // pellets: speed scaled for visibility, proportional to ve
+  const pxPerKms = 3.0; // animation scale, arbitrary but consistent
+  const speed = ve_kms * pxPerKms; // px/s
+
+  if (running){
+    lastSpawn += dt;
+    const spawnInterval = 0.45; // seconds
+    if (lastSpawn > spawnInterval){
+      lastSpawn = 0;
+      pellets.push({x: shipX-25, born: t});
+    }
+    for (const p of pellets){
+      p.x -= speed*dt;
+    }
+    pellets = pellets.filter(p => p.x > 10);
+  }
+
+  ctx.fillStyle = pelletColor;
+  for (const p of pellets){
+    ctx.beginPath();
+    ctx.arc(p.x, shipY, 4, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.fillStyle = cssVar('--muted');
+  ctx.font = '11px sans-serif';
+  ctx.fillText('pellets: 1 kg each, ejected at v_e — spacing grows with v_e', 20, 18);
+}
+
+function loop(now){
+  if (!running){ return; }
+  if (!loop.last) loop.last = now;
+  const dt = Math.min((now - loop.last)/1000, 0.05);
+  loop.last = now;
+  t += dt;
+  drawFrame(dt);
+  requestAnimationFrame(loop);
+}
+
+updateReadouts();
+positionTicks();
+drawFrame(0);
+window.__sceneReady = true;
+
+if (running){
+  requestAnimationFrame(loop);
+}
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;isp-is-exhaust-velocity&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
 </script>
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Specific impulse: the momentum a kilogram of propellant buys"
   ></iframe>
 </section>
 
 <section class="scene" id="rocket-equation">
   <h3>Propellant needs grow exponentially with delta-v</h3>
-  <p class="caption">Now watch what happens when we add up the recoil over a whole burn. The propellant you burn late had to be carried — and accelerated — by the propellant you burned early, and propellant pushing propellant compounds exactly like interest. The sum is Tsiolkovsky's equation, <math><mi>Δ</mi><mi>v</mi><mo>=</mo><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub><mo>·</mo><msub><mi>g</mi><mn>0</mn></msub><mo>·</mo><mi>ln</mi><mo>(</mo><msub><mi>m</mi><mrow><mi>wet</mi></mrow></msub><mo>/</mo><msub><mi>m</mi><mrow><mi>dry</mi></mrow></msub><mo>)</mo></math>, and turned around it says the propellant mass grows exponentially with the mission-required delta-v — the total velocity change you plan to execute. That exponential is merciless: a 500 kg spacecraft on chemical propellant, <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> near 300 s, cannot tank its way past about 700 m/s no matter how it tries. The only escape is to raise the exhaust velocity, which shrinks the exponent — and that is why <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> is worth real money.</p>
+  <p class="caption">Now watch what happens when we add up the recoil over a whole burn. The propellant you burn late had to be carried — and accelerated — by the propellant you burned early, and propellant pushing propellant compounds exactly like interest. The sum is Tsiolkovsky's equation, <math><mi>Δ</mi><mi>v</mi><mo>=</mo><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub><mo>·</mo><msub><mi>g</mi><mn>0</mn></msub><mo>·</mo><mi>ln</mi><mo>(</mo><msub><mi>m</mi><mrow><mi>wet</mi></mrow></msub><mo>/</mo><msub><mi>m</mi><mrow><mi>dry</mi></mrow></msub><mo>)</mo></math>, and turned around it says the propellant mass grows exponentially with the mission-required delta-v — the total velocity change you plan to execute. That exponential is merciless: a 500 kg spacecraft on chemical propellant — <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> 300 s at its very best, closer to 220 s for a typical thruster — cannot tank its way past about 700 m/s no matter how it tries. The only escape is to raise the exhaust velocity, which shrinks the exponent — and that is why <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> is worth real money.</p>
   <iframe
     class="scene-frame"
     data-scene-id="rocket-equation"
@@ -1815,232 +1698,282 @@ math{
 <head>
 <meta charset=&quot;utf-8&quot;>
 <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
-<title>The rocket equation's exponential penalty</title>
+<title>Propellant vs. Delta-v</title>
 <style>
   :root{
-    --bg:#fbfaf7; --fg:#1c1c1c; --muted:#666a6f;
-    --grid:#d8d5cd; --curve:#1f6f8b; --marker:#c1440e;
-    --wall:#8a5a00; --panel:#f0eee7; --accent:#1f6f8b;
+    --bg:#ffffff; --panel:#f4f5f7; --fg:#1a1a1a; --muted:#5b5f66;
+    --grid:#d9dadd; --accent:#d1453a; --curve-dim:#9aa3ad;
+    --wall:#a8761f; --cursor:#1a1a1a;
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --bg:#15171a; --fg:#e8e6e1; --muted:#9a9d a2;
-      --muted:#9aa0a6; --grid:#33373d; --curve:#59c3e6;
-      --marker:#ff8a5c; --wall:#e0b34d; --panel:#1e2126; --accent:#59c3e6;
+      --bg:#15171b; --panel:#1d2126; --fg:#eaeaea; --muted:#a2a7ae;
+      --grid:#31353b; --accent:#ff7362; --curve-dim:#68727e;
+      --wall:#e2ac4a; --cursor:#eaeaea;
     }
   }
   *{box-sizing:border-box;}
-  body{
-    margin:0; padding:12px; background:var(--bg); color:var(--fg);
-    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
-    max-width:680px;
-  }
-  h2{font-size:1.05rem; margin:0 0 8px 0;}
-  canvas{display:block; width:100%; height:auto; max-width:100%; background:var(--panel); border-radius:6px;}
-  .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:10px 0;}
-  .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
-  label{font-size:0.85rem;}
-  input[type=range]{width:220px; max-width:60vw;}
-  button{
-    font-size:0.8rem; padding:4px 10px; border-radius:5px; border:1px solid var(--grid);
-    background:var(--panel); color:var(--fg); cursor:pointer;
-  }
-  button.active{background:var(--accent); color:var(--bg); border-color:var(--accent);}
-  .readouts{display:flex; flex-wrap:wrap; gap:14px; font-size:0.85rem; margin:6px 0;}
-  .readouts b{color:var(--accent);}
-  .legend{font-size:0.72rem; color:var(--muted); margin:2px 0 12px 0; line-height:1.35;}
-  math{font-size:1.02rem;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:1.02rem;margin:0 0 8px;font-weight:600;}
+  canvas{max-width:100%;height:auto;display:block;background:var(--panel);
+    border-radius:6px;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;}
+  label{font-size:0.82rem;color:var(--muted);}
+  input[type=range]{flex:1;min-width:140px;}
+  .isp-btns{display:flex;gap:6px;flex-wrap:wrap;}
+  button{font-size:0.78rem;padding:5px 9px;border-radius:5px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--fg);cursor:pointer;}
+  button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:0.85rem;}
+  .readouts b{font-variant-numeric:tabular-nums;}
+  .eqwrap{margin-top:12px;}
+  .legend{font-size:0.74rem;color:var(--muted);margin-top:2px;line-height:1.35;}
+  math{font-size:1rem;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
+<div class=&quot;wrap&quot;>
+  <h2>Propellant mass required vs. mission Δv</h2>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;380&quot; role=&quot;img&quot;
+    aria-label=&quot;Plot of propellant mass required versus delta-v for three specific impulses&quot;></canvas>
 
-<h2>Propellant mass required vs. mission Δv</h2>
-
-<canvas id=&quot;plot&quot; width=&quot;640&quot; height=&quot;380&quot;></canvas>
-
-<div class=&quot;controls&quot;>
-  <div class=&quot;row&quot; style=&quot;width:100%;&quot;>
-    <label for=&quot;dv&quot;>mission-required Δv: <b id=&quot;dvLabel&quot;>0</b> m/s</label>
-    <input type=&quot;range&quot; id=&quot;dv&quot; min=&quot;0&quot; max=&quot;6000&quot; step=&quot;10&quot; value=&quot;0&quot;>
+  <div class=&quot;controls&quot;>
+    <div class=&quot;row&quot;>
+      <label for=&quot;dv&quot; style=&quot;min-width:230px;&quot;>mission-required Δv: <b id=&quot;dvLabel&quot;>0</b> m/s</label>
+      <input id=&quot;dv&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;6000&quot; step=&quot;10&quot; value=&quot;0&quot;>
+    </div>
+    <div class=&quot;row&quot;>
+      <label>specific impulse (I<sub>sp</sub>):</label>
+      <div class=&quot;isp-btns&quot;>
+        <button data-isp=&quot;220&quot;>220 s (typical chemical)</button>
+        <button data-isp=&quot;300&quot;>300 s (best chemical)</button>
+        <button data-isp=&quot;1500&quot;>1500 s (electric)</button>
+      </div>
+    </div>
   </div>
-  <div class=&quot;row&quot;>
-    <span style=&quot;font-size:0.85rem;&quot;>Isp:</span>
-    <button data-isp=&quot;300&quot; class=&quot;isp-btn active&quot;>300 s (chemical)</button>
-    <button data-isp=&quot;450&quot; class=&quot;isp-btn&quot;>450 s (cryogenic)</button>
-    <button data-isp=&quot;1500&quot; class=&quot;isp-btn&quot;>1500 s (electric)</button>
+
+  <div class=&quot;readouts&quot;>
+    <div>Δv: <b id=&quot;rDv&quot;>0</b> m/s</div>
+    <div>I<sub>sp</sub>: <b id=&quot;rIsp&quot;>300</b> s</div>
+    <div>propellant mass: <b id=&quot;rProp&quot;>0</b> kg</div>
+    <div>wet mass: <b id=&quot;rWet&quot;>500</b> kg</div>
   </div>
-</div>
 
-<div class=&quot;readouts&quot;>
-  <span>Δv: <b id=&quot;rDv&quot;>0</b> m/s</span>
-  <span>I<sub>sp</sub>: <b id=&quot;rIsp&quot;>300</b> s</span>
-  <span>propellant mass needed: <b id=&quot;rProp&quot;>0</b> kg</span>
-</div>
-
-<math display=&quot;block&quot;>
-  <mi>&amp;#916;v</mi><mo>=</mo><msub><mi>I</mi><mtext>sp</mtext></msub><mo>&amp;#183;</mo><msub><mi>g</mi><mn>0</mn></msub><mo>&amp;#183;</mo>
-  <mi>ln</mi><mfrac><msub><mi>m</mi><mtext>wet</mtext></msub><msub><mi>m</mi><mtext>dry</mtext></msub></mfrac>
-</math>
-<div class=&quot;legend&quot;>
-  &amp;#916;v — mission-required velocity change (m/s) &amp;#183; I<sub>sp</sub> — specific impulse, exhaust speed / g<sub>0</sub> (s) &amp;#183;
-  g<sub>0</sub> — standard gravity, 9.80665 m/s&amp;#178; &amp;#183; m<sub>wet</sub>, m<sub>dry</sub> — spacecraft mass with and without propellant (kg)
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>&amp;#916;v</mi><mo>=</mo>
+      <msub><mi>I</mi><mtext>sp</mtext></msub><mo>&amp;#183;</mo>
+      <msub><mi>g</mi><mn>0</mn></msub><mo>&amp;#183;</mo>
+      <mi>ln</mi><mfrac><msub><mi>m</mi><mtext>wet</mtext></msub><msub><mi>m</mi><mtext>dry</mtext></msub></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      &amp;#916;v &amp;#8212; mission delta-v, total velocity change planned (m/s) &amp;#183;
+      I<sub>sp</sub> &amp;#8212; specific impulse (s) &amp;#183;
+      g<sub>0</sub> &amp;#8212; standard gravity, 9.81 m/s&amp;#178; &amp;#183;
+      m<sub>wet</sub>, m<sub>dry</sub> &amp;#8212; fueled and empty spacecraft mass (kg)
+    </div>
+  </div>
 </div>
 
 <script>
 (function(){
-  const g0 = 9.80665;          // m/s^2, standard gravity
-  const mDry = 500;            // kg, dry spacecraft mass (fixed per spec)
-  const wallDv = 700;          // m/s, chemical tank-capacity wall marker
+  const G0 = 9.80665;       // m/s^2, standard gravity
+  const M_DRY = 500;        // kg, dry spacecraft mass
+  const DV_MAX = 6000;      // m/s
+  const MASS_MAX = 800;     // kg, plot ceiling
+  const WALL_DV = 700;      // m/s, chemical tank-capacity wall
 
-  const dvMax = 6000;          // m/s, x-axis max
-  const propMax = 800;         // kg, y-axis max
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const padL = 62, padR = 16, padT = 18, padB = 44;
 
-  let isp = 300;
-  let dv = 0;
+  const css = getComputedStyle(document.documentElement);
+  const col = n => css.getPropertyValue(n).trim();
 
-  const canvas = document.getElementById('plot');
-  const ctx = canvas.getContext('2d');
-  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const reduceMotion = window.matchMedia &amp;&amp;
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const dvSlider = document.getElementById('dv');
   const dvLabel = document.getElementById('dvLabel');
   const rDv = document.getElementById('rDv');
   const rIsp = document.getElementById('rIsp');
   const rProp = document.getElementById('rProp');
-  const ispBtns = document.querySelectorAll('.isp-btn');
+  const rWet = document.getElementById('rWet');
+  const ispButtons = Array.from(document.querySelectorAll('.isp-btns button'));
 
-  function propMass(dvVal, ispVal){
-    return mDry * (Math.exp(dvVal/(ispVal*g0)) - 1);
+  const state = { targetDv: 0, animDv: 0, isp: 300 };
+
+  function propMass(dv, isp){
+    return M_DRY * (Math.exp(dv / (isp * G0)) - 1);
   }
 
-  // plot geometry
-  const W = canvas.width, H = canvas.height;
-  const padL = 66, padR = 18, padT = 22, padB = 46;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
+  function xOf(dv){ return padL + (dv / DV_MAX) * (W - padL - padR); }
+  function yOf(m){ return (H - padB) - (m / MASS_MAX) * (H - padT - padB); }
 
-  function xToPx(x){ return padL + (x/dvMax)*plotW; }
-  function yToPx(y){
-    const yc = Math.min(y, propMax);
-    return padT + plotH - (yc/propMax)*plotH;
+  function computeCurve(isp){
+    const pts = [];
+    for (let dv = 0; dv <= DV_MAX; dv += 15){
+      const m = propMass(dv, isp);
+      if (m > MASS_MAX) break;
+      pts.push({ x: xOf(dv), y: yOf(m), dv, m });
+    }
+    return pts;
+  }
+
+  function strokeCurve(pts, color, width){
+    if (!pts.length) return;
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    pts.forEach((p,i)=>{
+      if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+    });
+    ctx.stroke();
   }
 
   function draw(){
-    const bg = cssVar('--panel'), fg = cssVar('--fg'), grid = cssVar('--grid');
-    const curveCol = cssVar('--curve'), markerCol = cssVar('--marker'), wallCol = cssVar('--wall');
-    const muted = cssVar('--muted');
-
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0,0,W,H);
 
     // grid + axes
-    ctx.strokeStyle = grid;
+    ctx.strokeStyle = col('--grid');
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px -apple-system,Segoe UI,sans-serif';
     ctx.lineWidth = 1;
-    ctx.font = '11px sans-serif';
-    ctx.fillStyle = muted;
-
-    for(let g=0; g<=6; g++){
-      const gx = padL + (g/6)*plotW;
-      ctx.beginPath(); ctx.moveTo(gx, padT); ctx.lineTo(gx, padT+plotH); ctx.stroke();
-      ctx.fillText(Math.round(g*dvMax/6), gx-10, padT+plotH+16);
+    for (let dv=0; dv<=DV_MAX; dv+=1000){
+      const x = xOf(dv);
+      ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke();
+      ctx.textAlign='center';
+      ctx.fillText(dv, x, H-padB+16);
     }
-    for(let g=0; g<=4; g++){
-      const gy = padT + plotH - (g/4)*plotH;
-      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL+plotW, gy); ctx.stroke();
-      ctx.fillText(Math.round(g*propMax/4), 6, gy+4);
+    for (let m=0; m<=MASS_MAX; m+=200){
+      const y = yOf(m);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.textAlign='right';
+      ctx.fillText(m, padL-8, y+4);
     }
-
-    // axis labels
-    ctx.fillStyle = fg;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('mission-required \u0394v \u2014 total velocity change planned (m/s)', padL, H-6);
+    ctx.fillStyle = col('--fg');
+    ctx.textAlign='center';
+    ctx.fillText('mission-required \u0394v \u2014 total velocity change planned (m/s)', (padL+W-padR)/2, H-8);
     ctx.save();
-    ctx.translate(14, padT+plotH/2+70);
+    ctx.translate(14, (padT+H-padB)/2);
     ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';
     ctx.fillText('propellant mass required (kg)', 0, 0);
     ctx.restore();
 
-    // curve
-    ctx.strokeStyle = curveCol;
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    let started = false;
-    for(let x=0; x<=dvMax; x+=10){
-      const y = propMass(x, isp);
-      const px = xToPx(x), py = yToPx(y);
-      if(!started){ ctx.moveTo(px,py); started = true; } else { ctx.lineTo(px,py); }
-      if(y > propMax*1.02) break;
-    }
-    ctx.stroke();
-
-    // curve label
-    ctx.fillStyle = curveCol;
-    ctx.font = '11px sans-serif';
-    ctx.fillText('I\u209b\u209a = ' + isp + ' s curve', padL+plotW-140, padT+14);
-
-    // tank-capacity wall (fixed at 700 m/s, only meaningful marker for Isp=300 narrative but always shown)
-    const wx = xToPx(wallDv);
+    // wall reference line
+    const wx = xOf(WALL_DV);
     ctx.save();
-    ctx.strokeStyle = wallCol;
+    ctx.strokeStyle = col('--wall');
     ctx.setLineDash([5,4]);
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(wx, padT);
-    ctx.lineTo(wx, padT+plotH);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = wallCol;
-    ctx.font = '10.5px sans-serif';
-    ctx.save();
-    ctx.translate(wx+4, padT+16);
-    ctx.fillText('chemical tank-capacity wall', 0, 0);
-    ctx.fillText('(tanks physically full, ~700 m/s)', 0, 12);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(wx,padT); ctx.lineTo(wx,H-padB); ctx.stroke();
     ctx.restore();
-    ctx.restore();
+    ctx.fillStyle = col('--wall');
+    ctx.font = '10.5px -apple-system,Segoe UI,sans-serif';
+    ctx.textAlign='left';
+    ctx.fillText('chemical tank-capacity wall \u2014', wx+4, padT+12);
+    ctx.fillText('tanks physically full (~700 m/s)', wx+4, padT+24);
 
-    // cursor point on active curve
-    const curY = propMass(dv, isp);
-    const cx = xToPx(dv), cy = yToPx(curY);
-    ctx.strokeStyle = markerCol;
-    ctx.setLineDash([3,3]);
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(cx, padT+plotH); ctx.lineTo(cx, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(padL, cy); ctx.lineTo(cx, cy); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = markerCol;
-    ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI*2); ctx.fill();
+    // curves: dim ones first, selected on top
+    const specs = [
+      {isp:220, label:'220 s (typical chemical)'},
+      {isp:300, label:'300 s (best chemical)'},
+      {isp:1500, label:'1500 s (electric)'}
+    ];
+
+    const curveData = specs.map(s=>({
+      s,
+      pts: computeCurve(s.isp),
+      color: s.isp === state.isp ? col('--accent') : col('--curve-dim'),
+      width: s.isp === state.isp ? 2.6 : 1.4
+    }));
+
+    // draw dim curves first, then selected one on top
+    curveData.forEach(c=>{ if (c.s.isp !== state.isp) strokeCurve(c.pts, c.color, c.width); });
+    const selC = curveData.find(c=>c.s.isp===state.isp);
+    strokeCurve(selC.pts, selC.color, selC.width);
+
+    // labels: compute anchor points then resolve vertical overlap
+    const labelInfo = curveData
+      .filter(c=>c.pts.length)
+      .map(c=>{
+        const lastPt = c.pts[c.pts.length - 1];
+        const lx = Math.min(lastPt.x + 4, W - padR - 4);
+        const align = (lastPt.x + 4 > W - padR - 60) ? 'end' : 'start';
+        return { lx, ly: Math.max(lastPt.y, padT + 10), align, color: c.color, text: c.s.label };
+      });
+    labelInfo.sort((a,b)=>a.ly - b.ly);
+    const MIN_GAP = 13;
+    for (let i=1;i<labelInfo.length;i++){
+      if (labelInfo[i].ly - labelInfo[i-1].ly < MIN_GAP){
+        labelInfo[i].ly = labelInfo[i-1].ly + MIN_GAP;
+      }
+    }
+    ctx.font = '11px -apple-system,Segoe UI,sans-serif';
+    labelInfo.forEach(l=>{
+      ctx.fillStyle = l.color;
+      ctx.textAlign = l.align;
+      ctx.fillText(l.text, l.lx, l.ly);
+    });
+
+    // cursor
+    const m = propMass(state.animDv, state.isp);
+    const cx = xOf(state.animDv);
+    const cy = yOf(Math.min(m, MASS_MAX));
+    ctx.beginPath();
+    ctx.fillStyle = col('--cursor');
+    ctx.arc(cx, cy, 4.5, 0, Math.PI*2);
+    ctx.fill();
   }
 
   function updateReadouts(){
-    dvLabel.textContent = Math.round(dv);
-    rDv.textContent = Math.round(dv);
+    const dv = Math.round(state.targetDv);
+    const isp = state.isp;
+    const m = propMass(dv, isp);
+    dvLabel.textContent = dv;
+    rDv.textContent = dv;
     rIsp.textContent = isp;
-    const p = propMass(dv, isp);
-    rProp.textContent = p.toFixed(1);
+    rProp.textContent = Math.round(m);
+    rWet.textContent = Math.round(M_DRY + m);
   }
 
-  function render(){
-    updateReadouts();
+  function tick(){
+    const diff = state.targetDv - state.animDv;
+    if (reduceMotion || Math.abs(diff) < 0.5){
+      state.animDv = state.targetDv;
+    } else {
+      state.animDv += diff * 0.22;
+    }
     draw();
+    requestAnimationFrame(tick);
   }
 
-  dvSlider.addEventListener('input', (e)=>{
-    dv = parseFloat(e.target.value);
-    render();
+  dvSlider.addEventListener('input', ()=>{
+    state.targetDv = Number(dvSlider.value);
+    updateReadouts();
+    if (reduceMotion) state.animDv = state.targetDv;
   });
 
-  ispBtns.forEach(btn=>{
+  ispButtons.forEach(btn=>{
+    const val = Number(btn.dataset.isp);
+    if (val === state.isp) btn.classList.add('active');
     btn.addEventListener('click', ()=>{
-      ispBtns.forEach(b=>b.classList.remove('active'));
+      state.isp = val;
+      ispButtons.forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      isp = parseFloat(btn.dataset.isp);
-      render();
+      updateReadouts();
     });
   });
 
-  // prefers-reduced-motion: no autoplay exists in this scene by design;
-  // interaction is purely user-driven via the slider/buttons above.
-  render();
+  updateReadouts();
+  draw();
+  requestAnimationFrame(tick);
+
   window.__sceneReady = true;
 
   const __ro = new ResizeObserver(() => {
@@ -2052,6 +1985,7 @@ math{
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Propellant needs grow exponentially with delta-v"
   ></iframe>
 </section>
@@ -2104,7 +2038,7 @@ math{
   math{font-size:16px;}
   .legend{font-size:12px; color:var(--muted); margin:4px 0 10px 0; line-height:1.4;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;panel&quot;>
   <math display=&quot;block&quot;>
@@ -2330,6 +2264,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Thrust decides how long a maneuver takes"
   ></iframe>
 </section>
@@ -2378,7 +2313,7 @@ __ro.observe(document.documentElement);
   .legend{color:var(--muted);font-size:11.5px;margin:2px 0 12px;line-height:1.4;}
   math{font-size:15px;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;wrap&quot;>
   <h2>Thrust vs. specific impulse: two propulsion families, two corners</h2>
@@ -2579,17 +2514,18 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="For 50 years: strong thrust or high efficiency, never both"
   ></iframe>
 </section>
 
 <header class="part">
-  <h2>The solar-thermal rocket</h2>
-  <p class="part-lede">Now the paper's idea: focus sunlight with a mirror to heat a light gas. That one move breaks the strong-or-efficient tradeoff — and the next scenes price it against chemical and electric engines on cost, speed, and readiness.</p>
+  <h2>The new technology: solar-thermal propulsion</h2>
+  <p class="part-lede">Now the paper's machine. Focus sunlight with a mirror, heat a light gas, and both halves of the old tradeoff give way at once.</p>
 </header>
 <section class="scene" id="sunlight-isp">
   <h3>Sunlight heating a light gas beats combustion on efficiency</h3>
-  <p class="caption">Here is where our two knobs come back. In a thermal rocket the exhaust speed is fixed by heat alone, <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi><mo>/</mo><mi>M</mi></mrow></msqrt></math> — and combustion, you notice, turns both knobs at once and tangles them: it makes the gas hot, but it insists on heavy product molecules. Suppose instead we heat the gas with concentrated sunlight. Then we may choose whatever molecule we please and run the temperature to the limit of the materials: ammonia, <math><mi>M</mi><mo>=</mo><mn>17</mn></math>, at 3,000 K gives <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> around 350–450 s — above anything combustion can reach — and hydrogen, <math><mi>M</mi><mo>=</mo><mn>2</mn></math>, gives about 800 s. There is no flame anywhere; the mirror is the whole energy supply.</p>
+  <p class="caption">Here is where our two knobs come back. In a thermal rocket the exhaust speed is fixed by heat alone, <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi><mo>/</mo><mi>M</mi></mrow></msqrt></math> — and combustion, you notice, turns both knobs at once and tangles them: it makes the gas hot, but it insists on heavy product molecules. Suppose instead we heat the gas with concentrated sunlight. Then we may choose whatever molecule we please and run the temperature to the limit of the materials: ammonia, <math><mi>M</mi><mo>=</mo><mn>17</mn></math>, at 3,000 K gives <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math> around 350–450 s — above anything a storable chemical rocket can reach — and hydrogen, <math><mi>M</mi><mo>=</mo><mn>2</mn></math>, gives about 800 s. There is no flame anywhere; the mirror is the whole energy supply.</p>
   <iframe
     class="scene-frame"
     data-scene-id="sunlight-isp"
@@ -2641,7 +2577,7 @@ math{font-size:15px;}
 text{fill:var(--text);font-size:11px;}
 .sunFill{fill:var(--accent);}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;wrap&quot;>
 <h2>Thermal-rocket exhaust velocity: heat vs. molecular mass</h2>
@@ -2811,6 +2747,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Sunlight heating a light gas beats combustion on efficiency"
   ></iframe>
 </section>
@@ -2873,7 +2810,7 @@ __ro.observe(document.documentElement);
   .barlabel{font-size:12px;fill:var(--fg);}
   .ticklabel{font-size:10.5px;fill:var(--muted);}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;wrap&quot;>
   <h2>Thrust: solar-thermal vs. Hall vs. chemical (log scale)</h2>
@@ -3004,10 +2941,15 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="And the mirror delivers chemical-class thrust"
   ></iframe>
 </section>
 
+<header class="part">
+  <h2>Why it beats existing rockets</h2>
+  <p class="part-lede">A new engine only matters if it wins against what already flies. Here it is priced head-to-head against chemical and electric propulsion on cost, speed, and readiness.</p>
+</header>
 <section class="scene" id="free-energy-cost">
   <h3>What a maneuver costs with each engine type</h3>
   <p class="caption">Now let us follow the money, because the physics writes the bills. The chemical stage hauls its energy up from Earth as propellant and is used up within a few burns, so its hardware cost falls on a handful of maneuvers. The ion thruster's energy is free sunlight — but it insists on xenon at $2,500 a kilogram, and its grids erode away with use, so the engine itself is a slow consumable. The solar-thermal rocket takes free sunlight, pushes ammonia at a dollar a kilogram, and its one-piece heat exchanger restarts hundreds of times. Same conservation laws; utterly different economics.</p>
@@ -3058,7 +3000,7 @@ __ro.observe(document.documentElement);
   .legend{color:var(--muted);font-size:11px;margin:2px 0 10px;line-height:1.4;}
   math{font-size:15px;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot; id=&quot;scene&quot;>
   <h1>Cost of a 100 m/s maneuver, 500 kg / $10M spacecraft</h1>
@@ -3285,6 +3227,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="What a maneuver costs with each engine type"
   ></iframe>
 </section>
@@ -3357,7 +3300,7 @@ __ro.observe(document.documentElement);
     canvas{height:240px;}
   }
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot;>
   <h3>Cost per maneuver vs. delta-v</h3>
@@ -3585,6 +3528,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Solar thermal is the cheapest at nearly every delta-v"
   ></iframe>
 </section>
@@ -3634,7 +3578,7 @@ __ro.observe(document.documentElement);
   .elecc{border-left-color:var(--electric);}
   .ratioc{border-left-color:var(--accent);}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;wrap&quot;>
   <h2>Maneuver time vs. &amp;Delta;v: &amp;Delta;t &amp;asymp; m&amp;middot;&amp;Delta;v / F</h2>
@@ -3837,226 +3781,216 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Solar thermal is also the fastest: 9 hours vs 527 days"
   ></iframe>
 </section>
 
 <section class="scene" id="storability">
   <h3>Ammonia can wait in orbit; cryogenic fuels cannot</h3>
-  <p class="caption">You might ask: why not simply fly a big cryogenic stage — methane and oxygen — and have strong thrust with better <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math>? Thermodynamics forbids it, in a sneaky way. Cryogens must be kept tens of degrees colder than anything sitting in sunlight can stay, so without refrigeration they boil away in days — the vehicle cannot wait in orbit fueled and ready. Ammonia sits happily at ordinary spacecraft temperatures for years. So the solar-thermal vehicle loiters for months and fires within minutes of the command — and being quick is worth nothing unless you are also ready.</p>
+  <p class="caption">You might ask: why not simply fly a big cryogenic stage — methane and oxygen — and have strong thrust with better <math><msub><mi>I</mi><mrow><mi>sp</mi></mrow></msub></math>? Thermodynamics forbids it, in a sneaky way. Cryogens must be kept tens of degrees colder than anything sitting in sunlight can stay, so without refrigeration they boil away within hours — the tank empties before a waiting spacecraft ever gets to use it. That is why only launch rockets use cryogenics: their whole job is over in the first few hours. Ammonia sits happily at ordinary spacecraft temperatures for years. So the solar-thermal vehicle loiters for months and fires within minutes of the command — and being quick is worth nothing unless you are also ready.</p>
   <iframe
     class="scene-frame"
     data-scene-id="storability"
     srcdoc="<!doctype html>
-<html>
+<html lang=&quot;en&quot;>
 <head>
 <meta charset=&quot;utf-8&quot;>
-<title>Storability Constraint</title>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Storability: ammonia vs. cryogenic propellant</title>
 <style>
 :root{
-  --bg:#f4f6f8; --panel:#ffffff; --text:#1a2230; --muted:#5a6472;
-  --cryo:#3d7fd6; --cryo-liq:#a9cdf5; --ammonia:#2e9e6a; --ammonia-liq:#a8ecc9;
-  --tank:#8a97a8; --accent:#d1495b; --earth:#3b6ea5;
+  --bg:#eef2f6; --fg:#1b2530; --muted:#5b6b7a;
+  --panel:#ffffff; --border:#c7d1db;
+  --cryo:#3a8fd6; --cryo-dark:#1f5f96;
+  --amm:#3aa66f; --amm-dark:#1f6f47;
+  --earth:#2f6d4e; --sky:#0a1830;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#12161c; --panel:#1a2029; --text:#e7ecf2; --muted:#93a0b0;
-    --cryo:#6fa8e8; --cryo-liq:#274a72; --ammonia:#57cf95; --ammonia-liq:#1c4d34;
-    --tank:#6b7788; --accent:#f0788a; --earth:#5e93c9;
+    --bg:#0f1620; --fg:#e6edf3; --muted:#9fb0bf;
+    --panel:#16202b; --border:#2b3a48;
+    --cryo:#5aa6e6; --cryo-dark:#2c6faf;
+    --amm:#57c48c; --amm-dark:#2f8a5c;
+    --earth:#245a3d; --sky:#040a14;
   }
 }
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);
   font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
-.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
-canvas{width:100%;max-width:680px;height:auto;display:block;background:var(--bg);
-  border-radius:8px;}
-.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;}
-.controls label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1;min-width:200px;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  font-size:13px;margin-bottom:8px;}
+.controls label{flex:1 1 260px;}
 input[type=range]{width:100%;}
-button{padding:6px 12px;border-radius:6px;border:1px solid var(--tank);
-  background:var(--panel);color:var(--text);cursor:pointer;font-size:13px;}
-.readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
-.card{background:var(--panel);border-radius:8px;padding:8px 10px;flex:1;min-width:140px;
-  border:1px solid var(--tank);font-size:13px;}
-.card .lab{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.02em;}
-.card .val{font-size:16px;font-weight:600;margin-top:2px;}
+button{background:var(--panel);border:1px solid var(--border);color:var(--fg);
+  border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;}
+canvas{width:100%;max-width:100%;height:auto;display:block;
+  background:var(--sky);border-radius:8px;border:1px solid var(--border);}
+.readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:13px;}
+.readouts div{flex:1 1 150px;background:var(--panel);border:1px solid var(--border);
+  border-radius:6px;padding:6px 8px;}
+.readouts span{font-weight:600;}
 math{font-size:15px;}
-.legend{font-size:11.5px;color:var(--muted);margin:2px 0 10px;line-height:1.4;}
+.legend{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
-<div class=&quot;wrap&quot;>
-<canvas id=&quot;cv&quot; width=&quot;680&quot; height=&quot;330&quot;></canvas>
+<div class=&quot;scene&quot; id=&quot;scene&quot;>
+  <div class=&quot;controls&quot;>
+    <label id=&quot;tLabel&quot;>Days of fueled loiter on orbit, t = <span id=&quot;tVal&quot;>0</span> d
+      <input type=&quot;range&quot; id=&quot;tSlider&quot; min=&quot;0&quot; max=&quot;180&quot; step=&quot;1&quot; value=&quot;0&quot;>
+    </label>
+    <button id=&quot;playBtn&quot;>Pause boil-off animation</button>
+  </div>
 
-<div class=&quot;controls&quot;>
-  <label>Days of fueled loiter on orbit, t (days)
-    <input id=&quot;tSlider&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;180&quot; step=&quot;1&quot; value=&quot;0&quot;>
-  </label>
-  <button id=&quot;playBtn&quot;>Play</button>
-</div>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;330&quot;></canvas>
 
-<div class=&quot;readouts&quot;>
-  <div class=&quot;card&quot;><div class=&quot;lab&quot;>Methalox fill</div><div class=&quot;val&quot; id=&quot;mFill&quot;>100%</div></div>
-  <div class=&quot;card&quot;><div class=&quot;lab&quot;>Ammonia fill</div><div class=&quot;val&quot; id=&quot;aFill&quot;>100%</div></div>
-  <div class=&quot;card&quot;><div class=&quot;lab&quot;>Methalox response</div><div class=&quot;val&quot; id=&quot;mResp&quot;>~30 min</div></div>
-  <div class=&quot;card&quot;><div class=&quot;lab&quot;>Ammonia response</div><div class=&quot;val&quot; id=&quot;aResp&quot;>~5 min</div></div>
-</div>
+  <div class=&quot;readouts&quot;>
+    <div>Methalox fill: <span id=&quot;mFill&quot;>100%</span></div>
+    <div>Ammonia fill: <span id=&quot;aFill&quot;>100%</span></div>
+    <div>Methalox response if commanded now: <span id=&quot;mResp&quot;>minutes</span></div>
+    <div>Ammonia response if commanded now: <span id=&quot;aResp&quot;>minutes</span></div>
+  </div>
 
-<math display=&quot;block&quot;>
-  <mi>f</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo>
-  <msup><mi>e</mi><mrow><mo>-</mo><mi>k</mi><mi>t</mi></mrow></msup>
-  <mo>,</mo><mspace width=&quot;0.4em&quot;/>
-  <mi>k</mi><mo>=</mo><mfrac><mrow><mi>ln</mi><mn>2</mn></mrow><msub><mi>t</mi><mtext>half</mtext></msub></mfrac>
-</math>
-<div class=&quot;legend&quot;>
-  f(t) — fraction of cryogenic propellant remaining (dimensionless) · t — days of fueled loiter on orbit (days) ·
-  k — boil-off rate constant (day<sup>-1</sup>) · t<sub>half</sub> — propellant boil-off half-life (days), set by unshielded tank temperature margin against ~90–110 K required for liquid methane/oxygen
+  <math display=&quot;block&quot;>
+    <mi>f</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo>
+    <msup><mi>e</mi><mrow><mo>-</mo><mi>t</mi><mo>/</mo><mi>τ</mi></mrow></msup>
+  </math>
+  <div class=&quot;legend&quot;>
+    f(t) — fraction of cryogenic propellant remaining after t days of loiter ·
+    t — days since fueling (slider above) ·
+    τ — boil-off time constant (days), set by radiative heat leak Q = εσA(T<sub>env</sub>⁴−T<sub>cryo</sub>⁴)
+    into the tank and the propellant's latent heat of vaporization.
+  </div>
 </div>
 
 <script>
-const K_LN2 = Math.log(2);
-const T_HALF = 5;            // days: boil-off half-life for an unshielded cryo tank in sunlight
-const K_BOILOFF = K_LN2 / T_HALF; // day^-1
-const EMPTY_THRESH = 0.01;   // fill fraction considered &quot;depleted&quot;
-const REFUEL_LATENCY_H = 24; // hours, minimum launch+fuel latency
-const CRYO_T_LOW = 90, CRYO_T_HIGH = 110; // K, required cryo range
-const NH3_T = 280; // K, ambient storable temperature
+// ---- physical constants (auditable) ----
+const SIGMA = 5.67e-8;   // Stefan-Boltzmann constant, W/(m^2 K^4)
+const EPS   = 0.4;       // effective emissivity of an unrefrigerated tank's insulation
+                          // (MLI seams/supports degrade far below its ideal ~0.01-0.03)
+const AREA  = 4;         // m^2, radiating surface area of a maneuvering-stage tank
+const T_ENV = 280;       // K, sunlit spacecraft structure temperature
+const T_CRYO= 100;       // K, required methalox storage temperature (~90-111 K)
+const L_V   = 5.1e5;     // J/kg, latent heat of vaporization (methane-dominated)
+const M0    = 10;        // kg, boil-off-limited propellant reserve in the tank
 
-const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
+const Q = EPS*SIGMA*AREA*(Math.pow(T_ENV,4)-Math.pow(T_CRYO,4)); // W, heat leak
+const MDOT = Q/L_V;          // kg/s, boil-off rate
+const TAU_DAYS = (M0/MDOT)/86400; // days, exponential time constant
+
+function fracMethalox(tDays){ return Math.exp(-tDays/TAU_DAYS); }
+function fracAmmonia(){ return 1.0; } // sealed liquid under its own vapor pressure at
+                                      // ambient T -> no boil-off pathway to space
+
+const cvs = document.getElementById('cv');
+const ctx = cvs.getContext('2d');
+const css = getComputedStyle(document.documentElement);
+const col = n => css.getPropertyValue(n).trim();
+
 const slider = document.getElementById('tSlider');
+const tVal = document.getElementById('tVal');
 const playBtn = document.getElementById('playBtn');
-const mFillEl = document.getElementById('mFill');
-const aFillEl = document.getElementById('aFill');
-const mRespEl = document.getElementById('mResp');
-const aRespEl = document.getElementById('aResp');
+const mFill = document.getElementById('mFill');
+const aFill = document.getElementById('aFill');
+const mResp = document.getElementById('mResp');
+const aResp = document.getElementById('aResp');
 
-function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = !reduced;
+playBtn.textContent = playing ? 'Pause boil-off animation' : 'Play boil-off animation';
 
-const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let playing = !reduceMotion;
-let phase = 0; // decorative bubble phase, radians-ish
-playBtn.textContent = playing ? 'Pause' : 'Play';
-
-function methaloxFraction(t){
-  return Math.exp(-K_BOILOFF * t);
+let bubbles = [];
+function spawnBubbles(n){
+  for(let i=0;i<n;i++){
+    bubbles.push({x:Math.random(),y:1+Math.random()*0.2,v:0.15+Math.random()*0.15,r:1.5+Math.random()*2});
+  }
 }
+spawnBubbles(14);
 
-function drawTank(x, y, w, h, fillFrac, liqColor, label, tempLabel, phaseOffset){
-  ctx.save();
-  ctx.strokeStyle = cssVar('--tank');
+function drawTank(x,y,w,h,frac,liquidColor,liquidDark,label1,label2,isCryo,boiling){
+  // outline
+  ctx.strokeStyle = col('--border');
   ctx.lineWidth = 2;
-  ctx.fillStyle = cssVar('--panel');
-  // tank body
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 10);
-  ctx.fill();
-  ctx.stroke();
+  ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  ctx.fillRect(x,y,w,h);
   // liquid
-  const liqH = Math.max(0, fillFrac) * (h - 8);
-  if (liqH > 0.5){
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(x+4, y+h-4-liqH, w-8, liqH, 6);
-    ctx.clip();
-    ctx.fillStyle = liqColor;
-    ctx.fillRect(x+4, y+h-4-liqH, w-8, liqH);
-    // boil-off bubbles
-    if (fillFrac > EMPTY_THRESH){
-      ctx.fillStyle = cssVar('--bg');
-      for(let i=0;i<5;i++){
-        const bx = x + 12 + (i*(w-24)/4);
-        const by = (y+h-4) - (((phase*18 + i*23 + phaseOffset) % (liqH+20)));
-        const r = 2.2 + (i%2);
-        if (by > y+h-4-liqH){
-          ctx.beginPath(); ctx.arc(bx, by, r, 0, 6.283); ctx.fill();
-        }
+  const lh = Math.max(0, Math.min(1,frac))*h;
+  const grad = ctx.createLinearGradient(0,y+h-lh,0,y+h);
+  grad.addColorStop(0, liquidColor);
+  grad.addColorStop(1, liquidDark);
+  ctx.fillStyle = grad;
+  ctx.fillRect(x+2, y+h-lh, w-4, lh);
+  // bubbles for boiling cryo tank
+  if(isCryo &amp;&amp; boiling &amp;&amp; lh>2){
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    for(const b of bubbles){
+      const by = y + h - (b.y*lh);
+      if(b.y<=1 &amp;&amp; by>y+h-lh){
+        ctx.beginPath();
+        ctx.arc(x+8+b.x*(w-16), by, b.r, 0, Math.PI*2);
+        ctx.fill();
       }
     }
-    ctx.restore();
   }
-  ctx.fillStyle = cssVar('--text');
+  // labels
+  ctx.fillStyle = col('--fg');
   ctx.font = '13px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(label, x+w/2, y-10);
+  ctx.fillText(label1, x+w/2, y-22);
+  ctx.fillStyle = col('--muted');
   ctx.font = '11px sans-serif';
-  ctx.fillStyle = cssVar('--muted');
-  ctx.fillText(tempLabel, x+w/2, y+h+16);
-  ctx.restore();
+  ctx.fillText(label2, x+w/2, y-8);
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = col('--fg');
+  ctx.fillText(Math.round(frac*100)+'%', x+w/2, y+h+16);
 }
 
-function drawEarth(){
-  const w = cv.width, h = cv.height;
-  ctx.save();
-  ctx.fillStyle = cssVar('--earth');
-  ctx.globalAlpha = 0.25;
+function drawScene(tDays){
+  const w = cvs.width, h = cvs.height;
+  ctx.clearRect(0,0,w,h);
+  // sky
+  ctx.fillStyle = col('--sky');
+  ctx.fillRect(0,0,w,h);
+  // earth limb
+  ctx.fillStyle = col('--earth');
   ctx.beginPath();
-  ctx.arc(w/2, h+60, 170, 0, 6.283);
+  ctx.arc(w/2, h+140, 260, 0, Math.PI*2);
   ctx.fill();
-  ctx.restore();
-  // stars
-  ctx.fillStyle = cssVar('--muted');
-  ctx.globalAlpha = 0.4;
-  for(let i=0;i<40;i++){
-    const sx = (i*53.7)%680;
-    const sy = (i*97.3)%110 + 6;
-    ctx.fillRect(sx, sy, 1.4, 1.4);
-  }
-  ctx.globalAlpha = 1;
+
+  const fm = fracMethalox(tDays);
+  const fa = fracAmmonia();
+  const boiling = fm>0.001 &amp;&amp; fm<0.995;
+
+  drawTank(90,50,150,190, fm, col('--cryo'), col('--cryo-dark'),
+    'methalox (cryogenic)', 'requires ~90-111 K', true, boiling);
+  drawTank(400,50,150,190, fa, col('--amm'), col('--amm-dark'),
+    'ammonia (storable)', 'ambient ~280 K', false, false);
+
+  mFill.textContent = Math.round(fm*100)+'%';
+  aFill.textContent = Math.round(fa*100)+'%';
+  mResp.textContent = fm>0.05 ? '~15 min (chill-down + ignition)' : 'empty — ≥24 h (launch &amp; refuel)';
+  aResp.textContent = '~15 min (valve open + ignition)';
 }
 
-function render(){
-  const t = parseFloat(slider.value);
-  const mFrac = methaloxFraction(t);
-  const aFrac = 1.0;
-
-  ctx.clearRect(0,0,cv.width,cv.height);
-  drawEarth();
-
-  drawTank(120, 60, 140, 200, mFrac, cssVar('--cryo-liq'),
-    'Methalox (cryogenic)', `~${CRYO_T_LOW}\u2013${CRYO_T_HIGH} K required`, 0);
-  drawTank(420, 60, 140, 200, aFrac, cssVar('--ammonia-liq'),
-    'Ammonia (storable)', `~${NH3_T} K, ambient`, 40);
-
-  ctx.textAlign='center';
-  ctx.font='12px sans-serif';
-  ctx.fillStyle=cssVar('--muted');
-  ctx.fillText('t = ' + Math.round(t) + ' days on orbit', cv.width/2, 300);
-
-  mFillEl.textContent = Math.round(Math.max(0,mFrac)*100) + '%';
-  aFillEl.textContent = Math.round(aFrac*100) + '%';
-
-  if (mFrac > EMPTY_THRESH){
-    mRespEl.textContent = '~30 min';
-  } else {
-    mRespEl.textContent = '\u2265 ' + REFUEL_LATENCY_H + ' h (refuel)';
+function loop(){
+  if(playing){
+    for(const b of bubbles){ b.y -= b.v*0.01; if(b.y<0) b.y = 1+Math.random()*0.2; }
   }
-  aRespEl.textContent = '~5 min';
-}
-
-slider.addEventListener('input', render);
-
-playBtn.addEventListener('click', () => {
-  playing = !playing;
-  playBtn.textContent = playing ? 'Pause' : 'Play';
-  if (playing) requestAnimationFrame(loop);
-});
-
-let lastTs = null;
-function loop(ts){
-  if (!playing) return;
-  if (lastTs === null) lastTs = ts;
-  const dt = (ts - lastTs)/1000;
-  lastTs = ts;
-  phase += dt*2;
-  render();
+  drawScene(parseFloat(slider.value));
   requestAnimationFrame(loop);
 }
 
-render();
-if (playing) requestAnimationFrame(loop);
+slider.addEventListener('input', ()=>{ tVal.textContent = slider.value; });
+playBtn.addEventListener('click', ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? 'Pause boil-off animation' : 'Play boil-off animation';
+});
 
+drawScene(0);
+requestAnimationFrame(loop);
 window.__sceneReady = true;
 
 const __ro = new ResizeObserver(() => {
@@ -4064,17 +3998,17 @@ const __ro = new ResizeObserver(() => {
 });
 __ro.observe(document.documentElement);
 </script>
-</div>
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Ammonia can wait in orbit; cryogenic fuels cannot"
   ></iframe>
 </section>
 
 <header class="part">
-  <h2>Why now, and what's next</h2>
-  <p class="part-lede">The physics was proven decades ago; the parts only recently became buildable — just as orbit is about to get eighty times more crowded. And the same machine has a nuclear future.</p>
+  <h2>Why now</h2>
+  <p class="part-lede">The physics was proven decades ago. Three manufacturing advances made it buildable — just as orbit is about to get eighty times more crowded, with a nuclear version waiting behind it.</p>
 </header>
 <section class="scene" id="why-now">
   <h3>Blocked by manufacturing then, buildable now</h3>
@@ -4155,7 +4089,7 @@ __ro.observe(document.documentElement);
   math{font-size:15px;display:block;margin:14px 0 2px;}
   .legend{font-size:11px;color:var(--muted);line-height:1.5;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot; id=&quot;scene&quot;>
 
@@ -4303,6 +4237,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="Blocked by manufacturing then, buildable now"
   ></iframe>
 </section>
@@ -4382,7 +4317,7 @@ button{background:var(--accent);color:#08131f;border:none;border-radius:6px;padd
 .legend{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-top:6px}
 .sw{width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:3px;vertical-align:middle}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;wrap&quot;>
   <div class=&quot;panel&quot;>
@@ -4582,6 +4517,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="80× more satellites means far more than 80× more dodging"
   ></iframe>
 </section>
@@ -4645,7 +4581,7 @@ __ro.observe(document.documentElement);
   .note{font-size:12px;color:var(--green);min-height:16px;margin-top:6px;}
   .temp{font-size:12px;color:var(--muted);margin-top:4px;}
 </style>
-<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}</style></head>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
 <body>
 <div class=&quot;scene&quot;>
   <svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 260&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;Engine cross section diagram&quot;>
@@ -4853,6 +4789,7 @@ __ro.observe(document.documentElement);
 </body>
 </html>"
     loading="lazy"
+    scrolling="no"
     title="The same engine can later run on nuclear heat"
   ></iframe>
 </section>

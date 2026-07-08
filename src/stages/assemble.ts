@@ -19,13 +19,14 @@ function escapeSrcdoc(html: string): string {
   return html.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
-// Uniform math sizing across every scene, applied at assembly so cached scene
-// HTML never needs regenerating for a typography change.
-const MATH_SIZE_STYLE = `<style>math{font-size:1.25em}math[display="block"]{font-size:1.4em}</style>`;
+// Uniform embed styling across every scene, applied at assembly so cached scene
+// HTML never needs regenerating for presentation changes: math sizing, and no
+// internal scrolling (the iframe is sized to the scene's reported height).
+const EMBED_STYLE = `<style>math{font-size:1.25em}math[display="block"]{font-size:1.4em}html,body{overflow:hidden}</style>`;
 
-function injectMathSize(html: string): string {
+function injectEmbedStyle(html: string): string {
   const idx = html.search(/<\/head>/i);
-  return idx >= 0 ? html.slice(0, idx) + MATH_SIZE_STYLE + html.slice(idx) : html;
+  return idx >= 0 ? html.slice(0, idx) + EMBED_STYLE + html.slice(idx) : html;
 }
 
 export function runAssemble(
@@ -57,7 +58,7 @@ export function runAssemble(
 </header>
 `;
       }
-      const html = injectMathSize(readFileSync(paths.sceneHtml(ctx, scene.id), "utf8"));
+      const html = injectEmbedStyle(readFileSync(paths.sceneHtml(ctx, scene.id), "utf8"));
       return `${partHeading}<section class="scene" id="${escapeHtml(scene.id)}">
   <h3>${renderRichText(scene.title)}</h3>
   <p class="caption">${renderRichText(scene.caption)}</p>
@@ -66,6 +67,7 @@ export function runAssemble(
     data-scene-id="${escapeHtml(scene.id)}"
     srcdoc="${escapeSrcdoc(html)}"
     loading="lazy"
+    scrolling="no"
     title="${escapeHtml(stripMath(scene.title))}"
   ></iframe>
 </section>`;
