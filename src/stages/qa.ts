@@ -8,6 +8,7 @@ import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import { QaReportSchema, type StoryboardScene, type QaReport } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
+import { sceneContract } from "./scenes.js";
 
 const MAX_REPAIRS = 2;
 const READY_TIMEOUT_MS = 10_000;
@@ -189,7 +190,7 @@ export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardSc
   while (attempts <= MAX_REPAIRS) {
     const html = readFileSync(htmlPath, "utf8");
     const hash = stageHash({
-      artifacts: [html, JSON.stringify(scene)],
+      artifacts: [html, sceneContract(scene)],
       prompt: loadPromptRaw("review") + loadPromptRaw("repair"),
       model: MODELS.review,
     });
@@ -215,7 +216,7 @@ export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardSc
         const result: SceneResult = { id: scene.id, status: "pass", attempts: attempts + 1 };
         writeFileSync(reportPath, JSON.stringify(result, null, 2));
         const finalHash = stageHash({
-          artifacts: [readFileSync(htmlPath, "utf8"), JSON.stringify(scene)],
+          artifacts: [readFileSync(htmlPath, "utf8"), sceneContract(scene)],
           prompt: loadPromptRaw("review") + loadPromptRaw("repair"),
           model: MODELS.review,
         });

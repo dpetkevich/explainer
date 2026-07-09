@@ -19,7 +19,10 @@ import {
   type ConceptMap,
   type Storyboard,
 } from "./lib/schemas.js";
-import { sceneInputHash } from "./stages/scenes.js";
+import { sceneInputHash, sceneContract } from "./stages/scenes.js";
+import { stageHash, recordHash } from "./lib/cache.js";
+import { loadPromptRaw } from "./lib/prompts.js";
+import { MODELS } from "./lib/anthropic.js";
 import { runScenePipeline } from "./stages/pipeline.js";
 import { runAssemble } from "./stages/assemble.js";
 import { paths, type Ctx } from "./lib/context.js";
@@ -264,6 +267,42 @@ program
       await runScenePipeline(ctx, storyboard, true);
       runAssemble(ctx, conceptMapFromPaperMeta(ctx.outDir), storyboard, qaSummaryFromReports(ctx, storyboard));
       info("repo", "regen complete — review the diff, then commit scenes/, qa/, and explainer.html");
+    } catch (err) {
+      reportError(err);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("rehash")
+  .description(
+    "Maintainer-local: re-record scene + QA hashes for scenes whose committed graphics are intentionally kept " +
+      "(hash-formula migrations). Skips scenes without artifacts or with failing QA."
+  )
+  .argument("<dir>", "explanation repo directory")
+  .action((dir: string) => {
+    try {
+      const ctx = repoCtx(dir);
+      const storyboard = loadStoryboard(ctx);
+      let kept = 0;
+      for (const scene of storyboard.scenes) {
+        const htmlPath = paths.sceneHtml(ctx, scene.id);
+        const reportPath = paths.qaReport(ctx, scene.id);
+        if (!existsSync(htmlPath) || !existsSync(reportPath)) continue;
+        const report = JSON.parse(readFileSync(reportPath, "utf8")) as SceneResult;
+        if (report.status !== "pass") continue;
+        recordHash(paths.sceneHash(ctx, scene.id), sceneInputHash(ctx, scene));
+        recordHash(
+          paths.qaHash(ctx, scene.id),
+          stageHash({
+            artifacts: [readFileSync(htmlPath, "utf8"), sceneContract(scene)],
+            prompt: loadPromptRaw("review") + loadPromptRaw("repair"),
+            model: MODELS.review,
+          })
+        );
+        kept++;
+      }
+      info("repo", `rehash: ${kept} scenes re-recorded under the current hash formula`);
     } catch (err) {
       reportError(err);
       process.exitCode = 1;

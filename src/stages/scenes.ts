@@ -17,9 +17,26 @@ export async function pool<T>(items: T[], limit: number, fn: (item: T) => Promis
   await Promise.all(workers);
 }
 
+/**
+ * The scene "contract": only the fields that shape the generated HTML.
+ * Prose fields (title, teaches, caption, part, requires) render OUTSIDE the
+ * scene iframe at assembly time, so editing them must never invalidate the
+ * cached graphic — that is what makes community prose PRs free and instant.
+ */
+export function sceneContract(scene: StoryboardScene): string {
+  return JSON.stringify({
+    id: scene.id,
+    conceptId: scene.conceptId,
+    visualMetaphor: scene.visualMetaphor,
+    animatedVariable: scene.animatedVariable,
+    quantitativeAnchor: scene.quantitativeAnchor,
+    physicsChecks: scene.physicsChecks,
+  });
+}
+
 export function sceneInputHash(ctx: Ctx, scene: StoryboardScene): string {
   return stageHash({
-    artifacts: [JSON.stringify(scene), ctx.audienceRaw],
+    artifacts: [sceneContract(scene), ctx.audienceRaw],
     prompt: loadPromptRaw("scene"),
     model: MODELS.codegen,
   });

@@ -1,5 +1,5 @@
 // Hub configuration — the GitHub org that hosts explanation repos.
 window.HUB_CONFIG = {
-  org: "explainer",
+  org: "idea-explainer",
   topic: "explain-it",
 };
