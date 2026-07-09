@@ -38,7 +38,7 @@ export const SceneLockSchema = z.object({
 });
 export type SceneLock = z.infer<typeof SceneLockSchema>;
 
-export const LOCKFILE = "scenes.lock.json";
+export const LOCKFILE = ".github/scenes.lock.json";
 export const BUNDLE_ASSET = "scenes.tar.gz";
 
 /** Prompt/model-agnostic hash of a scene's graphic-shaping fields + audience. */

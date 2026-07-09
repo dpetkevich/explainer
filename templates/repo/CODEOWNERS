@@ -2,4 +2,4 @@
 /endorsements.json @__ORG__/maintainers
 # CI and merge policy are maintainer-owned.
 /.github/ @__ORG__/maintainers
-/CODEOWNERS @__ORG__/maintainers
+/.github/CODEOWNERS @__ORG__/maintainers

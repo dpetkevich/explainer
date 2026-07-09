@@ -24,7 +24,9 @@ is open to improvement by you.
 | `audience.json` | Who the explanation is written for |
 | `paper.json` | Paper metadata (title, authors, source) |
 | `endorsements.json` | Field-expert endorsements (maintainer-gated) |
-| `scenes.lock.json` | Pins the generated-graphics bundle (a sha256-verified release asset) |
+
 
 The interactive scene graphics are **not in the tree** — they live in a release asset
-bundle pinned by `scenes.lock.json`, and CI fetches, verifies, and assembles them.
+bundle pinned by `.github/scenes.lock.json`; CI fetches, verifies, and assembles them.
+Everything under `.github/` is infrastructure — the four files above are the whole
+editable surface.

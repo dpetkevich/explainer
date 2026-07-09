@@ -21,7 +21,7 @@ npx tsx src/repo-cli.ts regen <path-to-this-repo>   # from an explain-it checkou
 
 which regenerates the stale scenes with *their own* model API key (this repo's CI has
 no keys, on purpose), runs the vision QA, uploads a new sha256-pinned artifact bundle
-release, and pushes the updated `scenes.lock.json` to your PR.
+release, and pushes the updated `.github/scenes.lock.json` to your PR.
 
 ## Ground rules
 

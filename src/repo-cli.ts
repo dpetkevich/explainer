@@ -195,11 +195,13 @@ function instantiateTemplate(name: string, vars: Record<string, string>): string
 }
 
 function writeRepoScaffolding(out: string, vars: Record<string, string>): void {
+  // Root contains ONLY editor-edited files; all infrastructure lives in .github/
+  // (GitHub officially renders README/CONTRIBUTING/CODEOWNERS from there).
   mkdirSync(join(out, ".github", "workflows"), { recursive: true });
   writeFileSync(join(out, ".github", "workflows", "build.yml"), instantiateTemplate("build.yml", vars));
-  writeFileSync(join(out, "CODEOWNERS"), instantiateTemplate("CODEOWNERS", vars));
-  writeFileSync(join(out, "README.md"), instantiateTemplate("README.md.tmpl", vars));
-  writeFileSync(join(out, "CONTRIBUTING.md"), instantiateTemplate("CONTRIBUTING.md", vars));
+  writeFileSync(join(out, ".github", "CODEOWNERS"), instantiateTemplate("CODEOWNERS", vars));
+  writeFileSync(join(out, ".github", "README.md"), instantiateTemplate("README.md.tmpl", vars));
+  writeFileSync(join(out, ".github", "CONTRIBUTING.md"), instantiateTemplate("CONTRIBUTING.md", vars));
   writeFileSync(join(out, ".gitignore"), `${SCENES_WORKDIR}/\nexplainer.html\n${BUNDLE_ASSET}\n.DS_Store\n`);
 }
 
