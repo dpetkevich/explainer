@@ -20,9 +20,11 @@ is open to improvement by you.
 
 | File | What it is |
 |---|---|
-| `storyboard.json` | The source of truth: parts, captions, scene specifications |
-| `scenes/*.html` | The generated interactive scenes (committed artifacts) |
-| `qa/*.report.json` | Vision-review verdicts for each scene |
+| `storyboard.json` | **The thing you edit**: parts, captions, scene specifications |
+| `audience.json` | Who the explanation is written for |
+| `paper.json` | Paper metadata (title, authors, source) |
 | `endorsements.json` | Field-expert endorsements (maintainer-gated) |
-| `explainer.html` | The assembled explainer (rebuilt by CI) |
-| `script.md` | Human-readable script for review |
+| `scenes.lock.json` | Pins the generated-graphics bundle (a sha256-verified release asset) |
+
+The interactive scene graphics are **not in the tree** — they live in a release asset
+bundle pinned by `scenes.lock.json`, and CI fetches, verifies, and assembles them.

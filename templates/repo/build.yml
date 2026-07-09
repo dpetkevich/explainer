@@ -26,6 +26,8 @@ jobs:
         run: cd .tool && npm ci --ignore-scripts
       - name: Validate (schema + scene/spec sync)
         run: cd .tool && npx tsx src/repo-cli.ts validate "$GITHUB_WORKSPACE"
+      - name: Fetch artifact bundle (sha256-pinned release)
+        run: cd .tool && npx tsx src/repo-cli.ts fetch "$GITHUB_WORKSPACE"
       - name: Assemble
         run: cd .tool && npx tsx src/repo-cli.ts assemble "$GITHUB_WORKSPACE"
       - name: Upload PR preview
