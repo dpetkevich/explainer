@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { callModel, MODELS, stripJsonFences } from "../lib/anthropic.js";
 import { stageHash, isFresh, recordHash } from "../lib/cache.js";
 import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
-import { stripMath } from "../lib/mathml.js";
+import { storyboardToMarkdown } from "../lib/storyboard-md.js";
 import { StoryboardSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
@@ -100,38 +100,10 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   return { board, fromCache: false };
 }
 
-/** Human-readable "script" of the storyboard for review before any graphics are generated. */
-export function renderScript(ctx: Ctx, board: Storyboard): string {
-  const lines: string[] = [
-    `# ${board.title}`,
-    "",
-    `> ${stripMath(board.hook)}`,
-    "",
-    `_Reader: ${ctx.audience.background}_`,
-    "",
-  ];
-  const ledes = new Map((board.parts ?? []).map((p) => [p.title, p.lede]));
-  let currentPart: string | undefined;
-  board.scenes.forEach((scene, i) => {
-    if (scene.part !== undefined && scene.part !== currentPart) {
-      currentPart = scene.part;
-      lines.push(`# Part: ${stripMath(scene.part)}`, "");
-      const lede = ledes.get(scene.part);
-      if (lede) lines.push(`_${stripMath(lede)}_`, "");
-    }
-    const v = scene.animatedVariable;
-    lines.push(
-      `## Scene ${i + 1} — ${stripMath(scene.title)}`,
-      "",
-      `- **Teaches:** ${stripMath(scene.teaches)}`,
-      `- **Builds on:** ${scene.requires.length ? scene.requires.join(", ") : "nothing — foundational"}`,
-      `- **Caption:** ${stripMath(scene.caption)}`,
-      `- **Interactive:** ${v.control} for ${v.name} (${v.range}) — ${v.whatChangesOnScreen}`
-    );
-    if (scene.quantitativeAnchor) lines.push(`- **Quantitative anchor:** ${scene.quantitativeAnchor}`);
-    lines.push(`- **Physics checks:**`);
-    for (const check of scene.physicsChecks) lines.push(`  - ${check}`);
-    lines.push("");
-  });
-  return lines.join("\n");
+/**
+ * The gate's script view IS the canonical storyboard.md format — reviewing the
+ * script means reviewing the exact file contributors edit in published repos.
+ */
+export function renderScript(_ctx: Ctx, board: Storyboard): string {
+  return storyboardToMarkdown(board);
 }

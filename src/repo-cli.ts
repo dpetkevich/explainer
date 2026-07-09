@@ -3,8 +3,8 @@
  * repo-cli — the collaboration surface for published explanations.
  *
  * An explanation repo contains ONLY the files a contributor edits:
- *   storyboard.json, audience.json, paper.json, endorsements.json,
- *   scenes.lock.json, README/CONTRIBUTING/CODEOWNERS/workflow.
+ *   storyboard.md, audience.json, paper.json, endorsements.json,
+ *   (+ infrastructure under .github/, incl. the machine-written lockfile).
  * Generated scene HTML lives in a GitHub release asset bundle pinned by the
  * lockfile. CI runs `validate` → `fetch` → `assemble` with NO model keys;
  * regeneration is always a maintainer-local act (`regen`) with their own key.
@@ -39,6 +39,7 @@ import { runScenePipeline } from "./stages/pipeline.js";
 import { runAssemble } from "./stages/assemble.js";
 import { paths, type Ctx } from "./lib/context.js";
 import { StageError, reportError, info, warn } from "./lib/log.js";
+import { storyboardToMarkdown, parseStoryboardMarkdown, roundTripCheck } from "./lib/storyboard-md.js";
 import type { QaSummary, SceneResult } from "./stages/qa.js";
 import {
   LOCKFILE,
@@ -86,7 +87,7 @@ function repoCtx(dir: string): Ctx {
 }
 
 function loadRepoStoryboard(dir: string): Storyboard {
-  return StoryboardSchema.parse(JSON.parse(readFileSync(join(dir, "storyboard.json"), "utf8")));
+  return parseStoryboardMarkdown(readFileSync(join(dir, "storyboard.md"), "utf8"));
 }
 
 function loadPaperMeta(dir: string): PaperMeta {
@@ -230,7 +231,8 @@ program
 
       // Editable tree
       mkdirSync(out, { recursive: true });
-      writeFileSync(join(out, "storyboard.json"), JSON.stringify(storyboard, null, 2) + "\n");
+      roundTripCheck(storyboard);
+      writeFileSync(join(out, "storyboard.md"), storyboardToMarkdown(storyboard));
       writeFileSync(join(out, "audience.json"), JSON.stringify(audience, null, 2) + "\n");
       const paperMeta = PaperMetaSchema.parse({
         title: conceptMap.paper.title,
