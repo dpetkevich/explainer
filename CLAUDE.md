@@ -44,6 +44,19 @@ In `prompts/review.md`: review on behalf of the injected audience profile, not t
 - Planning models think: `max_tokens` must budget for extended thinking (ingest 16k, storyboard/codegen/repair 64k). Long-context calls occasionally return truncated/empty JSON — stages retry ×3.
 - Assemble is deterministic and instant; `explainer.html` is a single self-contained file. Deploy: copy to `deploy/<slug>/index.html`, `vercel deploy --prod --yes` from that dir.
 
+## Collaboration layer (repo-cli)
+
+Published explanations live in per-explanation GitHub repos under the **`explainer` org**
+(topic `explain-it`), with native stars, fork→PR contribution, `maintainers`-team merge
+rights, and CODEOWNERS-gated `endorsements.json` (rendered as an "Endorsed by" strip by
+assemble). `src/repo-cli.ts`: `export` (pipeline workdir → publishable repo layout),
+`validate` (schema + sceneInputHash sync; CI gate — failure means "regeneration needed"),
+`assemble` (rebuild explainer.html, model-free), `regen` (maintainer-local, uses the local
+API key, incremental via hashes). **Hard rule: no model API keys in any explanation repo's
+CI** — regeneration is always maintainer-local. The hub homepage (`site/`, Vercel project
+`explain-it-hub`) ranks explanations by GitHub stars. Repo templates: `templates/repo/`
+(`__ORG__`/`__SLUG__`-style placeholders — NOT `{{ }}`, which collides with GitHub Actions).
+
 ## Testing
 
 No test suite yet. Verification = `npx tsc --noEmit`, then a pipeline run: all scenes pass QA and a rerun is a full cache no-op.

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>explain-it — interactive paper explainers</title>
+<meta name="description" content="Interactive explainers for math and physics papers. Star the good ones, branch and improve them, endorsed by people in the field.">
+<script src="config.js"></script>
+<style>
+  :root {
+    --bg: #fdfdfb; --fg: #1a1a1a; --muted: #555; --rule: #e2e2dc; --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181c; --fg: #e8e8e4; --muted: #a0a0a0; --rule: #33363c; --accent: #7aa6ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6; }
+  main { max-width: 880px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  h1 { font-size: 2rem; letter-spacing: -0.01em; margin: 0 0 0.5rem; }
+  .tagline { color: var(--muted); margin: 0 0 2.5rem; font-size: 1.05rem; }
+  .card { border: 1px solid var(--rule); border-radius: 10px; padding: 1.25rem 1.4rem; margin: 0 0 1.25rem; }
+  .card h2 { margin: 0 0 0.25rem; font-size: 1.25rem; letter-spacing: -0.01em; }
+  .card h2 a { color: var(--fg); text-decoration: none; }
+  .card h2 a:hover { color: var(--accent); }
+  .byline { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.6rem; }
+  .claim { margin: 0 0 0.8rem; }
+  .meta { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; font-size: 0.9rem; }
+  .stars { font-variant-numeric: tabular-nums; }
+  .endorse { color: #2e9e5b; }
+  .endorse a { color: inherit; }
+  .links a { color: var(--accent); text-decoration: none; margin-right: 0.9rem; }
+  .audience { color: var(--muted); font-size: 0.85rem; border: 1px solid var(--rule); border-radius: 999px; padding: 0.1rem 0.6rem; }
+  .status { color: var(--muted); }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: 0.875rem; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>explain-it</h1>
+  <p class="tagline">Interactive explainers for math and physics papers — most popular first.
+  ⭐ star the ones that taught you something · fork &amp; improve them · endorsed by people in the field.</p>
+  <div id="cards"><p class="status">Loading explanations…</p></div>
+  <footer>
+    Every explanation is a GitHub repo: branch it, improve it, open a PR — maintainers review and merge.
+    Built with <a id="toolLink" href="#">explain-it</a>.
+  </footer>
+</main>
+<script>
+(async () => {
+  const { org, topic } = window.HUB_CONFIG;
+  const cards = document.getElementById("cards");
+  document.getElementById("toolLink").href = `https://github.com/${org}`;
+
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  try {
+    const res = await fetch(
+      `https://api.github.com/search/repositories?q=${encodeURIComponent(`org:${org} topic:${topic}`)}&sort=stars&order=desc&per_page=50`,
+      { headers: { Accept: "application/vnd.github+json" } }
+    );
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const { items } = await res.json();
+    if (!items || items.length === 0) {
+      cards.innerHTML = `<p class="status">No explanations published yet.</p>`;
+      return;
+    }
+
+    const enriched = await Promise.all(items.map(async (repo) => {
+      const raw = (file) =>
+        fetch(`https://raw.githubusercontent.com/${org}/${repo.name}/${repo.default_branch}/${file}`)
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const [paper, endorsements] = await Promise.all([raw("paper.json"), raw("endorsements.json")]);
+      return { repo, paper, endorsements: Array.isArray(endorsements) ? endorsements : [] };
+    }));
+
+    cards.innerHTML = enriched.map(({ repo, paper, endorsements }) => {
+      const title = paper?.title ?? repo.name;
+      const authors = paper?.authors?.length ? paper.authors.join(", ") : "";
+      const claim = paper?.oneSentenceClaim ?? repo.description ?? "";
+      const live = `https://${org}.github.io/${repo.name}/`;
+      const endorse = endorsements.length
+        ? `<span class="endorse" title="Endorsed by qualified people in the field">✓ endorsed by ${endorsements
+            .map((e) => `<a href="${esc(e.link)}" rel="noopener">${esc(e.name)}</a>`) .join(", ")}</span>`
+        : "";
+      const audience = paper?.audienceName ? `<span class="audience">${esc(paper.audienceName)}</span>` : "";
+      return `<article class="card">
+        <h2><a href="${esc(live)}">${esc(title)}</a></h2>
+        <p class="byline">${esc(authors)}</p>
+        <p class="claim">${esc(claim)}</p>
+        <div class="meta">
+          <span class="stars">⭐ ${repo.stargazers_count}</span>
+          ${endorse}
+          ${audience}
+          <span class="links">
+            <a href="${esc(live)}">read</a>
+            <a href="${esc(repo.html_url)}">improve on GitHub</a>
+            ${paper?.source ? `<a href="${esc(paper.source)}" rel="noopener">paper</a>` : ""}
+          </span>
+        </div>
+      </article>`;
+    }).join("\n");
+  } catch (err) {
+    cards.innerHTML = `<p class="status">Could not load explanations right now (${esc(err.message)}).
+      Browse them directly at <a href="https://github.com/${esc(org)}">github.com/${esc(org)}</a>.</p>`;
+  }
+})();
+</script>
+</body>
+</html>

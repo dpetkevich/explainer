@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { templatePath } from "../lib/prompts.js";
 import { renderRichText, stripMath } from "../lib/mathml.js";
-import type { ConceptMap, Storyboard } from "../lib/schemas.js";
+import { EndorsementsSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import type { QaSummary } from "./qa.js";
 import { info, warn } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
@@ -27,6 +28,31 @@ const EMBED_STYLE = `<style>math{font-size:1.25em}math[display="block"]{font-siz
 function injectEmbedStyle(html: string): string {
   const idx = html.search(/<\/head>/i);
   return idx >= 0 ? html.slice(0, idx) + EMBED_STYLE + html.slice(idx) : html;
+}
+
+/** Render the "Endorsed by" strip from <outDir>/endorsements.json, when present and non-empty. */
+function renderEndorsements(outDir: string): string {
+  const file = join(outDir, "endorsements.json");
+  if (!existsSync(file)) return "";
+  const endorsements = EndorsementsSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+  if (endorsements.length === 0) return "";
+  const items = endorsements
+    .map((e) => {
+      const note = e.note ? `\n    <blockquote>${escapeHtml(e.note)}</blockquote>` : "";
+      return `  <li>
+    <span class="check" aria-hidden="true">✓</span>
+    <a href="${escapeHtml(e.link)}" rel="noopener">${escapeHtml(e.name)}</a>
+    — ${escapeHtml(e.title)}, ${escapeHtml(e.affiliation)}
+    <span class="date">· ${escapeHtml(e.date)}</span>${note}
+  </li>`;
+    })
+    .join("\n");
+  return `<section class="endorsements">
+  <h2>Endorsed by</h2>
+  <ul>
+${items}
+  </ul>
+</section>`;
 }
 
 export function runAssemble(
@@ -86,6 +112,7 @@ export function runAssemble(
   const out = template
     .replaceAll("{{title}}", () => escapeHtml(storyboard.title))
     .replaceAll("{{hook}}", () => renderRichText(storyboard.hook))
+    .replaceAll("{{endorsements}}", () => renderEndorsements(ctx.outDir))
     .replaceAll("{{scenes}}", () => sections)
     .replaceAll("{{footer}}", () => footer);
 

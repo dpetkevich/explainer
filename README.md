@@ -4,8 +4,32 @@ Turn a scientific paper (PDF) or technical article (URL) into a single self-cont
 
 ## Live explainers
 
+Browse all explanations, ranked by stars: **https://explain-it-hub.vercel.app**
+
 - **Solar-thermal propulsion** (Mach33 Portal article, Yale-physics-undergrad audience): https://portal-stp.vercel.app
 - **Shor's algorithm on 10,000 atomic qubits** (arXiv 2603.28627, smart-layperson audience): https://shor-atomic-qubits.vercel.app
+
+## Collaboration (GitHub-as-backend)
+
+Each published explanation lives in its own GitHub repo (org-grouped, topic `explain-it`):
+fork it, improve `storyboard.json`, open a PR; maintainers review and merge; CI validates,
+assembles, and republishes to GitHub Pages — **with no model keys in CI**. Prose edits get a
+free instant preview; scene-spec edits fail CI with "regeneration needed" until a maintainer
+runs `repo-cli regen` locally with their own key. Repos carry native ⭐ stars (the homepage
+ranks by them) and a maintainer-gated `endorsements.json` whose entries render as a visible
+"Endorsed by" strip on the explainer.
+
+```bash
+# publish an explanation as a collaborative repo
+npx tsx src/repo-cli.ts export explainers/<slug> ../<slug> --org <ORG> --slug <slug> --source <paper-url>
+
+# CI surface (secretless)
+npx tsx src/repo-cli.ts validate <repo-dir>    # schema + scene/spec sync (fails = regen needed)
+npx tsx src/repo-cli.ts assemble <repo-dir>    # rebuild explainer.html, no model calls
+
+# maintainer-local, uses YOUR key
+npx tsx src/repo-cli.ts regen <repo-dir>       # regenerate stale scenes + QA + reassemble
+```
 
 ## Setup
 

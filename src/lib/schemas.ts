@@ -123,6 +123,31 @@ export const QaReportSchema = z.object({
 });
 export type QaReport = z.infer<typeof QaReportSchema>;
 
+export const EndorsementSchema = z.object({
+  name: z.string().min(1),
+  title: z.string().min(1),
+  affiliation: z.string().min(1),
+  /** Public identity the reader can check (homepage, Scholar, X, …). */
+  link: z.string().url(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+  /** Optional one-line quote from the endorser. */
+  note: z.string().optional(),
+});
+export const EndorsementsSchema = z.array(EndorsementSchema);
+export type Endorsement = z.infer<typeof EndorsementSchema>;
+
+export const PaperMetaSchema = z.object({
+  title: z.string().min(1),
+  authors: z.array(z.string()),
+  oneSentenceClaim: z.string().min(1),
+  /** Source of the paper (arXiv URL, article URL, …). */
+  source: z.string().min(1),
+  slug: z.string().min(1),
+  audienceName: z.string().min(1),
+  tool: z.object({ repo: z.string(), ref: z.string() }),
+});
+export type PaperMeta = z.infer<typeof PaperMetaSchema>;
+
 export const AudienceProfileSchema = z.object({
   background: z.string(),
   assumeKnown: z.array(z.string()),

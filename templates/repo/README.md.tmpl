@@ -1,0 +1,28 @@
+# __TITLE__
+
+An interactive explainer for [__TITLE__](__SOURCE__), built with
+[explain-it](https://github.com/__TOOL_REPO__). Every concept is taught through an
+interactive animation with real physics — and every caption, scene, and check in it
+is open to improvement by you.
+
+**Read it live → https://__ORG__.github.io/__SLUG__/**
+
+## How this works
+
+- **⭐ Star this repo** if the explanation taught you something — stars rank explanations
+  on the [homepage](https://explain-it-hub.vercel.app).
+- **Endorsements** (`endorsements.json`) are from qualified people in the field, added
+  only through maintainer-approved pull requests. They appear at the top of the explainer.
+- **Improve it**: fork, edit, open a PR — see [CONTRIBUTING.md](CONTRIBUTING.md).
+  Maintainers review and merge; CI rebuilds and republishes automatically.
+
+## What's in this repo
+
+| File | What it is |
+|---|---|
+| `storyboard.json` | The source of truth: parts, captions, scene specifications |
+| `scenes/*.html` | The generated interactive scenes (committed artifacts) |
+| `qa/*.report.json` | Vision-review verdicts for each scene |
+| `endorsements.json` | Field-expert endorsements (maintainer-gated) |
+| `explainer.html` | The assembled explainer (rebuilt by CI) |
+| `script.md` | Human-readable script for review |
