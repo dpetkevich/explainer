@@ -1,0 +1,17 @@
+{
+  "background": "Smart, curious professional with no physics beyond high school",
+  "assumeKnown": [
+    "high-school algebra",
+    "exponents and logarithms",
+    "basic probability (coin flips, averages)",
+    "what a computer bit is"
+  ],
+  "doNotAssume": [
+    "quantum mechanics of any kind",
+    "linear algebra",
+    "university physics",
+    "how encryption works internally",
+    "any quantum-computing term of art (qubit, superposition, gate, code, stabilizer) before the scene that teaches it"
+  ],
+  "tone": "warm, patient, Feynman-lecture style; plain words; every term of art earned before it is used; keep the real numbers"
+}

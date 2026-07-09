@@ -1,7 +1,17 @@
 import { join } from "node:path";
 import type { AudienceProfile } from "./schemas.js";
+import { StageError } from "./log.js";
 
-export type InputKind = "pdf" | "url" | "text";
+export type InputKind = "pdf" | "url" | "text" | "arxiv";
+
+/** Extract the arXiv id from an abs/pdf URL, e.g. "2603.28627". */
+export function arxivId(input: string): string {
+  const m = input.match(/arxiv\.org\/(?:abs|pdf)\/([^\s/?#]+?)(?:\.pdf)?(?:[?#]|$)/i);
+  if (!m?.[1]) {
+    throw new StageError("cli", `could not extract an arXiv id from "${input}"`);
+  }
+  return m[1];
+}
 
 export interface Ctx {
   /** Original input argument (path or URL). */
@@ -21,6 +31,7 @@ export interface Ctx {
 
 export const paths = {
   sourceText: (c: Ctx) => join(c.workDir, "source.md"),
+  sourcePdf: (c: Ctx) => join(c.workDir, "source.pdf"),
   conceptMap: (c: Ctx) => join(c.workDir, "concept-map.json"),
   storyboard: (c: Ctx) => join(c.workDir, "storyboard.json"),
   script: (c: Ctx) => join(c.workDir, "script.md"),

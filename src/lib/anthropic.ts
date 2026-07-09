@@ -45,6 +45,8 @@ export async function callModel(opts: CallOptions): Promise<string> {
         .finalMessage();
       if (res.stop_reason === "max_tokens") {
         console.warn(`⚠ model response truncated at max_tokens=${opts.maxTokens ?? 16000} (${opts.model})`);
+      } else if (res.stop_reason !== "end_turn") {
+        console.warn(`⚠ model stopped with stop_reason=${res.stop_reason} (${opts.model})`);
       }
       return res.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")

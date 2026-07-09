@@ -7,7 +7,7 @@ import { stageHash, isFresh, recordHash } from "../lib/cache.js";
 import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import { ConceptMapSchema, type ConceptMap } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
-import { paths, type Ctx } from "../lib/context.js";
+import { paths, arxivId, type Ctx } from "../lib/context.js";
 
 async function fetchArticleText(url: string): Promise<string> {
   const res = await fetch(url, {
@@ -29,10 +29,39 @@ async function fetchArticleText(url: string): Promise<string> {
   return title + byline + article.textContent.trim() + "\n";
 }
 
+/** Download an arXiv paper's PDF and cache the bytes under work/. */
+async function fetchArxivPdf(ctx: Ctx): Promise<Buffer> {
+  const cached = paths.sourcePdf(ctx);
+  if (existsSync(cached) && !ctx.force) {
+    info("ingest", `using cached PDF ${cached}`);
+    return readFileSync(cached);
+  }
+  const url = `https://arxiv.org/pdf/${arxivId(ctx.input)}`;
+  info("ingest", `downloading ${url}`);
+  const res = await fetch(url, {
+    redirect: "follow",
+    headers: { "user-agent": "Mozilla/5.0 (explain-it CLI; paper extraction)" },
+  });
+  if (!res.ok) {
+    throw new StageError("ingest", `arXiv PDF fetch failed for ${url}: HTTP ${res.status}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (!buf.subarray(0, 5).toString("latin1").startsWith("%PDF")) {
+    throw new StageError("ingest", `arXiv response for ${url} is not a PDF (got ${buf.length} bytes starting "${buf.subarray(0, 12).toString("latin1")}")`);
+  }
+  mkdirSync(ctx.workDir, { recursive: true });
+  writeFileSync(cached, buf);
+  info("ingest", `cached PDF to ${cached} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
+  return buf;
+}
+
 /** Resolve the source material: PDF bytes, or plain text (URL-extracted and cached, or a local .md/.txt). */
 async function resolveSource(ctx: Ctx): Promise<{ text?: string; pdfBase64?: string }> {
   if (ctx.inputKind === "pdf") {
     return { pdfBase64: readFileSync(ctx.input).toString("base64") };
+  }
+  if (ctx.inputKind === "arxiv") {
+    return { pdfBase64: (await fetchArxivPdf(ctx)).toString("base64") };
   }
   if (ctx.inputKind === "text") {
     return { text: readFileSync(ctx.input, "utf8") };
@@ -88,18 +117,31 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
   content.push({ type: "text", text: prompt });
 
   info("ingest", `building concept map with ${MODELS.planning}`);
-  const raw = await callModel({
-    model: MODELS.planning,
-    messages: [{ role: "user", content }],
-    maxTokens: 8000,
-  });
-
+  // Long-context calls (a whole PDF in the prompt) occasionally end mid-output;
+  // an incomplete JSON response is retried, not fatal.
+  const MAX_ATTEMPTS = 3;
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripJsonFences(raw));
-  } catch {
-    writeFileSync(out + ".raw.txt", raw);
-    throw new StageError("ingest", "model did not return valid JSON (raw response saved)", out + ".raw.txt");
+  for (let attempt = 1; ; attempt++) {
+    const raw = await callModel({
+      model: MODELS.planning,
+      messages: [{ role: "user", content }],
+      // Dense papers (long PDFs, deep prerequisite ladders) can exceed 8k output tokens.
+      maxTokens: 16000,
+    });
+    try {
+      parsed = JSON.parse(stripJsonFences(raw));
+      break;
+    } catch {
+      writeFileSync(out + ".raw.txt", raw);
+      if (attempt >= MAX_ATTEMPTS) {
+        throw new StageError(
+          "ingest",
+          `model did not return valid JSON after ${MAX_ATTEMPTS} attempts (raw response saved)`,
+          out + ".raw.txt"
+        );
+      }
+      warn("ingest", `attempt ${attempt}: response was not valid JSON (${raw.length} chars) — retrying`);
+    }
   }
   const result = ConceptMapSchema.safeParse(parsed);
   if (!result.success) {

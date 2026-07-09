@@ -116,7 +116,7 @@ export const QaReportSchema = z.object({
   pass: z.boolean(),
   failures: z.array(
     z.object({
-      kind: z.enum(["layout", "physics", "readability", "interaction"]),
+      kind: z.enum(["layout", "physics", "readability", "interaction", "comprehension"]),
       detail: z.string(),
     })
   ),

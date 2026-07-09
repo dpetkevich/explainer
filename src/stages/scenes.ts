@@ -48,7 +48,9 @@ export async function generateScene(ctx: Ctx, scene: StoryboardScene): Promise<v
     const raw = await callModel({
       model: MODELS.codegen,
       messages: [{ role: "user", content: prompt }],
-      maxTokens: 32000,
+      // The codegen model's extended thinking counts against max_tokens; a
+      // formula-heavy scene can burn 32k reasoning and emit zero HTML.
+      maxTokens: 64000,
     });
     html = extractHtml(raw);
     if (/<!doctype html>/i.test(html) && /<\/html>/i.test(html)) break;

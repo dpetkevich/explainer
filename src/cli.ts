@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 import { AudienceProfileSchema, type Storyboard } from "./lib/schemas.js";
 import { stripMath } from "./lib/mathml.js";
 import { StageError, reportError, info, warn } from "./lib/log.js";
-import { paths, type Ctx, type InputKind } from "./lib/context.js";
+import { paths, arxivId, type Ctx, type InputKind } from "./lib/context.js";
 import { runIngest } from "./stages/ingest.js";
 import { runStoryboard } from "./stages/storyboard.js";
 import { pool, generateScene } from "./stages/scenes.js";
@@ -30,15 +30,19 @@ type StageName = (typeof STAGES)[number];
 const PIPELINE_CONCURRENCY = 4;
 
 function detectInputKind(input: string): InputKind {
+  if (/^https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\//i.test(input)) return "arxiv";
   if (/^https?:\/\//i.test(input)) return "url";
   if (/\.pdf$/i.test(input)) return "pdf";
   if (/\.(md|txt)$/i.test(input)) return "text";
   throw new StageError("cli", `unsupported input "${input}" — expected a .pdf, .md/.txt file, or an http(s) URL`);
 }
 
+
 function slugify(input: string, kind: InputKind): string {
   let base: string;
-  if (kind === "url") {
+  if (kind === "arxiv") {
+    base = `arxiv-${arxivId(input)}`;
+  } else if (kind === "url") {
     const path = new URL(input).pathname.replace(/\/+$/, "");
     base = path.split("/").pop() || new URL(input).hostname;
   } else {
@@ -157,7 +161,7 @@ program
   .action(async (input: string, opts) => {
     try {
       const inputKind = detectInputKind(input);
-      if (inputKind !== "url" && !existsSync(input)) {
+      if (inputKind !== "url" && inputKind !== "arxiv" && !existsSync(input)) {
         throw new StageError("cli", `input file not found: ${input}`);
       }
 

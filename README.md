@@ -2,6 +2,11 @@
 
 Turn a scientific paper (PDF) or technical article (URL) into a single self-contained, scrollable HTML explainer in which each core concept is taught through an interactive HTML/SVG/canvas animation — sliders, toggles, live physics — not video.
 
+## Live explainers
+
+- **Solar-thermal propulsion** (Mach33 Portal article, Yale-physics-undergrad audience): https://portal-stp.vercel.app
+- **Shor's algorithm on 10,000 atomic qubits** (arXiv 2603.28627, smart-layperson audience): https://shor-atomic-qubits.vercel.app
+
 ## Setup
 
 ```bash

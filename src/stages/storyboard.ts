@@ -42,19 +42,32 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   });
 
   info("storyboard", `writing storyboard with ${MODELS.planning}`);
-  const raw = await callModel({
-    model: MODELS.planning,
-    messages: [{ role: "user", content: prompt }],
-    // Uncapped scene counts + per-scene teaches/requires fields can exceed 16k output tokens.
-    maxTokens: 32000,
-  });
-
+  // Long-context calls occasionally end mid-output; retry incomplete JSON.
+  const MAX_ATTEMPTS = 3;
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripJsonFences(raw));
-  } catch {
-    writeFileSync(out + ".raw.txt", raw);
-    throw new StageError("storyboard", "model did not return valid JSON (raw response saved)", out + ".raw.txt");
+  for (let attempt = 1; ; attempt++) {
+    const raw = await callModel({
+      model: MODELS.planning,
+      messages: [{ role: "user", content: prompt }],
+      // Uncapped scene counts + per-scene teaches/requires fields produce large JSON,
+      // and the planning model's extended thinking also counts against max_tokens —
+      // hard papers can burn 25k+ tokens reasoning before emitting a byte of output.
+      maxTokens: 64000,
+    });
+    try {
+      parsed = JSON.parse(stripJsonFences(raw));
+      break;
+    } catch {
+      writeFileSync(out + ".raw.txt", raw);
+      if (attempt >= MAX_ATTEMPTS) {
+        throw new StageError(
+          "storyboard",
+          `model did not return valid JSON after ${MAX_ATTEMPTS} attempts (raw response saved)`,
+          out + ".raw.txt"
+        );
+      }
+      warn("storyboard", `attempt ${attempt}: response was not valid JSON (${raw.length} chars) — retrying`);
+    }
   }
   const result = StoryboardSchema.safeParse(parsed);
   if (!result.success) {

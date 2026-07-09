@@ -82,10 +82,12 @@ async function renderScene(browser: Browser, htmlPath: string): Promise<RenderRe
 }
 
 async function reviewScene(
+  ctx: Ctx,
   scene: StoryboardScene,
   render: RenderResult
 ): Promise<QaReport> {
   const prompt = loadPrompt("review", {
+    audience: ctx.audienceRaw,
     scene: JSON.stringify(scene, null, 2),
     consoleWarnings: render.consoleWarnings.length
       ? render.consoleWarnings.join("\n")
@@ -126,6 +128,19 @@ async function reviewScene(
   return parsed.data;
 }
 
+/** reviewScene with retries: a malformed reviewer response is a flake, not a scene failure. */
+async function reviewSceneWithRetry(ctx: Ctx, scene: StoryboardScene, render: RenderResult): Promise<QaReport> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await reviewScene(ctx, scene, render);
+    } catch (err) {
+      if (attempt >= MAX_ATTEMPTS || !(err instanceof StageError)) throw err;
+      warn("qa", `${scene.id}: reviewer response unusable (attempt ${attempt}) — retrying`);
+    }
+  }
+}
+
 async function repairScene(
   ctx: Ctx,
   scene: StoryboardScene,
@@ -145,7 +160,8 @@ async function repairScene(
   const raw = await callModel({
     model: MODELS.codegen,
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 32000,
+    // Same headroom as generation: thinking counts against max_tokens.
+    maxTokens: 64000,
   });
   const html = extractHtml(raw);
   if (!/<!doctype html>/i.test(html)) {
@@ -194,7 +210,7 @@ export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardSc
       failureText = `Console errors while running the scene:\n${render.consoleErrors.join("\n")}`;
       info("qa", `${scene.id}: ${render.consoleErrors.length} console error(s) — skipping vision review`);
     } else {
-      const report = await reviewScene(scene, render);
+      const report = await reviewSceneWithRetry(ctx, scene, render);
       if (report.pass) {
         const result: SceneResult = { id: scene.id, status: "pass", attempts: attempts + 1 };
         writeFileSync(reportPath, JSON.stringify(result, null, 2));
