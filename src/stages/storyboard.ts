@@ -104,6 +104,6 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
  * The gate's script view IS the canonical storyboard.md format — reviewing the
  * script means reviewing the exact file contributors edit in published repos.
  */
-export function renderScript(_ctx: Ctx, board: Storyboard): string {
-  return storyboardToMarkdown(board);
+export function renderScript(ctx: Ctx, board: Storyboard): string {
+  return storyboardToMarkdown(board, ctx.audience);
 }

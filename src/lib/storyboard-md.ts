@@ -8,17 +8,26 @@
  * round-trip (enforced by roundTripCheck), so tooling can rewrite the file
  * without drift.
  */
-import { StoryboardSchema, type Storyboard, type StoryboardScene } from "./schemas.js";
+import { StoryboardSchema, AudienceProfileSchema, type Storyboard, type StoryboardScene, type AudienceProfile } from "./schemas.js";
 import { StageError } from "./log.js";
 
 const CONTROL_VALUES = ["slider", "buttons", "toggle", "play-pause"] as const;
 
 // ---------------------------------------------------------------- serialize
 
-export function storyboardToMarkdown(board: Storyboard): string {
+export function storyboardToMarkdown(board: Storyboard, audience: AudienceProfile): string {
   const lines: string[] = [];
   lines.push(`# ${board.title}`, "");
   lines.push(`Hook: ${board.hook}`, "");
+  lines.push(`## Audience`, "");
+  lines.push(`Background: ${audience.background}`, "");
+  lines.push(`Assume known:`);
+  for (const item of audience.assumeKnown) lines.push(`- ${item}`);
+  lines.push("");
+  lines.push(`Do not assume:`);
+  for (const item of audience.doNotAssume) lines.push(`- ${item}`);
+  lines.push("");
+  lines.push(`Tone: ${audience.tone}`, "");
 
   const ledes = new Map((board.parts ?? []).map((p) => [p.title, p.lede]));
   let currentPart: string | undefined;
@@ -88,7 +97,7 @@ class Parser {
     return value.trim();
   }
   isStructural(line: string): boolean {
-    return /^(#{1,3} |- |Hook: |Lede: |Teaches: |Caption: |Visual: |Interactive:|Anchor: |Checks:)/.test(line);
+    return /^(#{1,3} |- |Hook: |Lede: |Teaches: |Caption: |Visual: |Interactive:|Anchor: |Checks:|Background: |Tone: |Assume known:|Do not assume:)/.test(line);
   }
   bullet(prefix?: string): string | undefined {
     this.skipBlank();
@@ -105,7 +114,12 @@ class Parser {
   }
 }
 
-export function parseStoryboardMarkdown(text: string): Storyboard {
+export interface ParsedStoryboardDoc {
+  storyboard: Storyboard;
+  audience: AudienceProfile;
+}
+
+export function parseStoryboardMarkdown(text: string): ParsedStoryboardDoc {
   const p = new Parser(text.split("\n"));
 
   p.skipBlank();
@@ -113,6 +127,25 @@ export function parseStoryboardMarkdown(text: string): Storyboard {
   if (!titleLine?.startsWith("# ")) throw new StageError("storyboard.md", `line 1: expected "# <explainer title>"`);
   const title = titleLine.slice(2).trim();
   const hook = p.labeled("Hook");
+
+  p.skipBlank();
+  if (p.peek() !== "## Audience") {
+    throw new StageError("storyboard.md", `expected "## Audience" section after the hook`);
+  }
+  p.next();
+  const background = p.labeled("Background");
+  p.skipBlank();
+  if (p.peek() !== "Assume known:") throw new StageError("storyboard.md", `expected "Assume known:" in the Audience section`);
+  p.next();
+  const assumeKnown: string[] = [];
+  for (let b = p.bullet(); b !== undefined; b = p.bullet()) assumeKnown.push(b);
+  p.skipBlank();
+  if (p.peek() !== "Do not assume:") throw new StageError("storyboard.md", `expected "Do not assume:" in the Audience section`);
+  p.next();
+  const doNotAssume: string[] = [];
+  for (let b = p.bullet(); b !== undefined; b = p.bullet()) doNotAssume.push(b);
+  const tone = p.labeled("Tone");
+  const audience = AudienceProfileSchema.parse({ background, assumeKnown, doNotAssume, tone });
 
   const parts: { title: string; lede: string }[] = [];
   const scenes: StoryboardScene[] = [];
@@ -178,15 +211,16 @@ export function parseStoryboardMarkdown(text: string): Storyboard {
     });
   }
 
-  return StoryboardSchema.parse({ title, hook, parts: parts.length ? parts : undefined, scenes });
+  return {
+    storyboard: StoryboardSchema.parse({ title, hook, parts: parts.length ? parts : undefined, scenes }),
+    audience,
+  };
 }
 
-/** Serialize→parse must reproduce the exact same storyboard. */
-export function roundTripCheck(board: Storyboard): void {
-  const again = parseStoryboardMarkdown(storyboardToMarkdown(board));
-  const a = JSON.stringify(board);
-  const b = JSON.stringify(again);
-  if (a !== b) {
-    throw new StageError("storyboard.md", "round-trip mismatch — the storyboard contains text this format cannot carry");
+/** Serialize→parse must reproduce the exact same storyboard + audience. */
+export function roundTripCheck(board: Storyboard, audience: AudienceProfile): void {
+  const again = parseStoryboardMarkdown(storyboardToMarkdown(board, audience));
+  if (JSON.stringify(board) !== JSON.stringify(again.storyboard) || JSON.stringify(audience) !== JSON.stringify(again.audience)) {
+    throw new StageError("storyboard.md", "round-trip mismatch — the document contains text this format cannot carry");
   }
 }

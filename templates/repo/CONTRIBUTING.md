@@ -12,6 +12,10 @@ Field labels are recognized only at the **start of a line**, in this order per s
 Parts are `## Part: <name>` followed by `Lede: …`. CI parses the file and reports the
 exact line of any format error.
 
+The `## Audience` section (Background / Assume known / Do not assume / Tone) is part of
+the same file. **Editing the audience flags every scene for regeneration** — by design:
+graphics are calibrated to the reader — so audience changes are maintainer-level edits.
+
 ## Two kinds of change
 
 **1. Prose changes — free and instant.**

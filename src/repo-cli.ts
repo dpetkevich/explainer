@@ -67,15 +67,15 @@ const SCENES_WORKDIR = ".scenes"; // gitignored working area holding fetched/reg
   }
 })();
 
-/** Ctx whose generated artifacts live in <repo>/.scenes; outputs (explainer.html) in <repo>. */
-function repoCtx(dir: string): Ctx {
+/** Parse storyboard.md (the single source: audience + script + specs) into a Ctx + Storyboard. */
+function loadRepoDoc(dir: string): { ctx: Ctx; storyboard: Storyboard } {
   const abs = resolve(dir);
-  const audienceFile = join(abs, "audience.json");
-  if (!existsSync(audienceFile)) {
-    throw new StageError("repo", `not an explanation repo (missing audience.json): ${abs}`);
+  const mdPath = join(abs, "storyboard.md");
+  if (!existsSync(mdPath)) {
+    throw new StageError("repo", `not an explanation repo (missing storyboard.md): ${abs}`);
   }
-  const audience = AudienceProfileSchema.parse(JSON.parse(readFileSync(audienceFile, "utf8")));
-  return {
+  const { storyboard, audience } = parseStoryboardMarkdown(readFileSync(mdPath, "utf8"));
+  const ctx: Ctx = {
     input: abs,
     inputKind: "text",
     outDir: abs,
@@ -84,10 +84,7 @@ function repoCtx(dir: string): Ctx {
     audienceRaw: JSON.stringify(audience, null, 2),
     force: false,
   };
-}
-
-function loadRepoStoryboard(dir: string): Storyboard {
-  return parseStoryboardMarkdown(readFileSync(join(dir, "storyboard.md"), "utf8"));
+  return { ctx, storyboard };
 }
 
 function loadPaperMeta(dir: string): PaperMeta {
@@ -231,9 +228,8 @@ program
 
       // Editable tree
       mkdirSync(out, { recursive: true });
-      roundTripCheck(storyboard);
-      writeFileSync(join(out, "storyboard.md"), storyboardToMarkdown(storyboard));
-      writeFileSync(join(out, "audience.json"), JSON.stringify(audience, null, 2) + "\n");
+      roundTripCheck(storyboard, audience);
+      writeFileSync(join(out, "storyboard.md"), storyboardToMarkdown(storyboard, audience));
       const paperMeta = PaperMetaSchema.parse({
         title: conceptMap.paper.title,
         authors: conceptMap.paper.authors,
@@ -272,7 +268,7 @@ program
       }
       const bundleFile = join(out, BUNDLE_ASSET);
       const sha = packBundle(scenesDir, bundleFile);
-      const ctx = repoCtx(out);
+      const { ctx } = loadRepoDoc(out);
       const lock = buildLock(ctx, storyboard, sha, { scenes: qaResults });
       writeLock(out, lock);
 
@@ -292,8 +288,7 @@ program
   .argument("<dir>", "explanation repo directory")
   .action((dir: string) => {
     try {
-      const ctx = repoCtx(dir);
-      const storyboard = loadRepoStoryboard(ctx.outDir);
+      const { ctx, storyboard } = loadRepoDoc(dir);
       loadPaperMeta(ctx.outDir);
       EndorsementsSchema.parse(JSON.parse(readFileSync(join(ctx.outDir, "endorsements.json"), "utf8")));
       const lock = readLock(ctx.outDir);
@@ -340,8 +335,7 @@ program
   .argument("<dir>", "explanation repo directory")
   .action((dir: string) => {
     try {
-      const ctx = repoCtx(dir);
-      const storyboard = loadRepoStoryboard(ctx.outDir);
+      const { ctx, storyboard } = loadRepoDoc(dir);
       if (!existsSync(join(ctx.workDir, "scenes"))) {
         throw new StageError("repo", `no fetched scenes at ${ctx.workDir}/scenes — run \`fetch\` first`);
       }
@@ -362,8 +356,7 @@ program
   .action(async (dir: string, opts) => {
     try {
       const abs = resolve(dir);
-      const ctx = repoCtx(abs);
-      const storyboard = loadRepoStoryboard(abs);
+      const { ctx, storyboard } = loadRepoDoc(abs);
       const lock = readLock(abs);
 
       fetchBundle(abs);
@@ -402,8 +395,7 @@ program
   .argument("<dir>", "explanation repo directory")
   .action((dir: string) => {
     try {
-      const ctx = repoCtx(dir);
-      const storyboard = loadRepoStoryboard(ctx.outDir);
+      const { ctx, storyboard } = loadRepoDoc(dir);
       const lock = readLock(ctx.outDir);
       let kept = 0;
       for (const scene of storyboard.scenes) {

@@ -20,8 +20,7 @@ is open to improvement by you.
 
 | File | What it is |
 |---|---|
-| `storyboard.md` | **The thing you edit**: the full script — parts, captions, and every instruction that generates the graphics |
-| `audience.json` | Who the explanation is written for |
+| `storyboard.md` | **The thing you edit**: audience, script, and every instruction that generates the graphics — one document |
 | `paper.json` | Paper metadata (title, authors, source) |
 | `endorsements.json` | Field-expert endorsements (maintainer-gated) |
 
