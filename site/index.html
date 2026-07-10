@@ -37,7 +37,6 @@
   .endorse { color: #2e9e5b; }
   .endorse a { color: inherit; }
   .links a { color: var(--accent); text-decoration: none; margin-right: 0.9rem; }
-  .audience { color: var(--muted); font-size: 0.85rem; border: 1px solid var(--rule); border-radius: 999px; padding: 0.1rem 0.6rem; }
   .status { color: var(--muted); }
   footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: 0.875rem; }
   footer a { color: var(--accent); }
@@ -93,7 +92,6 @@
         ? `<span class="endorse" title="Endorsed by qualified people in the field">✓ endorsed by ${endorsements
             .map((e) => (e.link ? `<a href="${esc(e.link)}" rel="noopener">${esc(e.name)}</a>` : esc(e.name))).join(", ")}</span>`
         : "";
-      const audience = paper?.audienceName ? `<span class="audience">${esc(paper.audienceName)}</span>` : "";
       return `<article class="card">
         <h2><a href="${esc(live)}">${esc(title)}</a></h2>
         <p class="byline">${esc(authors)}</p>
@@ -104,7 +102,6 @@
             <span class="glyph">☆</span><span class="count">${repo.stargazers_count}</span>
           </a>
           ${endorse}
-          ${audience}
           <span class="links">
             <a href="${esc(live)}">read</a>
             <a href="${esc(repo.html_url)}">improve on GitHub</a>
