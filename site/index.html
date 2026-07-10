@@ -8,7 +8,7 @@
 <script src="config.js"></script>
 <style>
   :root {
-    --bg: #fdfdfb; --fg: #1a1a1a; --muted: #555; --rule: #e2e2dc; --accent: #2f6fed;
+    --bg: #fdfdfb; --fg: #1a1a1a; --muted: #555; --rule: #e2e2dc; --accent: #2f6fed; --star: #e3b341;
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
@@ -28,7 +28,14 @@
   .byline { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.6rem; }
   .claim { margin: 0 0 0.8rem; }
   .meta { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; font-size: 0.9rem; }
-  .stars { font-variant-numeric: tabular-nums; }
+  .star-btn { display: inline-flex; align-items: center; gap: 0.35rem; font: inherit; font-size: 0.9rem;
+    color: var(--fg); background: none; border: 1px solid var(--rule); border-radius: 999px;
+    padding: 0.1rem 0.7rem; cursor: pointer; }
+  .star-btn:hover { border-color: var(--accent); }
+  .star-btn .glyph { color: var(--muted); }
+  .star-btn[aria-pressed="true"] .glyph { color: var(--star); }
+  .star-btn .count { font-variant-numeric: tabular-nums; }
+  .star-btn[disabled] { opacity: 0.6; cursor: wait; }
   .endorse { color: #2e9e5b; }
   .endorse a { color: inherit; }
   .links a { color: var(--accent); text-decoration: none; margin-right: 0.9rem; }
@@ -46,7 +53,7 @@
   <div id="cards"><p class="status">Loading explanations…</p></div>
   <footer>
     Every explanation is a GitHub repo: branch it, improve it, open a PR — maintainers review and merge.
-    Built with <a id="toolLink" href="#">explain-it</a>.
+    Built with <a id="toolLink" href="#">explain-it</a>.<span id="session"></span>
   </footer>
 </main>
 <script>
@@ -57,29 +64,63 @@
 
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+  // ---- GitHub session (token issued by /api/auth/callback, kept in localStorage)
+  const TOKEN_KEY = "explain_it_gh_token";
+  let token = localStorage.getItem(TOKEN_KEY);
+  if (location.hash.startsWith("#token=")) {
+    token = decodeURIComponent(location.hash.slice("#token=".length));
+    localStorage.setItem(TOKEN_KEY, token);
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  const signOut = () => { localStorage.removeItem(TOKEN_KEY); token = null; renderSession(); };
+  const renderSession = () => {
+    document.getElementById("session").innerHTML = token
+      ? ` · starring as your GitHub account (<a href="#" id="signout">sign out</a>)`
+      : "";
+    document.getElementById("signout")?.addEventListener("click", (e) => { e.preventDefault(); signOut(); location.reload(); });
+  };
+  renderSession();
+
+  const gh = (path, opts = {}) =>
+    fetch(`https://api.github.com${path}`, {
+      ...opts,
+      headers: {
+        Accept: "application/vnd.github+json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opts.headers || {}),
+      },
+    });
+
   try {
-    const res = await fetch(
-      `https://api.github.com/search/repositories?q=${encodeURIComponent(`org:${org} topic:${topic}`)}&sort=stars&order=desc&per_page=50`,
-      { headers: { Accept: "application/vnd.github+json" } }
-    );
+    // The repos API returns live star counts (the search index lags by minutes to hours).
+    let res = await gh(`/orgs/${org}/repos?per_page=100`);
+    if (res.status === 401 && token) { signOut(); res = await gh(`/orgs/${org}/repos?per_page=100`); }
     if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-    const { items } = await res.json();
-    // The search index's sort can lag; the counts themselves are fresh — sort locally.
-    items?.sort((a, b) => b.stargazers_count - a.stargazers_count);
-    if (!items || items.length === 0) {
+    const repos = (await res.json())
+      .filter((r) => !r.private && !r.archived && (r.topics ?? []).includes(topic))
+      .sort((a, b) => b.stargazers_count - a.stargazers_count);
+    if (repos.length === 0) {
       cards.innerHTML = `<p class="status">No explanations published yet.</p>`;
       return;
     }
 
-    const enriched = await Promise.all(items.map(async (repo) => {
+    const enriched = await Promise.all(repos.map(async (repo) => {
       const raw = (file) =>
         fetch(`https://raw.githubusercontent.com/${org}/${repo.name}/${repo.default_branch}/${file}`)
           .then((r) => (r.ok ? r.json() : null)).catch(() => null);
-      const [paper, endorsements] = await Promise.all([raw("paper.json"), raw("endorsements.json")]);
-      return { repo, paper, endorsements: Array.isArray(endorsements) ? endorsements : [] };
+      const [paper, endorsements, starredRes] = await Promise.all([
+        raw("paper.json"),
+        raw("endorsements.json"),
+        token ? gh(`/user/starred/${org}/${repo.name}`) : null,
+      ]);
+      return {
+        repo, paper,
+        endorsements: Array.isArray(endorsements) ? endorsements : [],
+        starred: starredRes?.status === 204,
+      };
     }));
 
-    cards.innerHTML = enriched.map(({ repo, paper, endorsements }) => {
+    cards.innerHTML = enriched.map(({ repo, paper, endorsements, starred }) => {
       const title = paper?.title ?? repo.name;
       const authors = paper?.authors?.length ? paper.authors.join(", ") : "";
       const claim = paper?.oneSentenceClaim ?? repo.description ?? "";
@@ -94,7 +135,10 @@
         <p class="byline">${esc(authors)}</p>
         <p class="claim">${esc(claim)}</p>
         <div class="meta">
-          <span class="stars">⭐ ${repo.stargazers_count}</span>
+          <button class="star-btn" data-repo="${esc(repo.name)}" aria-pressed="${starred}"
+            title="${token ? (starred ? "Unstar on GitHub" : "Star on GitHub") : "Sign in with GitHub to star"}">
+            <span class="glyph">${starred ? "★" : "☆"}</span><span class="count">${repo.stargazers_count}</span>
+          </button>
           ${endorse}
           ${audience}
           <span class="links">
@@ -105,6 +149,44 @@
         </div>
       </article>`;
     }).join("\n");
+
+    // ---- Starring: same star as GitHub's own button, via the user's OAuth token.
+    const startSignIn = (repoName) => {
+      sessionStorage.setItem("explain_it_star_intent", repoName);
+      location.href = "/api/auth/login";
+    };
+    const toggleStar = async (btn) => {
+      const repoName = btn.dataset.repo;
+      if (!token) return startSignIn(repoName);
+      const starred = btn.getAttribute("aria-pressed") === "true";
+      btn.disabled = true;
+      try {
+        const r = await gh(`/user/starred/${org}/${repoName}`, { method: starred ? "DELETE" : "PUT" });
+        if (r.status === 401 || r.status === 403) { signOut(); return startSignIn(repoName); }
+        if (r.status !== 204) throw new Error(`GitHub API ${r.status}`);
+        const now = !starred;
+        btn.setAttribute("aria-pressed", String(now));
+        btn.querySelector(".glyph").textContent = now ? "★" : "☆";
+        btn.title = now ? "Unstar on GitHub" : "Star on GitHub";
+        const count = btn.querySelector(".count");
+        count.textContent = String(Math.max(0, Number(count.textContent) + (now ? 1 : -1)));
+        // Confirm against the live count so the number always matches GitHub's.
+        const fresh = await gh(`/repos/${org}/${repoName}`).then((x) => (x.ok ? x.json() : null));
+        if (fresh) count.textContent = String(fresh.stargazers_count);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    cards.querySelectorAll(".star-btn").forEach((btn) =>
+      btn.addEventListener("click", () => toggleStar(btn).catch((e) => alert(`Could not update star: ${e.message}`))));
+
+    // Returning from sign-in with a pending star? Apply it.
+    const intent = sessionStorage.getItem("explain_it_star_intent");
+    if (intent && token) {
+      sessionStorage.removeItem("explain_it_star_intent");
+      const btn = cards.querySelector(`.star-btn[data-repo="${CSS.escape(intent)}"]`);
+      if (btn && btn.getAttribute("aria-pressed") !== "true") toggleStar(btn).catch(() => {});
+    }
   } catch (err) {
     cards.innerHTML = `<p class="status">Could not load explanations right now (${esc(err.message)}).
       Browse them directly at <a href="https://github.com/${esc(org)}">github.com/${esc(org)}</a>.</p>`;
