@@ -46,6 +46,12 @@
     color: var(--muted);
     margin: 0 0 3rem;
   }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
   section.endorsements {
     margin: -1.5rem 0 3rem;
     padding: 1rem 1.25rem;
@@ -110,15 +116,13 @@
     color: var(--muted);
     font-size: 0.875rem;
   }
-  footer .footer-links { margin: 0.5rem 0 0; }
-  footer .footer-links a { color: var(--accent); text-decoration: none; }
-  footer .footer-links a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 <main>
   <h1>{{title}}</h1>
   <p class="hook">{{hook}}</p>
+{{links}}
 {{endorsements}}
 
 {{scenes}}

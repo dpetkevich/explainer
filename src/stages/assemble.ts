@@ -111,12 +111,12 @@ export function runAssemble(
   const paperMeta = existsSync(paperMetaFile)
     ? PaperMetaSchema.safeParse(JSON.parse(readFileSync(paperMetaFile, "utf8")))
     : undefined;
-  const footerLinks = paperMeta?.success
-    ? `\n<p class="footer-links"><a href="${escapeHtml(paperMeta.data.source)}" rel="noopener">source paper</a> · <a href="https://github.com/${escapeHtml(paperMeta.data.org)}/${escapeHtml(paperMeta.data.slug)}" rel="noopener">improve on GitHub</a></p>`
+  const pageLinks = paperMeta?.success
+    ? `  <p class="page-links"><a href="${escapeHtml(paperMeta.data.source)}" rel="noopener">source paper</a> · <a href="https://github.com/${escapeHtml(paperMeta.data.org)}/${escapeHtml(paperMeta.data.slug)}" rel="noopener">improve on GitHub</a></p>`
     : "";
   const footer = `Source: <em>${escapeHtml(conceptMap.paper.title)}</em>${
     authors ? ` — ${escapeHtml(authors)}` : ""
-  }. Explainer generated ${generated}.${footerLinks}`;
+  }. Explainer generated ${generated}.`;
 
   const template = readFileSync(templatePath("explainer.html"), "utf8");
   // Function replacements: string replacements interpret `$&`/`$'` patterns,
@@ -124,6 +124,7 @@ export function runAssemble(
   const out = template
     .replaceAll("{{title}}", () => escapeHtml(storyboard.title))
     .replaceAll("{{hook}}", () => renderRichText(storyboard.hook))
+    .replaceAll("{{links}}", () => pageLinks)
     .replaceAll("{{endorsements}}", () => renderEndorsements(ctx.outDir))
     .replaceAll("{{scenes}}", () => sections)
     .replaceAll("{{footer}}", () => footer);
