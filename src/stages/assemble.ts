@@ -39,10 +39,13 @@ function renderEndorsements(outDir: string): string {
   const items = endorsements
     .map((e) => {
       const note = e.note ? `\n    <blockquote>${escapeHtml(e.note)}</blockquote>` : "";
+      const who = e.link
+        ? `<a href="${escapeHtml(e.link)}" rel="noopener">${escapeHtml(e.name)}</a>`
+        : escapeHtml(e.name);
+      const role = [e.title, e.affiliation].filter((s): s is string => Boolean(s)).map(escapeHtml).join(", ");
       return `  <li>
     <span class="check" aria-hidden="true">✓</span>
-    <a href="${escapeHtml(e.link)}" rel="noopener">${escapeHtml(e.name)}</a>
-    — ${escapeHtml(e.title)}, ${escapeHtml(e.affiliation)}
+    ${who}${role ? `\n    — ${role}` : ""}
     <span class="date">· ${escapeHtml(e.date)}</span>${note}
   </li>`;
     })

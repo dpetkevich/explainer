@@ -86,7 +86,7 @@
       const live = `https://${org}.github.io/${repo.name}/`;
       const endorse = endorsements.length
         ? `<span class="endorse" title="Endorsed by qualified people in the field">✓ endorsed by ${endorsements
-            .map((e) => `<a href="${esc(e.link)}" rel="noopener">${esc(e.name)}</a>`) .join(", ")}</span>`
+            .map((e) => (e.link ? `<a href="${esc(e.link)}" rel="noopener">${esc(e.name)}</a>` : esc(e.name))).join(", ")}</span>`
         : "";
       const audience = paper?.audienceName ? `<span class="audience">${esc(paper.audienceName)}</span>` : "";
       return `<article class="card">

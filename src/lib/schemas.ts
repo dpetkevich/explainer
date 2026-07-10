@@ -124,11 +124,12 @@ export const QaReportSchema = z.object({
 export type QaReport = z.infer<typeof QaReportSchema>;
 
 export const EndorsementSchema = z.object({
+  /** Who endorses — a person, or a collective like "Technical staff at …". */
   name: z.string().min(1),
-  title: z.string().min(1),
-  affiliation: z.string().min(1),
-  /** Public identity the reader can check (homepage, Scholar, X, …). */
-  link: z.string().url(),
+  title: z.string().min(1).optional(),
+  affiliation: z.string().min(1).optional(),
+  /** Public identity the reader can check (homepage, Scholar, X, …); omit for anonymous endorsements. */
+  link: z.string().url().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
   /** Optional one-line quote from the endorser. */
   note: z.string().optional(),
