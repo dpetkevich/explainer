@@ -114,12 +114,10 @@
       </article>`;
     }).join("\n");
 
-    // Star on GitHub, tab back, and the numbers are already fresh: re-fetch
-    // live counts whenever the page regains focus (at most once per 5 s).
-    let lastRefresh = 0;
+    // Poll GitHub for fresh star counts every few minutes (skipped while the
+    // tab is hidden; unauthenticated rate limit is 60/hr, this uses ~20).
     const refreshCounts = async () => {
-      if (Date.now() - lastRefresh < 5000) return;
-      lastRefresh = Date.now();
+      if (document.visibilityState === "hidden") return;
       const res = await gh(`/orgs/${org}/repos?per_page=100`);
       if (!res.ok) return;
       const byName = new Map((await res.json()).map((r) => [r.name, r.stargazers_count]));
@@ -128,10 +126,7 @@
         if (n !== undefined) btn.querySelector(".count").textContent = String(n);
       });
     };
-    window.addEventListener("focus", () => { refreshCounts().catch(() => {}); });
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") refreshCounts().catch(() => {});
-    });
+    setInterval(() => { refreshCounts().catch(() => {}); }, 3 * 60 * 1000);
   } catch (err) {
     cards.innerHTML = `<p class="status">Could not load explanations right now (${esc(err.message)}).
       Browse them directly at <a href="https://github.com/${esc(org)}">github.com/${esc(org)}</a>.</p>`;
