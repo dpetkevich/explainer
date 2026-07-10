@@ -10,6 +10,7 @@
     --fg: #1a1a1a;
     --muted: #555;
     --rule: #e2e2dc;
+    --accent: #2f6fed;
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
@@ -18,6 +19,7 @@
       --fg: #e8e8e4;
       --muted: #a0a0a0;
       --rule: #33363c;
+      --accent: #7aa6ff;
     }
   }
   * { box-sizing: border-box; }
@@ -108,6 +110,9 @@
     color: var(--muted);
     font-size: 0.875rem;
   }
+  footer .footer-links { margin: 0.5rem 0 0; }
+  footer .footer-links a { color: var(--accent); text-decoration: none; }
+  footer .footer-links a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>

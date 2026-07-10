@@ -28,6 +28,7 @@
   .byline { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.6rem; }
   .claim { margin: 0 0 0.8rem; }
   .meta { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; font-size: 0.9rem; }
+  .links { margin-top: 0.6rem; font-size: 0.9rem; }
   .star-btn { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem;
     color: var(--fg); text-decoration: none; border: 1px solid var(--rule); border-radius: 999px;
     padding: 0.1rem 0.7rem; }
@@ -102,11 +103,9 @@
             <span class="glyph">☆</span><span class="count">${repo.stargazers_count}</span>
           </a>
           ${endorse}
-          <span class="links">
-            <a href="${esc(live)}">read</a>
-            <a href="${esc(repo.html_url)}">improve on GitHub</a>
-            ${paper?.source ? `<a href="${esc(paper.source)}" rel="noopener">paper</a>` : ""}
-          </span>
+        </div>
+        <div class="links">
+          <a href="${esc(live)}">read</a>
         </div>
       </article>`;
     }).join("\n");

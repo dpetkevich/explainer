@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { templatePath } from "../lib/prompts.js";
 import { renderRichText, stripMath } from "../lib/mathml.js";
-import { EndorsementsSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
+import { EndorsementsSchema, PaperMetaSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import type { QaSummary } from "./qa.js";
 import { info, warn } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
@@ -105,9 +105,18 @@ export function runAssemble(
 
   const authors = conceptMap.paper.authors.join(", ");
   const generated = new Date().toISOString().slice(0, 10);
+  // Published repos carry paper.json (source URL + repo coordinates); local
+  // pipeline runs may not — the footer links render only when it's there.
+  const paperMetaFile = join(ctx.outDir, "paper.json");
+  const paperMeta = existsSync(paperMetaFile)
+    ? PaperMetaSchema.safeParse(JSON.parse(readFileSync(paperMetaFile, "utf8")))
+    : undefined;
+  const footerLinks = paperMeta?.success
+    ? `\n<p class="footer-links"><a href="${escapeHtml(paperMeta.data.source)}" rel="noopener">source paper</a> · <a href="https://github.com/${escapeHtml(paperMeta.data.org)}/${escapeHtml(paperMeta.data.slug)}" rel="noopener">improve on GitHub</a></p>`
+    : "";
   const footer = `Source: <em>${escapeHtml(conceptMap.paper.title)}</em>${
     authors ? ` — ${escapeHtml(authors)}` : ""
-  }. Explainer generated ${generated}.`;
+  }. Explainer generated ${generated}.${footerLinks}`;
 
   const template = readFileSync(templatePath("explainer.html"), "utf8");
   // Function replacements: string replacements interpret `$&`/`$'` patterns,
