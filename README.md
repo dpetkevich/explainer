@@ -2,34 +2,20 @@
 
 Turn a scientific paper (PDF) or technical article (URL) into a single self-contained, scrollable HTML explainer in which each core concept is taught through an interactive HTML/SVG/canvas animation — sliders, toggles, live physics — not video.
 
-## Live explainers
+## Two ways to run it
 
-Browse all explanations, ranked by stars: **https://explain-it-hub.vercel.app**
+**Web app (self-serve):** `npm run serve` starts a single always-on Fastify service where
+anyone uploads a paper (PDF or arXiv/URL) and watches it generate live — a global feed with
+per-scene status — then reads the result and posts anonymous comments. Generation runs as
+in-process background jobs (SQLite-backed, live progress over SSE) with per-IP rate limits and
+a daily cap. See `src/server/` and the "Web app" section of `CLAUDE.md`. Deploy as one
+container on a long-job host (needs Chromium + `ANTHROPIC_API_KEY` + a persistent `data/` and
+`explainers/` volume).
 
-- **Solar-thermal propulsion** (Mach33 Portal article, Yale-physics-undergrad audience): https://portal-stp.vercel.app
-- **Shor's algorithm on 10,000 atomic qubits** (arXiv 2603.28627, smart-layperson audience): https://shor-atomic-qubits.vercel.app
+**CLI (local):** `npx tsx src/cli.ts <paper>` runs the same pipeline locally, with a
+script-review gate (below). Useful for development and one-off runs.
 
-## Collaboration (GitHub-as-backend)
-
-Each published explanation lives in its own GitHub repo (org-grouped, topic `explain-it`):
-fork it, improve `storyboard.json`, open a PR; maintainers review and merge; CI validates,
-assembles, and republishes to GitHub Pages — **with no model keys in CI**. Prose edits get a
-free instant preview; scene-spec edits fail CI with "regeneration needed" until a maintainer
-runs `repo-cli regen` locally with their own key. Repos carry native ⭐ stars (the homepage
-ranks by them) and a maintainer-gated `endorsements.json` whose entries render as a visible
-"Endorsed by" strip on the explainer.
-
-```bash
-# publish an explanation as a collaborative repo
-npx tsx src/repo-cli.ts export explainers/<slug> ../<slug> --org <ORG> --slug <slug> --source <paper-url>
-
-# CI surface (secretless)
-npx tsx src/repo-cli.ts validate <repo-dir>    # schema + scene/spec sync (fails = regen needed)
-npx tsx src/repo-cli.ts assemble <repo-dir>    # rebuild explainer.html, no model calls
-
-# maintainer-local, uses YOUR key
-npx tsx src/repo-cli.ts regen <repo-dir>       # regenerate stale scenes + QA + reassemble
-```
+Both paths produce the same single self-contained `explainer.html`.
 
 ## Setup
 

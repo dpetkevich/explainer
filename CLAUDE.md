@@ -38,24 +38,24 @@ In `prompts/review.md`: review on behalf of the injected audience profile, not t
 
 - `npx tsx src/cli.ts <arxiv-url|pdf|md|url> [--audience profiles/X.json]` — stops at the **script gate** after the storyboard; present `work/script.md` to the user before generating graphics.
 - Audience profiles: `profiles/default.json` (Yale physics undergrad), `profiles/smart-layperson.json` (no physics beyond high school). Changing the audience invalidates all caches by design.
-- Caches: every stage hashed on inputs (see `src/lib/cache.ts`). Scene hashes cover only the **scene contract** (`sceneContract()` in `src/stages/scenes.ts`: visualMetaphor, animatedVariable, physicsChecks, quantitativeAnchor) — prose fields (title, teaches, caption, part, requires) render outside the scene HTML and **never invalidate graphics**; edit them freely and just reassemble. Spec (contract) edits DO regenerate the scene, by design. After a hash-formula change, migrate committed artifacts with `repo-cli rehash <dir>`.
+- Caches: every stage hashed on inputs (see `src/lib/cache.ts`). Scene hashes cover only the **scene contract** (`sceneContract()` in `src/stages/scenes.ts`: visualMetaphor, animatedVariable, physicsChecks, quantitativeAnchor) — prose fields (title, teaches, caption, part, requires) render outside the scene HTML and **never invalidate graphics**; edit them freely and just reassemble. Spec (contract) edits DO regenerate the scene, by design.
 - Editing any `prompts/*.md` invalidates the corresponding stage hashes everywhere — re-record hashes for already-accepted artifacts after prompt-rule changes (protect shipped work; new work faces the new rules).
 - Failed scenes: prefer fixing the SPEC (add an implementation requirement naming the failure) over trusting the repair loop — spec-fix-then-regenerate has passed first-try nearly every time.
 - Planning models think: `max_tokens` must budget for extended thinking (ingest 16k, storyboard/codegen/repair 64k). Long-context calls occasionally return truncated/empty JSON — stages retry ×3.
-- Assemble is deterministic and instant; `explainer.html` is a single self-contained file. Deploy: copy to `deploy/<slug>/index.html`, `vercel deploy --prod --yes` from that dir.
+- Assemble is deterministic and instant; `explainer.html` is a single self-contained file, served directly by the web app.
 
-## Collaboration layer (repo-cli)
+## Web app (self-serve)
 
-Published explanations live in per-explanation GitHub repos under the **`explainer` org**
-(topic `explain-it`), with native stars, fork→PR contribution, `maintainers`-team merge
-rights, and CODEOWNERS-gated `endorsements.json` (rendered as an "Endorsed by" strip by
-assemble). `src/repo-cli.ts`: `export` (pipeline workdir → publishable repo layout),
-`validate` (schema + sceneInputHash sync; CI gate — failure means "regeneration needed"),
-`assemble` (rebuild explainer.html, model-free), `regen` (maintainer-local, uses the local
-API key, incremental via hashes). **Hard rule: no model API keys in any explanation repo's
-CI** — regeneration is always maintainer-local. The hub homepage (`site/`, Vercel project
-`explain-it-hub`) ranks explanations by GitHub stars. Repo templates: `templates/repo/`
-(`__ORG__`/`__SLUG__`-style placeholders — NOT `{{ }}`, which collides with GitHub Actions).
+One always-on Node/Fastify service (`src/server/`, run with `npm run serve`) turns the
+pipeline into a self-serve product: anyone uploads a paper (PDF or arXiv/URL) and watches
+it generate live; readers post anonymous comments. There is **no GitHub integration** —
+generation, storage, and hosting all live in this one service.
+- `index.ts` — routes: `POST /api/uploads`, `GET /api/explainers` (feed), `GET /api/explainers/:id/events` (SSE progress), `GET /api/explainers/:id/html` (the finished explainer), `GET|POST …/comments`, and the `/` + `/explainer/:id` frontend (`src/server/public/`).
+- `queue.ts` + `jobs.ts` — in-process job queue (concurrency `GEN_CONCURRENCY`, default 1) runs the pipeline stages directly (so the CLI's script gate never applies) with a fixed default audience (`AUDIENCE_PROFILE`, default `profiles/default.json`).
+- Live progress is the additive `ProgressEvent` layer: `src/lib/progress.ts` + `Ctx.onEvent`, emitted next to the existing `info()` sites in ingest/storyboard/pipeline/qa/assemble. The job's `onEvent` updates the SQLite row and fans out to SSE.
+- `db.ts` — SQLite (`better-sqlite3`) at `data/explainers.db`: explainer records + comments. On boot, `running` jobs are marked failed and `queued` jobs resume.
+- `limits.ts` — per-IP rate limits, 25 MB PDF cap, global daily generation cap. Model refusals become a typed `RefusalError` → clean `failed: content declined`.
+- Deploy as one container on a long-job host (Playwright base image for Chromium), `ANTHROPIC_API_KEY` set, a persistent volume at `data/` **and** `explainers/` (artifacts). Not Vercel — jobs are long and need a browser.
 
 ## Testing
 

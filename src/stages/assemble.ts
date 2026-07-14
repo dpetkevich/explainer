@@ -113,7 +113,7 @@ export function runAssemble(
     ? PaperMetaSchema.safeParse(JSON.parse(readFileSync(paperMetaFile, "utf8")))
     : undefined;
   const pageLinks = paperMeta?.success
-    ? `  <p class="page-links"><a href="${escapeHtml(paperMeta.data.source)}" rel="noopener">source paper</a> · <a href="https://github.com/${escapeHtml(paperMeta.data.org)}/${escapeHtml(paperMeta.data.slug)}" rel="noopener">improve on GitHub</a></p>`
+    ? `  <p class="page-links"><a href="${escapeHtml(paperMeta.data.source)}" rel="noopener">source paper</a></p>`
     : "";
   const footer = `Source: <em>${escapeHtml(conceptMap.paper.title)}</em>${
     authors ? ` — ${escapeHtml(authors)}` : ""

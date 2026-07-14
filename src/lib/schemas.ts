@@ -143,11 +143,7 @@ export const PaperMetaSchema = z.object({
   oneSentenceClaim: z.string().min(1),
   /** Source of the paper (arXiv URL, article URL, …). */
   source: z.string().min(1),
-  /** GitHub org hosting this explanation repo (used to fetch release bundles). */
-  org: z.string().min(1),
-  slug: z.string().min(1),
   audienceName: z.string().min(1),
-  tool: z.object({ repo: z.string(), ref: z.string() }),
 });
 export type PaperMeta = z.infer<typeof PaperMetaSchema>;
 
