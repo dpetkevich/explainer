@@ -1,21 +1,18 @@
 /**
- * The self-serve web app: one always-on Fastify service that serves the
- * frontend, accepts paper uploads, runs generation as in-process background
- * jobs, streams live progress over SSE, serves the finished explainer, and
- * stores anonymous comments. See src/server/{db,queue,jobs,sse,limits}.ts.
+ * The web app: one always-on Fastify service that serves the frontend and a
+ * read-only gallery of explainers (browse, filter, star, comment). Papers are
+ * added out-of-band via the CLI + a DB seed, not uploaded through the web —
+ * there is intentionally no upload endpoint. See src/server/{db,sse,limits}.ts.
  */
 import Fastify from "fastify";
-import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { detectInputKind, paths, type Ctx } from "../lib/context.js";
-import { StageError } from "../lib/log.js";
+import { paths, type Ctx } from "../lib/context.js";
 import {
   initDb,
-  createExplainer,
   getExplainer,
   listExplainers,
   addComment,
@@ -24,11 +21,10 @@ import {
   toggleStar,
   countStars,
   hasStarred,
-  UPLOADS_DIR,
   type ExplainerRow,
 } from "./db.js";
-import { enqueue, resumeQueued, queueDepth } from "./queue.js";
-import { allowUpload, allowComment, allowStar, allowGeneration } from "./limits.js";
+import { resumeQueued, queueDepth } from "./queue.js";
+import { allowComment, allowStar } from "./limits.js";
 import { subscribe, type StreamMessage } from "./sse.js";
 
 // Minimal .env loader so ANTHROPIC_API_KEY can live in the project (mirrors cli.ts).
@@ -43,13 +39,11 @@ import { subscribe, type StreamMessage } from "./sse.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, "public");
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const PORT = Number(process.env.PORT ?? "3000");
 
 initDb();
 
 const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
-await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
 await app.register(fastifyStatic, { root: PUBLIC_DIR, prefix: "/" });
 
 const clientIp = (req: { ip: string; headers: Record<string, unknown> }): string =>
@@ -89,55 +83,6 @@ function toFeedItem(r: ExplainerRow, voterId: string) {
     commentCount: countComments(r.id),
   };
 }
-
-// ---- Upload: multipart PDF, or JSON { url | arxiv | text } ----
-app.post("/api/uploads", async (req, reply) => {
-  if (!allowUpload(clientIp(req))) return reply.code(429).send({ error: "Too many uploads — try again shortly." });
-  if (!allowGeneration()) return reply.code(429).send({ error: "Daily generation limit reached — try again tomorrow." });
-
-  try {
-    let sourceKind: ExplainerRow["source_kind"];
-    let sourceRef: string;
-    let sourceLabel: string;
-    const newId = Math.random().toString(36).slice(2, 10);
-    const outDir = join("explainers", newId);
-
-    if (req.isMultipart()) {
-      const file = await req.file();
-      if (!file) return reply.code(400).send({ error: "No file provided." });
-      const name = file.filename ?? "upload.pdf";
-      if (!/\.pdf$/i.test(name) && file.mimetype !== "application/pdf") {
-        return reply.code(415).send({ error: "Only PDF uploads are supported." });
-      }
-      const buf = await file.toBuffer(); // throws if over the configured fileSize limit
-      mkdirSync(UPLOADS_DIR, { recursive: true });
-      const stored = join(UPLOADS_DIR, `${newId}.pdf`);
-      writeFileSync(stored, buf);
-      sourceKind = "pdf";
-      sourceRef = stored;
-      sourceLabel = name;
-    } else {
-      const body = (req.body ?? {}) as { url?: string; arxiv?: string; text?: string };
-      const raw = (body.url ?? body.arxiv ?? "").trim();
-      if (!raw) return reply.code(400).send({ error: "Provide a paper URL or arXiv link." });
-      sourceKind = detectInputKind(raw); // may throw StageError → 400 below
-      if (sourceKind === "text") return reply.code(400).send({ error: "Paste text is not supported here; upload a PDF or give a URL." });
-      sourceRef = raw;
-      sourceLabel = raw;
-    }
-
-    const row = createExplainer({ id: newId, sourceKind, sourceRef, sourceLabel, outDir });
-    enqueue(row);
-    return reply.code(201).send({ id: row.id });
-  } catch (err) {
-    if (err instanceof StageError) return reply.code(400).send({ error: err.message });
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/maximum file size|request file too large/i.test(msg)) {
-      return reply.code(413).send({ error: "That file is too large (25 MB max)." });
-    }
-    return reply.code(500).send({ error: msg });
-  }
-});
 
 // ---- Feed ----
 app.get("/api/explainers", async (req) => listExplainers().map((r) => toFeedItem(r, voterOf(req))));

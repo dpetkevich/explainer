@@ -65,21 +65,7 @@
 <body>
 <main>
   <h1>explain-it</h1>
-  <p class="tagline">Turn a paper into an interactive, self-explaining walkthrough. Upload one and watch it build, scene by scene.</p>
-
-  <section class="upload">
-    <h2>Explain a paper</h2>
-    <div class="row">
-      <input type="url" id="url" placeholder="Paste an arXiv link or paper URL…" autocomplete="off">
-      <button id="go">Explain it</button>
-    </div>
-    <p class="or">or</p>
-    <div class="file">
-      <label for="pdf" id="pdflabel">Choose a PDF…</label>
-      <input type="file" id="pdf" accept="application/pdf,.pdf">
-    </div>
-    <p class="msg" id="msg"></p>
-  </section>
+  <p class="tagline">Interactive, self-explaining walkthroughs of research papers — browse, star, and comment.</p>
 
   <h2 class="feed-title">All explainers</h2>
   <div class="filters" id="filters"></div>
@@ -88,42 +74,6 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const msg = $("#msg");
-const setMsg = (t, cls="") => { msg.textContent = t; msg.className = "msg " + cls; };
-
-$("#pdf").addEventListener("change", (e) => {
-  const f = e.target.files[0];
-  $("#pdflabel").textContent = f ? f.name : "Choose a PDF…";
-  if (f) submit({ file: f });
-});
-$("#go").addEventListener("click", () => {
-  const url = $("#url").value.trim();
-  if (!url) return setMsg("Paste a link, or choose a PDF.", "err");
-  submit({ url });
-});
-$("#url").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#go").click(); });
-
-async function submit({ url, file }) {
-  $("#go").disabled = true;
-  setMsg("Uploading…");
-  try {
-    let res;
-    if (file) {
-      const fd = new FormData();
-      fd.append("paper", file);
-      res = await fetch("/api/uploads", { method: "POST", body: fd });
-    } else {
-      res = await fetch("/api/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
-    }
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-    setMsg("Started — opening its page…", "ok");
-    location.href = `/explainer/${data.id}`;
-  } catch (err) {
-    setMsg(err.message, "err");
-    $("#go").disabled = false;
-  }
-}
 
 const STATUS_LABEL = { queued: "queued", running: "building", done: "ready", failed: "failed" };
 function card(it) {
