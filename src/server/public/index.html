@@ -52,9 +52,9 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .status { color: var(--muted); }
   .empty { color: var(--muted); }
-  .filters { margin: 0 0 1.25rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .filters { margin: 0 0 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; }
   .filterrow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
-  .filterrow .lbl { color: var(--muted); width: 4.75rem; }
+  .filterrow .lbl { color: var(--muted); }
   .chip { cursor: pointer; padding: 0.15rem 0.7rem; border: 1px solid var(--rule); border-radius: 999px;
     background: none; color: var(--fg); font: inherit; font-size: 0.85rem; }
   .chip:hover { border-color: var(--accent); }
