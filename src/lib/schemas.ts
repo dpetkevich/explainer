@@ -14,6 +14,11 @@ const notSectionName = (label: string) =>
     message: `${label} is named after a document section — name the idea, not the structure`,
   });
 
+// Planning models sometimes emit an explicit `null` for an omitted optional field
+// (e.g. "quantitativeAnchor": null). Treat null and undefined alike as "absent".
+const optionalString = z.string().min(1).nullish().transform((v) => v ?? undefined);
+const optionalBool = z.boolean().nullish().transform((v) => v ?? undefined);
+
 export const ConceptMapSchema = z.object({
   paper: z.object({
     title: z.string().min(1),
@@ -28,10 +33,10 @@ export const ConceptMapSchema = z.object({
         name: notSectionName("concept name"),
         whyItMatters: z.string().min(1),
         coreMechanism: z.string().min(1),
-        keyEquation: z.string().optional(),
-        keyFigureRef: z.string().optional(),
-        misconception: z.string().optional(),
-        foundational: z.boolean().optional(),
+        keyEquation: optionalString,
+        keyFigureRef: optionalString,
+        misconception: optionalString,
+        foundational: optionalBool,
       })
     )
     .min(1),
@@ -42,7 +47,7 @@ export const StoryboardSceneSchema = z.object({
   id: kebab,
   conceptId: kebab,
   /** Part (section) title this scene belongs to — must match an entry in Storyboard.parts. */
-  part: z.string().min(1).optional(),
+  part: optionalString,
   title: notSectionName("scene title"),
   teaches: z.string().min(1),
   requires: z.array(kebab),
@@ -54,7 +59,7 @@ export const StoryboardSceneSchema = z.object({
     range: z.string().min(1),
     whatChangesOnScreen: z.string().min(1),
   }),
-  quantitativeAnchor: z.string().optional(),
+  quantitativeAnchor: optionalString,
   physicsChecks: z.array(z.string().min(1)).min(1),
 });
 export type StoryboardScene = z.infer<typeof StoryboardSceneSchema>;
