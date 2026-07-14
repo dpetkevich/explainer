@@ -32,6 +32,12 @@ export function allowComment(ip: string): boolean {
   return allow(`c:${ip}`, COMMENT_MAX, COMMENT_WINDOW_MS);
 }
 
+// Stars are a raw click counter, so allow frequent increments; the cap only
+// stops a runaway script.
+export function allowStar(ip: string): boolean {
+  return allow(`s:${ip}`, 120, 60_000);
+}
+
 let dayKey = "";
 let dayCount = 0;
 

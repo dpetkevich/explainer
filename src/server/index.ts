@@ -20,11 +20,12 @@ import {
   addComment,
   listComments,
   countComments,
+  starExplainer,
   UPLOADS_DIR,
   type ExplainerRow,
 } from "./db.js";
 import { enqueue, resumeQueued, queueDepth } from "./queue.js";
-import { allowUpload, allowComment, allowGeneration } from "./limits.js";
+import { allowUpload, allowComment, allowStar, allowGeneration } from "./limits.js";
 import { subscribe, type StreamMessage } from "./sse.js";
 
 // Minimal .env loader so ANTHROPIC_API_KEY can live in the project (mirrors cli.ts).
@@ -64,6 +65,7 @@ function toFeedItem(r: ExplainerRow) {
     scenesTotal: r.scenes_total,
     scenesPassed: r.scenes_passed,
     error: r.error,
+    stars: r.stars,
     createdAt: r.created_at,
     commentCount: countComments(r.id),
   };
@@ -174,6 +176,14 @@ app.get("/api/explainers/:id/events", async (req, reply) => {
     unsubscribe();
   });
   return reply;
+});
+
+// ---- Stars (a raw click counter; anonymous, no accounts) ----
+app.post("/api/explainers/:id/star", async (req, reply) => {
+  const id = (req.params as { id: string }).id;
+  if (!getExplainer(id)) return reply.code(404).send({ error: "Not found." });
+  if (!allowStar(clientIp(req))) return reply.code(429).send({ error: "Too many stars — slow down a moment." });
+  return { stars: starExplainer(id) };
 });
 
 // ---- Comments ----

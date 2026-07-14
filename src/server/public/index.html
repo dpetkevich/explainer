@@ -130,7 +130,8 @@ function card(it) {
     <div class="meta">
       <span class="badge ${it.status}">${badgeInner}</span>
       ${it.status === "failed" && it.error ? `<span title="${esc(it.error)}">${esc(it.error)}</span>` : ""}
-      <span>💬 ${it.commentCount}</span>
+      <span title="Stars">⭐ ${it.stars ?? 0}</span>
+      <span title="Comments">💬 ${it.commentCount}</span>
     </div>
   </article>`;
 }

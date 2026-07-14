@@ -30,6 +30,7 @@ export interface ExplainerRow {
   scenes_passed: number | null;
   out_dir: string;
   error: string | null;
+  stars: number;
   created_at: number;
   updated_at: number;
 }
@@ -63,6 +64,7 @@ export function initDb(): Database.Database {
       scenes_passed INTEGER,
       out_dir TEXT NOT NULL,
       error TEXT,
+      stars INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -75,6 +77,9 @@ export function initDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_comments_explainer ON comments(explainer_id, created_at);
   `);
+  // Columns added after the initial schema (SQLite has no IF NOT EXISTS for columns).
+  const cols = (db.prepare("PRAGMA table_info(explainers)").all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes("stars")) db.exec("ALTER TABLE explainers ADD COLUMN stars INTEGER NOT NULL DEFAULT 0");
   // A run cannot resume mid-flight in a fresh process, so mark anything that was
   // "running" as failed on boot. "queued" rows never started, so the queue can
   // safely pick them up again (see resumeQueued in queue.ts).
@@ -126,6 +131,13 @@ export function updateExplainer(id: string, patch: ExplainerPatch): void {
   const set = keys.map((k) => `${k} = ?`).join(", ");
   const values = keys.map((k) => patch[k] ?? null);
   db.prepare(`UPDATE explainers SET ${set}, updated_at = ? WHERE id = ?`).run(...values, Date.now(), id);
+}
+
+/** Increment an explainer's star count and return the new total. */
+export function starExplainer(id: string): number {
+  db.prepare(`UPDATE explainers SET stars = stars + 1, updated_at = ? WHERE id = ?`).run(Date.now(), id);
+  const row = db.prepare(`SELECT stars FROM explainers WHERE id = ?`).get(id) as { stars: number } | undefined;
+  return row?.stars ?? 0;
 }
 
 export function addComment(explainerId: string, authorName: string, body: string): CommentRow {
