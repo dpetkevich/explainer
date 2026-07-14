@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "label": "Visuals carry the load; minimal captions",
+  "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2026-07-14",
+      "summary": "Visuals carry the explanation: every scene is a labeled diagram (structure) or an interactive chart with the independent variable on a reader-moved control (relationships). Captions cut from 3-5 sentences to 1-2 that point at the visual. Metaphor is a doorway, not a residence (introduce, then name the real term and drop the metaphor). Removed the story-roles rule."
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-07-07",
+      "summary": "Feynman-first four-part arc (building blocks -> new tech -> why it beats existing -> why now). 3-5 sentence captions in Feynman voice with Zinsser economy. Introduce-then-use vocabulary; sustained metaphors with explicit mappings; story roles over algebra labels; honest black boxes for beyond-audience mechanisms."
+    }
+  ]
+}

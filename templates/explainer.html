@@ -49,9 +49,21 @@
   .page-links {
     margin: -2.25rem 0 3rem;
     font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
   }
   .page-links a { color: var(--accent); text-decoration: none; }
   .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
   section.endorsements {
     margin: -1.5rem 0 3rem;
     padding: 1rem 1.25rem;

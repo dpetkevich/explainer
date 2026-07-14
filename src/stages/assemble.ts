@@ -2,7 +2,8 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { templatePath } from "../lib/prompts.js";
 import { renderRichText, stripMath } from "../lib/mathml.js";
-import { EndorsementsSchema, PaperMetaSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
+import { EndorsementsSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
+import { currentPedagogy } from "../lib/pedagogy.js";
 import type { QaSummary } from "./qa.js";
 import { info, warn } from "../lib/log.js";
 import { emit } from "../lib/progress.js";
@@ -106,15 +107,27 @@ export function runAssemble(
 
   const authors = conceptMap.paper.authors.join(", ");
   const generated = new Date().toISOString().slice(0, 10);
-  // Published repos carry paper.json (source URL + repo coordinates); local
-  // pipeline runs may not — the footer links render only when it's there.
-  const paperMetaFile = join(ctx.outDir, "paper.json");
-  const paperMeta = existsSync(paperMetaFile)
-    ? PaperMetaSchema.safeParse(JSON.parse(readFileSync(paperMetaFile, "utf8")))
-    : undefined;
-  const pageLinks = paperMeta?.success
-    ? `  <p class="page-links"><a href="${escapeHtml(paperMeta.data.source)}" rel="noopener">source paper</a></p>`
+
+  // Under the hook: a link to the source paper (when the input was a URL/arXiv)
+  // and the pedagogy-style version that produced this explainer. Pin both in
+  // generation-meta.json at first assembly so a later model-free reassembly
+  // keeps the original values (a paper made under pedagogy v1 stays labelled v1).
+  const metaFile = join(ctx.outDir, "generation-meta.json");
+  interface GenMeta { source?: string; pedagogy: { version: string; label: string } }
+  let meta: GenMeta;
+  if (existsSync(metaFile)) {
+    meta = JSON.parse(readFileSync(metaFile, "utf8")) as GenMeta;
+  } else {
+    const sourceUrl = ctx.inputKind === "url" || ctx.inputKind === "arxiv" ? ctx.input : undefined;
+    meta = { source: sourceUrl, pedagogy: currentPedagogy() };
+    writeFileSync(metaFile, JSON.stringify(meta, null, 2) + "\n");
+  }
+  const paperLink = meta.source
+    ? `<a href="${escapeHtml(meta.source)}" rel="noopener">Source paper</a><span class="sep"> · </span>`
     : "";
+  const pageLinks =
+    `  <p class="page-links">${paperLink}<span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">` +
+    `Pedagogy v${escapeHtml(meta.pedagogy.version)} · ${escapeHtml(meta.pedagogy.label)}</span></p>`;
   const footer = `Source: <em>${escapeHtml(conceptMap.paper.title)}</em>${
     authors ? ` — ${escapeHtml(authors)}` : ""
   }. Explainer generated ${generated}.`;
