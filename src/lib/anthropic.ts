@@ -16,6 +16,9 @@ export const MODELS = {
   planning: process.env.PLANNING_MODEL ?? "claude-fable-5",
   codegen: process.env.CODEGEN_MODEL ?? "claude-sonnet-5",
   review: process.env.REVIEW_MODEL ?? "claude-sonnet-5",
+  // The prose/slop reviewer runs on fable-5 by default: a stronger, different
+  // model from the sonnet scene-author, which reduces self-enhancement bias.
+  prose: process.env.PROSE_MODEL ?? "claude-fable-5",
 };
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 529]);

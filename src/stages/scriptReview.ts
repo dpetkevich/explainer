@@ -21,15 +21,17 @@ function scriptText(board: Storyboard): string {
 }
 
 async function reviewScript(ctx: Ctx, board: Storyboard): Promise<ScriptReview> {
-  const prompt = loadPrompt("script-review", { audience: ctx.audienceRaw, script: scriptText(board) });
-  const raw = await callModel({ model: MODELS.review, messages: [{ role: "user", content: prompt }], maxTokens: 8000 });
+  // Best-effort quality enhancer, never a hard gate: a malformed review, a
+  // model error, or a refusal (fable-5 may decline some content) all degrade to
+  // a pass rather than failing the generation.
   try {
+    const prompt = loadPrompt("script-review", { audience: ctx.audienceRaw, script: scriptText(board) });
+    const raw = await callModel({ model: MODELS.prose, messages: [{ role: "user", content: prompt }], maxTokens: 8000 });
     const parsed = ScriptReviewSchema.safeParse(JSON.parse(stripJsonFences(raw)));
     if (parsed.success) return parsed.data;
-  } catch {
-    /* fall through */
+  } catch (err) {
+    warn("script-review", `prose review unavailable (${err instanceof Error ? err.message : String(err)}) — skipping`);
   }
-  // A malformed review must not block the pipeline — treat as a pass.
   return { pass: true, issues: [] };
 }
 
