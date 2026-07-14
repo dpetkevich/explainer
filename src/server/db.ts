@@ -76,6 +76,12 @@ export function initDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_comments_explainer ON comments(explainer_id, created_at);
+    CREATE TABLE IF NOT EXISTS stars (
+      explainer_id TEXT NOT NULL,
+      voter_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (explainer_id, voter_id)
+    );
   `);
   // Columns added after the initial schema (SQLite has no IF NOT EXISTS for columns).
   const cols = (db.prepare("PRAGMA table_info(explainers)").all() as { name: string }[]).map((c) => c.name);
@@ -133,11 +139,23 @@ export function updateExplainer(id: string, patch: ExplainerPatch): void {
   db.prepare(`UPDATE explainers SET ${set}, updated_at = ? WHERE id = ?`).run(...values, Date.now(), id);
 }
 
-/** Increment an explainer's star count and return the new total. */
-export function starExplainer(id: string): number {
-  db.prepare(`UPDATE explainers SET stars = stars + 1, updated_at = ? WHERE id = ?`).run(Date.now(), id);
-  const row = db.prepare(`SELECT stars FROM explainers WHERE id = ?`).get(id) as { stars: number } | undefined;
-  return row?.stars ?? 0;
+/** Toggle one anonymous visitor's star for an explainer; returns the new total + their state. */
+export function toggleStar(explainerId: string, voterId: string): { stars: number; starred: boolean } {
+  const existing = db.prepare(`SELECT 1 FROM stars WHERE explainer_id = ? AND voter_id = ?`).get(explainerId, voterId);
+  if (existing) {
+    db.prepare(`DELETE FROM stars WHERE explainer_id = ? AND voter_id = ?`).run(explainerId, voterId);
+  } else {
+    db.prepare(`INSERT INTO stars (explainer_id, voter_id, created_at) VALUES (?, ?, ?)`).run(explainerId, voterId, Date.now());
+  }
+  return { stars: countStars(explainerId), starred: !existing };
+}
+
+export function countStars(explainerId: string): number {
+  return (db.prepare(`SELECT COUNT(*) AS n FROM stars WHERE explainer_id = ?`).get(explainerId) as { n: number }).n;
+}
+
+export function hasStarred(explainerId: string, voterId: string): boolean {
+  return !!db.prepare(`SELECT 1 FROM stars WHERE explainer_id = ? AND voter_id = ?`).get(explainerId, voterId);
 }
 
 export function addComment(explainerId: string, authorName: string, body: string): CommentRow {

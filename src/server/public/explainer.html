@@ -22,7 +22,9 @@
   #star { font: inherit; font-size: 0.95rem; cursor: pointer; color: var(--fg);
     background: none; border: 1px solid var(--rule); border-radius: 999px; padding: 0.2rem 0.8rem; }
   #star:hover { border-color: #e3b341; }
-  #star .glyph { color: #e3b341; }
+  #star .glyph { color: var(--muted); }
+  #star.starred { border-color: #e3b341; }
+  #star.starred .glyph { color: #e3b341; }
   #star.bump { transform: scale(1.15); transition: transform 0.12s ease; }
   #star .count { font-variant-numeric: tabular-nums; }
   main { max-width: 880px; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
@@ -58,7 +60,7 @@
 <body>
 <div class="bar">
   <a href="/">← all explainers</a>
-  <button id="star" title="Star this explainer"><span class="glyph">★</span> <span class="count" id="starcount">0</span></button>
+  <button id="star" title="Star this explainer"><span class="glyph">☆</span> <span class="count" id="starcount">0</span></button>
 </div>
 <main>
   <div id="view"><div class="progress"><h1>Loading…</h1></div></div>
@@ -132,13 +134,19 @@ function handle(msg) {
   }
 }
 
-// ---- Stars ----
+// ---- Stars (one per anonymous visitor, toggle) ----
 const starBtn = $("#star");
 const starCount = $("#starcount");
+function renderStar(stars, starred) {
+  starCount.textContent = String(stars ?? 0);
+  starBtn.classList.toggle("starred", !!starred);
+  starBtn.querySelector(".glyph").textContent = starred ? "★" : "☆";
+  starBtn.title = starred ? "Starred — click to remove" : "Star this explainer";
+}
 async function loadStars() {
   try {
     const res = await fetch(`/api/explainers/${encodeURIComponent(id)}`);
-    if (res.ok) starCount.textContent = String((await res.json()).stars ?? 0);
+    if (res.ok) { const d = await res.json(); renderStar(d.stars, d.starredByYou); }
   } catch { /* transient */ }
 }
 starBtn.addEventListener("click", async () => {
@@ -147,7 +155,7 @@ starBtn.addEventListener("click", async () => {
     const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/star`, { method: "POST" });
     const data = await res.json();
     if (res.ok) {
-      starCount.textContent = String(data.stars);
+      renderStar(data.stars, data.starred);
       starBtn.classList.add("bump");
       setTimeout(() => starBtn.classList.remove("bump"), 150);
     }

@@ -10,6 +10,7 @@ import fastifyStatic from "@fastify/static";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { detectInputKind, paths, type Ctx } from "../lib/context.js";
 import { StageError } from "../lib/log.js";
 import {
@@ -20,7 +21,9 @@ import {
   addComment,
   listComments,
   countComments,
-  starExplainer,
+  toggleStar,
+  countStars,
+  hasStarred,
   UPLOADS_DIR,
   type ExplainerRow,
 } from "./db.js";
@@ -53,7 +56,20 @@ const clientIp = (req: { ip: string; headers: Record<string, unknown> }): string
   (typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",")[0]!.trim() : "") ||
   req.ip;
 
-function toFeedItem(r: ExplainerRow) {
+// Give every browser an anonymous visitor id in an httpOnly cookie, so a star
+// can be one-per-visitor without any login (best-effort: clearable, per-browser).
+app.addHook("onRequest", async (req, reply) => {
+  const m = (req.headers.cookie ?? "").match(/(?:^|;\s*)voter=([^;]+)/);
+  let voter = m?.[1];
+  if (!voter) {
+    voter = randomUUID();
+    reply.header("Set-Cookie", `voter=${voter}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax`);
+  }
+  (req as unknown as { voterId: string }).voterId = voter;
+});
+const voterOf = (req: unknown): string => (req as { voterId: string }).voterId;
+
+function toFeedItem(r: ExplainerRow, voterId: string) {
   return {
     id: r.id,
     title: r.title ?? r.source_label,
@@ -65,7 +81,8 @@ function toFeedItem(r: ExplainerRow) {
     scenesTotal: r.scenes_total,
     scenesPassed: r.scenes_passed,
     error: r.error,
-    stars: r.stars,
+    stars: countStars(r.id),
+    starredByYou: hasStarred(r.id, voterId),
     createdAt: r.created_at,
     commentCount: countComments(r.id),
   };
@@ -121,12 +138,12 @@ app.post("/api/uploads", async (req, reply) => {
 });
 
 // ---- Feed ----
-app.get("/api/explainers", async () => listExplainers().map(toFeedItem));
+app.get("/api/explainers", async (req) => listExplainers().map((r) => toFeedItem(r, voterOf(req))));
 
 app.get("/api/explainers/:id", async (req, reply) => {
   const row = getExplainer((req.params as { id: string }).id);
   if (!row) return reply.code(404).send({ error: "Not found." });
-  return toFeedItem(row);
+  return toFeedItem(row, voterOf(req));
 });
 
 // ---- Serve the finished, self-contained explainer.html ----
@@ -155,7 +172,7 @@ app.get("/api/explainers/:id/events", async (req, reply) => {
   const send = (msg: StreamMessage) => reply.raw.write(`data: ${JSON.stringify(msg)}\n\n`);
 
   // Snapshot first so a late subscriber (or a reconnect) gets current state.
-  send({ type: "snapshot", ...toFeedItem(row) } as unknown as StreamMessage);
+  send({ type: "snapshot", ...toFeedItem(row, voterOf(req)) } as unknown as StreamMessage);
   if (row.status === "done" || row.status === "failed") {
     send({ type: "closed", status: row.status, error: row.error ?? undefined });
     reply.raw.end();
@@ -183,7 +200,7 @@ app.post("/api/explainers/:id/star", async (req, reply) => {
   const id = (req.params as { id: string }).id;
   if (!getExplainer(id)) return reply.code(404).send({ error: "Not found." });
   if (!allowStar(clientIp(req))) return reply.code(429).send({ error: "Too many stars — slow down a moment." });
-  return { stars: starExplainer(id) };
+  return toggleStar(id, voterOf(req));
 });
 
 // ---- Comments ----
