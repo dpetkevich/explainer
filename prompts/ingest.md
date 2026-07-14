@@ -48,3 +48,5 @@ Return **strict JSON only** — no markdown fences, no commentary before or afte
 `prerequisites` lists what the paper assumes the reader knows (so downstream stages know what NOT to explain).
 
 `category` is the single best-fit subject tag, chosen from exactly this list: **Computing** (AI/ML, systems, GPUs, graphics, algorithms, software), **Space** (propulsion, aerospace, astronomy, orbital physics), **Quantum** (qubits, quantum algorithms or hardware). Pick the closest one.
+
+`oneSentenceClaim` is the paper's **abstract in plain language**: 1–2 short sentences a curious non-expert can read start to finish, saying what the work does and why it matters. It is the gist shown in listings, so it must read like a real abstract — no jargon dumps, no undefined terms, no dense run-on clauses stacking every technical detail. Prefer the plainest phrasing that is still accurate.

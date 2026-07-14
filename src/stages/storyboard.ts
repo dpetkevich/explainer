@@ -6,6 +6,7 @@ import { storyboardToMarkdown } from "../lib/storyboard-md.js";
 import { StoryboardSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
 import { emit } from "../lib/progress.js";
+import { reviewAndReviseScript } from "./scriptReview.js";
 import { paths, type Ctx } from "../lib/context.js";
 
 export interface StoryboardResult {
@@ -95,6 +96,11 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
     warn("storyboard", `model returned ${board.scenes.length} scenes; keeping first ${ctx.maxScenes}`);
     board = { ...board, scenes: board.scenes.slice(0, ctx.maxScenes) };
   }
+
+  // Prose review + auto-revise (hook + captions) before anything is cached or
+  // any graphics are made. Prose fields are outside the scene contract, so this
+  // never triggers scene regeneration.
+  board = await reviewAndReviseScript(ctx, board);
 
   writeFileSync(out, JSON.stringify(board, null, 2));
   writeFileSync(paths.script(ctx), renderScript(ctx, board));

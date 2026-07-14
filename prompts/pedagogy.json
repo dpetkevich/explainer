@@ -1,7 +1,12 @@
 {
-  "version": "2.0.0",
-  "label": "Visuals carry the load; minimal captions",
+  "version": "3.0.0",
+  "label": "Abstract-quality gist; sensible, idiomatic-only prose",
   "changelog": [
+    {
+      "version": "3.0.0",
+      "date": "2026-07-14",
+      "summary": "The list gist (oneSentenceClaim) must read like a plain-language abstract, not a dense claim. The hook must be sensible English with no slop, and any metaphor must be genuinely idiomatic (no invented images like 'a fort out of movable boxes'). Added a prose reviewer that reads the hook + captions before graphics and auto-revises slop / non-idiomatic metaphors / undefined terms; the scene reviewer also fails caption slop."
+    },
     {
       "version": "2.0.0",
       "date": "2026-07-14",

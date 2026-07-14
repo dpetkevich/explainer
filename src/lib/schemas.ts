@@ -134,6 +134,19 @@ export const QaReportSchema = z.object({
 });
 export type QaReport = z.infer<typeof QaReportSchema>;
 
+/** Prose-quality review of the storyboard's hook + captions (text, not screenshots). */
+export const ScriptReviewSchema = z.object({
+  pass: z.boolean(),
+  issues: z.array(
+    z.object({
+      where: z.string(), // "hook" or a scene id
+      kind: z.enum(["slop", "metaphor", "undefined-term", "too-wordy", "other"]),
+      detail: z.string(),
+    })
+  ),
+});
+export type ScriptReview = z.infer<typeof ScriptReviewSchema>;
+
 export const EndorsementSchema = z.object({
   /** Who endorses — a person, or a collective like "Technical staff at …". */
   name: z.string().min(1),
