@@ -60,7 +60,7 @@
   .chip:hover { border-color: var(--accent); }
   .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .pill { padding: 0.05rem 0.55rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
-  /* Comment fields are a dev/feedback tool — hidden until dev mode (Cmd/Ctrl+D). */
+  /* Comment fields are a dev/feedback tool — hidden until dev mode (Ctrl+Shift+D). */
   .discuss { margin-top: 0.75rem; font-size: 0.9rem; display: none; }
   body.dev .discuss { display: block; }
   .discuss > summary { cursor: pointer; color: var(--muted); }
@@ -96,7 +96,7 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-// ---- Dev mode: reveal the comment/feedback fields with Cmd/Ctrl+D ----
+// ---- Dev mode: reveal the comment/feedback fields with Ctrl+Shift+D ----
 let dev = localStorage.getItem("eiDev") === "1";
 let toastTimer = null;
 function toast(m) {
@@ -105,7 +105,7 @@ function toast(m) {
 }
 function applyDev() { document.body.classList.toggle("dev", dev); }
 addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === "KeyD") {
+  if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === "KeyD") {
     e.preventDefault();
     dev = !dev; localStorage.setItem("eiDev", dev ? "1" : "0"); applyDev();
     toast(dev ? "Dev mode ON — comment fields visible" : "Dev mode OFF");

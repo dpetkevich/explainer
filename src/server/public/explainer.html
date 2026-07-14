@@ -42,7 +42,7 @@
   .scenebar { margin-top: 0.75rem; color: var(--muted); font-size: 0.95rem; }
   .fail { color: var(--err); }
   iframe.viewer { width: 100%; border: 1px solid var(--rule); border-radius: 10px; background: transparent; }
-  /* All comment UI is a dev/feedback tool — hidden until dev mode (Cmd/Ctrl+D). */
+  /* All comment UI is a dev/feedback tool — hidden until dev mode (Ctrl+Shift+D). */
   section.comments { margin-top: 2.5rem; display: none; }
   body.dev section.comments { display: block; }
   .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
@@ -90,7 +90,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const STAGES = [["ingest","Reading the paper"],["storyboard","Planning the walkthrough"],["scenes","Building interactive scenes"],["assemble","Assembling"]];
 
-// ---- Dev mode: reveal the comment/feedback UI with Cmd/Ctrl+D ----
+// ---- Dev mode: reveal the comment/feedback UI with Ctrl+Shift+D ----
 let dev = localStorage.getItem("eiDev") === "1";
 let toastTimer = null;
 function toast(m) {
@@ -103,7 +103,7 @@ function applyDev() {
   if (typeof autosize === "function") setTimeout(autosize, 60);
 }
 addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === "KeyD") {
+  if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === "KeyD") {
     e.preventDefault();
     dev = !dev; localStorage.setItem("eiDev", dev ? "1" : "0");
     applyDev();
