@@ -10,14 +10,7 @@ import { info, warn, StageError } from "../lib/log.js";
 import { emit } from "../lib/progress.js";
 import { paths, arxivId, type Ctx } from "../lib/context.js";
 
-async function fetchArticleText(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: { "user-agent": "Mozilla/5.0 (explain-it CLI; article extraction)" },
-  });
-  if (!res.ok) {
-    throw new StageError("ingest", `fetch failed for ${url}: HTTP ${res.status}`);
-  }
-  const html = await res.text();
+function extractArticle(html: string, url: string): string {
   // Readability chokes loudly on modern CSS; silence jsdom's parse noise.
   const vc = new VirtualConsole();
   const dom = new JSDOM(html, { url, virtualConsole: vc });
@@ -67,16 +60,43 @@ async function resolveSource(ctx: Ctx): Promise<{ text?: string; pdfBase64?: str
   if (ctx.inputKind === "text") {
     return { text: readFileSync(ctx.input, "utf8") };
   }
-  const cached = paths.sourceText(ctx);
-  if (existsSync(cached) && !ctx.force) {
-    info("ingest", `using cached extraction ${cached}`);
-    return { text: readFileSync(cached, "utf8") };
+  // A URL can be an HTML article OR a direct PDF link — decide by content-type
+  // (falling back to a .pdf extension) and route PDFs through the document path.
+  const pdfCache = paths.sourcePdf(ctx);
+  const txtCache = paths.sourceText(ctx);
+  if (!ctx.force) {
+    if (existsSync(pdfCache)) {
+      info("ingest", `using cached PDF ${pdfCache}`);
+      return { pdfBase64: readFileSync(pdfCache).toString("base64") };
+    }
+    if (existsSync(txtCache)) {
+      info("ingest", `using cached extraction ${txtCache}`);
+      return { text: readFileSync(txtCache, "utf8") };
+    }
   }
-  info("ingest", `fetching and extracting ${ctx.input}`);
-  const text = await fetchArticleText(ctx.input);
+  info("ingest", `fetching ${ctx.input}`);
+  const res = await fetch(ctx.input, {
+    redirect: "follow",
+    headers: { "user-agent": "Mozilla/5.0 (explain-it CLI; paper extraction)" },
+  });
+  if (!res.ok) {
+    throw new StageError("ingest", `fetch failed for ${ctx.input}: HTTP ${res.status}`);
+  }
   mkdirSync(ctx.workDir, { recursive: true });
-  writeFileSync(cached, text);
-  info("ingest", `cached extraction to ${cached}`);
+  const contentType = res.headers.get("content-type") ?? "";
+  const looksPdf = /application\/pdf/i.test(contentType) || /\.pdf(?:$|[?#])/i.test(ctx.input);
+  if (looksPdf) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.subarray(0, 5).toString("latin1").startsWith("%PDF")) {
+      throw new StageError("ingest", `expected a PDF at ${ctx.input} but got ${buf.length} bytes starting "${buf.subarray(0, 12).toString("latin1")}"`);
+    }
+    writeFileSync(pdfCache, buf);
+    info("ingest", `cached PDF to ${pdfCache} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
+    return { pdfBase64: buf.toString("base64") };
+  }
+  const text = extractArticle(await res.text(), ctx.input);
+  writeFileSync(txtCache, text);
+  info("ingest", `cached extraction to ${txtCache}`);
   return { text };
 }
 
