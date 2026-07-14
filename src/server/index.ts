@@ -68,6 +68,7 @@ function toFeedItem(r: ExplainerRow, voterId: string) {
     id: r.id,
     title: r.title ?? r.source_label,
     claim: r.one_sentence_claim,
+    hook: r.hook,
     source: r.source_kind === "pdf" ? r.source_label : r.source_ref,
     sourceKind: r.source_kind,
     status: r.status,

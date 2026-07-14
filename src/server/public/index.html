@@ -60,6 +60,20 @@
   .chip:hover { border-color: var(--accent); }
   .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .pill { padding: 0.05rem 0.55rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
+  .discuss { margin-top: 0.75rem; font-size: 0.9rem; }
+  .discuss > summary { cursor: pointer; color: var(--muted); }
+  .thread { border-top: 1px solid var(--rule); padding-top: 0.6rem; margin-top: 0.6rem; }
+  .thread h4 { margin: 0 0 0.2rem; font-size: 0.9rem; }
+  .thread .quote { color: var(--muted); font-style: italic; margin: 0 0 0.5rem; }
+  .thread .c { border-top: 1px solid var(--rule); padding: 0.35rem 0; }
+  .thread .who { font-weight: 600; }
+  .thread .when { color: var(--muted); font-size: 0.8em; margin-left: 0.4rem; }
+  .thread .text { margin: 0.15rem 0 0; white-space: pre-wrap; }
+  .thread input, .thread textarea { width: 100%; margin-top: 0.35rem; padding: 0.4rem 0.6rem;
+    border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; box-sizing: border-box; }
+  .thread textarea { min-height: 3rem; resize: vertical; }
+  .thread button { margin-top: 0.35rem; padding: 0.3rem 0.85rem; border: 0; border-radius: 6px;
+    background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -94,7 +108,53 @@ function card(it) {
       <span class="pill" title="Tag">${esc(it.category || "Computing")}</span>
       ${it.pedagogyVersion ? `<span class="pill" title="Pedagogy version">Pedagogy v${esc(it.pedagogyVersion)}</span>` : ""}
     </div>
+    <details class="discuss" data-id="${esc(it.id)}">
+      <summary>💬 Discuss the abstract &amp; blurb</summary>
+      <div class="threads"><p class="status">Loading…</p></div>
+    </details>
   </article>`;
+}
+
+const commentC = (c) =>
+  `<div class="c"><span class="who">${esc(c.authorName)}</span><span class="when">${new Date(c.createdAt).toLocaleString()}</span><p class="text">${esc(c.body)}</p></div>`;
+
+function thread(sceneId, label, quote, list) {
+  return `<div class="thread" data-scene="${sceneId}">
+    <h4>${label}</h4>
+    ${quote ? `<p class="quote">${esc(quote)}</p>` : `<p class="quote">(no ${label.toLowerCase()} recorded)</p>`}
+    ${list.map(commentC).join("")}
+    <input type="text" class="name" placeholder="Your name (optional)" maxlength="60">
+    <textarea class="body" placeholder="Comment on the ${label.toLowerCase()}…" maxlength="5000"></textarea>
+    <button type="button" class="post">Post</button>
+  </div>`;
+}
+
+async function renderDiscuss(d) {
+  const id = d.dataset.id;
+  const item = allItems.find((i) => i.id === id) || {};
+  const wrap = d.querySelector(".threads");
+  let comments = [];
+  try { comments = await (await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`)).json(); } catch { /* transient */ }
+  d.dataset.loaded = "1";
+  const byScene = (sid) => comments.filter((c) => c.sceneId === sid);
+  wrap.innerHTML = thread("abstract", "Abstract", item.hook, byScene("abstract")) + thread("blurb", "Blurb", item.claim, byScene("blurb"));
+  wrap.querySelectorAll(".thread").forEach((t) => {
+    const btn = t.querySelector(".post");
+    btn.addEventListener("click", async () => {
+      const body = t.querySelector(".body").value.trim();
+      if (!body) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: t.dataset.scene, authorName: t.querySelector(".name").value.trim(), body }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || `Error ${res.status}`);
+        d.dataset.loaded = "";
+        await renderDiscuss(d);
+      } catch (e) { alert(e.message); btn.disabled = false; }
+    });
+  });
 }
 
 let allItems = [];
@@ -138,17 +198,27 @@ function renderFeed() {
       (filterTag == null || (i.category || "Computing") === filterTag) &&
       (filterPed == null || i.pedagogyVersion === filterPed)
   );
-  $("#feed").innerHTML = !allItems.length
-    ? `<p class="empty">No explainers yet — be the first to upload a paper.</p>`
+  const feed = $("#feed");
+  feed.innerHTML = !allItems.length
+    ? `<p class="empty">No explainers yet.</p>`
     : items.length
       ? items.map(card).join("")
       : `<p class="empty">No explainers match this filter.</p>`;
+  feed.querySelectorAll("details.discuss").forEach((d) =>
+    d.addEventListener("toggle", () => { if (d.open && !d.dataset.loaded) renderDiscuss(d); })
+  );
 }
 
+let lastSig = "";
 async function refreshFeed() {
   try {
     const res = await fetch("/api/explainers");
-    allItems = await res.json();
+    const items = await res.json();
+    // Skip re-render when nothing changed, so an open comment box isn't wiped by polling.
+    const sig = JSON.stringify(items.map((i) => [i.id, i.status, i.stage, i.scenesPassed, i.scenesTotal, i.stars, i.starredByYou, i.commentCount, i.category, i.pedagogyVersion, i.title, i.claim, i.hook]));
+    if (sig === lastSig) return;
+    lastSig = sig;
+    allItems = items;
     // Default the Pedagogy filter to the latest version present (until the user picks one).
     if (!pedTouched) {
       const vers = [...new Set(allItems.map((i) => i.pedagogyVersion).filter(Boolean))];

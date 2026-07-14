@@ -24,6 +24,8 @@ export interface ExplainerRow {
   source_label: string;
   title: string | null;
   one_sentence_claim: string | null;
+  /** The explainer's opening hook / abstract paragraph. */
+  hook: string | null;
   status: ExplainerStatus;
   stage: string | null;
   scenes_total: number | null;
@@ -62,6 +64,7 @@ export function initDb(): Database.Database {
       source_label TEXT NOT NULL,
       title TEXT,
       one_sentence_claim TEXT,
+      hook TEXT,
       status TEXT NOT NULL,
       stage TEXT,
       scenes_total INTEGER,
@@ -93,6 +96,7 @@ export function initDb(): Database.Database {
   if (!cols.includes("stars")) db.exec("ALTER TABLE explainers ADD COLUMN stars INTEGER NOT NULL DEFAULT 0");
   if (!cols.includes("category")) db.exec("ALTER TABLE explainers ADD COLUMN category TEXT");
   if (!cols.includes("pedagogy_version")) db.exec("ALTER TABLE explainers ADD COLUMN pedagogy_version TEXT");
+  if (!cols.includes("hook")) db.exec("ALTER TABLE explainers ADD COLUMN hook TEXT");
   const ccols = (db.prepare("PRAGMA table_info(comments)").all() as { name: string }[]).map((c) => c.name);
   if (!ccols.includes("scene_id")) db.exec("ALTER TABLE comments ADD COLUMN scene_id TEXT");
   // A run cannot resume mid-flight in a fresh process, so mark anything that was
@@ -138,6 +142,7 @@ type ExplainerPatch = Partial<
     ExplainerRow,
     | "title"
     | "one_sentence_claim"
+    | "hook"
     | "status"
     | "stage"
     | "scenes_total"

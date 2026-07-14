@@ -63,6 +63,7 @@ export async function runGenerationJob(row: ExplainerRow): Promise<void> {
       category: conceptMap.paper.category ?? "Computing",
     });
     const { board } = await runStoryboard(ctx, conceptMap);
+    updateExplainer(row.id, { title: board.title, hook: board.hook });
     const qa = await runScenePipeline(ctx, board, true);
     runAssemble(ctx, conceptMap, board, qa);
     updateExplainer(row.id, { status: "done", stage: "assemble", pedagogy_version: currentPedagogy().version });
