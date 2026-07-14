@@ -31,6 +31,8 @@ export interface ExplainerRow {
   out_dir: string;
   error: string | null;
   stars: number;
+  category: string | null;
+  pedagogy_version: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -89,6 +91,8 @@ export function initDb(): Database.Database {
   // Columns added after the initial schema (SQLite has no IF NOT EXISTS for columns).
   const cols = (db.prepare("PRAGMA table_info(explainers)").all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes("stars")) db.exec("ALTER TABLE explainers ADD COLUMN stars INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes("category")) db.exec("ALTER TABLE explainers ADD COLUMN category TEXT");
+  if (!cols.includes("pedagogy_version")) db.exec("ALTER TABLE explainers ADD COLUMN pedagogy_version TEXT");
   const ccols = (db.prepare("PRAGMA table_info(comments)").all() as { name: string }[]).map((c) => c.name);
   if (!ccols.includes("scene_id")) db.exec("ALTER TABLE comments ADD COLUMN scene_id TEXT");
   // A run cannot resume mid-flight in a fresh process, so mark anything that was
@@ -132,7 +136,15 @@ export function listQueued(): ExplainerRow[] {
 type ExplainerPatch = Partial<
   Pick<
     ExplainerRow,
-    "title" | "one_sentence_claim" | "status" | "stage" | "scenes_total" | "scenes_passed" | "error"
+    | "title"
+    | "one_sentence_claim"
+    | "status"
+    | "stage"
+    | "scenes_total"
+    | "scenes_passed"
+    | "error"
+    | "category"
+    | "pedagogy_version"
   >
 >;
 

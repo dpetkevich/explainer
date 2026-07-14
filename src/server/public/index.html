@@ -52,6 +52,14 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .status { color: var(--muted); }
   .empty { color: var(--muted); }
+  .filters { margin: 0 0 1.25rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .filterrow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
+  .filterrow .lbl { color: var(--muted); width: 4.75rem; }
+  .chip { cursor: pointer; padding: 0.15rem 0.7rem; border: 1px solid var(--rule); border-radius: 999px;
+    background: none; color: var(--fg); font: inherit; font-size: 0.85rem; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pill { padding: 0.05rem 0.55rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -74,6 +82,7 @@
   </section>
 
   <h2 class="feed-title">All explainers</h2>
+  <div class="filters" id="filters"></div>
   <div id="feed"><p class="status">Loading…</p></div>
 </main>
 <script>
@@ -132,19 +141,57 @@ function card(it) {
       ${it.status === "failed" && it.error ? `<span title="${esc(it.error)}">${esc(it.error)}</span>` : ""}
       <span title="Stars${it.starredByYou ? " (you starred this)" : ""}">${it.starredByYou ? "★" : "☆"} ${it.stars ?? 0}</span>
       <span title="Comments">💬 ${it.commentCount}</span>
+      <span class="pill" title="Tag">${esc(it.category || "Computing")}</span>
+      ${it.pedagogyVersion ? `<span class="pill" title="Pedagogy version">Pedagogy v${esc(it.pedagogyVersion)}</span>` : ""}
     </div>
   </article>`;
+}
+
+let allItems = [];
+let filterTag = null, filterPed = null;
+
+function renderFilters() {
+  const tags = [...new Set(allItems.map((i) => i.category || "Computing"))].sort();
+  const peds = [...new Set(allItems.map((i) => i.pedagogyVersion).filter(Boolean))].sort();
+  const row = (label, values, active, kind, fmt) =>
+    `<div class="filterrow"><span class="lbl">${label}</span>` +
+    `<button class="chip ${active == null ? "active" : ""}" data-kind="${kind}" data-val="">All</button>` +
+    values.map((v) => `<button class="chip ${active === v ? "active" : ""}" data-kind="${kind}" data-val="${esc(v)}">${fmt(v)}</button>`).join("") +
+    `</div>`;
+  const el = $("#filters");
+  el.innerHTML =
+    row("Tag", tags, filterTag, "tag", (v) => esc(v)) +
+    (peds.length ? row("Pedagogy", peds, filterPed, "ped", (v) => "v" + esc(v)) : "");
+  el.querySelectorAll(".chip").forEach((c) =>
+    c.addEventListener("click", () => {
+      const val = c.dataset.val || null;
+      if (c.dataset.kind === "tag") filterTag = val; else filterPed = val;
+      renderFilters();
+      renderFeed();
+    })
+  );
+}
+
+function renderFeed() {
+  const items = allItems.filter(
+    (i) =>
+      (filterTag == null || (i.category || "Computing") === filterTag) &&
+      (filterPed == null || i.pedagogyVersion === filterPed)
+  );
+  $("#feed").innerHTML = !allItems.length
+    ? `<p class="empty">No explainers yet — be the first to upload a paper.</p>`
+    : items.length
+      ? items.map(card).join("")
+      : `<p class="empty">No explainers match this filter.</p>`;
 }
 
 async function refreshFeed() {
   try {
     const res = await fetch("/api/explainers");
-    const items = await res.json();
-    const feed = $("#feed");
-    feed.innerHTML = items.length ? items.map(card).join("") : `<p class="empty">No explainers yet — be the first to upload a paper.</p>`;
-  } catch {
-    /* transient; try again on next tick */
-  }
+    allItems = await res.json();
+    renderFilters();
+    renderFeed();
+  } catch { /* transient; try again on next tick */ }
 }
 refreshFeed();
 setInterval(refreshFeed, 4000);

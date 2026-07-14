@@ -83,6 +83,8 @@ function toFeedItem(r: ExplainerRow, voterId: string) {
     error: r.error,
     stars: countStars(r.id),
     starredByYou: hasStarred(r.id, voterId),
+    category: r.category ?? "Computing",
+    pedagogyVersion: r.pedagogy_version,
     createdAt: r.created_at,
     commentCount: countComments(r.id),
   };

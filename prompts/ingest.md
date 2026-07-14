@@ -28,7 +28,7 @@ Return **strict JSON only** — no markdown fences, no commentary before or afte
 
 ```
 {
-  "paper": { "title": string, "authors": string[], "oneSentenceClaim": string },
+  "paper": { "title": string, "authors": string[], "oneSentenceClaim": string, "category": "Computing" | "Space" | "Quantum" },
   "prerequisites": string[],
   "concepts": [
     {
@@ -46,3 +46,5 @@ Return **strict JSON only** — no markdown fences, no commentary before or afte
 ```
 
 `prerequisites` lists what the paper assumes the reader knows (so downstream stages know what NOT to explain).
+
+`category` is the single best-fit subject tag, chosen from exactly this list: **Computing** (AI/ML, systems, GPUs, graphics, algorithms, software), **Space** (propulsion, aerospace, astronomy, orbital physics), **Quantum** (qubits, quantum algorithms or hardware). Pick the closest one.

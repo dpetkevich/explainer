@@ -10,6 +10,7 @@ import { runStoryboard } from "../stages/storyboard.js";
 import { runScenePipeline } from "../stages/pipeline.js";
 import { runAssemble } from "../stages/assemble.js";
 import { AudienceProfileSchema, type AudienceProfile } from "../lib/schemas.js";
+import { currentPedagogy } from "../lib/pedagogy.js";
 import { RefusalError } from "../lib/anthropic.js";
 import type { Ctx } from "../lib/context.js";
 import type { ProgressEvent } from "../lib/progress.js";
@@ -57,11 +58,14 @@ export async function runGenerationJob(row: ExplainerRow): Promise<void> {
 
   try {
     const conceptMap = await runIngest(ctx);
-    updateExplainer(row.id, { one_sentence_claim: conceptMap.paper.oneSentenceClaim });
+    updateExplainer(row.id, {
+      one_sentence_claim: conceptMap.paper.oneSentenceClaim,
+      category: conceptMap.paper.category ?? "Computing",
+    });
     const { board } = await runStoryboard(ctx, conceptMap);
     const qa = await runScenePipeline(ctx, board, true);
     runAssemble(ctx, conceptMap, board, qa);
-    updateExplainer(row.id, { status: "done", stage: "assemble" });
+    updateExplainer(row.id, { status: "done", stage: "assemble", pedagogy_version: currentPedagogy().version });
     publish(row.id, { type: "closed", status: "done" });
   } catch (err) {
     const message =

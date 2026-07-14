@@ -19,11 +19,17 @@ const notSectionName = (label: string) =>
 const optionalString = z.string().min(1).nullish().transform((v) => v ?? undefined);
 const optionalBool = z.boolean().nullish().transform((v) => v ?? undefined);
 
+export const CATEGORIES = ["Computing", "Space", "Quantum"] as const;
+export const PaperCategory = z.enum(CATEGORIES);
+export type PaperCategory = (typeof CATEGORIES)[number];
+
 export const ConceptMapSchema = z.object({
   paper: z.object({
     title: z.string().min(1),
     authors: z.array(z.string()),
     oneSentenceClaim: z.string().min(1),
+    /** Best-fit subject tag; models may omit or null it — the UI defaults missing to Computing. */
+    category: PaperCategory.nullish().transform((v) => v ?? undefined),
   }),
   prerequisites: z.array(z.string()),
   concepts: z
