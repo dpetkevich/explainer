@@ -7,6 +7,7 @@ import { stageHash, isFresh, recordHash } from "../lib/cache.js";
 import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import { ConceptMapSchema, type ConceptMap } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
+import { emit } from "../lib/progress.js";
 import { paths, arxivId, type Ctx } from "../lib/context.js";
 
 async function fetchArticleText(url: string): Promise<string> {
@@ -80,6 +81,7 @@ async function resolveSource(ctx: Ctx): Promise<{ text?: string; pdfBase64?: str
 }
 
 export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
+  emit(ctx.onEvent, { type: "stage-start", stage: "ingest" });
   mkdirSync(ctx.workDir, { recursive: true });
   const source = await resolveSource(ctx);
 
@@ -95,7 +97,9 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
 
   if (!ctx.force && isFresh(hashFile, hash, [out])) {
     info("ingest", "cache hit — skipping");
-    return ConceptMapSchema.parse(JSON.parse(readFileSync(out, "utf8")));
+    const cached = ConceptMapSchema.parse(JSON.parse(readFileSync(out, "utf8")));
+    emit(ctx.onEvent, { type: "ingest-done", concepts: cached.concepts.length });
+    return cached;
   }
 
   const prompt = loadPrompt("ingest", {
@@ -163,5 +167,6 @@ export async function runIngest(ctx: Ctx): Promise<ConceptMap> {
   writeFileSync(out, JSON.stringify(map, null, 2));
   recordHash(hashFile, hash);
   info("ingest", `wrote ${out} (${map.concepts.length} concepts)`);
+  emit(ctx.onEvent, { type: "ingest-done", concepts: map.concepts.length });
   return map;
 }

@@ -1,8 +1,18 @@
 import { join } from "node:path";
 import type { AudienceProfile } from "./schemas.js";
+import type { ProgressSink } from "./progress.js";
 import { StageError } from "./log.js";
 
 export type InputKind = "pdf" | "url" | "text" | "arxiv";
+
+/** Classify a raw input string (URL or file path) into a pipeline input kind. */
+export function detectInputKind(input: string): InputKind {
+  if (/^https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\//i.test(input)) return "arxiv";
+  if (/^https?:\/\//i.test(input)) return "url";
+  if (/\.pdf$/i.test(input)) return "pdf";
+  if (/\.(md|txt)$/i.test(input)) return "text";
+  throw new StageError("cli", `unsupported input "${input}" — expected a .pdf, .md/.txt file, or an http(s) URL`);
+}
 
 /** Extract the arXiv id from an abs/pdf URL, e.g. "2603.28627". */
 export function arxivId(input: string): string {
@@ -27,6 +37,8 @@ export interface Ctx {
   force: boolean;
   /** When set, scenes/qa run for this scene only (with force). */
   onlyScene?: string;
+  /** Optional structured-progress sink; the CLI leaves it unset, the web server wires it to SSE. */
+  onEvent?: ProgressSink;
 }
 
 export const paths = {

@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { AudienceProfileSchema, type Storyboard } from "./lib/schemas.js";
 import { stripMath } from "./lib/mathml.js";
 import { StageError, reportError, info } from "./lib/log.js";
-import { paths, arxivId, type Ctx, type InputKind } from "./lib/context.js";
+import { paths, arxivId, detectInputKind, type Ctx, type InputKind } from "./lib/context.js";
 import { runIngest } from "./stages/ingest.js";
 import { runStoryboard } from "./stages/storyboard.js";
 import { runScenePipeline } from "./stages/pipeline.js";
@@ -24,15 +24,6 @@ import { runAssemble } from "./stages/assemble.js";
 
 const STAGES = ["ingest", "storyboard", "scenes", "qa", "assemble"] as const;
 type StageName = (typeof STAGES)[number];
-
-function detectInputKind(input: string): InputKind {
-  if (/^https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\//i.test(input)) return "arxiv";
-  if (/^https?:\/\//i.test(input)) return "url";
-  if (/\.pdf$/i.test(input)) return "pdf";
-  if (/\.(md|txt)$/i.test(input)) return "text";
-  throw new StageError("cli", `unsupported input "${input}" — expected a .pdf, .md/.txt file, or an http(s) URL`);
-}
-
 
 function slugify(input: string, kind: InputKind): string {
   let base: string;

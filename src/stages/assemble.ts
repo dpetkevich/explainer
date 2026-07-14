@@ -5,6 +5,7 @@ import { renderRichText, stripMath } from "../lib/mathml.js";
 import { EndorsementsSchema, PaperMetaSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import type { QaSummary } from "./qa.js";
 import { info, warn } from "../lib/log.js";
+import { emit } from "../lib/progress.js";
 import { paths, type Ctx } from "../lib/context.js";
 
 function escapeHtml(s: string): string {
@@ -132,5 +133,6 @@ export function runAssemble(
   const outPath = paths.explainer(ctx);
   writeFileSync(outPath, out);
   info("assemble", `wrote ${outPath} (${included.length} scenes)`);
+  emit(ctx.onEvent, { type: "assembled", scenesIncluded: included.length });
   return outPath;
 }

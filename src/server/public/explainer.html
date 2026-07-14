@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>explain-it</title>
+<style>
+  :root {
+    --bg: #fdfdfb; --fg: #1a1a1a; --muted: #555; --rule: #e2e2dc; --accent: #2f6fed;
+    --ok: #2e9e5b; --err: #c0392b; color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181c; --fg: #e8e8e4; --muted: #a0a0a0; --rule: #33363c; --accent: #7aa6ff;
+      --ok: #4cc47f; --err: #e06b5c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; }
+  .bar { max-width: 880px; margin: 0 auto; padding: 1rem 1.25rem 0; }
+  .bar a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+  main { max-width: 880px; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
+  .progress { border: 1px solid var(--rule); border-radius: 12px; padding: 1.5rem; margin-top: 1rem; }
+  .progress h1 { font-size: 1.4rem; margin: 0 0 0.75rem; }
+  .steps { list-style: none; padding: 0; margin: 0; }
+  .steps li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; color: var(--muted); }
+  .steps li.active { color: var(--fg); font-weight: 600; }
+  .steps li.done { color: var(--ok); }
+  .dot { width: 0.7em; height: 0.7em; border-radius: 50%; border: 2px solid currentColor; display: inline-block; }
+  .steps li.done .dot { background: var(--ok); border-color: var(--ok); }
+  .spinner { width: 0.7em; height: 0.7em; border: 2px solid var(--accent); border-right-color: transparent;
+    border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .scenebar { margin-top: 0.75rem; color: var(--muted); font-size: 0.95rem; }
+  .fail { color: var(--err); }
+  iframe.viewer { width: 100%; border: 1px solid var(--rule); border-radius: 10px; background: transparent; }
+  section.comments { margin-top: 2.5rem; }
+  section.comments h2 { font-size: 1.2rem; margin: 0 0 1rem; }
+  .comment { border-top: 1px solid var(--rule); padding: 0.75rem 0; }
+  .comment .who { font-weight: 600; font-size: 0.9rem; }
+  .comment .when { color: var(--muted); font-size: 0.8rem; margin-left: 0.5rem; }
+  .comment .text { margin: 0.25rem 0 0; white-space: pre-wrap; }
+  .cform { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .cform input, .cform textarea { padding: 0.5rem 0.7rem; border: 1px solid var(--rule); border-radius: 8px;
+    background: var(--bg); color: var(--fg); font: inherit; }
+  .cform textarea { min-height: 5rem; resize: vertical; }
+  .cform button { align-self: flex-start; padding: 0.5rem 1.1rem; border: 0; border-radius: 8px;
+    background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  .cmsg { font-size: 0.85rem; color: var(--err); min-height: 1em; }
+</style>
+</head>
+<body>
+<div class="bar"><a href="/">← all explainers</a></div>
+<main>
+  <div id="view"><div class="progress"><h1>Loading…</h1></div></div>
+
+  <section class="comments">
+    <h2>Comments</h2>
+    <div id="comments"></div>
+    <div class="cform">
+      <input type="text" id="cname" placeholder="Your name (optional)" maxlength="60">
+      <textarea id="cbody" placeholder="Add a comment…" maxlength="5000"></textarea>
+      <div class="cmsg" id="cmsg"></div>
+      <button id="csend">Post comment</button>
+    </div>
+  </section>
+</main>
+<script>
+const id = location.pathname.split("/").pop();
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const STAGES = [["ingest","Reading the paper"],["storyboard","Planning the walkthrough"],["scenes","Building interactive scenes"],["assemble","Assembling"]];
+
+let scenesTotal = null, scenesPassed = 0, scenesFailed = 0, curStage = null, title = "Working…";
+
+function renderProgress() {
+  const idx = STAGES.findIndex(([s]) => s === curStage);
+  const steps = STAGES.map(([s, label], i) => {
+    const cls = i < idx ? "done" : i === idx ? "active" : "";
+    const mark = i < idx ? '<span class="dot"></span>' : i === idx ? '<span class="spinner"></span>' : '<span class="dot"></span>';
+    return `<li class="${cls}">${mark} ${label}</li>`;
+  }).join("");
+  const scenebar = curStage === "scenes" && scenesTotal
+    ? `<p class="scenebar">${scenesPassed}/${scenesTotal} scenes passing${scenesFailed ? ` · ${scenesFailed} being retried/dropped` : ""}</p>`
+    : "";
+  $("#view").innerHTML = `<div class="progress"><h1>${esc(title)}</h1><ul class="steps">${steps}</ul>${scenebar}</div>`;
+}
+
+function showViewer() {
+  $("#view").innerHTML = `<iframe class="viewer" id="frame" src="/api/explainers/${encodeURIComponent(id)}/html"></iframe>`;
+  const frame = $("#frame");
+  frame.addEventListener("load", () => {
+    const autosize = () => {
+      try {
+        const h = frame.contentDocument.documentElement.scrollHeight;
+        if (h) frame.style.height = h + "px";
+      } catch { frame.style.height = "80vh"; }
+    };
+    autosize();
+    try { new ResizeObserver(autosize).observe(frame.contentDocument.documentElement); } catch { /* cross-doc guard */ }
+    setInterval(autosize, 1000); // inner scene iframes resize async via postMessage
+  });
+}
+
+function showFailed(err) {
+  $("#view").innerHTML = `<div class="progress"><h1>Couldn't build this one</h1><p class="fail">${esc(err || "Generation failed.")}</p><p><a href="/">Try another paper →</a></p></div>`;
+}
+
+function handle(msg) {
+  switch (msg.type) {
+    case "snapshot":
+      title = msg.title || title; curStage = msg.stage; scenesTotal = msg.scenesTotal; scenesPassed = msg.scenesPassed || 0;
+      if (msg.status === "done") return showViewer();
+      if (msg.status === "failed") return showFailed(msg.error);
+      renderProgress(); break;
+    case "stage-start": curStage = msg.stage; renderProgress(); break;
+    case "storyboard-ready": title = msg.title; scenesTotal = msg.sceneCount; renderProgress(); break;
+    case "scene-pass": scenesPassed++; renderProgress(); break;
+    case "scene-fail": scenesFailed++; renderProgress(); break;
+    case "closed":
+      if (msg.status === "done") showViewer(); else showFailed(msg.error);
+      break;
+  }
+}
+
+function connect() {
+  const es = new EventSource(`/api/explainers/${encodeURIComponent(id)}/events`);
+  es.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handle(msg);
+    if (msg.type === "closed") es.close();
+  };
+  es.onerror = () => { es.close(); setTimeout(connect, 3000); }; // reconnect + re-snapshot
+}
+connect();
+
+// ---- Comments ----
+async function loadComments() {
+  const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`);
+  const list = await res.json();
+  $("#comments").innerHTML = list.length
+    ? list.map((c) => `<div class="comment"><span class="who">${esc(c.authorName)}</span><span class="when">${new Date(c.createdAt).toLocaleString()}</span><p class="text">${esc(c.body)}</p></div>`).join("")
+    : `<p style="color:var(--muted)">No comments yet.</p>`;
+}
+$("#csend").addEventListener("click", async () => {
+  const body = $("#cbody").value.trim();
+  if (!body) { $("#cmsg").textContent = "Write something first."; return; }
+  $("#csend").disabled = true; $("#cmsg").textContent = "";
+  try {
+    const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authorName: $("#cname").value.trim(), body }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    $("#cbody").value = "";
+    await loadComments();
+  } catch (err) { $("#cmsg").textContent = err.message; }
+  finally { $("#csend").disabled = false; }
+});
+loadComments();
+</script>
+</body>
+</html>

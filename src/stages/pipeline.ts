@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 import type { Storyboard } from "../lib/schemas.js";
 import { StageError, info, warn } from "../lib/log.js";
+import { emit } from "../lib/progress.js";
 import { paths, type Ctx } from "../lib/context.js";
 import { pool, generateScene } from "./scenes.js";
 import { qaOneScene, type QaSummary, type SceneResult } from "./qa.js";
@@ -26,6 +27,7 @@ export async function runScenePipeline(ctx: Ctx, storyboard: Storyboard, withQa:
     }
   }
 
+  emit(ctx.onEvent, { type: "stage-start", stage: "scenes" });
   if (withQa) mkdirSync(paths.qaDir(ctx), { recursive: true });
   const browser = withQa ? await chromium.launch() : null;
 
@@ -36,6 +38,7 @@ export async function runScenePipeline(ctx: Ctx, storyboard: Storyboard, withQa:
   const results: SceneResult[] = [];
   try {
     await pool(scenes, PIPELINE_CONCURRENCY, async (scene) => {
+      emit(ctx.onEvent, { type: "scene-start", id: scene.id });
       try {
         await generateScene(ctx, scene);
       } catch (err) {
@@ -44,17 +47,25 @@ export async function runScenePipeline(ctx: Ctx, storyboard: Storyboard, withQa:
             ? err
             : new StageError("scenes", err instanceof Error ? err.message : String(err), undefined, scene.id)
         );
+        emit(ctx.onEvent, { type: "scene-fail", id: scene.id, kinds: ["generation"] });
         return;
       }
       if (!browser) return;
       try {
-        results.push(await qaOneScene(ctx, browser, scene));
+        const result = await qaOneScene(ctx, browser, scene);
+        results.push(result);
+        if (result.status === "pass") {
+          emit(ctx.onEvent, { type: "scene-pass", id: scene.id, attempts: result.attempts });
+        } else {
+          emit(ctx.onEvent, { type: "scene-fail", id: scene.id, kinds: (result.failures ?? []).map((f) => f.kind) });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         warn("qa", `${scene.id}: QA errored (${msg}) — marking failed`);
         const result: SceneResult = { id: scene.id, status: "fail", attempts: 0, consoleErrors: [msg] };
         writeFileSync(paths.qaReport(ctx, scene.id), JSON.stringify(result, null, 2));
         results.push(result);
+        emit(ctx.onEvent, { type: "scene-fail", id: scene.id, kinds: ["qa-error"] });
       }
     });
   } finally {

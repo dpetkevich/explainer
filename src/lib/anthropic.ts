@@ -21,6 +21,14 @@ export const MODELS = {
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 529]);
 const MAX_ATTEMPTS = 3;
 
+/** Thrown when the model declines to answer (stop_reason "refusal") — e.g. some dual-use content. */
+export class RefusalError extends Error {
+  constructor(public model: string) {
+    super("the model declined to generate a response for this content");
+    this.name = "RefusalError";
+  }
+}
+
 export interface CallOptions {
   model: string;
   system?: string;
@@ -43,6 +51,12 @@ export async function callModel(opts: CallOptions): Promise<string> {
           messages: opts.messages,
         })
         .finalMessage();
+      // "refusal" isn't in every SDK version's stop_reason union; compare as a string.
+      if ((res.stop_reason as string | null) === "refusal") {
+        // A refusal will not improve on retry; surface it as a typed error so
+        // callers can report "content declined" instead of a downstream parse failure.
+        throw new RefusalError(opts.model);
+      }
       if (res.stop_reason === "max_tokens") {
         console.warn(`⚠ model response truncated at max_tokens=${opts.maxTokens ?? 16000} (${opts.model})`);
       } else if (res.stop_reason !== "end_turn") {

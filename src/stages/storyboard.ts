@@ -5,6 +5,7 @@ import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import { storyboardToMarkdown } from "../lib/storyboard-md.js";
 import { StoryboardSchema, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
+import { emit } from "../lib/progress.js";
 import { paths, type Ctx } from "../lib/context.js";
 
 export interface StoryboardResult {
@@ -14,6 +15,7 @@ export interface StoryboardResult {
 }
 
 export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<StoryboardResult> {
+  emit(ctx.onEvent, { type: "stage-start", stage: "storyboard" });
   const conceptMapJson = JSON.stringify(conceptMap, null, 2);
   const promptRaw = loadPromptRaw("storyboard");
   const hash = stageHash({
@@ -30,6 +32,7 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
     // and re-render the script so it always reflects those edits.
     const board = StoryboardSchema.parse(JSON.parse(readFileSync(out, "utf8")));
     writeFileSync(paths.script(ctx), renderScript(ctx, board));
+    emit(ctx.onEvent, { type: "storyboard-ready", title: board.title, sceneCount: board.scenes.length });
     return { board, fromCache: true };
   }
 
@@ -97,6 +100,7 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   writeFileSync(paths.script(ctx), renderScript(ctx, board));
   recordHash(hashFile, hash);
   info("storyboard", `wrote ${out} (${board.scenes.length} scenes)`);
+  emit(ctx.onEvent, { type: "storyboard-ready", title: board.title, sceneCount: board.scenes.length });
   return { board, fromCache: false };
 }
 

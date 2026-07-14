@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>explain-it — turn a paper into an interactive explainer</title>
+<meta name="description" content="Upload a paper and get an interactive, self-explaining walkthrough. Watch it build, scene by scene.">
+<style>
+  :root {
+    --bg: #fdfdfb; --fg: #1a1a1a; --muted: #555; --rule: #e2e2dc; --accent: #2f6fed;
+    --ok: #2e9e5b; --warn: #c9770a; --err: #c0392b; color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181c; --fg: #e8e8e4; --muted: #a0a0a0; --rule: #33363c; --accent: #7aa6ff;
+      --ok: #4cc47f; --warn: #e0a44a; --err: #e06b5c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; }
+  main { max-width: 880px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  h1 { font-size: 2rem; letter-spacing: -0.01em; margin: 0 0 0.5rem; }
+  .tagline { color: var(--muted); margin: 0 0 2rem; font-size: 1.05rem; }
+  .upload { border: 1px solid var(--rule); border-radius: 12px; padding: 1.25rem 1.4rem; margin: 0 0 2.5rem; }
+  .upload h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .row input[type="url"] { flex: 1; min-width: 220px; padding: 0.5rem 0.7rem; border: 1px solid var(--rule);
+    border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; }
+  .row button { padding: 0.5rem 1.1rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff;
+    font: inherit; font-weight: 600; cursor: pointer; }
+  .row button:disabled { opacity: 0.6; cursor: wait; }
+  .or { color: var(--muted); font-size: 0.9rem; margin: 0.6rem 0; }
+  .file label { display: inline-block; padding: 0.45rem 0.9rem; border: 1px dashed var(--rule); border-radius: 8px;
+    cursor: pointer; color: var(--muted); }
+  .file input { display: none; }
+  .msg { margin: 0.75rem 0 0; font-size: 0.9rem; min-height: 1.2em; }
+  .msg.err { color: var(--err); } .msg.ok { color: var(--ok); }
+  h2.feed-title { font-size: 1.1rem; margin: 0 0 1rem; }
+  .card { border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.25rem; margin: 0 0 1rem; }
+  .card h3 { margin: 0 0 0.25rem; font-size: 1.15rem; letter-spacing: -0.01em; }
+  .card h3 a { color: var(--fg); text-decoration: none; }
+  .card h3 a:hover { color: var(--accent); }
+  .card .claim { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.95rem; }
+  .meta { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; font-size: 0.85rem; color: var(--muted); }
+  .badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.1rem 0.55rem; border-radius: 999px;
+    border: 1px solid var(--rule); font-weight: 600; }
+  .badge.queued { color: var(--muted); }
+  .badge.running { color: var(--accent); border-color: var(--accent); }
+  .badge.done { color: var(--ok); border-color: var(--ok); }
+  .badge.failed { color: var(--err); border-color: var(--err); }
+  .spinner { width: 0.7em; height: 0.7em; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { color: var(--muted); }
+  .empty { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>explain-it</h1>
+  <p class="tagline">Turn a paper into an interactive, self-explaining walkthrough. Upload one and watch it build, scene by scene.</p>
+
+  <section class="upload">
+    <h2>Explain a paper</h2>
+    <div class="row">
+      <input type="url" id="url" placeholder="Paste an arXiv link or paper URL…" autocomplete="off">
+      <button id="go">Explain it</button>
+    </div>
+    <p class="or">or</p>
+    <div class="file">
+      <label for="pdf" id="pdflabel">Choose a PDF…</label>
+      <input type="file" id="pdf" accept="application/pdf,.pdf">
+    </div>
+    <p class="msg" id="msg"></p>
+  </section>
+
+  <h2 class="feed-title">All explainers</h2>
+  <div id="feed"><p class="status">Loading…</p></div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const msg = $("#msg");
+const setMsg = (t, cls="") => { msg.textContent = t; msg.className = "msg " + cls; };
+
+$("#pdf").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  $("#pdflabel").textContent = f ? f.name : "Choose a PDF…";
+  if (f) submit({ file: f });
+});
+$("#go").addEventListener("click", () => {
+  const url = $("#url").value.trim();
+  if (!url) return setMsg("Paste a link, or choose a PDF.", "err");
+  submit({ url });
+});
+$("#url").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#go").click(); });
+
+async function submit({ url, file }) {
+  $("#go").disabled = true;
+  setMsg("Uploading…");
+  try {
+    let res;
+    if (file) {
+      const fd = new FormData();
+      fd.append("paper", file);
+      res = await fetch("/api/uploads", { method: "POST", body: fd });
+    } else {
+      res = await fetch("/api/uploads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    setMsg("Started — opening its page…", "ok");
+    location.href = `/explainer/${data.id}`;
+  } catch (err) {
+    setMsg(err.message, "err");
+    $("#go").disabled = false;
+  }
+}
+
+const STATUS_LABEL = { queued: "queued", running: "building", done: "ready", failed: "failed" };
+function card(it) {
+  const badgeInner = it.status === "running"
+    ? `<span class="spinner"></span> ${it.stage ? esc(it.stage) : "building"}${it.scenesTotal ? ` · ${it.scenesPassed ?? 0}/${it.scenesTotal} scenes` : ""}`
+    : STATUS_LABEL[it.status] || it.status;
+  const titleHtml = it.status === "done"
+    ? `<a href="/explainer/${esc(it.id)}">${esc(it.title)}</a>`
+    : `<a href="/explainer/${esc(it.id)}">${esc(it.title)}</a>`;
+  return `<article class="card">
+    <h3>${titleHtml}</h3>
+    ${it.claim ? `<p class="claim">${esc(it.claim)}</p>` : ""}
+    <div class="meta">
+      <span class="badge ${it.status}">${badgeInner}</span>
+      ${it.status === "failed" && it.error ? `<span title="${esc(it.error)}">${esc(it.error)}</span>` : ""}
+      <span>💬 ${it.commentCount}</span>
+    </div>
+  </article>`;
+}
+
+async function refreshFeed() {
+  try {
+    const res = await fetch("/api/explainers");
+    const items = await res.json();
+    const feed = $("#feed");
+    feed.innerHTML = items.length ? items.map(card).join("") : `<p class="empty">No explainers yet — be the first to upload a paper.</p>`;
+  } catch {
+    /* transient; try again on next tick */
+  }
+}
+refreshFeed();
+setInterval(refreshFeed, 4000);
+</script>
+</body>
+</html>

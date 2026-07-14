@@ -3,3 +3,6 @@ explainers/
 *.env
 .env*
 .DS_Store
+
+# web app runtime data (SQLite, uploads)
+data/
