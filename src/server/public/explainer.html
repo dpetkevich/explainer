@@ -42,7 +42,13 @@
   .scenebar { margin-top: 0.75rem; color: var(--muted); font-size: 0.95rem; }
   .fail { color: var(--err); }
   iframe.viewer { width: 100%; border: 1px solid var(--rule); border-radius: 10px; background: transparent; }
-  section.comments { margin-top: 2.5rem; }
+  /* All comment UI is a dev/feedback tool — hidden until dev mode (Ctrl/Cmd+Shift+`). */
+  section.comments { margin-top: 2.5rem; display: none; }
+  body.dev section.comments { display: block; }
+  .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+    background: var(--fg); color: var(--bg); padding: 0.5rem 1rem; border-radius: 8px;
+    font-size: 0.9rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: 0.92; }
   section.comments h2 { font-size: 1.2rem; margin: 0 0 1rem; }
   .comment { border-top: 1px solid var(--rule); padding: 0.75rem 0; }
   .comment .who { font-weight: 600; font-size: 0.9rem; }
@@ -77,11 +83,33 @@
     </div>
   </section>
 </main>
+<div class="toast" id="toast"></div>
 <script>
 const id = location.pathname.split("/").pop();
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const STAGES = [["ingest","Reading the paper"],["storyboard","Planning the walkthrough"],["scenes","Building interactive scenes"],["assemble","Assembling"]];
+
+// ---- Dev mode: reveal the comment/feedback UI with Ctrl/Cmd+Shift+` ----
+let dev = localStorage.getItem("eiDev") === "1";
+let toastTimer = null;
+function toast(m) {
+  const t = $("#toast"); t.textContent = m; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+}
+function applyDev() {
+  document.body.classList.toggle("dev", dev);
+  if (viewerFrame) { try { viewerFrame.contentDocument.body.classList.toggle("ei-dev", dev); } catch { /* cross-doc */ } }
+  if (typeof autosize === "function") setTimeout(autosize, 60);
+}
+addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "Backquote") {
+    e.preventDefault();
+    dev = !dev; localStorage.setItem("eiDev", dev ? "1" : "0");
+    applyDev();
+    toast(dev ? "Dev mode ON — feedback fields visible" : "Dev mode OFF");
+  }
+});
 
 let scenesTotal = null, scenesPassed = 0, scenesFailed = 0, curStage = null, title = "Working…";
 
@@ -220,7 +248,8 @@ $("#csend").addEventListener("click", async () => {
 });
 
 const SECTION_STYLE = `
-  .ei-comments { margin: 1rem 0 0; border-top: 1px dashed var(--rule); padding-top: 0.6rem; font-size: 0.9rem; }
+  .ei-comments { display: none; margin: 1rem 0 0; border-top: 1px dashed var(--rule); padding-top: 0.6rem; font-size: 0.9rem; }
+  body.ei-dev .ei-comments { display: block; }
   .ei-comments > summary { cursor: pointer; color: var(--muted); list-style: none; }
   .ei-comments .c { border-top: 1px solid var(--rule); padding: 0.4rem 0; }
   .ei-comments .who { font-weight: 600; }
@@ -233,6 +262,30 @@ const SECTION_STYLE = `
     background: var(--accent, #2f6fed); color: #fff; font: inherit; cursor: pointer; }
 `;
 
+function buildBlock(doc, sceneId, label) {
+  const list = commentsByScene[sceneId] || [];
+  const block = doc.createElement("div");
+  block.className = "ei-comments";
+  block.innerHTML =
+    `<details ${list.length ? "open" : ""}><summary>💬 ${label} (${list.length})</summary>` +
+    `<div class="clist">${list.map(commentHtml).join("")}</div>` +
+    `<input type="text" placeholder="Your name (optional)" maxlength="60" class="ei-name">` +
+    `<textarea placeholder="Comment…" maxlength="5000" class="ei-body"></textarea>` +
+    `<button type="button" class="ei-post">Post</button></details>`;
+  block.querySelector(".ei-post").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    const body = block.querySelector(".ei-body").value.trim();
+    if (!body) return;
+    btn.disabled = true;
+    try { await postComment(sceneId, block.querySelector(".ei-name").value.trim(), body); }
+    catch (e) { alert(e.message); btn.disabled = false; }
+  });
+  return block;
+}
+
+// Inject feedback comment blocks into the embedded explainer: one for the
+// abstract (after the hook) and one per section. Visibility is gated by the
+// body.ei-dev class (toggled by dev mode); the blocks are always injected.
 function renderSectionComments(frame) {
   let doc;
   try { doc = frame.contentDocument; } catch { return; }
@@ -243,29 +296,23 @@ function renderSectionComments(frame) {
     st.textContent = SECTION_STYLE;
     doc.head.appendChild(st);
   }
+  doc.body.classList.toggle("ei-dev", dev);
+  const hook = doc.querySelector(".hook");
+  if (hook) {
+    const fresh = buildBlock(doc, "abstract", "Comments on the abstract");
+    fresh.id = "ei-abstract";
+    const prev = doc.getElementById("ei-abstract");
+    if (prev) prev.replaceWith(fresh); else hook.after(fresh);
+  }
   doc.querySelectorAll("section.scene[id]").forEach((section) => {
-    const sceneId = section.id;
-    const list = commentsByScene[sceneId] || [];
-    let block = section.querySelector(":scope > .ei-comments");
-    if (!block) { block = doc.createElement("div"); block.className = "ei-comments"; section.appendChild(block); }
-    block.innerHTML =
-      `<details ${list.length ? "open" : ""}><summary>💬 Comments on this section (${list.length})</summary>` +
-      `<div class="clist">${list.map(commentHtml).join("")}</div>` +
-      `<input type="text" placeholder="Your name (optional)" maxlength="60" class="ei-name">` +
-      `<textarea placeholder="Comment on this section…" maxlength="5000" class="ei-body"></textarea>` +
-      `<button type="button" class="ei-post">Post</button></details>`;
-    const btn = block.querySelector(".ei-post");
-    btn.addEventListener("click", async () => {
-      const body = block.querySelector(".ei-body").value.trim();
-      if (!body) return;
-      btn.disabled = true;
-      try { await postComment(sceneId, block.querySelector(".ei-name").value.trim(), body); }
-      catch (e) { alert(e.message); btn.disabled = false; }
-    });
+    const fresh = buildBlock(doc, section.id, "Comments on this section");
+    const prev = section.querySelector(":scope > .ei-comments");
+    if (prev) prev.replaceWith(fresh); else section.appendChild(fresh);
   });
-  setTimeout(autosize, 50); // the injected blocks grow the doc; refit the outer iframe
+  setTimeout(autosize, 50); // injected blocks grow the doc; refit the outer iframe
 }
 fetchComments();
+applyDev();
 </script>
 </body>
 </html>

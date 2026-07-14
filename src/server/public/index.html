@@ -60,8 +60,14 @@
   .chip:hover { border-color: var(--accent); }
   .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .pill { padding: 0.05rem 0.55rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
-  .discuss { margin-top: 0.75rem; font-size: 0.9rem; }
+  /* Comment fields are a dev/feedback tool — hidden until dev mode (Ctrl/Cmd+Shift+`). */
+  .discuss { margin-top: 0.75rem; font-size: 0.9rem; display: none; }
+  body.dev .discuss { display: block; }
   .discuss > summary { cursor: pointer; color: var(--muted); }
+  .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+    background: var(--fg); color: var(--bg); padding: 0.5rem 1rem; border-radius: 8px;
+    font-size: 0.9rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: 0.92; }
   .thread { border-top: 1px solid var(--rule); padding-top: 0.6rem; margin-top: 0.6rem; }
   .thread h4 { margin: 0 0 0.2rem; font-size: 0.9rem; }
   .thread .quote { color: var(--muted); font-style: italic; margin: 0 0 0.5rem; }
@@ -85,9 +91,27 @@
   <div class="filters" id="filters"></div>
   <div id="feed"><p class="status">Loading…</p></div>
 </main>
+<div class="toast" id="toast"></div>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+// ---- Dev mode: reveal the comment/feedback fields with Ctrl/Cmd+Shift+` ----
+let dev = localStorage.getItem("eiDev") === "1";
+let toastTimer = null;
+function toast(m) {
+  const t = $("#toast"); t.textContent = m; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+}
+function applyDev() { document.body.classList.toggle("dev", dev); }
+addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "Backquote") {
+    e.preventDefault();
+    dev = !dev; localStorage.setItem("eiDev", dev ? "1" : "0"); applyDev();
+    toast(dev ? "Dev mode ON — comment fields visible" : "Dev mode OFF");
+  }
+});
+applyDev();
 
 const STATUS_LABEL = { queued: "queued", running: "building", done: "ready", failed: "failed" };
 function card(it) {
@@ -109,7 +133,7 @@ function card(it) {
       ${it.pedagogyVersion ? `<span class="pill" title="Pedagogy version">Pedagogy v${esc(it.pedagogyVersion)}</span>` : ""}
     </div>
     <details class="discuss" data-id="${esc(it.id)}">
-      <summary>💬 Discuss the abstract &amp; blurb</summary>
+      <summary>💬 Comment on the blurb</summary>
       <div class="threads"><p class="status">Loading…</p></div>
     </details>
   </article>`;
@@ -137,7 +161,7 @@ async function renderDiscuss(d) {
   try { comments = await (await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`)).json(); } catch { /* transient */ }
   d.dataset.loaded = "1";
   const byScene = (sid) => comments.filter((c) => c.sceneId === sid);
-  wrap.innerHTML = thread("abstract", "Abstract", item.hook, byScene("abstract")) + thread("blurb", "Blurb", item.claim, byScene("blurb"));
+  wrap.innerHTML = thread("blurb", "Blurb", item.claim, byScene("blurb"));
   wrap.querySelectorAll(".thread").forEach((t) => {
     const btn = t.querySelector(".post");
     btn.addEventListener("click", async () => {
