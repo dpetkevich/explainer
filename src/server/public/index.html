@@ -148,7 +148,17 @@ function card(it) {
 }
 
 let allItems = [];
-let filterTag = null, filterPed = null;
+let filterTag = null, filterPed = null, pedTouched = false;
+
+// Compare dotted versions numerically ("2.0.0" > "1.0.0" > "1.2.0" handled right).
+function cmpVer(a, b) {
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
 
 function renderFilters() {
   const tags = [...new Set(allItems.map((i) => i.category || "Computing"))].sort();
@@ -165,7 +175,7 @@ function renderFilters() {
   el.querySelectorAll(".chip").forEach((c) =>
     c.addEventListener("click", () => {
       const val = c.dataset.val || null;
-      if (c.dataset.kind === "tag") filterTag = val; else filterPed = val;
+      if (c.dataset.kind === "tag") filterTag = val; else { filterPed = val; pedTouched = true; }
       renderFilters();
       renderFeed();
     })
@@ -189,6 +199,11 @@ async function refreshFeed() {
   try {
     const res = await fetch("/api/explainers");
     allItems = await res.json();
+    // Default the Pedagogy filter to the latest version present (until the user picks one).
+    if (!pedTouched) {
+      const vers = [...new Set(allItems.map((i) => i.pedagogyVersion).filter(Boolean))];
+      filterPed = vers.length ? vers.sort(cmpVer)[vers.length - 1] : null;
+    }
     renderFilters();
     renderFeed();
   } catch { /* transient; try again on next tick */ }
