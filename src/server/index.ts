@@ -207,20 +207,27 @@ app.post("/api/explainers/:id/star", async (req, reply) => {
 app.get("/api/explainers/:id/comments", async (req, reply) => {
   const id = (req.params as { id: string }).id;
   if (!getExplainer(id)) return reply.code(404).send({ error: "Not found." });
-  return listComments(id).map((c) => ({ id: c.id, authorName: c.author_name, body: c.body, createdAt: c.created_at }));
+  return listComments(id).map((c) => ({
+    id: c.id,
+    sceneId: c.scene_id,
+    authorName: c.author_name,
+    body: c.body,
+    createdAt: c.created_at,
+  }));
 });
 
 app.post("/api/explainers/:id/comments", async (req, reply) => {
   const id = (req.params as { id: string }).id;
   if (!getExplainer(id)) return reply.code(404).send({ error: "Not found." });
   if (!allowComment(clientIp(req))) return reply.code(429).send({ error: "Too many comments — slow down a moment." });
-  const body = (req.body ?? {}) as { authorName?: string; body?: string };
+  const body = (req.body ?? {}) as { authorName?: string; body?: string; sceneId?: string };
   const text = (body.body ?? "").trim();
   if (!text) return reply.code(400).send({ error: "Comment cannot be empty." });
   if (text.length > 5000) return reply.code(400).send({ error: "Comment is too long (5000 chars max)." });
   const author = (body.authorName ?? "").trim().slice(0, 60) || "Anonymous";
-  const c = addComment(id, author, text);
-  return reply.code(201).send({ id: c.id, authorName: c.author_name, body: c.body, createdAt: c.created_at });
+  const sceneId = typeof body.sceneId === "string" && body.sceneId.trim() ? body.sceneId.trim() : null;
+  const c = addComment(id, author, text, sceneId);
+  return reply.code(201).send({ id: c.id, sceneId: c.scene_id, authorName: c.author_name, body: c.body, createdAt: c.created_at });
 });
 
 // ---- Viewer page (frontend handles fetching by id) ----

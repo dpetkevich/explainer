@@ -38,6 +38,8 @@ export interface ExplainerRow {
 export interface CommentRow {
   id: string;
   explainer_id: string;
+  /** Scene/section this comment is on; null = an overall comment on the whole explainer. */
+  scene_id: string | null;
   author_name: string;
   body: string;
   created_at: number;
@@ -71,6 +73,7 @@ export function initDb(): Database.Database {
     CREATE TABLE IF NOT EXISTS comments (
       id TEXT PRIMARY KEY,
       explainer_id TEXT NOT NULL,
+      scene_id TEXT,
       author_name TEXT NOT NULL,
       body TEXT NOT NULL,
       created_at INTEGER NOT NULL
@@ -86,6 +89,8 @@ export function initDb(): Database.Database {
   // Columns added after the initial schema (SQLite has no IF NOT EXISTS for columns).
   const cols = (db.prepare("PRAGMA table_info(explainers)").all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes("stars")) db.exec("ALTER TABLE explainers ADD COLUMN stars INTEGER NOT NULL DEFAULT 0");
+  const ccols = (db.prepare("PRAGMA table_info(comments)").all() as { name: string }[]).map((c) => c.name);
+  if (!ccols.includes("scene_id")) db.exec("ALTER TABLE comments ADD COLUMN scene_id TEXT");
   // A run cannot resume mid-flight in a fresh process, so mark anything that was
   // "running" as failed on boot. "queued" rows never started, so the queue can
   // safely pick them up again (see resumeQueued in queue.ts).
@@ -158,13 +163,18 @@ export function hasStarred(explainerId: string, voterId: string): boolean {
   return !!db.prepare(`SELECT 1 FROM stars WHERE explainer_id = ? AND voter_id = ?`).get(explainerId, voterId);
 }
 
-export function addComment(explainerId: string, authorName: string, body: string): CommentRow {
+export function addComment(
+  explainerId: string,
+  authorName: string,
+  body: string,
+  sceneId: string | null = null
+): CommentRow {
   const id = randomUUID();
   const now = Date.now();
   db.prepare(
-    `INSERT INTO comments (id, explainer_id, author_name, body, created_at) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, explainerId, authorName, body, now);
-  return { id, explainer_id: explainerId, author_name: authorName, body, created_at: now };
+    `INSERT INTO comments (id, explainer_id, scene_id, author_name, body, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, explainerId, sceneId, authorName, body, now);
+  return { id, explainer_id: explainerId, scene_id: sceneId, author_name: authorName, body, created_at: now };
 }
 
 export function listComments(explainerId: string): CommentRow[] {

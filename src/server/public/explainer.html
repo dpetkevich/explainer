@@ -66,11 +66,12 @@
   <div id="view"><div class="progress"><h1>Loading…</h1></div></div>
 
   <section class="comments">
-    <h2>Comments</h2>
+    <h2>Overall comments</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin:-0.5rem 0 1rem">For notes on a specific section, use the comment box under each section above.</p>
     <div id="comments"></div>
     <div class="cform">
       <input type="text" id="cname" placeholder="Your name (optional)" maxlength="60">
-      <textarea id="cbody" placeholder="Add a comment…" maxlength="5000"></textarea>
+      <textarea id="cbody" placeholder="Add an overall comment…" maxlength="5000"></textarea>
       <div class="cmsg" id="cmsg"></div>
       <button id="csend">Post comment</button>
     </div>
@@ -97,11 +98,13 @@ function renderProgress() {
   $("#view").innerHTML = `<div class="progress"><h1>${esc(title)}</h1><ul class="steps">${steps}</ul>${scenebar}</div>`;
 }
 
+let viewerFrame = null;
+let autosize = () => {};
 function showViewer() {
   $("#view").innerHTML = `<iframe class="viewer" id="frame" src="/api/explainers/${encodeURIComponent(id)}/html"></iframe>`;
   const frame = $("#frame");
   frame.addEventListener("load", () => {
-    const autosize = () => {
+    autosize = () => {
       try {
         const h = frame.contentDocument.documentElement.scrollHeight;
         if (h) frame.style.height = h + "px";
@@ -110,6 +113,8 @@ function showViewer() {
     autosize();
     try { new ResizeObserver(autosize).observe(frame.contentDocument.documentElement); } catch { /* cross-doc guard */ }
     setInterval(autosize, 1000); // inner scene iframes resize async via postMessage
+    viewerFrame = frame;
+    fetchComments(); // renders the overall panel and injects per-section comment blocks
   });
 }
 
@@ -175,31 +180,92 @@ function connect() {
 }
 connect();
 
-// ---- Comments ----
-async function loadComments() {
-  const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`);
-  const list = await res.json();
-  $("#comments").innerHTML = list.length
-    ? list.map((c) => `<div class="comment"><span class="who">${esc(c.authorName)}</span><span class="when">${new Date(c.createdAt).toLocaleString()}</span><p class="text">${esc(c.body)}</p></div>`).join("")
-    : `<p style="color:var(--muted)">No comments yet.</p>`;
+// ---- Comments: overall (bottom panel) + per-section (injected into the explainer) ----
+let commentsByScene = {}; // sceneId -> [comments]; "" = overall
+
+const commentHtml = (c) =>
+  `<div class="comment"><span class="who">${esc(c.authorName)}</span><span class="when">${new Date(c.createdAt).toLocaleString()}</span><p class="text">${esc(c.body)}</p></div>`;
+
+async function fetchComments() {
+  try {
+    const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`);
+    const list = await res.json();
+    commentsByScene = {};
+    for (const c of list) (commentsByScene[c.sceneId || ""] ||= []).push(c);
+  } catch { /* transient */ }
+  const overall = commentsByScene[""] || [];
+  $("#comments").innerHTML = overall.length
+    ? overall.map(commentHtml).join("")
+    : `<p style="color:var(--muted)">No overall comments yet.</p>`;
+  if (viewerFrame) renderSectionComments(viewerFrame);
 }
+
+async function postComment(sceneId, name, body) {
+  const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ authorName: name, body, sceneId: sceneId || undefined }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  await fetchComments();
+}
+
 $("#csend").addEventListener("click", async () => {
   const body = $("#cbody").value.trim();
   if (!body) { $("#cmsg").textContent = "Write something first."; return; }
   $("#csend").disabled = true; $("#cmsg").textContent = "";
-  try {
-    const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/comments`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authorName: $("#cname").value.trim(), body }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-    $("#cbody").value = "";
-    await loadComments();
-  } catch (err) { $("#cmsg").textContent = err.message; }
+  try { await postComment("", $("#cname").value.trim(), body); $("#cbody").value = ""; }
+  catch (err) { $("#cmsg").textContent = err.message; }
   finally { $("#csend").disabled = false; }
 });
-loadComments();
+
+const SECTION_STYLE = `
+  .ei-comments { margin: 1rem 0 0; border-top: 1px dashed var(--rule); padding-top: 0.6rem; font-size: 0.9rem; }
+  .ei-comments > summary { cursor: pointer; color: var(--muted); list-style: none; }
+  .ei-comments .c { border-top: 1px solid var(--rule); padding: 0.4rem 0; }
+  .ei-comments .who { font-weight: 600; }
+  .ei-comments .when { color: var(--muted); font-size: 0.8em; margin-left: 0.4rem; }
+  .ei-comments .text { margin: 0.2rem 0 0; white-space: pre-wrap; }
+  .ei-comments input, .ei-comments textarea { width: 100%; margin-top: 0.4rem; padding: 0.4rem 0.6rem;
+    border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; box-sizing: border-box; }
+  .ei-comments textarea { min-height: 3.2rem; resize: vertical; }
+  .ei-comments button { margin-top: 0.4rem; padding: 0.35rem 0.9rem; border: 0; border-radius: 6px;
+    background: var(--accent, #2f6fed); color: #fff; font: inherit; cursor: pointer; }
+`;
+
+function renderSectionComments(frame) {
+  let doc;
+  try { doc = frame.contentDocument; } catch { return; }
+  if (!doc) return;
+  if (!doc.getElementById("ei-comment-style")) {
+    const st = doc.createElement("style");
+    st.id = "ei-comment-style";
+    st.textContent = SECTION_STYLE;
+    doc.head.appendChild(st);
+  }
+  doc.querySelectorAll("section.scene[id]").forEach((section) => {
+    const sceneId = section.id;
+    const list = commentsByScene[sceneId] || [];
+    let block = section.querySelector(":scope > .ei-comments");
+    if (!block) { block = doc.createElement("div"); block.className = "ei-comments"; section.appendChild(block); }
+    block.innerHTML =
+      `<details ${list.length ? "open" : ""}><summary>💬 Comments on this section (${list.length})</summary>` +
+      `<div class="clist">${list.map(commentHtml).join("")}</div>` +
+      `<input type="text" placeholder="Your name (optional)" maxlength="60" class="ei-name">` +
+      `<textarea placeholder="Comment on this section…" maxlength="5000" class="ei-body"></textarea>` +
+      `<button type="button" class="ei-post">Post</button></details>`;
+    const btn = block.querySelector(".ei-post");
+    btn.addEventListener("click", async () => {
+      const body = block.querySelector(".ei-body").value.trim();
+      if (!body) return;
+      btn.disabled = true;
+      try { await postComment(sceneId, block.querySelector(".ei-name").value.trim(), body); }
+      catch (e) { alert(e.message); btn.disabled = false; }
+    });
+  });
+  setTimeout(autosize, 50); // the injected blocks grow the doc; refit the outer iframe
+}
+fetchComments();
 </script>
 </body>
 </html>
