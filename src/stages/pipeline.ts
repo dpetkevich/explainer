@@ -7,7 +7,10 @@ import { paths, type Ctx } from "../lib/context.js";
 import { pool, generateScene } from "./scenes.js";
 import { qaOneScene, type QaSummary, type SceneResult } from "./qa.js";
 
-const PIPELINE_CONCURRENCY = 4;
+// Scene workers run mostly-network-bound codegen+QA chains, so this can go well
+// above CPU count; the practical ceiling is the Anthropic rate limit. Override
+// with SCENE_CONCURRENCY (e.g. 8) to shorten the scenes phase.
+const PIPELINE_CONCURRENCY = Math.max(1, Number(process.env.SCENE_CONCURRENCY ?? "4"));
 
 /**
  * Per-scene pipeline: each worker runs generate → render → review → repair
