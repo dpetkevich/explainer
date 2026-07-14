@@ -297,12 +297,15 @@ function renderSectionComments(frame) {
     doc.head.appendChild(st);
   }
   doc.body.classList.toggle("ei-dev", dev);
-  const hook = doc.querySelector(".hook");
-  if (hook) {
+  // Anchor the abstract block after the "source paper · pedagogy" links row
+  // (which has a negative top margin), not directly after the hook — otherwise
+  // that row overlaps the injected block.
+  const anchor = doc.querySelector(".page-links") || doc.querySelector(".hook");
+  if (anchor) {
     const fresh = buildBlock(doc, "abstract", "Comments on the abstract");
     fresh.id = "ei-abstract";
     const prev = doc.getElementById("ei-abstract");
-    if (prev) prev.replaceWith(fresh); else hook.after(fresh);
+    if (prev) prev.replaceWith(fresh); else anchor.after(fresh);
   }
   doc.querySelectorAll("section.scene[id]").forEach((section) => {
     const fresh = buildBlock(doc, section.id, "Comments on this section");
