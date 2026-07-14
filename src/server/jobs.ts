@@ -58,12 +58,11 @@ export async function runGenerationJob(row: ExplainerRow): Promise<void> {
 
   try {
     const conceptMap = await runIngest(ctx);
-    updateExplainer(row.id, {
-      one_sentence_claim: conceptMap.paper.oneSentenceClaim,
-      category: conceptMap.paper.category ?? "Computing",
-    });
+    updateExplainer(row.id, { category: conceptMap.paper.category ?? "Computing" });
     const { board } = await runStoryboard(ctx, conceptMap);
-    updateExplainer(row.id, { title: board.title, hook: board.hook });
+    // one_sentence_claim is set after storyboard: the prose reviewer there may
+    // have rewritten the abstract (mutating conceptMap in place).
+    updateExplainer(row.id, { title: board.title, hook: board.hook, one_sentence_claim: conceptMap.paper.oneSentenceClaim });
     const qa = await runScenePipeline(ctx, board, true);
     runAssemble(ctx, conceptMap, board, qa);
     updateExplainer(row.id, { status: "done", stage: "assemble", pedagogy_version: currentPedagogy().version });

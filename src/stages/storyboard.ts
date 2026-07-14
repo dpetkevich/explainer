@@ -100,7 +100,7 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   // Prose review + auto-revise (hook + captions) before anything is cached or
   // any graphics are made. Prose fields are outside the scene contract, so this
   // never triggers scene regeneration.
-  board = await reviewAndReviseScript(ctx, board);
+  board = await reviewAndReviseScript(ctx, board, conceptMap);
 
   writeFileSync(out, JSON.stringify(board, null, 2));
   writeFileSync(paths.script(ctx), renderScript(ctx, board));

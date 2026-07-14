@@ -49,4 +49,8 @@ Return **strict JSON only** — no markdown fences, no commentary before or afte
 
 `category` is the single best-fit subject tag, chosen from exactly this list: **Computing** (AI/ML, systems, GPUs, graphics, algorithms, software), **Space** (propulsion, aerospace, astronomy, orbital physics), **Quantum** (qubits, quantum algorithms or hardware). Pick the closest one.
 
-`oneSentenceClaim` is the paper's **abstract in plain language**: 1–2 short sentences a curious non-expert can read start to finish, saying what the work does and why it matters. It is the gist shown in listings, so it must read like a real abstract — no jargon dumps, no undefined terms, no dense run-on clauses stacking every technical detail. Prefer the plainest phrasing that is still accurate.
+`oneSentenceClaim` is the paper's **abstract in plain language** — a short paragraph of **2–4 sentences**, shown as the gist in listings. Write it clear and simple:
+- **One idea per sentence**, each sentence **about 15–20 words** and never past ~25. Never a single run-on; do not stack clauses with dashes, semicolons, or "while…".
+- **Active voice, present tense, common words.** Lead with what the work is and does, then why it matters, then the single headline number **in its own sentence**.
+- **No undefined jargon** — a curious non-expert must follow every sentence on one read; gloss any unavoidable term in plain words.
+Prefer the plainest phrasing that is still accurate. (Bad: one 60-word sentence with five clauses. Good: "Training an AI agent can take billions of practice runs. A slow simulator, not the algorithm, is usually the bottleneck. This work runs thousands of simulated worlds at once on a single GPU. That makes training about 100× faster.")

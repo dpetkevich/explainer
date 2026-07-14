@@ -14,7 +14,8 @@ You are rewriting the flagged prose of a science explainer's script — its hook
 
 ## Rules for the rewrite
 
-- **Hook**: 3–4 sentences of clear, natural, sensible English; no jargon, no filler, no "slop." Every sentence must parse and mean something concrete.
+- **Abstract**: 2–4 short sentences, **one idea per sentence, ~15–20 words each (never past ~25)**, active voice, common words; the headline number in its own sentence. Never one long run-on. A non-expert must follow every sentence on one read.
+- **Hook**: 3–4 sentences of clear, natural, sensible English; no jargon, no filler, no "slop." Every sentence must parse and mean something concrete. Same one-idea-per-sentence, short-sentence rule.
 - **Captions**: 1–2 short sentences that point at the visual (the visual carries the teaching). Keep every number.
 - **Metaphors**: only idiomatic, widely-recognized comparisons (compound interest, a traffic jam, a bucket brigade). Never invent a contrived image the reader must construct from scratch. If no familiar comparison fits, use none.
 - Fix the flagged lines; you may lightly touch others for consistency, but keep unflagged text essentially as-is.
@@ -25,9 +26,10 @@ Return **strict JSON only** — no fences, no commentary:
 
 ```
 {
+  "abstract": string,
   "hook": string,
   "captions": { "<scene-id>": string }
 }
 ```
 
-Include `hook` only if you changed it; include a `captions` entry only for scenes whose caption you changed. Omit anything you left alone.
+Include a key only for text you actually changed (`abstract`, `hook`, and/or specific `captions` entries). Omit anything you left alone.

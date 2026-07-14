@@ -15,7 +15,7 @@ You review **on behalf of the reader below**, cold, with no other context.
 - **slop** — a sentence that does not parse or does not mean anything concrete on first read. Watch for the specific tells of machine filler: **excessive hedging** ("it's worth noting", "it's important to remember", "that said"), **formulaic transitions**, **over-qualification**, **vague hand-waving** where a concrete specific belongs, **generic platitudes**, and **repetitive sentence structure** (several sentences built the same way). Read it aloud: if it sounds empty or padded, it fails.
 - **metaphor** — a contrived, non-idiomatic comparison: a made-up image the reader would NOT already recognize (e.g. "building a fort out of movable boxes"). Idiomatic, widely-known comparisons (compound interest, a traffic jam, a bucket brigade) are fine; invented ones are not.
 - **undefined-term** — a term of art used before it is defined in plain words (the hook especially must use no jargon at all).
-- **too-wordy** — a caption longer than ~2 sentences, or a hook that is a dense run-on stacking technical detail instead of a clear plain-language abstract.
+- **too-wordy** — a caption longer than ~2 sentences; or ANY sentence (in the abstract, hook, or a caption) that **runs long (~25+ words) or stacks more than one idea**, or piles up clauses with dashes/semicolons/"while…". Clear writing is one idea per sentence, ~15–20 words each. A sentence a non-expert cannot follow on a single read fails here. (The abstract especially must be 2–4 short sentences, not one long run-on.)
 
 ## Before you decide
 

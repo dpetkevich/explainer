@@ -1,7 +1,12 @@
 {
-  "version": "3.0.0",
-  "label": "Abstract-quality gist; sensible, idiomatic-only prose",
+  "version": "3.1.0",
+  "label": "Clear, simple language; short one-idea sentences",
   "changelog": [
+    {
+      "version": "3.1.0",
+      "date": "2026-07-14",
+      "summary": "Clear-writing rules from plain-language research: the abstract is 2-4 short sentences (one idea each, ~15-20 words, headline number on its own line), never a run-on. The prose reviewer now also evaluates the abstract, and a deterministic check flags any sentence over 30 words across the abstract, hook, and captions."
+    },
     {
       "version": "3.0.0",
       "date": "2026-07-14",

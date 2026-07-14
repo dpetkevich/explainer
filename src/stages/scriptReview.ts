@@ -1,53 +1,85 @@
 /**
- * Prose review of the freshly generated script: a model reads the hook + every
- * caption (text only, no screenshots) and flags slop, contrived non-idiomatic
- * metaphors, undefined terms, and over-long prose. Failures are auto-revised by
- * the planning model and re-reviewed. This runs before any graphics are made,
- * and only edits prose fields (hook, captions) — which are outside the scene
- * contract, so it never triggers scene regeneration.
+ * Prose review of the freshly generated script — the abstract (the listing
+ * gist), the hook, and every caption. A model reads the text and flags slop,
+ * contrived metaphors, undefined terms, and unclear / run-on sentences; a
+ * deterministic check independently flags any over-long sentence (the model is
+ * unreliable at catching its own run-ons). Failures are auto-revised and
+ * re-reviewed. Runs before any graphics; edits only prose (abstract lives in the
+ * concept map; hook + captions are outside the scene contract), so it never
+ * triggers scene regeneration.
  */
+import { writeFileSync } from "node:fs";
 import { callModel, MODELS, stripJsonFences } from "../lib/anthropic.js";
 import { loadPrompt } from "../lib/prompts.js";
-import { ScriptReviewSchema, StoryboardSchema, type ScriptReview, type Storyboard } from "../lib/schemas.js";
+import { ScriptReviewSchema, StoryboardSchema, type ScriptReview, type ConceptMap, type Storyboard } from "../lib/schemas.js";
 import { info, warn } from "../lib/log.js";
-import type { Ctx } from "../lib/context.js";
+import { paths, type Ctx } from "../lib/context.js";
 
 const MAX_REVISIONS = 2;
+const LONG_SENTENCE_WORDS = 30;
 
-function scriptText(board: Storyboard): string {
-  const lines = [`HOOK: ${board.hook}`, ""];
+type Issue = { where: string; kind: string; detail: string };
+
+function scriptText(abstract: string, board: Storyboard): string {
+  const lines = [`ABSTRACT: ${abstract}`, "", `HOOK: ${board.hook}`, ""];
   for (const s of board.scenes) lines.push(`[${s.id}] ${s.title}\n  CAPTION: ${s.caption}`);
   return lines.join("\n");
 }
 
-async function reviewScript(ctx: Ctx, board: Storyboard): Promise<ScriptReview> {
-  // Best-effort quality enhancer, never a hard gate: a malformed review, a
-  // model error, or a refusal (fable-5 may decline some content) all degrade to
-  // a pass rather than failing the generation.
+/** Split into sentences and count words, ignoring inline \( … \) math. */
+function longSentences(text: string): string[] {
+  const plain = text.replace(/\\\([^)]*\\\)/g, "X");
+  return plain
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.split(/\s+/).filter(Boolean).length > LONG_SENTENCE_WORDS);
+}
+
+/** Deterministic run-on backstop over abstract + hook + captions. */
+function longSentenceIssues(abstract: string, board: Storyboard): Issue[] {
+  const issues: Issue[] = [];
+  const add = (where: string, text: string) => {
+    for (const s of longSentences(text)) {
+      issues.push({ where, kind: "too-wordy", detail: `Sentence runs long (>${LONG_SENTENCE_WORDS} words) — split into shorter one-idea sentences: "${s.slice(0, 80)}…"` });
+    }
+  };
+  add("abstract", abstract);
+  add("hook", board.hook);
+  for (const s of board.scenes) add(s.id, s.caption);
+  return issues;
+}
+
+async function reviewScript(ctx: Ctx, abstract: string, board: Storyboard): Promise<ScriptReview> {
   try {
-    const prompt = loadPrompt("script-review", { audience: ctx.audienceRaw, script: scriptText(board) });
+    const prompt = loadPrompt("script-review", { audience: ctx.audienceRaw, script: scriptText(abstract, board) });
     const raw = await callModel({ model: MODELS.prose, messages: [{ role: "user", content: prompt }], maxTokens: 8000 });
     const parsed = ScriptReviewSchema.safeParse(JSON.parse(stripJsonFences(raw)));
     if (parsed.success) return parsed.data;
   } catch (err) {
-    warn("script-review", `prose review unavailable (${err instanceof Error ? err.message : String(err)}) — skipping`);
+    warn("script-review", `prose review unavailable (${err instanceof Error ? err.message : String(err)}) — skipping model pass`);
   }
   return { pass: true, issues: [] };
 }
 
-async function reviseScript(ctx: Ctx, board: Storyboard, issues: { where: string; kind: string; detail: string }[]): Promise<Storyboard> {
+async function reviseScript(
+  ctx: Ctx,
+  abstract: string,
+  board: Storyboard,
+  issues: Issue[]
+): Promise<{ abstract: string; board: Storyboard }> {
   const prompt = loadPrompt("script-revise", {
     audience: ctx.audienceRaw,
     issues: issues.map((i) => `- [${i.where} / ${i.kind}] ${i.detail}`).join("\n"),
-    script: scriptText(board),
+    script: scriptText(abstract, board),
   });
-  const raw = await callModel({ model: MODELS.planning, messages: [{ role: "user", content: prompt }], maxTokens: 16000 });
-  let data: { hook?: unknown; captions?: Record<string, unknown> };
+  let data: { abstract?: unknown; hook?: unknown; captions?: Record<string, unknown> };
   try {
+    const raw = await callModel({ model: MODELS.planning, messages: [{ role: "user", content: prompt }], maxTokens: 16000 });
     data = JSON.parse(stripJsonFences(raw));
   } catch {
-    return board;
+    return { abstract, board };
   }
+  const nextAbstract = typeof data.abstract === "string" && data.abstract.trim() ? data.abstract.trim() : abstract;
   const next: Storyboard = { ...board, scenes: board.scenes.map((s) => ({ ...s })) };
   if (typeof data.hook === "string" && data.hook.trim()) next.hook = data.hook.trim();
   const caps = data.captions ?? {};
@@ -55,25 +87,37 @@ async function reviseScript(ctx: Ctx, board: Storyboard, issues: { where: string
     const c = caps[s.id];
     if (typeof c === "string" && c.trim()) s.caption = c.trim();
   }
-  // Re-validate; if the rewrite broke the schema, keep the original.
   const v = StoryboardSchema.safeParse(next);
-  return v.success ? v.data : board;
+  return { abstract: nextAbstract, board: v.success ? v.data : board };
 }
 
-/** Review the script's prose and auto-revise until it passes (bounded). Returns the improved board. */
-export async function reviewAndReviseScript(ctx: Ctx, board: Storyboard): Promise<Storyboard> {
+/**
+ * Review the script's prose (abstract + hook + captions) and auto-revise until
+ * it passes (bounded). Mutates conceptMap.paper.oneSentenceClaim (and rewrites
+ * concept-map.json) if the abstract was improved; returns the improved board.
+ */
+export async function reviewAndReviseScript(ctx: Ctx, board: Storyboard, conceptMap: ConceptMap): Promise<Storyboard> {
+  let abstract = conceptMap.paper.oneSentenceClaim;
   for (let attempt = 0; ; attempt++) {
-    const report = await reviewScript(ctx, board);
-    if (report.pass || report.issues.length === 0) {
+    const modelReport = await reviewScript(ctx, abstract, board);
+    const issues: Issue[] = [...modelReport.issues, ...longSentenceIssues(abstract, board)];
+    if (issues.length === 0) {
       if (attempt > 0) info("script-review", "prose passed after revision");
-      return board;
+      break;
     }
-    info("script-review", `prose issues (${report.issues.length}): ${report.issues.map((i) => `${i.where}/${i.kind}`).join(", ")}`);
+    info("script-review", `prose issues (${issues.length}): ${issues.map((i) => `${i.where}/${i.kind}`).join(", ")}`);
     if (attempt >= MAX_REVISIONS) {
-      warn("script-review", `still ${report.issues.length} prose issue(s) after ${MAX_REVISIONS} revisions — proceeding`);
-      return board;
+      warn("script-review", `still ${issues.length} prose issue(s) after ${MAX_REVISIONS} revisions — proceeding`);
+      break;
     }
     info("script-review", `revising prose (${attempt + 1}/${MAX_REVISIONS})`);
-    board = await reviseScript(ctx, board, report.issues);
+    const revised = await reviseScript(ctx, abstract, board, issues);
+    abstract = revised.abstract;
+    board = revised.board;
   }
+  if (abstract !== conceptMap.paper.oneSentenceClaim) {
+    conceptMap.paper.oneSentenceClaim = abstract;
+    writeFileSync(paths.conceptMap(ctx), JSON.stringify(conceptMap, null, 2));
+  }
+  return board;
 }
