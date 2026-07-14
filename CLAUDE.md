@@ -20,17 +20,17 @@ Models are overridable via `PLANNING_MODEL`, `CODEGEN_MODEL`, `REVIEW_MODEL`.
 ## Pedagogy principles (all user-taught; do not weaken)
 
 In `prompts/storyboard.md`:
+- **Visuals carry the explanation**: an explainer should nearly stand on its diagrams, charts, and equations alone; words are connective tissue and the hardest part to absorb, so use as few as possible. Whenever a sentence could be drawn instead, draw it.
+- Every scene is a **labeled diagram** (structural concepts — name the parts, draw the connections) or an **interactive chart** (relationships — plot it, put the independent variable on a reader-moved control). Push meaning into labels/annotations/axes.
+- Captions are **1–2 short sentences** that name the need and point at the visual — not paragraphs. Keep every number. Feynman warmth, Zinsser economy, read-aloud test.
 - Fixed four-section arc: building blocks → the new technology → why it beats existing tech → why now; every part lede states what it builds on.
 - Feynman-first refresher scenes (`requires: []`) even when `assumeKnown` technically covers them.
 - Atomicity: one idea per scene; mechanism vs full-scale payoff = two scenes (toy example first); multi-step process = one scene per step; every scene opens by naming the need it answers.
-- Feynman voice with Zinsser economy; plain idiomatic English (read-aloud test).
-- No undefined terms anywhere (hook, ledes, titles included); introduce-then-use (metaphor → proper term, then the proper term); sustained metaphors declared explicitly with their mapping.
-- Mechanisms must be cashed out in a concrete miniature example; when a taught mechanism reappears at a new scale, map each ingredient onto the new actors.
-- Story roles beat algebra labels ("you", "your friend", never "atom A", "B's half").
+- No undefined terms anywhere (hook, ledes, titles included). **A metaphor is a doorway, not a residence**: open a concept with a one-line metaphor if useful, then name the proper term and drop the metaphor — never sustain it across a scene.
 - A metaphor must survive the reader's arithmetic; when the WHY is beyond the audience, teach the verified contract (with a "try to cheat" control); when even that is too much, declare an honest black box with cost + guarantees.
 - Caption math in `\( ... \)` (never `$` — captions contain currency); simple declarative titles.
 
-In `prompts/scene.md`: no clipped text at any edge; MathML equations with a symbol legend; every plot element labeled in plain words; no bare abbreviations; control captions say what they do; instant-completing sequences (QA screenshots the end state); no reset-dependent state.
+In `prompts/scene.md`: the drawing must stand on its own labels (caption is minimal) — name every part, label every axis/curve, annotate the values that matter; no clipped text at any edge; MathML equations with a symbol legend; no bare abbreviations; control captions say what they do; instant-completing sequences (QA screenshots the end state); no reset-dependent state.
 
 In `prompts/review.md`: review on behalf of the injected audience profile, not the author; edge sweep first; first-time reader test (mechanism named-but-not-shown fails); `comprehension` is a first-class failure kind.
 
