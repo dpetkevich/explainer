@@ -46,6 +46,11 @@ function longSentenceIssues(abstract: string, board: Storyboard): Issue[] {
   add("abstract", abstract);
   add("hook", board.hook);
   for (const s of board.scenes) add(s.id, s.caption);
+  // The list abstract must stay short: cap at 3 sentences.
+  const abstractSentences = abstract.replace(/\\\([^)]*\\\)/g, "X").split(/(?<=[.!?])\s+/).filter((s) => s.trim()).length;
+  if (abstractSentences > 3) {
+    issues.push({ where: "abstract", kind: "too-wordy", detail: `The abstract has ${abstractSentences} sentences — trim it to 2–3 short sentences (what, why, and the one headline number).` });
+  }
   return issues;
 }
 

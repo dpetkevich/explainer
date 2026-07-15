@@ -1,7 +1,12 @@
 {
-  "version": "3.1.0",
+  "version": "3.1.1",
   "label": "Clear, simple language; short one-idea sentences",
   "changelog": [
+    {
+      "version": "3.1.1",
+      "date": "2026-07-14",
+      "summary": "List abstract tightened to 2-3 short sentences (down from 2-4), enforced by a deterministic sentence-count cap in the prose reviewer. The explainer-top hook stays a separate, motivational lead-in."
+    },
     {
       "version": "3.1.0",
       "date": "2026-07-14",
