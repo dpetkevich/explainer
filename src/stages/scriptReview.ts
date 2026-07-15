@@ -21,8 +21,22 @@ const LONG_SENTENCE_WORDS = 30;
 type Issue = { where: string; kind: string; detail: string };
 
 function scriptText(abstract: string, board: Storyboard): string {
-  const lines = [`ABSTRACT: ${abstract}`, "", `HOOK: ${board.hook}`, ""];
-  for (const s of board.scenes) lines.push(`[${s.id}] ${s.title}\n  CAPTION: ${s.caption}`);
+  const lines = [`TITLE: ${board.title}`, "", `ABSTRACT: ${abstract}`, "", `HOOK: ${board.hook}`, ""];
+  // Walk the arc part by part so the reviewer can see the throughline: each
+  // part's lede, then its scenes in order with what each one teaches and builds on.
+  const sceneLine = (s: Storyboard["scenes"][number]) => {
+    const req = s.requires.length ? ` (builds on: ${s.requires.join(", ")})` : "";
+    return [`  [${s.id}] ${s.title}${req}`, `    TEACHES: ${s.teaches}`, `    CAPTION: ${s.caption}`];
+  };
+  const parts = board.parts ?? [];
+  if (parts.length === 0) {
+    for (const s of board.scenes) lines.push(...sceneLine(s));
+  } else {
+    for (const part of parts) {
+      lines.push(`PART — ${part.title}`, `  LEDE: ${part.lede}`);
+      for (const s of board.scenes.filter((sc) => sc.part === part.title)) lines.push(...sceneLine(s));
+    }
+  }
   return lines.join("\n");
 }
 

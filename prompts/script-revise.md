@@ -17,6 +17,7 @@ You are rewriting the flagged prose of a science explainer's script — its hook
 - **Abstract**: 2–4 short sentences, **one idea per sentence, ~15–20 words each (never past ~25)**, active voice, common words; the headline number in its own sentence. Never one long run-on. A non-expert must follow every sentence on one read.
 - **Hook**: 3–4 sentences of clear, natural, sensible English; no jargon, no filler, no "slop." Every sentence must parse and mean something concrete. Same one-idea-per-sentence, short-sentence rule.
 - **Captions**: 1–2 short sentences that point at the visual (the visual carries the teaching). Keep every number.
+- **Coherence issues** (`overall` / `other`): you can only change wording, so tighten the throughline in the prose you control — have captions name and return to the ONE running example, and open a scene's caption by connecting to the step before it ("now that the agents can hide, watch what the seekers learn"). If a coherence issue truly needs a scene cut, added, or reordered, you cannot fix it here — leave the prose as good as you can and it will be flagged for regeneration.
 - **Metaphors**: only idiomatic, widely-recognized comparisons (compound interest, a traffic jam, a bucket brigade). Never invent a contrived image the reader must construct from scratch. If no familiar comparison fits, use none.
 - Fix the flagged lines; you may lightly touch others for consistency, but keep unflagged text essentially as-is.
 

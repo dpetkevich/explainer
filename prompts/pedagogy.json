@@ -1,7 +1,12 @@
 {
-  "version": "3.3.0",
-  "label": "Introduce canonical examples; establish baselines; triggerable causes",
+  "version": "4.0.0",
+  "label": "One insight + one running example carried through connected scenes (story-discovery methodology)",
   "changelog": [
+    {
+      "version": "4.0.0",
+      "date": "2026-07-14",
+      "summary": "Methodology reframe from studying the best prior art (Ciechanowski, Distill's 'Communicating with Interactive Articles', moonshine, 3Blue1Brown). The scriptwriter prompt was rewritten from an accreted list of negative rules into a coherent positive spec: (1) story-discovery first — commit to ONE insight and ONE concrete running example (a named benchmark/device/scenario) before any scene; (2) one connected narrative throughline — every scene returns to and advances the same running example instead of inventing fresh toys, fewer/deeper scenes over exhaustive coverage; (3) teach prerequisites just-in-time and briefly instead of front-loading a thick refresher block; (4) guided discovery — predict-before-reveal moments; (5) details-on-demand — overview first, secondary detail in labels; (6) selective interactivity — a clean labeled diagram or a single sentence is allowed where a slider wouldn't earn its place (over-interactivizing is a known failure). All hard-won specifics kept but subordinated to the throughline: caption math \\(...\\), no undefined terms, idiomatic-only metaphors, 2-3 sentence abstract, introduce canonical examples by name/role, show the cause, establish baselines. The prose reviewer was expanded into a whole-explainer coherence reviewer (reads title+abstract+hook+arc+scenes end to end) that fails: no single insight, no running example, broken throughline, reader-gets-lost, and filler scenes."
+    },
     {
       "version": "3.3.0",
       "date": "2026-07-14",
