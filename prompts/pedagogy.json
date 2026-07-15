@@ -1,7 +1,12 @@
 {
-  "version": "3.1.1",
-  "label": "Clear, simple language; short one-idea sentences",
+  "version": "3.2.0",
+  "label": "Thicker prerequisite ramp; show cause + takeaway",
   "changelog": [
+    {
+      "version": "3.2.0",
+      "date": "2026-07-14",
+      "summary": "From Madrona reader feedback: a prerequisite-gap ramp gives a refresher scene to every prerequisite the paper needs that the audience doesn't already know (bedrock nouns of the paper's field — agent, simulator, GPU/warp — count as undefined terms for an out-of-field reader). Scenes must show the cause of an effect, not just the effect, and make their single takeaway unmistakable; the reviewer now fails scenes whose takeaway is unclear or that show an effect without its cause."
+    },
     {
       "version": "3.1.1",
       "date": "2026-07-14",
