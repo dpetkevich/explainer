@@ -38,6 +38,11 @@ export function allowStar(ip: string): boolean {
   return allow(`s:${ip}`, 120, 60_000);
 }
 
+// "Chat with this paper" makes a paid model call per turn.
+export function allowChat(ip: string): boolean {
+  return allow(`chat:${ip}`, 30, 5 * 60_000);
+}
+
 let dayKey = "";
 let dayCount = 0;
 

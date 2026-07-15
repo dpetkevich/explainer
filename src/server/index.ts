@@ -24,8 +24,9 @@ import {
   type ExplainerRow,
 } from "./db.js";
 import { resumeQueued, queueDepth } from "./queue.js";
-import { allowComment, allowStar } from "./limits.js";
+import { allowComment, allowStar, allowChat } from "./limits.js";
 import { subscribe, type StreamMessage } from "./sse.js";
+import { chat, type ChatMessage } from "./chat.js";
 
 // Minimal .env loader so ANTHROPIC_API_KEY can live in the project (mirrors cli.ts).
 (() => {
@@ -141,6 +142,22 @@ app.get("/api/explainers/:id/events", async (req, reply) => {
     unsubscribe();
   });
   return reply;
+});
+
+// ---- Chat with this paper (multi-turn, grounded in the explainer; fable-5) ----
+app.post("/api/explainers/:id/chat", async (req, reply) => {
+  const row = getExplainer((req.params as { id: string }).id);
+  if (!row) return reply.code(404).send({ error: "Not found." });
+  if (!allowChat(clientIp(req))) return reply.code(429).send({ error: "Too many messages — give it a moment." });
+  const body = (req.body ?? {}) as { messages?: ChatMessage[]; selection?: string };
+  const messages = Array.isArray(body.messages)
+    ? body.messages.filter((m) => (m?.role === "user" || m?.role === "assistant") && typeof m.content === "string")
+    : [];
+  if (!messages.some((m) => m.role === "user" && m.content.trim())) {
+    return reply.code(400).send({ error: "Ask a question first." });
+  }
+  const replyText = await chat(row.out_dir, messages.slice(-20), typeof body.selection === "string" ? body.selection : undefined);
+  return { reply: replyText };
 });
 
 // ---- Stars (a raw click counter; anonymous, no accounts) ----

@@ -19,6 +19,8 @@ export const MODELS = {
   // The prose/slop reviewer runs on fable-5 by default: a stronger, different
   // model from the sonnet scene-author, which reduces self-enhancement bias.
   prose: process.env.PROSE_MODEL ?? "claude-fable-5",
+  // "Chat with this paper" runs on fable-5 for the strongest reasoning.
+  chat: process.env.CHAT_MODEL ?? "claude-fable-5",
 };
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 529]);
