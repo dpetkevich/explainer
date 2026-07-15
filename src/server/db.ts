@@ -44,6 +44,8 @@ export interface CommentRow {
   explainer_id: string;
   /** Scene/section this comment is on; null = an overall comment on the whole explainer. */
   scene_id: string | null;
+  /** Pedagogy version the explainer was on when this comment was left (snapshot). */
+  pedagogy_version: string | null;
   author_name: string;
   body: string;
   created_at: number;
@@ -79,6 +81,7 @@ export function initDb(): Database.Database {
       id TEXT PRIMARY KEY,
       explainer_id TEXT NOT NULL,
       scene_id TEXT,
+      pedagogy_version TEXT,
       author_name TEXT NOT NULL,
       body TEXT NOT NULL,
       created_at INTEGER NOT NULL
@@ -97,6 +100,7 @@ export function initDb(): Database.Database {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       selection TEXT,
+      pedagogy_version TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_chat_explainer ON chat_turns(explainer_id, conversation_id, created_at);
@@ -109,6 +113,9 @@ export function initDb(): Database.Database {
   if (!cols.includes("hook")) db.exec("ALTER TABLE explainers ADD COLUMN hook TEXT");
   const ccols = (db.prepare("PRAGMA table_info(comments)").all() as { name: string }[]).map((c) => c.name);
   if (!ccols.includes("scene_id")) db.exec("ALTER TABLE comments ADD COLUMN scene_id TEXT");
+  if (!ccols.includes("pedagogy_version")) db.exec("ALTER TABLE comments ADD COLUMN pedagogy_version TEXT");
+  const tcols = (db.prepare("PRAGMA table_info(chat_turns)").all() as { name: string }[]).map((c) => c.name);
+  if (tcols.length && !tcols.includes("pedagogy_version")) db.exec("ALTER TABLE chat_turns ADD COLUMN pedagogy_version TEXT");
   // A run cannot resume mid-flight in a fresh process, so mark anything that was
   // "running" as failed on boot. "queued" rows never started, so the queue can
   // safely pick them up again (see resumeQueued in queue.ts).
@@ -194,14 +201,15 @@ export function addComment(
   explainerId: string,
   authorName: string,
   body: string,
-  sceneId: string | null = null
+  sceneId: string | null = null,
+  pedagogyVersion: string | null = null
 ): CommentRow {
   const id = randomUUID();
   const now = Date.now();
   db.prepare(
-    `INSERT INTO comments (id, explainer_id, scene_id, author_name, body, created_at) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, explainerId, sceneId, authorName, body, now);
-  return { id, explainer_id: explainerId, scene_id: sceneId, author_name: authorName, body, created_at: now };
+    `INSERT INTO comments (id, explainer_id, scene_id, pedagogy_version, author_name, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, explainerId, sceneId, pedagogyVersion, authorName, body, now);
+  return { id, explainer_id: explainerId, scene_id: sceneId, pedagogy_version: pedagogyVersion, author_name: authorName, body, created_at: now };
 }
 
 export interface ChatTurnRow {
@@ -211,6 +219,7 @@ export interface ChatTurnRow {
   role: string;
   content: string;
   selection: string | null;
+  pedagogy_version: string | null;
   created_at: number;
 }
 
@@ -220,12 +229,13 @@ export function addChatTurn(
   conversationId: string,
   role: "user" | "assistant",
   content: string,
-  selection: string | null = null
+  selection: string | null = null,
+  pedagogyVersion: string | null = null
 ): void {
   db.prepare(
-    `INSERT INTO chat_turns (id, explainer_id, conversation_id, role, content, selection, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(randomUUID(), explainerId, conversationId, role, content, selection, Date.now());
+    `INSERT INTO chat_turns (id, explainer_id, conversation_id, role, content, selection, pedagogy_version, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(randomUUID(), explainerId, conversationId, role, content, selection, pedagogyVersion, Date.now());
 }
 
 /** All recorded chat turns for an explainer, oldest first within each conversation. */

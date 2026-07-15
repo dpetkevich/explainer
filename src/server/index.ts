@@ -164,18 +164,18 @@ app.post("/api/explainers/:id/chat", async (req, reply) => {
   // readers ask. Anonymous — text only, grouped by a client conversation id.
   const conversationId = typeof body.conversationId === "string" && body.conversationId ? body.conversationId : randomUUID();
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
-  if (lastUser) addChatTurn(row.id, conversationId, "user", lastUser.content, selection ?? null);
-  addChatTurn(row.id, conversationId, "assistant", replyText, selection ?? null);
+  if (lastUser) addChatTurn(row.id, conversationId, "user", lastUser.content, selection ?? null, row.pedagogy_version);
+  addChatTurn(row.id, conversationId, "assistant", replyText, selection ?? null, row.pedagogy_version);
   return { reply: replyText };
 });
 
 app.get("/api/explainers/:id/chats", async (req, reply) => {
   const row = getExplainer((req.params as { id: string }).id);
   if (!row) return reply.code(404).send({ error: "Not found." });
-  const byConvo = new Map<string, { conversationId: string; selection: string | null; turns: { role: string; content: string; createdAt: number }[] }>();
+  const byConvo = new Map<string, { conversationId: string; selection: string | null; pedagogyVersion: string | null; turns: { role: string; content: string; createdAt: number }[] }>();
   for (const t of listChatTurns(row.id)) {
     let c = byConvo.get(t.conversation_id);
-    if (!c) { c = { conversationId: t.conversation_id, selection: t.selection, turns: [] }; byConvo.set(t.conversation_id, c); }
+    if (!c) { c = { conversationId: t.conversation_id, selection: t.selection, pedagogyVersion: t.pedagogy_version, turns: [] }; byConvo.set(t.conversation_id, c); }
     c.turns.push({ role: t.role, content: t.content, createdAt: t.created_at });
   }
   return [...byConvo.values()].sort((a, b) => (b.turns[0]?.createdAt ?? 0) - (a.turns[0]?.createdAt ?? 0));
@@ -196,6 +196,7 @@ app.get("/api/explainers/:id/comments", async (req, reply) => {
   return listComments(id).map((c) => ({
     id: c.id,
     sceneId: c.scene_id,
+    pedagogyVersion: c.pedagogy_version,
     authorName: c.author_name,
     body: c.body,
     createdAt: c.created_at,
@@ -204,7 +205,8 @@ app.get("/api/explainers/:id/comments", async (req, reply) => {
 
 app.post("/api/explainers/:id/comments", async (req, reply) => {
   const id = (req.params as { id: string }).id;
-  if (!getExplainer(id)) return reply.code(404).send({ error: "Not found." });
+  const row = getExplainer(id);
+  if (!row) return reply.code(404).send({ error: "Not found." });
   if (!allowComment(clientIp(req))) return reply.code(429).send({ error: "Too many comments — slow down a moment." });
   const body = (req.body ?? {}) as { authorName?: string; body?: string; sceneId?: string };
   const text = (body.body ?? "").trim();
@@ -212,8 +214,8 @@ app.post("/api/explainers/:id/comments", async (req, reply) => {
   if (text.length > 5000) return reply.code(400).send({ error: "Comment is too long (5000 chars max)." });
   const author = (body.authorName ?? "").trim().slice(0, 60) || "Anonymous";
   const sceneId = typeof body.sceneId === "string" && body.sceneId.trim() ? body.sceneId.trim() : null;
-  const c = addComment(id, author, text, sceneId);
-  return reply.code(201).send({ id: c.id, sceneId: c.scene_id, authorName: c.author_name, body: c.body, createdAt: c.created_at });
+  const c = addComment(id, author, text, sceneId, row.pedagogy_version);
+  return reply.code(201).send({ id: c.id, sceneId: c.scene_id, pedagogyVersion: c.pedagogy_version, authorName: c.author_name, body: c.body, createdAt: c.created_at });
 });
 
 // ---- Viewer page (frontend handles fetching by id) ----

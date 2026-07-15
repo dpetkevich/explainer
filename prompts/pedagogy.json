@@ -1,7 +1,12 @@
 {
-  "version": "3.2.0",
-  "label": "Thicker prerequisite ramp; show cause + takeaway",
+  "version": "3.3.0",
+  "label": "Introduce canonical examples; establish baselines; triggerable causes",
   "changelog": [
+    {
+      "version": "3.3.0",
+      "date": "2026-07-14",
+      "summary": "From Madrona v3.2.0 chat feedback: introduce canonical examples/benchmarks (cartpole, hide-and-seek) by name and role before using them; establish the field's default/'naive' baseline before critiquing it; make the cause of an effect triggerable in the interactive itself, not just asserted. Reviewer fails scenes that invoke an un-introduced example/benchmark or baseline."
+    },
     {
       "version": "3.2.0",
       "date": "2026-07-14",
