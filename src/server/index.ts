@@ -21,6 +21,8 @@ import {
   toggleStar,
   countStars,
   hasStarred,
+  addChatTurn,
+  listChatTurns,
   type ExplainerRow,
 } from "./db.js";
 import { resumeQueued, queueDepth } from "./queue.js";
@@ -149,15 +151,34 @@ app.post("/api/explainers/:id/chat", async (req, reply) => {
   const row = getExplainer((req.params as { id: string }).id);
   if (!row) return reply.code(404).send({ error: "Not found." });
   if (!allowChat(clientIp(req))) return reply.code(429).send({ error: "Too many messages — give it a moment." });
-  const body = (req.body ?? {}) as { messages?: ChatMessage[]; selection?: string };
+  const body = (req.body ?? {}) as { messages?: ChatMessage[]; selection?: string; conversationId?: string };
   const messages = Array.isArray(body.messages)
     ? body.messages.filter((m) => (m?.role === "user" || m?.role === "assistant") && typeof m.content === "string")
     : [];
   if (!messages.some((m) => m.role === "user" && m.content.trim())) {
     return reply.code(400).send({ error: "Ask a question first." });
   }
-  const replyText = await chat(row.out_dir, messages.slice(-20), typeof body.selection === "string" ? body.selection : undefined);
+  const selection = typeof body.selection === "string" ? body.selection : undefined;
+  const replyText = await chat(row.out_dir, messages.slice(-20), selection);
+  // Record this turn (the latest user message + the reply) so we can mine what
+  // readers ask. Anonymous — text only, grouped by a client conversation id.
+  const conversationId = typeof body.conversationId === "string" && body.conversationId ? body.conversationId : randomUUID();
+  const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  if (lastUser) addChatTurn(row.id, conversationId, "user", lastUser.content, selection ?? null);
+  addChatTurn(row.id, conversationId, "assistant", replyText, selection ?? null);
   return { reply: replyText };
+});
+
+app.get("/api/explainers/:id/chats", async (req, reply) => {
+  const row = getExplainer((req.params as { id: string }).id);
+  if (!row) return reply.code(404).send({ error: "Not found." });
+  const byConvo = new Map<string, { conversationId: string; selection: string | null; turns: { role: string; content: string; createdAt: number }[] }>();
+  for (const t of listChatTurns(row.id)) {
+    let c = byConvo.get(t.conversation_id);
+    if (!c) { c = { conversationId: t.conversation_id, selection: t.selection, turns: [] }; byConvo.set(t.conversation_id, c); }
+    c.turns.push({ role: t.role, content: t.content, createdAt: t.created_at });
+  }
+  return [...byConvo.values()].sort((a, b) => (b.turns[0]?.createdAt ?? 0) - (a.turns[0]?.createdAt ?? 0));
 });
 
 // ---- Stars (a raw click counter; anonymous, no accounts) ----

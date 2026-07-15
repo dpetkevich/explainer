@@ -360,6 +360,7 @@ applyDev();
 // ---- Chat with this paper (fable-5, multi-turn, grounded) ----
 const chatMsgs = [];      // {role:"user"|"assistant", content}
 let chatSelection = "";   // highlighted passage seeded via right-click
+let chatConversationId = ""; // groups a thread for server-side recording
 const pane = $("#chat-pane");
 function openPane() { pane.classList.add("open"); pane.setAttribute("aria-hidden", "false"); if (!chatMsgs.length && !chatSelection) renderChat(); $("#chat-input").focus(); }
 function closePane() { pane.classList.remove("open"); pane.setAttribute("aria-hidden", "true"); }
@@ -387,11 +388,12 @@ $("#chat-form").addEventListener("submit", async (e) => {
   chatMsgs.push({ role: "assistant", content: "…" });
   renderChat();
   const send = $("#chat-send"); send.disabled = true;
+  if (!chatConversationId) chatConversationId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
   try {
     const payload = chatMsgs.filter((m) => m.content !== "…");
     const res = await fetch(`/api/explainers/${encodeURIComponent(id)}/chat`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: payload, selection: chatSelection || undefined }),
+      body: JSON.stringify({ messages: payload, selection: chatSelection || undefined, conversationId: chatConversationId }),
     });
     const data = await res.json();
     chatMsgs[chatMsgs.length - 1].content = res.ok ? data.reply : (data.error || `Error ${res.status}`);
@@ -427,6 +429,7 @@ $("#ctx-chat").addEventListener("click", () => {
   menu.style.display = "none";
   // A new highlighted passage starts a fresh chat — clear the previous thread.
   chatMsgs.length = 0;
+  chatConversationId = "";
   chatSelection = menu.dataset.sel || "";
   openPane();
   renderChat();

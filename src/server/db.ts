@@ -90,6 +90,16 @@ export function initDb(): Database.Database {
       created_at INTEGER NOT NULL,
       PRIMARY KEY (explainer_id, voter_id)
     );
+    CREATE TABLE IF NOT EXISTS chat_turns (
+      id TEXT PRIMARY KEY,
+      explainer_id TEXT NOT NULL,
+      conversation_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      selection TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_explainer ON chat_turns(explainer_id, conversation_id, created_at);
   `);
   // Columns added after the initial schema (SQLite has no IF NOT EXISTS for columns).
   const cols = (db.prepare("PRAGMA table_info(explainers)").all() as { name: string }[]).map((c) => c.name);
@@ -192,6 +202,37 @@ export function addComment(
     `INSERT INTO comments (id, explainer_id, scene_id, author_name, body, created_at) VALUES (?, ?, ?, ?, ?, ?)`
   ).run(id, explainerId, sceneId, authorName, body, now);
   return { id, explainer_id: explainerId, scene_id: sceneId, author_name: authorName, body, created_at: now };
+}
+
+export interface ChatTurnRow {
+  id: string;
+  explainer_id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  selection: string | null;
+  created_at: number;
+}
+
+/** Record one turn of a "chat with this paper" conversation (anonymous — text only). */
+export function addChatTurn(
+  explainerId: string,
+  conversationId: string,
+  role: "user" | "assistant",
+  content: string,
+  selection: string | null = null
+): void {
+  db.prepare(
+    `INSERT INTO chat_turns (id, explainer_id, conversation_id, role, content, selection, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(randomUUID(), explainerId, conversationId, role, content, selection, Date.now());
+}
+
+/** All recorded chat turns for an explainer, oldest first within each conversation. */
+export function listChatTurns(explainerId: string): ChatTurnRow[] {
+  return db
+    .prepare(`SELECT * FROM chat_turns WHERE explainer_id = ? ORDER BY conversation_id, created_at`)
+    .all(explainerId) as ChatTurnRow[];
 }
 
 export function listComments(explainerId: string): CommentRow[] {
