@@ -425,6 +425,8 @@ function wireChatContextMenu(frame) {
 $("#ctx-chat").addEventListener("click", () => {
   const menu = $("#ctx-menu");
   menu.style.display = "none";
+  // A new highlighted passage starts a fresh chat — clear the previous thread.
+  chatMsgs.length = 0;
   chatSelection = menu.dataset.sel || "";
   openPane();
   renderChat();
