@@ -31,6 +31,7 @@ __ro.observe(document.documentElement);
 ```
 
 13. **No console errors or warnings.** The scene is loaded headlessly and any console error is an automatic failure.
-14. **Visual restraint**: this scene teaches ONE idea — draw exactly one plot OR one diagram, never both. At most 2 controls and at most 4 value readouts. Target ≤ 250 lines / ~10 KB total. If you are tempted to add a second visualization, the storyboard already split that idea into its own scene.
+14. **Visual restraint**: this scene teaches ONE idea — draw exactly one plot OR one diagram, never both. At most 2 controls and at most 4 value readouts. Target ≤ 250 lines / ~10 KB total. If you are tempted to add a second visualization, the storyboard already split that idea into its own scene. **Exception — equation scenes:** when the spec's core is a governing equation, the equation itself IS the diagram — center the `<math>` equation large, put the symbol legend (rule 10) directly under it, and optionally show one worked substitution with the running example's numbers. Do not add a chart to an equation scene; the storyboard puts the chart that explores it in a separate, following scene.
+15. **Enumerations as lists**: when a readout or annotation presents 3+ parallel discrete items, render them as a real `<ul>`/`<li>` list (or evenly-spaced labeled rows), not a comma-run — the reader should be able to scan them as separate points.
 
 Quality bar: the reader should be able to move the control, immediately see the consequence, and read off a correct number. Smooth, legible, quantitatively honest.

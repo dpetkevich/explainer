@@ -118,10 +118,45 @@ export function texToMathML(tex: string, display = false): string {
   return `<math${display ? ' display="block"' : ""}>${body}</math>`;
 }
 
-/** Escape text, converting \( ... \) segments to inline MathML. */
-export function renderRichText(text: string): string {
+/** Escape one text run, converting \( ... \) segments to inline MathML. */
+function renderInline(text: string): string {
   const parts = text.split(/\\\(([\s\S]*?)\\\)/g);
   return parts.map((part, idx) => (idx % 2 === 1 ? texToMathML(part) : esc(part))).join("");
+}
+
+/**
+ * Escape text and convert \( ... \) to inline MathML. Also supports a minimal
+ * list convention: consecutive lines starting with "- " become a <ul><li>…</li>
+ * list (each item still math-aware), so a caption/lede can enumerate discrete
+ * items as bullets instead of a comma-run. Callers that may receive a list must
+ * host the result in a block element (a <div>, not a <p>).
+ */
+export function renderRichText(text: string): string {
+  if (!/(^|\n)\s*-\s+/.test(text)) return renderInline(text); // fast path: no bullets
+  const out: string[] = [];
+  let list: string[] = [];
+  let buf: string[] = [];
+  const flushList = () => {
+    if (list.length) out.push(`<ul>${list.map((li) => `<li>${renderInline(li)}</li>`).join("")}</ul>`);
+    list = [];
+  };
+  const flushText = () => {
+    if (buf.length) out.push(renderInline(buf.join(" ").trim()));
+    buf = [];
+  };
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*-\s+(.*)$/);
+    if (m) {
+      flushText();
+      list.push(m[1]!);
+    } else {
+      flushList();
+      if (line.trim()) buf.push(line.trim());
+    }
+  }
+  flushText();
+  flushList();
+  return out.join("");
 }
 
 /** Strip \( \)-math markup back to readable plain text (for script.md and terminal digests). */

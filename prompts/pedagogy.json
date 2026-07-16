@@ -1,7 +1,12 @@
 {
-  "version": "4.0.0",
-  "label": "One insight + one running example carried through connected scenes (story-discovery methodology)",
+  "version": "4.1.0",
+  "label": "Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations",
   "changelog": [
+    {
+      "version": "4.1.0",
+      "date": "2026-07-15",
+      "summary": "Refinements within the v4 methodology, from reader feedback on the v4.0.0 solar-thermal explainer (portal-v4). (1) Just-in-time prerequisites must actually DEFINE the term: a named quantity the arc runs on (Δv, specific impulse) or a governing equation gets a plain one-line gloss the first time it appears — never compute with a symbol the reader wasn't handed in words. (2) A governing equation is its own scene: present it as a labeled equation diagram (every symbol, unit, meaning) with the interactive chart that explores it as a separate following scene — never crammed into a chart corner. (3) The throughline must be visible, not just intended: every caption opens by connecting to the prior step, and part ledes explicitly hand off; the coherence reviewer fails ledes/captions that reference a missing or non-adjacent scene or lack an explicit hand-off. (4) Plain, not poetic: banned lyrical antithesis and magazine-feature flourish where a plain declarative belongs (added as a named slop tell with the failing example). (5) Enumerations render as bullets: 3+ parallel items in a caption or lede become a real list (renderRichText gained minimal '- ' list support; caption/lede wrappers moved from <p> to <div>)."
+    },
     {
       "version": "4.0.0",
       "date": "2026-07-14",

@@ -85,14 +85,14 @@ export function runAssemble(
         currentPart = scene.part;
         const lede = ledes.get(scene.part);
         partHeading = `<header class="part">
-  <h2>${renderRichText(scene.part)}</h2>${lede ? `\n  <p class="part-lede">${renderRichText(lede)}</p>` : ""}
+  <h2>${renderRichText(scene.part)}</h2>${lede ? `\n  <div class="part-lede">${renderRichText(lede)}</div>` : ""}
 </header>
 `;
       }
       const html = injectEmbedStyle(readFileSync(paths.sceneHtml(ctx, scene.id), "utf8"));
       return `${partHeading}<section class="scene" id="${escapeHtml(scene.id)}">
   <h3>${renderRichText(scene.title)}</h3>
-  <p class="caption">${renderRichText(scene.caption)}</p>
+  <div class="caption">${renderRichText(scene.caption)}</div>
   <iframe
     class="scene-frame"
     data-scene-id="${escapeHtml(scene.id)}"
