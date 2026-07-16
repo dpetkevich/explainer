@@ -114,7 +114,8 @@ async function reviewScene(
     ],
     // Reviews are small JSON, but a verbose reviewer that hits the cap produces
     // unparseable output and falsely fails the scene — leave generous headroom.
-    maxTokens: 8000,
+    // (8000 truncated intermittently on sonnet-5, spuriously failing good scenes.)
+    maxTokens: 16000,
   });
   let json: unknown;
   try {
