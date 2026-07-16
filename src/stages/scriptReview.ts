@@ -71,7 +71,9 @@ function longSentenceIssues(abstract: string, board: Storyboard): Issue[] {
 async function reviewScript(ctx: Ctx, abstract: string, board: Storyboard): Promise<ScriptReview> {
   try {
     const prompt = loadPrompt("script-review", { audience: ctx.audienceRaw, script: scriptText(abstract, board) });
-    const raw = await callModel({ model: MODELS.prose, messages: [{ role: "user", content: prompt }], maxTokens: 8000 });
+    // fable-5 is a thinking model and the coherence pass reasons over the whole
+    // arc, so budget generously — 8000 truncated the JSON and silently skipped the pass.
+    const raw = await callModel({ model: MODELS.prose, messages: [{ role: "user", content: prompt }], maxTokens: 32000 });
     const parsed = ScriptReviewSchema.safeParse(JSON.parse(stripJsonFences(raw)));
     if (parsed.success) return parsed.data;
   } catch (err) {
@@ -93,7 +95,7 @@ async function reviseScript(
   });
   let data: { abstract?: unknown; hook?: unknown; captions?: Record<string, unknown> };
   try {
-    const raw = await callModel({ model: MODELS.planning, messages: [{ role: "user", content: prompt }], maxTokens: 16000 });
+    const raw = await callModel({ model: MODELS.planning, messages: [{ role: "user", content: prompt }], maxTokens: 32000 });
     data = JSON.parse(stripJsonFences(raw));
   } catch {
     return { abstract, board };
