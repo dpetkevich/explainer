@@ -122,8 +122,11 @@ export function runAssemble(
     meta = { source: sourceUrl, pedagogy: currentPedagogy() };
     writeFileSync(metaFile, JSON.stringify(meta, null, 2) + "\n");
   }
+  // Link to the source paper, labeled with the paper's own title. Opens in a new
+  // tab: the explainer is viewed inside an iframe, and most paper hosts (arXiv)
+  // refuse to be framed, so a same-frame navigation would break.
   const paperLink = meta.source
-    ? `<a href="${escapeHtml(meta.source)}" rel="noopener">Source paper</a><span class="sep"> · </span>`
+    ? `<a href="${escapeHtml(meta.source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(conceptMap.paper.title)}</a><span class="sep"> · </span>`
     : "";
   const pageLinks =
     `  <p class="page-links">${paperLink}<span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">` +

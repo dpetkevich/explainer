@@ -6,3 +6,6 @@ explainers/
 
 # web app runtime data (SQLite, uploads)
 data/
+
+# one-off regen/run logs
+regen-*.log
