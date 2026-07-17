@@ -27,17 +27,20 @@ export async function runGenerationJob(row: ExplainerRow): Promise<void> {
   const audience = loadAudience();
   let scenesPassed = 0;
 
+  // Progress updates are fire-and-forget (best-effort): the DB write is async now,
+  // and live progress is no longer watched, so we don't block the pipeline on it.
+  const bg = (p: Promise<unknown>) => void p.catch(() => {});
   const onEvent = (e: ProgressEvent): void => {
     switch (e.type) {
       case "stage-start":
-        updateExplainer(row.id, { stage: e.stage });
+        bg(updateExplainer(row.id, { stage: e.stage }));
         break;
       case "storyboard-ready":
-        updateExplainer(row.id, { title: e.title, scenes_total: e.sceneCount });
+        bg(updateExplainer(row.id, { title: e.title, scenes_total: e.sceneCount }));
         break;
       case "scene-pass":
         scenesPassed += 1;
-        updateExplainer(row.id, { scenes_passed: scenesPassed });
+        bg(updateExplainer(row.id, { scenes_passed: scenesPassed }));
         break;
     }
     publish(row.id, e);
@@ -54,18 +57,18 @@ export async function runGenerationJob(row: ExplainerRow): Promise<void> {
     onEvent,
   };
 
-  updateExplainer(row.id, { status: "running", stage: "ingest", error: null });
+  await updateExplainer(row.id, { status: "running", stage: "ingest", error: null });
 
   try {
     const conceptMap = await runIngest(ctx);
-    updateExplainer(row.id, { category: conceptMap.paper.category ?? "Computing" });
+    await updateExplainer(row.id, { category: conceptMap.paper.category ?? "Computing" });
     const { board } = await runStoryboard(ctx, conceptMap);
     // one_sentence_claim is set after storyboard: the prose reviewer there may
     // have rewritten the abstract (mutating conceptMap in place).
-    updateExplainer(row.id, { title: board.title, hook: board.hook, one_sentence_claim: conceptMap.paper.oneSentenceClaim });
+    await updateExplainer(row.id, { title: board.title, hook: board.hook, one_sentence_claim: conceptMap.paper.oneSentenceClaim });
     const qa = await runScenePipeline(ctx, board, true);
     runAssemble(ctx, conceptMap, board, qa);
-    updateExplainer(row.id, { status: "done", stage: "assemble", pedagogy_version: currentPedagogy().version });
+    await updateExplainer(row.id, { status: "done", stage: "assemble", pedagogy_version: currentPedagogy().version });
     publish(row.id, { type: "closed", status: "done" });
   } catch (err) {
     const message =
@@ -74,7 +77,7 @@ export async function runGenerationJob(row: ExplainerRow): Promise<void> {
         : err instanceof Error
           ? err.message
           : String(err);
-    updateExplainer(row.id, { status: "failed", error: message });
+    await updateExplainer(row.id, { status: "failed", error: message });
     publish(row.id, { type: "closed", status: "failed", error: message });
   }
 }

@@ -1,0 +1,106 @@
+{
+  "title": "Why Solar-Thermal Propulsion Breaks a 50-Year Tradeoff",
+  "hook": "Every spacecraft ever flown has been forced to choose: burn fast and die young (chemical) or sip propellant and take 18 months to move (electric). With over 1.2 million satellites now filed for orbit, maneuvering is becoming a continuous operational load, and neither legacy architecture can serve it. This explainer walks through the physics — one equation, one heat exchanger, one cost model — showing why concentrated sunlight is the first architecture to escape the binary.",
+  "scenes": [
+    {
+      "id": "logarithm-punishes-propellant",
+      "conceptId": "rocket-equation-thrust-isp-tradeoff",
+      "title": "The Logarithm That Governs Everything in Orbit",
+      "caption": "Total velocity change obeys Δv = Isp·g₀·ln(m_wet/m_dry): it grows linearly with exhaust efficiency (Isp) but only logarithmically with propellant load. Doubling propellant buys you a fixed ln(2) increment, and tank mass grows with it — so a 500 kg spacecraft on storable bipropellant (Isp ≈ 300s) hits a practical wall near 700 m/s no matter how much fuel you cram aboard. Electric thrusters at 1,500s Isp escape the wall by multiplying the whole logarithm by 5, which is why Isp, not tank size, is the lever that matters.",
+      "visualMetaphor": "A 2D plot: x-axis is mass ratio m_wet/m_dry from 1 to 10 (linear), y-axis is Δv in m/s from 0 to 8,000. Two curves drawn live from the rocket equation: a red curve for Isp = 300s (storable chemical) and a blue curve for Isp = 1,500s (Hall electric). A draggable vertical cursor set by the slider marks the current mass ratio; numeric Δv readouts for both curves sit at the cursor intersections. A horizontal dashed line at 700 m/s labeled 'practical biprop ceiling, 500 kg vehicle'. Below the plot, a schematic spacecraft silhouette whose propellant-tank segment grows proportionally with the slider, visually dwarfing the fixed dry-mass segment.",
+      "animatedVariable": {
+        "name": "propellant mass ratio (m_wet/m_dry)",
+        "control": "slider",
+        "range": "m_wet/m_dry = 1.0 to 10",
+        "whatChangesOnScreen": "The cursor sweeps right along both curves; the Δv readouts climb but visibly flatten (each doubling of propellant adds the same increment), the tank segment of the spacecraft schematic balloons, and the red readout's gains per slider tick shrink while it crawls toward the 700 m/s dashed line."
+      },
+      "quantitativeAnchor": "At Isp = 300s, doubling the mass ratio from 2 to 4 adds only Isp·g₀·ln(2) ≈ 2,040 m/s of theoretical Δv — but the practical storable-biprop ceiling for a 500 kg vehicle is ~700 m/s once structure and tank mass are counted.",
+      "physicsChecks": [
+        "Both curves are concave (flattening) as mass ratio increases; neither is a straight line.",
+        "At every slider position the blue (1,500s) curve reads exactly 5× the red (300s) curve.",
+        "At mass ratio 2, the red curve reads ≈ 2,040 m/s (300 × 9.81 × ln 2), within 5%.",
+        "The 700 m/s dashed ceiling line is horizontal and the red readout's practical annotation never exceeds it."
+      ]
+    },
+    {
+      "id": "tempo-is-not-efficiency",
+      "conceptId": "maneuver-time-asymmetry",
+      "title": "Isp Measures Economy, Not Tempo",
+      "caption": "Maneuver time is Δv divided by acceleration, so it scales inversely with thrust — and electric propulsion's millinewtons make it catastrophically slow regardless of its 1,500s Isp. A 100 m/s reposition takes a Hall thruster ~223 hours of continuous firing; a 5,000 m/s LEO-to-GEO transfer takes 527 days. For a defense customer facing a demonstrated adversary maneuver, an asset that arrives in 527 days did not arrive. Solar thermal (100–200 N) is the only class that stays in single-digit hours across the entire Δv range while remaining indefinitely storable on orbit.",
+      "visualMetaphor": "A horizontal bar chart with a logarithmic time axis (x-axis: 1 minute to 2 years, labeled ticks at 10 min, 1 hr, 1 day, 1 month, 1 year). Four bars: 'Storable chemical', 'Cryogenic methalox', 'Solar thermal', 'Hall electric', each with a live numeric time label at its tip. A slider above sets the commanded Δv. The storable-chemical bar turns gray and stamps 'CAPACITY EXCEEDED' when Δv > 700 m/s; the methalox bar always carries a fixed '+24 hr launch-and-fuel delay (no on-orbit storage)' prefix segment rendered in a hatched pattern. A thin vertical reference line marks a nominal 12-hour 'threat window'.",
+      "animatedVariable": {
+        "name": "commanded delta-v of the maneuver",
+        "control": "slider",
+        "range": "Δv = 100 to 5,000 m/s",
+        "whatChangesOnScreen": "All four bars stretch rightward as Δv grows, but on the log axis the Hall bar races past months while the solar-thermal bar stays left of the 12-hour line; at 700 m/s the chemical bar grays out and stops responding; time labels update continuously."
+      },
+      "quantitativeAnchor": "At Δv = 100 m/s: solar thermal ≈ 10 minutes (including multi-arc coasting), Hall electric ≈ 223 hours. At Δv = 5,000 m/s: solar thermal ≈ 9 hours, Hall electric ≈ 527 days.",
+      "physicsChecks": [
+        "Hall-electric time scales linearly with Δv: the 5,000 m/s readout is ~50× the 100 m/s readout.",
+        "The storable-chemical bar is grayed out with 'CAPACITY EXCEEDED' for all slider positions above 700 m/s.",
+        "The solar-thermal bar never crosses the 12-hour reference line at any slider position (max ≈ 9 hours at 5,000 m/s).",
+        "The methalox bar never reads less than 24 hours even at the minimum Δv setting."
+      ]
+    },
+    {
+      "id": "decouple-energy-from-mass",
+      "conceptId": "solar-thermal-mechanism",
+      "title": "Separate the Energy Source from the Reaction Mass",
+      "caption": "In a chemical rocket the propellant is both fuel and reaction mass, so Isp is capped by combustion enthalpy. Solar thermal breaks the coupling: deployable mirrors concentrate sunlight onto a heat exchanger that raises the propellant to ~3,000 K, and exhaust velocity then scales as √(T/M) — set by temperature and molecular weight alone, not chemistry. Choose ammonia (M = 17) and you get 350–450s; choose hydrogen (M = 2) and you get ~800s, well above any storable chemical ceiling, while thrust stays at 100–200 N because the flow is a dense thermal gas, not a trickle of ions. Note what this is not: there is no photovoltaic conversion and no electrostatic acceleration anywhere in the loop.",
+      "visualMetaphor": "Left panel: a schematic energy path — sun icon → parabolic mirror arc → focal spot on a heat-exchanger block → nozzle with an exhaust plume. Plume length is proportional to exhaust velocity and plume width is proportional to thrust. Right panel: a plot of Isp (y-axis, 0–1,000s) versus chamber temperature (x-axis, 1,000–3,500 K) showing two √(T/M) curves, one per propellant, with the operating point marked at the current temperature. Two horizontal reference bands: 'storable chemical ceiling: 180–330s' (red band) and 'Hall electric: 1,500s' (blue line). A propellant toggle (NH₃ / H₂) switches which curve the operating point sits on. Readouts: Isp (s), thrust (N, fixed 100–200 N band), exhaust velocity (m/s).",
+      "animatedVariable": {
+        "name": "propellant molecular weight (toggle) and chamber temperature (slider)",
+        "control": "toggle",
+        "range": "propellant: NH₃ (M = 17 g/mol) ↔ H₂ (M = 2 g/mol); temperature slider 1,800–3,000 K",
+        "whatChangesOnScreen": "Switching NH₃ → H₂ jumps the operating point to the higher √(T/M) curve — the plume lengthens sharply and the Isp readout roughly doubles — while the plume width and thrust readout barely change; raising temperature slides the operating point up its curve with visible √T flattening."
+      },
+      "quantitativeAnchor": "At ~3,000 K: ammonia delivers Isp ≈ 350–450s; hydrogen delivers Isp ≈ 800s. Thrust remains 100–200 N in both cases.",
+      "physicsChecks": [
+        "Isp increases with temperature on both curves, and the curves are concave (√T shape), not linear.",
+        "At fixed temperature, the H₂ operating point reads higher Isp than NH₃ by roughly √(17/2) ≈ 2.9× in ideal terms (displayed values honor the paper's 800s vs 350–450s anchors).",
+        "The thrust readout stays within 100–200 N under all toggle and slider settings; plume width does not visibly change when Isp doubles.",
+        "The H₂ curve at 3,000 K sits above the red chemical band but below the blue 1,500s electric line."
+      ]
+    },
+    {
+      "id": "why-now-temperature-ceiling",
+      "conceptId": "enabling-tech-convergence",
+      "title": "The Physics Was Validated in 1979 — Manufacturing Was the Bottleneck",
+      "caption": "NASA and the USAF validated solar thermal decades ago; ground tests exceeded 800s Isp with hydrogen. What killed it three times over: 1980s heat exchangers were hundreds of brazed machined parts, 1980s materials failed structurally near 1,800 K, and deployable mirrors were an order of magnitude too heavy. Since Isp scales as √(T/M), the material temperature ceiling directly gated performance — and additively manufactured refractory alloys now hold to ~3,000 K in a single monolithic part, while membrane optics deliver >1,000 W/kg versus ~100 W/kg for conventional arrays. The instinct 'if it worked, someone would have built it' inverts here: it worked, repeatedly, and was shelved on manufacturability grounds that have since dissolved.",
+      "visualMetaphor": "A single plot: x-axis is maximum survivable heat-exchanger temperature (1,500–3,200 K), y-axis is hydrogen Isp (400–900s), with the √T curve drawn. A slider drags the operating point along the curve. Two labeled vertical zones on the x-axis: '1980s material limit: ~1,800 K' (shaded red up to 1,800 K) and 'modern refractory alloys: ~3,000 K' (shaded green from 2,800 K). Below the plot, a two-state exploded-view schematic tied to slider position: below 2,200 K it renders the legacy heat exchanger as ~dozens of small brazed segments with joint lines; above 2,200 K it renders one monolithic printed part with smooth internal channels. A side gauge shows reflector specific power stepping from 100 W/kg (legacy) to 1,000 W/kg (membrane) as the slider crosses into the modern zone.",
+      "animatedVariable": {
+        "name": "maximum survivable heat-exchanger temperature (proxy for manufacturing era)",
+        "control": "slider",
+        "range": "T_max = 1,500 K (1980s brazed assembly) to 3,000 K (modern printed refractory alloy)",
+        "whatChangesOnScreen": "The operating point climbs the √T Isp curve; the heat-exchanger schematic snaps from a fragile many-part brazed assembly to a single monolithic printed part; the reflector gauge jumps from ~100 to >1,000 W/kg; the Isp readout rises from sub-chemical-parity toward ~800s."
+      },
+      "quantitativeAnchor": "Modern refractory alloys survive ~3,000 K versus the ~1,800 K structural limit of 1980s materials; membrane reflectors deliver >1,000 W/kg versus ~100 W/kg for conventional solar arrays.",
+      "physicsChecks": [
+        "Isp increases monotonically with T_max and the curve flattens at high temperature (√T behavior).",
+        "The Isp readout ratio between 3,000 K and 1,800 K is ≈ √(3000/1800) ≈ 1.29, within 10%.",
+        "At the slider maximum the Isp readout is ≈ 800s, matching the historical hydrogen ground-test figure.",
+        "The schematic shows multiple brazed segments at the slider minimum and exactly one monolithic part at the maximum."
+      ]
+    },
+    {
+      "id": "three-layer-cost-stack",
+      "conceptId": "three-layer-cost-structure",
+      "title": "Cheapest at Every Delta-v, Not Just at a Crossover",
+      "caption": "Cost per maneuver is not propellant price — it's three stacked layers, and they interact. Propellant: ammonia at $1/kg keeps the solar-thermal curve flat while xenon at $2,500/kg erodes electric's efficiency edge at high Δv. Amortization: with 50+ restarts across a 5–6 km/s lifetime budget, each solar-thermal maneuver absorbs a sliver of the standardized $10M hardware, whereas chemical stages concentrate full cost into a handful of burns and Hall thrusters wear out from throughput erosion. Energy: sunlight is free and external; chemical systems burn their energy supply, electric thrusters degrade as slow consumables. The result is not a crossover chart — solar thermal is the floor across the entire domain, which is what makes it a platform rather than a niche.",
+      "visualMetaphor": "A plot: x-axis is Δv per maneuver (100 to 5,000 m/s, log scale), y-axis is cost per maneuver ($100k to $12M, log scale). Three curves for a 500 kg spacecraft with standardized $10M hardware: storable biprop (red, terminating with an open endpoint and 'ceiling' marker at 700 m/s), Hall electric (blue), solar thermal (green). A slider positions a vertical cursor; at the cursor, each live curve shows a stacked mini-bar decomposing its cost into three colored layers (propellant / hardware amortization / energy-degradation), with dollar readouts. The green stacked bar's propellant layer stays visually negligible at all positions.",
+      "animatedVariable": {
+        "name": "delta-v of the maneuver being purchased",
+        "control": "slider",
+        "range": "Δv = 100 to 5,000 m/s",
+        "whatChangesOnScreen": "The cursor sweeps the domain; the stacked cost bars re-proportion live — hardware amortization dominates all bars at low Δv, xenon propellant cost visibly swells the blue bar's propellant layer at high Δv, the red curve vanishes past 700 m/s, and the green curve remains below both others at every cursor position."
+      },
+      "quantitativeAnchor": "At Δv = 100 m/s: solar thermal ≈ $222k vs biprop ≈ $1.46M. At Δv = 5,000 m/s: solar thermal ≈ $9.1M vs Hall electric ≈ $10.9M; chemical cannot reach that regime. Ammonia: $1/kg; xenon: $2,500/kg.",
+      "physicsChecks": [
+        "The green (solar thermal) curve is below both other curves at every slider position — no crossover exists.",
+        "The red (biprop) curve terminates at 700 m/s and produces no readout beyond it.",
+        "In the stacked decomposition at 100 m/s, hardware amortization is the largest layer for all architectures; at 5,000 m/s, the blue bar's propellant layer has grown to a dominant fraction while the green bar's propellant layer remains near-zero.",
+        "Readouts at the anchor points (100 and 5,000 m/s) match the paper's figures within ~10%: $222k/$1.46M and $9.1M/$10.9M."
+      ]
+    }
+  ]
+}

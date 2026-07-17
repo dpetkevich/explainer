@@ -1,0 +1,453 @@
+{
+  "title": "How 10,000 Atoms Could Break the Internet's Locks",
+  "hook": "The codes that guard your bank account rest on one bet: that no computer on Earth can factor a certain 2,048-bit number before the sun burns out. A new kind of machine — one that computes with single atoms held in laser beams, atoms it can pick up and carry around mid-calculation — threatens that bet, and a new paper argues it needs only about 10,000 atoms instead of the million everyone expected. That factor of a hundred is the difference between a distant fantasy and a machine whose parts already exist in laboratories today. To understand the claim honestly, we have to begin at the beginning: what a quantum bit actually is, why it is so terribly fragile, and how you protect information you are forbidden to look at.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "We start from the one thing you already know — an ordinary bit — and follow it step by step to the wall that has stalled an entire field: protecting quantum information is so expensive that breaking real encryption seemed to need a million-part machine."
+    },
+    {
+      "title": "The new machine: atoms you can carry",
+      "lede": "Now we meet the paper's hardware and its central trick. When qubits are single atoms that can be physically moved, you can wire together partners that are far apart — and that one freedom changes the economics of protection entirely."
+    },
+    {
+      "title": "The head-to-head: why 10,000 beats a million",
+      "lede": "With the machine assembled, we can run the paper's arithmetic against the standard plan: the same protection from 161 times fewer parts, a failure budget that closes, and a menu of runtimes from 264 days down to 10."
+    },
+    {
+      "title": "Why now, and what comes next",
+      "lede": "A resource estimate only matters if the hardware is real. Here is what laboratories have already demonstrated, piece by piece — and why the remaining gap is integration, not invention."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "qubit-blend",
+      "conceptId": "qubit-and-fragility",
+      "part": "The basic building blocks",
+      "title": "A quantum bit can lean between 0 and 1",
+      "teaches": "Unlike an ordinary bit, a qubit can be prepared in an in-between blend of 0 and 1 — a superposition — and the superposition sets the odds of what you find when you read it.",
+      "requires": [],
+      "caption": "Suppose you have a bit — a switch that reads 0 or 1, nothing else. Nature offers something stranger: store information in a single atom's internal state, and you can prepare it leaning part way between 0 and 1, a genuine blend of both at once — physicists call this blend a superposition, and the whole object a qubit. Slide the lean and watch the readout odds follow: tilt the superposition three-quarters toward 1, and reading it gives a 1 three times out of four. A qubit is not a faster bit; its power comes later, when many qubits hold many possibilities at once and those superpositions interfere like overlapping waves. For now, hold onto the picture: the information lives in the superposition — the angle of the lean — not in a definite 0 or 1.",
+      "visualMetaphor": "Left: a classical bit drawn as a two-position switch (0 or 1, snapping between them). Right: a qubit drawn as an arrow on a semicircle, with '0' at the left pole and '1' at the right pole; the arrow can rest at any angle between. Below the arrow, two horizontal probability bars labeled 'chance of reading 0' and 'chance of reading 1' that always sum to 100%. A 'read it' button collapses the arrow to a pole, chosen randomly with the displayed odds, and a tally of the last 20 reads is shown.",
+      "animatedVariable": {
+        "name": "the qubit's lean between 0 and 1",
+        "control": "slider",
+        "range": "100% toward 0 ↔ 100% toward 1",
+        "whatChangesOnScreen": "The arrow rotates across the semicircle; the two probability bars re-balance continuously; repeated 'read it' presses produce 0s and 1s at the displayed odds."
+      },
+      "quantitativeAnchor": "With the arrow set 75% toward 1, the running tally of reads converges near 75% ones.",
+      "physicsChecks": [
+        "The two probability bars always sum to 100% at every slider position",
+        "With the slider at either extreme, every read gives the same value (deterministic 0 or deterministic 1)",
+        "The classical switch on the left never shows an intermediate position, in contrast to the arrow"
+      ]
+    },
+    {
+      "id": "one-in-a-thousand",
+      "conceptId": "qubit-and-fragility",
+      "part": "The basic building blocks",
+      "title": "Each operation corrupts a qubit about once in a thousand tries",
+      "teaches": "Every physical operation on qubits fails with probability around 0.1%, so an unprotected computation of more than a few hundred steps almost certainly goes wrong.",
+      "requires": [
+        "qubit-blend"
+      ],
+      "caption": "That delicate superposition is stored in something microscopic, and the world will not leave it alone: a stray photon, a vibration, a slightly imperfect laser pulse — any of these knocks the arrow to a random angle. In today's best hardware, each two-qubit operation goes wrong about 1 time in 1,000, an error rate we write as \\(p ≈ 0.1\\%\\). That sounds excellent until you multiply: the chance of surviving \\(N\\) operations unscathed is \\((1-0.001)^N\\), and by \\(N ≈ 700\\) you are down to a coin flip. Drag the slider out to 10,000 operations and watch the survival odds collapse toward zero. A serious computation needs billions of steps — so raw qubits, on their own, are hopeless.",
+      "visualMetaphor": "The qubit arrow from the previous scene sits at a set angle. A horizontal axis counts operations performed, N. As the slider increases N, small red lightning icons strike the arrow at random and jolt its angle. The main plot: survival probability (1−0.001)^N on the y-axis (0–100%) versus N on the x-axis, drawn as a falling curve with a moving dot at the current N. A dashed horizontal line at 50% marks the coin-flip level.",
+      "animatedVariable": {
+        "name": "number of operations performed on the qubit",
+        "control": "slider",
+        "range": "N = 1 to 10,000 operations at p = 0.1% per operation",
+        "whatChangesOnScreen": "The survival-probability dot slides down the curve; the readout updates; error strikes visibly accumulate on the arrow."
+      },
+      "quantitativeAnchor": "Survival probability crosses 50% near N ≈ 700 operations at p = 0.1%.",
+      "physicsChecks": [
+        "Survival probability decreases monotonically as N increases",
+        "At N ≈ 700 the readout shows approximately 50%",
+        "At N = 10,000 the readout shows approximately 0.005% (essentially zero)",
+        "At N = 1 the readout shows 99.9%"
+      ]
+    },
+    {
+      "id": "quantum-factoring",
+      "conceptId": "shor-breaks-encryption",
+      "part": "The basic building blocks",
+      "title": "A quantum computer can factor the numbers that guard the internet",
+      "teaches": "Widely used encryption is safe only because factoring huge numbers takes classical computers essentially forever, and Shor's 1994 algorithm lets a quantum computer do it in a feasible number of steps.",
+      "requires": [
+        "qubit-blend"
+      ],
+      "caption": "Your bank's lock is a math problem: multiply two enormous secret primes and publish the product, and anyone can lock a message but only the prime-holder can unlock it. Factoring that 2,048-bit product with the best classical methods would take longer than the age of the universe — slide the key size up and watch the classical time bar shoot off the chart. In 1994 Peter Shor showed that a quantum computer, using the interference of superpositions — many held-at-once possibilities, can find a hidden repeating pattern in these problems exponentially faster; it does not try all keys at once, it exploits that specific structure — which is why newer schemes without it are believed safe. The cost is counted in a basic three-bit step called the Toffoli gate: flip one bit only if two others are both 1. Breaking one 2,048-bit key takes about 6.5 billion Toffoli gates; a 256-bit elliptic-curve key, the other common lock, takes only 70–90 million.",
+      "visualMetaphor": "Two vertical bars on a shared logarithmic y-axis. Left bar: 'classical computer, time to break' (units climbing from seconds through years to 'age of the universe', marked with a dashed line). Right bar: 'quantum computer, Toffoli gates needed' (from millions to billions). A slider selects the target lock: elliptic-curve 256-bit or RSA at 1024/2048-bit. As key size grows, the classical bar grows explosively (exponentially) while the quantum bar grows gently (polynomially). Numeric readouts under each bar. Both vertical axes carry fully visible labels: the left axis in years, the right axis in Toffoli-gate counts (log scale) with its unit stated in the axis title — leave enough right-hand margin that no label or exponent is ever clipped by the panel edge.",
+      "animatedVariable": {
+        "name": "size and type of the encryption key",
+        "control": "buttons",
+        "range": "ECC-256 → RSA-1024 → RSA-2048",
+        "whatChangesOnScreen": "The classical bar leaps past the age-of-the-universe line; the quantum readout steps from ~70–90 million to ~6.5 billion Toffoli gates."
+      },
+      "quantitativeAnchor": "RSA-2048: ~6.5 billion Toffoli gates; ECC-256: ~70–90 million Toffoli gates.",
+      "physicsChecks": [
+        "The classical bar exceeds the 'age of the universe' dashed line at RSA-2048",
+        "The quantum bar grows far more slowly than the classical bar as key size increases",
+        "The ECC-256 quantum readout is roughly 70–90× smaller than the RSA-2048 readout",
+        "Every axis label on BOTH y-axes is fully visible and unclipped in both screenshots — the right-hand axis shows complete values with units (e.g. 10^8 gates), not truncated text at the panel edge."
+      ]
+    },
+    {
+      "id": "parity-checks",
+      "conceptId": "error-correction-by-redundancy",
+      "part": "The basic building blocks",
+      "title": "You can find an error without looking at the data",
+      "teaches": "A parity check asks a pair of qubits one safe question — 'are you two the same, or different?' — which locates errors without revealing what is stored.",
+      "requires": [
+        "one-in-a-thousand"
+      ],
+      "caption": "For ordinary bits, protection is easy: store each bit three times and take a majority vote. Quantum information forbids this — you cannot copy a superposition, and reading one destroys it, so it seems protection is impossible. The solution is beautiful: spread one protected qubit — a logical qubit — across several physical ones, and never ask any qubit what it holds; instead, ask each pair of neighbors a single yes/no question: 'are you two the same, or different?' That comparison is a parity check, and it is safe — learning that two qubits agree tells you nothing about what they hold, just as learning that a couple wore matching outfits tells you nothing about the color. But an error that flips one qubit makes it suddenly disagree with both of its neighbors: flip any qubit below and watch exactly the two checks touching it switch to 'different!', pinpointing the culprit while the protected data stays sealed. Run every check each cycle — 1 millisecond in this paper — and errors are caught as fast as they arrive.",
+      "visualMetaphor": "Five circles in a row (physical qubits 1–5) with four diamond check nodes between them, each linked to its two neighboring qubits. Every diamond permanently displays the question it is asking in plain words ('qubit 1 = qubit 2?') and its live answer: a calm 'same' when the pair agrees, flipping to a bright 'different!' when they disagree. Buttons read 'Flip qubit N (simulate an error)'; flipping a middle qubit turns exactly the two adjacent diamonds to 'different!', flipping an end qubit turns exactly one. A decoder line below states the logic in words: 'two different!-answers meet at exactly one qubit — the error is at qubit N', while a locked panel labeled 'protected logical qubit — contents never revealed' stays visibly unchanged. A one-line legend: 'circles = physical qubits · diamonds = parity checks, each comparing its two neighbors'. Readouts: decoder verdict, checks answering different!, cycle count with 1 ms per cycle.",
+      "animatedVariable": {
+        "name": "which physical qubit an error strikes",
+        "control": "buttons",
+        "range": "strike qubit 1, 2, 3, 4, 5, or no error",
+        "whatChangesOnScreen": "Each flip turns the struck qubit's adjacent diamonds from 'same' to 'different!' (two for a middle qubit, one for an end qubit), the decoder line names the located qubit, and the locked data panel never changes."
+      },
+      "quantitativeAnchor": "One round of parity checks — one cycle — takes 1 millisecond in this paper's accounting.",
+      "physicsChecks": [
+        "Every diamond displays both its question ('qubit N = qubit N+1?') and a live same/different answer in both screenshots.",
+        "Flipping a middle qubit turns exactly its two adjacent checks to 'different!'; end qubits turn exactly one — never a non-adjacent check.",
+        "The decoder verdict names exactly the flipped qubit, and the 'protected logical qubit' panel is pixel-identical in both screenshots.",
+        "The legend (circles = physical qubits, diamonds = parity checks comparing neighbors) is present and unclipped."
+      ]
+    },
+    {
+      "id": "code-distance",
+      "conceptId": "code-distance-scaling",
+      "part": "The basic building blocks",
+      "title": "Each step of code distance multiplies reliability",
+      "teaches": "A code of distance d fails only when about d/2 errors conspire at once, so the logical failure rate falls like p^(d/2) — protection compounds multiplicatively as the code grows.",
+      "requires": [
+        "parity-checks"
+      ],
+      "caption": "How much protection do the checks buy? A code has a distance, \\(d\\): the minimum number of simultaneous physical errors needed to silently corrupt the stored information. For the code to fail, roughly \\(d/2\\) independent errors must land in exactly the wrong pattern, so the logical failure rate falls like \\(P_{\\text{logical}} ∝ p^{d/2}\\) — each increase in distance multiplies your reliability rather than adding to it. Slide \\(d\\) up and watch the failure rate plunge down the logarithmic axis: at a physical error rate \\(p\\) of 0.1%, the paper's largest code, with distance up to 24, reaches about \\(10^{-11}\\) failures per cycle — a hundred-million-fold better than the raw hardware. One catch, and it is the hinge of everything: flip \\(p\\) above a critical threshold value and the magic runs backwards — bigger codes get worse. Staying below threshold is a hardware achievement, and neutral-atom experiments sit 2× below it today, with a path to 10×.",
+      "visualMetaphor": "A plot with code distance d on the x-axis (3 to 24) and logical failure rate per cycle on a logarithmic y-axis (from 10^-3 down to 10^-12). A moving dot follows the p^(d/2)-shaped falling line as the slider changes d, with a readout of the current failure rate. A toggle sets p to 0.1% (below threshold: line slopes down) or 0.5% (above threshold: line slopes up, drawn in warning red). A dashed horizontal line marks 10^-11, labeled 'good enough for billions of steps'.",
+      "animatedVariable": {
+        "name": "code distance d (with a below/above-threshold toggle for physical error rate p)",
+        "control": "slider",
+        "range": "d = 3 to 24; toggle p = 0.1% or 0.5%",
+        "whatChangesOnScreen": "The failure-rate dot slides down (or, above threshold, up) the log-scale curve; the readout updates by orders of magnitude."
+      },
+      "quantitativeAnchor": "At p = 0.1% and distance ≤ 24, the block's extrapolated failure rate is ~10^-11 per cycle.",
+      "physicsChecks": [
+        "With p = 0.1%, the failure rate decreases monotonically as d increases",
+        "At d = 24 with p = 0.1%, the readout is within an order of magnitude of 10^-11",
+        "With the toggle at p = 0.5%, increasing d makes the failure rate worse, not better",
+        "The y-axis is logarithmic: equal slider steps produce multiplicative, not additive, changes in the readout"
+      ]
+    },
+    {
+      "id": "million-qubit-wall",
+      "conceptId": "the-million-qubit-overhead",
+      "part": "The basic building blocks",
+      "title": "The standard plan needs about a million qubits to break one key",
+      "teaches": "The standard surface-code scheme protects exactly one logical qubit per grid patch of hundreds-to-thousands of physical qubits, so Shor's algorithm's 1,200–1,500 logical qubits push the bill to roughly a million.",
+      "requires": [
+        "code-distance",
+        "quantum-factoring"
+      ],
+      "caption": "Now let us pay the bill. The standard protection scheme, the surface code, arranges physical qubits on a flat grid where each talks only to its immediate neighbors — perfect for a rigid chip, but the grid patch protects exactly one logical qubit, at a cost of hundreds to thousands of physical qubits apiece — an encoding rate, protected qubits per physical qubit, of just 0.1% to 4%. Shor's algorithm needs 1,200 to 1,500 logical qubits, plus factories for special helper states we will meet later. Drag the slider and watch the patches tile the floor: by the time you reach RSA-2048's requirement, the counter reads about 1,000,000 physical qubits. Today's largest quantum processors hold a few hundred. The obstacle is not the algorithm — it is this overhead, and it is exactly what the paper attacks.",
+      "visualMetaphor": "A floor plan viewed from above. Each logical qubit is a square patch of small dots (physical qubits on a grid), and patches tile outward as the slider increases the number of logical qubits needed (1 to 1,500). A large counter shows total physical qubits, climbing toward ~1,000,000. A tiny highlighted region in the corner, labeled 'largest processors today: a few hundred qubits', stays fixed for scale. A marker on the slider flags '1,200–1,500: what Shor's algorithm needs'.",
+      "animatedVariable": {
+        "name": "number of logical qubits the algorithm requires",
+        "control": "slider",
+        "range": "1 to 1,500 logical qubits",
+        "whatChangesOnScreen": "Grid patches tile across the floor plan and the physical-qubit counter climbs toward one million; the 'today's hardware' region shrinks into visual insignificance."
+      },
+      "quantitativeAnchor": "Surface-code estimates for RSA-2048: ~1,000,000 physical qubits for 1,200–1,500 logical qubits.",
+      "physicsChecks": [
+        "The physical-qubit counter grows linearly with the number of patches (one patch per logical qubit)",
+        "At the 1,500-logical-qubit mark the counter reads on the order of 10^6",
+        "The 'few hundred qubits today' reference region is visibly thousands of times smaller than the full tiling at maximum"
+      ]
+    },
+    {
+      "id": "movable-atoms",
+      "conceptId": "movable-atom-qubits",
+      "part": "The new machine: atoms you can carry",
+      "title": "Atoms held in laser beams can be carried to any partner",
+      "teaches": "Comparing far-apart qubits on a fixed chip needs an error-prone bucket brigade, but a movable atom is carried to its partner in one step — the hardware freedom that long-range checks require.",
+      "requires": [
+        "million-qubit-wall",
+        "qubit-blend"
+      ],
+      "caption": "Remember what a parity check does: it compares qubits. Here is the problem — on a fixed chip, a qubit can only talk to the neighbors it is wired to, so comparing two distant qubits means a bucket brigade: pass the information through every qubit in between, each handoff a fresh 1-in-1,000 chance of error. That confines chips to checks among adjacent qubits, and the next scene shows that this confinement is exactly what makes protection so expensive. This paper's hardware dissolves the problem: each qubit is a single atom held in a steerable laser beam — an optical tweezer — and to compare two far-apart atoms you simply pick one up and set it beside the other: one move, one comparison, however far apart they started. Slide the separation below and compare the two costs yourself. The price is pace — about 1 millisecond per operation cycle, a thousand times slower than rigid chips — and the whole paper is a wager that the freedom to rewire is worth far more than the speed it gives up.",
+      "visualMetaphor": "Split screen. Top: a fixed grid of chip qubits with two highlighted qubits; a chain of intermediate qubits lights up one by one to relay the connection, with a counter 'operations needed' that grows with separation. Bottom: the same two qubits as atoms in tweezer beams (drawn as cones of light); one tweezer lifts its atom and carries it in a smooth arc next to the other, then both flash (the Rydberg interaction), counter fixed at '1 move + 1 gate'. A slider sets how many grid rows apart the two qubits are.",
+      "animatedVariable": {
+        "name": "separation between the two qubits to be connected",
+        "control": "slider",
+        "range": "1 to 50 grid rows apart",
+        "whatChangesOnScreen": "The chip's relay chain lengthens and its operation counter climbs with separation; the atom panel's counter stays constant at one carry regardless of distance."
+      },
+      "quantitativeAnchor": "Operation cycle time: ~1 millisecond for atoms versus ~1 microsecond for superconducting chips — a 1,000× pace difference the architecture must overcome.",
+      "physicsChecks": [
+        "The chip panel's operation count increases monotonically with the separation slider",
+        "The atom panel's cost readout is identical at minimum and maximum separation",
+        "At maximum separation the chip count is tens of operations while the atom count remains 1 move"
+      ]
+    },
+    {
+      "id": "shared-redundancy",
+      "conceptId": "high-rate-qldpc",
+      "part": "The new machine: atoms you can carry",
+      "title": "Far-reaching checks let many qubits share one set of guards",
+      "teaches": "When checks can reach across the whole block, many logical qubits share one communal set of guard qubits instead of each paying for its own private crew.",
+      "requires": [
+        "parity-checks",
+        "movable-atoms"
+      ],
+      "caption": "Why does reach matter so much? Think of the guarding qubits — the redundancy — as security guards. When checks reach only neighbors, the block splits into fenced-off patches, and every logical qubit must hire its own private crew; none of the guards can be shared. Let the checks reach anywhere and one communal web of guards watches over many logical qubits at once — the same guard helps protect dozens of tenants, the way one alarm system serves a whole building instead of one per apartment. Toggle the reach below on a toy block of 18 atoms and count it yourself: fenced into neighbor-only patches, those 18 atoms protect just 2 logical qubits; rewoven into one far-reaching web, the same 18 atoms protect 6. Same atoms, same number of checks — three times the protection, purely from reach. The next scene pays this out at the paper's full scale.",
+      "visualMetaphor": "A block of 18 atom dots with check connectors drawn between them, and a single toggle: 'check reach — neighbors only / anywhere'. In 'neighbors only' the block is divided by visible fences into 2 patches, each labeled 'protects 1 logical qubit' with its guards colored per patch; in 'anywhere' the fences dissolve and long connectors weave one communal web, with the label 'protects 6 logical qubits — guards shared'. A large counter reads 'logical qubits protected: 2' vs '6', and a second readout 'atoms used: 18' stays fixed in both states. Legend: 'dots = atoms · lines = parity checks · a guard atom can serve many logical qubits only if its checks can reach them'.",
+      "animatedVariable": {
+        "name": "how far a parity check is allowed to reach",
+        "control": "toggle",
+        "range": "neighbors only ↔ anywhere in the block",
+        "whatChangesOnScreen": "Fences dissolve into one communal web of long connectors; the protected-qubits counter jumps from 2 to 6 while the atoms-used readout stays fixed at 18."
+      },
+      "quantitativeAnchor": "Toy block: the same 18 atoms protect 2 logical qubits with neighbor-only checks, 6 with far-reaching checks.",
+      "physicsChecks": [
+        "The atoms-used readout is identical (18) in both toggle states — only the connectivity changes.",
+        "The protected-qubits counter reads 2 in 'neighbors only' and 6 in 'anywhere'.",
+        "In 'neighbors only' the connectors never cross a fence; in 'anywhere' at least several connectors visibly span most of the block.",
+        "Every visible element is covered by the legend; no bare abbreviations."
+      ]
+    },
+    {
+      "id": "dense-codes",
+      "conceptId": "high-rate-qldpc-codes",
+      "part": "The new machine: atoms you can carry",
+      "title": "Long-range checks pack 1,480 protected qubits into 5,278 atoms",
+      "teaches": "At full scale, shared far-reaching checks protect 1,480 logical qubits with 5,278 atoms — 161 times fewer than neighbor-only patches would need.",
+      "requires": [
+        "shared-redundancy",
+        "code-distance"
+      ],
+      "caption": "Now the payoff at full scale. The paper's workhorse code weaves 5,278 atoms into one communal web protecting 1,480 logical qubits at distance 24 — nearly 30 protected qubits per 100 atoms, where the neighbor-only surface code managed between 0.1 and 4. Buying those same 1,480 logical qubits at the same distance with fenced patches would cost 852,480 atoms: 161 times more, for the same one-in-a-hundred-billion per-cycle failure rate. And the web stays tame — each check still touches only about 10 qubits, so no single measurement becomes unwieldy. Slide the check reach from 'neighbors only' toward 'anywhere' and watch the atom bill collapse from 852,480 down to 5,278: that single collapse is where 'a million qubits, someday' becomes 'ten thousand atoms'.",
+      "visualMetaphor": "Center: a block of atoms (dots) with a few example parity checks drawn as spider-like connectors; a slider extends the connectors' maximum reach from nearest-neighbor to block-wide. Right: two vertical bars on a shared axis, 'physical atoms needed to protect 1,480 logical qubits at distance 24' — the surface-code bar fixed at 852,480, the movable-atom bar shrinking to 5,278 as reach grows, with a large '161×' ratio readout. Below, an encoding-rate meter climbing from 0.1–4% to ~30%. A side gauge confirms 'failure per cycle: ~10^-11' stays constant throughout.",
+      "animatedVariable": {
+        "name": "maximum reach allowed for a parity check",
+        "control": "slider",
+        "range": "neighbors only ↔ anywhere in the block",
+        "whatChangesOnScreen": "As check reach increases the atom-count readout falls; at the slider's MAXIMUM the readouts must show exactly the paper's operating point — 5,278 atoms protecting 1,480 logical qubits, labeled '161× fewer than surface code'. Implementation requirement: the slider's max position IS the lifted-product code; interpolate intermediate points toward it, never past or short of it."
+      },
+      "quantitativeAnchor": "[[5278, 1480, ≤24]]: 1,480 logical qubits in 5,278 atoms — 161× fewer than the 852,480 surface-code atoms for equal count and distance.",
+      "physicsChecks": [
+        "The required-atoms readout at maximum reach is 5,278 and the ratio readout is 161×",
+        "The failure-rate gauge shows ~10^-11 in both the default and max-reach screenshots",
+        "The encoding-rate meter increases as check reach increases",
+        "Each drawn check touches roughly 10 dots even at maximum reach, never dozens"
+      ]
+    },
+    {
+      "id": "library-processor",
+      "conceptId": "zoned-architecture",
+      "part": "The new machine: atoms you can carry",
+      "title": "The machine splits into a big library and a small processor",
+      "teaches": "Densely packed storage cannot be computed on directly, so the machine keeps its 1,480 logical qubits in a passive library and does all actual work in a small processor beside it.",
+      "requires": [
+        "dense-codes"
+      ],
+      "caption": "Dense packing has a price. In the big block, the 1,480 logical qubits are woven together by shared checks — wonderful for safekeeping, terrible for access: you cannot work on one book without disturbing the whole shelf. So the machine splits in two like a closed-stack library — and from here on, think of each stored logical qubit as a book: the big block is the stacks, where books are only ever stored, never worked on. Beside it sits a small processor — a separate code holding just 10 to 148 logical qubits — and every actual computation step happens there. Pick any book below and the rule is always the same: to be computed on, it must first travel to the processor. The trick that makes that trip possible comes next.",
+      "visualMetaphor": "Left: a large block of dots arranged as shelves, labeled 'library — 1,480 logical qubits, storage only'. Right: a small block labeled 'processor — 10 to 148 logical qubits, all computation'. Buttons choose a stored book ('book 3 / book 700 / book 1,480'); choosing one highlights it on its shelf and draws a travel path ending at the processor with the annotation 'must travel here to be used'. Readouts: library size (fixed 1,480), processor capacity, chosen book number. Legend: 'dots = logical qubits · highlighted dot = the book you asked for · dashed path = the trip it must make'.",
+      "animatedVariable": {
+        "name": "which stored logical qubit is requested",
+        "control": "buttons",
+        "range": "book 3 / book 700 / book 1,480",
+        "whatChangesOnScreen": "A different dot highlights on the shelves and the dashed travel path redraws from that dot to the processor; the library-size readout never changes."
+      },
+      "quantitativeAnchor": "Library: 1,480 logical qubits; processor: 10 to 148 logical qubits.",
+      "physicsChecks": [
+        "The library-size readout reads 1,480 in both screenshots and the processor capacity reads 10–148.",
+        "Choosing a different book highlights a different dot, and the dashed path always terminates at the processor.",
+        "Every element is covered by the legend; no bare abbreviations."
+      ]
+    },
+    {
+      "id": "entangled-pair",
+      "conceptId": "entanglement",
+      "part": "The new machine: atoms you can carry",
+      "title": "Two atoms can be prepared to always agree",
+      "teaches": "An entangled pair is two qubits prepared together so their readouts always match, even though neither answer exists before you look.",
+      "requires": [
+        "qubit-blend"
+      ],
+      "caption": "One more quantum ingredient, and it is the strangest one. Two atoms can be prepared together — entangled — so that their readouts are locked to each other: read both and you get 0-and-0 or 1-and-1, never a mismatch, no matter how far apart the atoms have since been carried. Neither atom secretly knows its answer in advance — each readout alone is a fair coin flip — yet the two flips always land the same way. Press 'measure both' below and tally the outcomes: fifty-fifty between 00 and 11, and never once 01 or 10. Hold onto this: a shared entangled pair is a resource — and in the next scene, the machine spends such pairs to move quantum states around.",
+      "visualMetaphor": "Two atom circles far apart, joined by a wavy 'entangled pair' tie. Buttons: 'entangle a fresh pair' and 'measure both (×1 / ×100)'. Each measurement flashes both atoms to definite 0s or 1s and adds the joint outcome to a four-bar histogram over 00, 01, 10, 11 — the 01 and 10 bars stay pinned at zero while 00 and 11 grow roughly equal. Readouts: last joint outcome, counts of 00 and 11, fraction of matches (always 100%). Legend: 'wavy tie = entangled pair · histogram = tally of joint readouts'.",
+      "animatedVariable": {
+        "name": "number of joint measurements on freshly entangled pairs",
+        "control": "buttons",
+        "range": "measure both ×1 / measure both ×100",
+        "whatChangesOnScreen": "The 00 and 11 histogram bars grow roughly equal while 01 and 10 stay at zero, and the match-fraction readout stays pinned at 100%."
+      },
+      "quantitativeAnchor": "Outcomes split ~50/50 between 00 and 11; mismatches (01, 10) occur 0 times.",
+      "physicsChecks": [
+        "After ×100 the 00 and 11 bars are each within ~20% of half the total, and the 01 and 10 bars are exactly zero.",
+        "The match-fraction readout reads 100% in both screenshots once any measurements exist.",
+        "Each atom's individual outcomes are roughly fifty-fifty (no bias toward 0 or 1).",
+        "Every visible element is covered by the legend; no bare abbreviations."
+      ]
+    },
+    {
+      "id": "fetch-teleportation",
+      "conceptId": "code-surgery-ppm",
+      "part": "The new machine: atoms you can carry",
+      "title": "Books travel to the processor by quantum teleportation",
+      "teaches": "Books move to the processor through a standard procedure called quantum teleportation — not explained here — whose price is one entangled helper pair and ~16 ms per fetch, with the original always destroyed and never read.",
+      "requires": [
+        "library-processor",
+        "entangled-pair"
+      ],
+      "caption": "How does a book get from the stacks to the processor without being read? Through a standard, well-tested procedure called quantum teleportation — and we will not explain its inner workings here; honestly, they take quantum arithmetic to appreciate. What matters for this paper is teleportation's price tag, and that much you can watch: each fetch consumes one freshly entangled pair of helper atoms — the matched pairs from the last scene — takes about 16 milliseconds of repeated measurements, and sends only ordinary classical bits across the machine. Two guarantees come with it: the book's contents are never read along the way, and the original is always destroyed — a quantum state can be moved, never copied. Press fetch and watch the machine pay the price and collect the goods.",
+      "visualMetaphor": "The library block (one highlighted book) and the processor block (one blank slot), with a helper-atom pool at the side. A single 'fetch the book' button (completes instantly): helper atoms swoop in around the book and the blank slot, a brief 'teleporting…' shimmer plays, then the book icon appears in the processor labeled 'arrived — never read', the library slot is relabeled 'original destroyed', and the helpers drift back to their pool. Readouts: time per fetch ≈ 16 ms, classical bits sent = 2, entangled pairs consumed = 1, and a persistent counter 'copies of the book in existence: 1'. Legend: 'highlighted dot = the book (a stored logical qubit) · swooping dots = helper atoms (consumed pair + crew) · the shimmer = teleportation, a standard procedure not explained here'.",
+      "animatedVariable": {
+        "name": "the fetch",
+        "control": "buttons",
+        "range": "fetch the book — teleportation runs as a black box, completing instantly",
+        "whatChangesOnScreen": "Helpers swoop in, the shimmer plays, the book appears in the processor while the library slot reads 'original destroyed', helpers return, and the readouts settle at ≈16 ms, 2 bits, 1 pair consumed, copies = 1."
+      },
+      "quantitativeAnchor": "One fetch: ~16 ms, 2 classical bits, 1 entangled helper pair consumed; copies in existence: always 1.",
+      "physicsChecks": [
+        "After the click the book icon is in the processor labeled 'arrived — never read' and the library slot reads 'original destroyed' — never both occupied.",
+        "The readouts show ≈16 ms, exactly 2 bits, and 1 pair consumed; the copies counter reads 1 in both screenshots.",
+        "The helpers are at their pool before, deployed nowhere in the final state (returned).",
+        "Every element is covered by the legend; no bare abbreviations."
+      ]
+    },
+    {
+      "id": "helper-pool",
+      "conceptId": "zoned-architecture",
+      "part": "The new machine: atoms you can carry",
+      "title": "One shared pool of helpers serves every fetch",
+      "teaches": "Because atoms can be carried anywhere, a single pool of 900–1,900 helper atoms — 10–20% of the machine — is rearranged on demand to run every fetch, instead of dedicated wiring beside every book.",
+      "requires": [
+        "fetch-teleportation",
+        "movable-atoms"
+      ],
+      "caption": "Notice what the fetch consumed: a crew of helper atoms, busy for about sixteen milliseconds, then released. Here is the final economy of movability. Because any atom can be carried anywhere, the machine keeps just one communal crew — 900 to 1,900 helpers, 10 to 20 percent of all its atoms — and rearranges the same crew, fetch after fetch, to serve whichever book is called next. Toggle the comparison below: a rigid chip, whose helpers cannot move, would need a dedicated measuring rig wired in beside every one of the 1,480 books, and the rigs would dwarf the library itself. One roaming crew versus fourteen hundred parked ones — that is why the helper overhead stays a footnote instead of becoming the bill.",
+      "visualMetaphor": "The library block with a compact cluster of helper dots beside it. A toggle: 'movable helpers — one shared pool' vs 'rigid chip — a rig beside every book'. In the first state, the single helper cluster (labeled '900–1,900 helpers · 10–20% of the machine') animates between a few example fetch sites; in the second, every shelf sprouts a small greyed rig and a counter tallies the total rig atoms, visibly several times the library itself. Readouts: helper atoms needed (shared pool: 900–1,900; rigid: many tens of thousands), fraction of machine devoted to helpers. Legend: 'small cluster = the one shared crew · grey rigs = dedicated per-book hardware a rigid chip would need'.",
+      "animatedVariable": {
+        "name": "how helper hardware is provisioned",
+        "control": "toggle",
+        "range": "one shared movable pool ↔ a dedicated rig per book",
+        "whatChangesOnScreen": "The single 900–1,900-atom cluster is replaced by rigs beside all 1,480 books, and the helper-atoms counter jumps from under 2,000 to many tens of thousands while the library itself stays the same size."
+      },
+      "quantitativeAnchor": "Shared pool: 900–1,900 helper atoms (10–20% of the machine) serve all 1,480 stored qubits.",
+      "physicsChecks": [
+        "In the shared-pool state the helper counter reads between 900 and 1,900; in the per-book state it reads at least 10× larger.",
+        "The library block itself is identical in both toggle states — only the helper hardware changes.",
+        "The fraction-of-machine readout reads 10–20% in the shared-pool state.",
+        "Every element is covered by the legend; no bare abbreviations."
+      ]
+    },
+    {
+      "id": "magic-fuel",
+      "conceptId": "magic-states-and-toffoli",
+      "part": "The new machine: atoms you can carry",
+      "title": "The one gate the codes cannot do runs on manufactured fuel",
+      "teaches": "Error-corrected codes natively support only a limited gate family, so each Toffoli gate must consume a pre-manufactured 'magic' state, purified from error ~10^-6 down to ~10^-10 by distillation.",
+      "requires": [
+        "fetch-teleportation",
+        "quantum-factoring"
+      ],
+      "caption": "There is a hole in the armor. Error-correcting codes natively support only a limited family of operations called Clifford gates — necessary, but a machine running only those can be efficiently simulated by an ordinary computer, so it has no quantum power at all. The missing ingredient is exactly the Toffoli gate we count Shor's algorithm in, and it is supplied indirectly: prepare a special three-qubit resource called a magic state offline, then splice it into the computation with the same teleportation move the machine uses for fetching books, consuming it like fuel — 'magic' is a term of art, not hype, naming the specific resource that elevates the machine. Raw magic states are dirty, so step through the factory: first 'cultivation' grows small \\(|T⟩\\) states with error near \\(10^{-6}\\), then batches of eight run through a distillation circuit that outputs one CCZ state with error near \\(10^{-10}\\) — clean enough for billions of gates. The factory brews these faster, on average, than the computation burns them.",
+      "visualMetaphor": "A three-stage assembly line, left to right, with a large logarithmic error meter (10^-3 down to 10^-10) tracking the current stage's output. Stage buttons advance the line: Stage 1 'cultivation' shows small code patches growing a glowing |T⟩ token, meter at ~10^-6. Stage 2 'distillation' funnels 8 tokens into a compact factory block that emits 1 brighter CCZ token, meter at ~10^-10. Stage 3 'consumption' shows the CCZ token teleported into the processor, vanishing as a Toffoli gate fires; a fuel gauge labeled 'factory keeps pace with demand' stays topped up.",
+      "animatedVariable": {
+        "name": "stage of the magic-state factory pipeline",
+        "control": "buttons",
+        "range": "cultivate → distill (8-to-1) → consume in a Toffoli gate",
+        "whatChangesOnScreen": "The error meter drops from ~10^-6 to ~10^-10 across stages; eight tokens visibly merge into one; the final token is destroyed as the gate executes."
+      },
+      "quantitativeAnchor": "Distillation: 8 cultivated |T⟩ states at ~10^-6 error yield one CCZ state at ~10^-10 error.",
+      "physicsChecks": [
+        "The error meter reads ~10^-6 after stage 1 and ~10^-10 after stage 2 (a four-orders-of-magnitude drop)",
+        "Exactly eight input tokens enter distillation and exactly one token exits",
+        "After stage 3, the consumed token is gone — magic states are one-use fuel, not reusable parts"
+      ]
+    },
+    {
+      "id": "failure-budget",
+      "conceptId": "failure-budget-arithmetic",
+      "part": "The head-to-head: why 10,000 beats a million",
+      "title": "A months-long run tolerates about one failure per hundred billion cycles",
+      "teaches": "Requiring 90% success over billions of Toffoli gates fixes how low the per-cycle logical failure rate must be — about 10^-11 — which in turn fixes the code sizes and the final atom counts of 9,739–13,255.",
+      "requires": [
+        "code-distance",
+        "quantum-factoring",
+        "magic-fuel"
+      ],
+      "caption": "Now one line of arithmetic decides everything. For the whole run to succeed with 90% probability, the expected number of block failures must stay below about 0.1. Each Toffoli occupies a few hundred cycles — about 19 fetch-lengths, \\(τ_{\\text{Toff}} ≈ 19 × 16\\) rounds, and in every cycle the memory can fail with probability \\(P_L\\), so the tolerable gate count is \\(n_{\\text{Toff}} = \\frac{\\log(0.9)}{τ_{\\text{Toff}}·\\log(1 − P_L)}\\). Slide \\(P_L\\) down and watch the budget grow: you must reach about \\(10^{-11}\\) before the markers for ECC-256's \\(9×10^7\\) Toffolis and RSA-2048's \\(6.5×10^9\\) fall inside the green zone. If \\(10^{-11}\\) sounded like absurd overkill back in the distance scene, here is why it is not: a months-long run at 1 millisecond per cycle accumulates around \\(10^{10}\\) cycles, so one-in-a-hundred-billion per cycle only barely keeps success likely. Working backwards, that demands physical error rates \\(p\\) between 0.048% and 0.093% — near-term plausible — and code sizes that total 9,739 to 13,255 atoms.",
+      "visualMetaphor": "A single horizontal number line on a logarithmic scale showing 'tolerable Toffoli count' from 10^5 to 10^11, with two fixed flags: 'ECC-256: 9×10^7' and 'RSA-2048: 6.5×10^9'. A slider sets P_L from 10^-8 down to 10^-13; the green 'affordable' region extends rightward from zero up to the computed n_Toff, sweeping past each flag as P_L drops. Side readouts: the equation with live numbers, the implied required physical error rate p, and the implied total atom count (9,739–13,255 band). A small odometer accumulates 'total cycles this run: ~10^10'.",
+      "animatedVariable": {
+        "name": "per-cycle logical failure rate P_L of the memory block",
+        "control": "slider",
+        "range": "P_L = 10^-8 down to 10^-13",
+        "whatChangesOnScreen": "The green affordable region extends across the number line; the ECC-256 flag turns green near P_L ≈ 10^-10–10^-11 and the RSA-2048 flag only near ~10^-11 or below; readouts of required p and atom count update."
+      },
+      "quantitativeAnchor": "Closing the budget requires P_L ≈ 10^-11 per cycle and physical error rates p between 0.048% and 0.093%, yielding total counts of 9,739–13,255 qubits.",
+      "physicsChecks": [
+        "The tolerable Toffoli count increases monotonically as P_L decreases",
+        "At P_L = 10^-8 neither flag is inside the green zone; at P_L = 10^-13 both are",
+        "The RSA-2048 flag requires a P_L roughly 70× smaller than the ECC-256 flag, matching their gate-count ratio",
+        "The displayed atom-count band stays within 9,739–13,255"
+      ]
+    },
+    {
+      "id": "space-time-trade",
+      "conceptId": "space-time-tradeoff",
+      "part": "The head-to-head: why 10,000 beats a million",
+      "title": "Extra atoms buy speed: 264 days can become 10",
+      "teaches": "Distilling and consuming many magic states in parallel trades atoms for runtime: ECC-256 falls from ~264 days at ~10,000 qubits to ~10 days at 26,000, and RSA-2048 becomes feasible in ~97 days at 102,000.",
+      "requires": [
+        "failure-budget",
+        "magic-fuel"
+      ],
+      "caption": "The lean 10,000-atom machine runs Toffoli gates one at a time, each costing an amortized 10–72 surgery cycles at 1 millisecond apiece — so ECC-256's 90 million Toffolis take 52 to 1,000 days depending on processor size, around 264 days in the paper's representative design. The paper attacks that serial bottleneck twice: mathematically, swapping ripple-carry adders, whose \\(n\\)-bit additions need about \\(n\\) to \\(2n\\) sequential Toffoli layers, for carry-lookahead adders needing only about \\(4·\\log n\\); and physically, distilling and consuming \\(P\\) magic states simultaneously through parallel surgery. Slide \\(P\\) up and watch the trade: more parallel machinery means more atoms, less time — ECC-256 at \\(P = 130\\) costs 26,000 qubits and about 10 days, RSA-2048 at \\(P = 1{,}160\\) costs 102,000 qubits and about 97 days. Notice the twist: the 'modern' elliptic-curve locks fall sooner than RSA not because of hardware but because their keys demand about 70× fewer Toffoli gates.",
+      "visualMetaphor": "A log-log plot: x-axis 'total physical qubits' (10^4 to 10^5+), y-axis 'runtime in days' (1 to 1,000). Two curves, one per target (toggle: ECC-256 / RSA-2048), each sloping down-right. A slider sets parallelism P; a dot moves along the active curve with paired readouts 'qubits / days'. Labeled anchor points: ECC-256 serial (~264 days), ECC-256 at P=130 (26,000 qubits, ~10 days), RSA-2048 at P=1,160 (102,000 qubits, ~97 days). A small inset compares adder depth: a long staircase (ripple-carry, ~n layers) versus a short one (carry-lookahead, ~4·log n layers).",
+      "animatedVariable": {
+        "name": "parallelism P — magic states consumed simultaneously (with a target toggle ECC-256/RSA-2048)",
+        "control": "slider",
+        "range": "P = 1 to 1,160",
+        "whatChangesOnScreen": "The dot slides down the runtime curve as P grows while the qubit readout climbs; toggling the target swaps curves and anchor labels."
+      },
+      "quantitativeAnchor": "ECC-256: ~264 days serial → ~10 days at 26,000 qubits (P = 130); RSA-2048: ~97 days at 102,000 qubits (P = 1,160).",
+      "physicsChecks": [
+        "Runtime decreases monotonically and qubit count increases monotonically as P grows",
+        "At P = 130 on the ECC-256 curve the readouts show ≈26,000 qubits and ≈10 days",
+        "At P = 1,160 on the RSA-2048 curve the readouts show ≈102,000 qubits and ≈97 days",
+        "At equal machine size, the RSA-2048 runtime is roughly 70× the ECC-256 runtime"
+      ]
+    },
+    {
+      "id": "ingredients-exist",
+      "conceptId": "movable-atom-qubits",
+      "part": "Why now, and what comes next",
+      "title": "Every ingredient has already worked in a laboratory",
+      "teaches": "Each capability the 10,000-atom machine needs — array size, tweezer count, below-threshold error rates, fault-tolerant operation — has been demonstrated separately, so the remaining challenge is integration, not invention.",
+      "requires": [
+        "movable-atoms",
+        "space-time-trade"
+      ],
+      "caption": "Why should you believe any of this is near? Because the paper invents no new physics — it re-budgets capabilities already shown. Click through the checklist: arrays of 6,100 coherent atoms have been trapped, comfortably past the 9,739–13,255 the lean machine needs; patterns of 360,000 tweezers have been demonstrated, enough even for the 102,000-atom fast variant; full fault-tolerant operation — the stitching, checking, and correcting of earlier scenes — has run on about 500 qubits; error rates sit 2× below the critical threshold, with a credible path to 10×, against the required \\(p\\) of 0.048% to 0.093%; and readout as fast as 1 microsecond points at recovering the 1-millisecond cycle's lost speed. No single machine has combined them yet — that is the honest gap. But it is an engineering gap, and it is why a claim that once meant 'a million qubits, someday' now reads 'ten thousand atoms, days to months of runtime' — and why the world is racing to encryption without hidden periodic patterns before the atoms finish moving.",
+      "visualMetaphor": "A checklist of five requirement rows, each with a horizontal gauge: 'atoms in one coherent array' (need 9,739–13,255; demonstrated 6,100), 'tweezer sites' (need up to 102,000; demonstrated 360,000), 'qubits run fault-tolerantly' (need ~10,000; demonstrated ~500), 'physical error rate vs threshold' (need 0.048–0.093%; demonstrated 2× below threshold, arrow toward 10×), 'readout speed' (budgeted 1 ms cycle; demonstrated 1 µs readout). Buttons select a row; the selected gauge animates its 'demonstrated' fill against the 'required' marker and highlights the matching module on a miniature floor plan of the machine from the surgery scene.",
+      "animatedVariable": {
+        "name": "which required capability to compare against laboratory demonstrations",
+        "control": "buttons",
+        "range": "5 requirements: array size, tweezer count, fault-tolerant scale, error rate, readout speed",
+        "whatChangesOnScreen": "Each selection fills its gauge to the demonstrated level against the required marker, colors it green (met/exceeded) or amber (gap remains), and highlights the corresponding zone of the miniature machine."
+      },
+      "quantitativeAnchor": "Demonstrated separately: 6,100 coherent atoms trapped, 360,000-tweezer patterns, fault-tolerant operation on ~500 qubits — against a lean-machine requirement of 9,739–13,255 atoms.",
+      "physicsChecks": [
+        "The tweezer-count gauge shows demonstrated (360,000) exceeding even the 102,000 requirement and renders green",
+        "The array-size gauge shows 6,100 filling roughly half to two-thirds of the ~10,000 requirement and renders amber",
+        "The fault-tolerant-scale gauge shows ~500 against ~10,000, the largest visible gap on the board",
+        "Each button press highlights a different module of the miniature machine floor plan"
+      ]
+    }
+  ]
+}

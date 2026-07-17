@@ -1,0 +1,108 @@
+{
+  "paper": {
+    "title": "ParallelKittens: Systematic and Practical Simplification of Multi-GPU AI Kernels",
+    "authors": [
+      "Stuart H. Sul",
+      "Simran Arora",
+      "Benjamin F. Spector",
+      "Christopher Ré"
+    ],
+    "oneSentenceClaim": "Three simple, reusable principles — pick the right data-transfer mechanism, pick the right compute/communication scheduling strategy, and strip away library design overheads — suffice to build multi-GPU AI kernels in under 50 lines of device code that match or beat hand-optimized systems by up to 4.08×."
+  },
+  "prerequisites": [
+    "linear algebra (matrix multiplication and its O(MNK) operation count)",
+    "basic notion of parallelism and pipelining",
+    "bandwidth = bytes / time, latency vs throughput",
+    "big-picture idea that neural networks are dominated by large matrix multiplies"
+  ],
+  "concepts": [
+    {
+      "id": "gpu-memory-hierarchy",
+      "name": "The GPU as a hierarchy of compute islands and memory tiers",
+      "whyItMatters": "Every design decision in the paper is about which tier data lives in and which hardware unit moves it; without this map the trade-offs are meaningless.",
+      "coreMechanism": "An H100 GPU has ~130 streaming multiprocessors (SMs), each an independent compute island with 64 KB of registers (accessible every clock, ~130 TB/s aggregate) and 227 KB of shared memory (SMEM, ~33 TB/s). All SMs share a 50 MB L2 cache (~12 TB/s) and 80 GB of HBM main memory (3 TB/s). Bandwidth drops roughly an order of magnitude per tier as you move away from the SM, so performance is governed by keeping data as close to the compute units as possible, and re-loading from HBM only when necessary.",
+      "keyFigureRef": "Fig. 1 (left pyramid)",
+      "foundational": true
+    },
+    {
+      "id": "arithmetic-intensity-and-overlap",
+      "name": "Hiding slow operations behind fast ones: overlap as the only free lunch",
+      "whyItMatters": "The entire paper is an exercise in making communication time disappear inside compute time; this is the principle that makes that possible.",
+      "coreMechanism": "GPUs contain separate execution units — tensor cores for matrix math, CUDA cores for elementwise ops, TMA units for bulk memory movement, copy engines for DMA — that can all run simultaneously. If compute takes T_comp and communication takes T_comm, running them serially costs T_comp + T_comm, but running them concurrently costs only max(T_comp, T_comm). Since these units don't contend for the same silicon, the slower stream can be completely hidden whenever the faster stream keeps its unit busy — the classic assembly-line argument, applied inside one chip.",
+      "misconception": "Overlap is not automatic: it requires the software to explicitly issue asynchronous operations and manage synchronization; naive code serializes everything.",
+      "foundational": true
+    },
+    {
+      "id": "interconnect-lag",
+      "name": "Why inter-GPU communication became the bottleneck",
+      "whyItMatters": "This is the problem statement: compute is outrunning the wires connecting GPUs, so unhidden communication increasingly dominates wall-clock time.",
+      "coreMechanism": "Modern AI models are too large for one GPU, so weights and activations are sharded across 8+ devices connected by NVLink (450 GB/s per H100, 900 GB/s per B200). From the A100 to the B200 generation, tensor-core throughput improved 7.2× and HBM bandwidth 5.1×, but NVLink only 3× and PCIe/InfiniBand only 2×. Because compute per byte of communication keeps growing, the same model now spends a larger fraction of time — over 50% in some LLM workloads — waiting on data transfers with tensor cores idle. Meanwhile intra-GPU memory bottlenecks were largely solved by IO-aware algorithms like FlashAttention, leaving communication as the dominant residual cost."
+    },
+    {
+      "id": "cost-model",
+      "name": "The four-term cost model of a multi-GPU kernel",
+      "whyItMatters": "It decomposes performance into interpretable, independently optimizable terms — the paper's three design principles each attack a different term.",
+      "coreMechanism": "Total kernel time is launch overhead, plus the maximum of the three overlapped pipeline components (compute, memory, communication), plus anything that failed to overlap, plus synchronization cost. Each pipeline component's time is its work size divided by achieved bandwidth (T_comm = S_comm/B_comm). The transfer-mechanism choice sets B_comm and can shrink S_comm (via in-network reduction); the scheduling strategy determines T_non-overlap; the library design choices determine T_sync and add hidden data movement.",
+      "keyEquation": "T_{\\text{kernel}} = T_{\\text{launch}} + \\max(T_{\\text{comp}}, T_{\\text{mem}}, T_{\\text{comm}}) + T_{\\text{non-overlap}} + T_{\\text{sync}}"
+    },
+    {
+      "id": "transfer-mechanism-tradeoffs",
+      "name": "Three ways to move bytes between GPUs, three different sweet spots",
+      "whyItMatters": "Existing systems hard-code one mechanism and pay for it; PK's speedups over Flux/Triton-Distributed on small matrices come directly from picking the right mechanism per situation.",
+      "coreMechanism": "The host-launched copy engine achieves the best peak (82% of NVLink's 450 GB/s) but needs ≥256 MB contiguous messages to saturate — useless for fine-grained tile traffic. The Tensor Memory Accelerator (TMA) reaches 78% with only 2 KB messages and, critically, is fired asynchronously by a single thread, saturating the link with just ~15 SMs of participation. Plain register-level load/store instructions are the least efficient (70–76%) and need ~76 SMs of thousands of synchronously-issuing threads to saturate, but they are the only mechanism that can invoke NVSwitch in-network reduction and arbitrary elementwise transfers. So the optimal kernel mixes mechanisms by functionality rather than committing to one.",
+      "keyFigureRef": "Fig. 2, Fig. 3, Tables 1–2",
+      "misconception": "The mechanism with the highest peak bandwidth (copy engine) is not the fastest in practice — at fine granularity it falls off a cliff while TMA holds near-peak down to 2 KB messages."
+    },
+    {
+      "id": "intra-vs-inter-sm-overlap",
+      "name": "Intra-SM vs inter-SM overlapping: two ways to split compute from communication",
+      "whyItMatters": "This is the paper's central scheduling insight: neither strategy dominates, and prior systems that committed to one strategy fail on workloads suited to the other (e.g., Flux-style intra-SM applied to GEMM all-reduce would be 3.6× slower).",
+      "coreMechanism": "Intra-SM overlapping splits threads *within* every SM: some warps drive tensor cores, one thread fires asynchronous TMA transfers. All SMs keep computing, so compute throughput (which scales linearly with SM count, unlike interconnect bandwidth) stays at 100%, and synchronization stays on-chip (~64 ns via mbarrier vs ~832 ns through HBM for inter-SM). Inter-SM overlapping instead dedicates whole SMs to communication, sacrificing some compute but freeing the communication pattern from the computation's tile-by-tile structure — enabling in-network reduction and bulk prefetching that intra-SM cannot express. Empirically: GEMM+reduce-scatter favors intra-SM (743.7 vs 618.1 TFLOP/s) while GEMM+all-reduce favors inter-SM (623.9 vs 172.3 TFLOP/s).",
+      "keyFigureRef": "Fig. 4"
+    },
+    {
+      "id": "k-threshold-full-hiding",
+      "name": "The K ≥ sR/2B threshold: when communication vanishes entirely",
+      "whyItMatters": "This closed-form condition tells you a priori whether a fused GEMM kernel can fully hide its communication — and it explains PK's <1% residual communication time at large reduction dimensions.",
+      "coreMechanism": "For an M×N×K GEMM fused with a reduce-scatter, each m×n output tile requires 2mnK FLOPs of compute (time 2mnK/R at tensor-core rate R) but only smn bytes of transfer (time smn/B at NVLink bandwidth B). Compute time grows with K while transfer time doesn't, so once K ≥ sR/2B the transfer of each tile fits entirely under the computation of the next. For BF16 on H100 (s=2 bytes, R=989 TFLOP/s, B=450 GB/s) this gives K ≳ 2197 — and measurements confirm: at K=512 communication is 68% of runtime, at K=2048 it drops to 26%, at K=4096 it is under 1%.",
+      "keyEquation": "K \\geq \\frac{sR}{2B}",
+      "keyFigureRef": "Table 3"
+    },
+    {
+      "id": "in-network-reduction",
+      "name": "In-network reduction: making the switch do the math",
+      "whyItMatters": "It cuts all-reduce traffic by roughly the number of GPUs N, delivering the 3.62× GEMM+all-reduce win that no intra-SM scheme can achieve — and it's only reachable via register instructions, tying the mechanism and scheduling principles together.",
+      "coreMechanism": "In a naive N-GPU all-reduce, every GPU writes its partial result to all N peers, and since each destination GPU has a single 450 GB/s ingress port, the N concurrent writes serialize there — traffic scales with N. NVSwitch instead contains arithmetic units: a special multicast address maps one virtual address to physical memory on all devices simultaneously, and PTX instructions (multimem.red, multimem.ld_reduce) tell the switch fabric to sum the N copies in flight. Each GPU then sends and receives its data roughly once, cutting T_comm by ~N. Because these are synchronous register-level instructions with high occupancy cost, the right pattern is inter-SM: compute SMs accumulate locally and signal, a few dedicated communicator SMs then fire one in-fabric all-reduce.",
+      "keyFigureRef": "Fig. 4 (right), Fig. 22"
+    },
+    {
+      "id": "library-design-overheads",
+      "name": "Hidden costs baked into NCCL and NVSHMEM",
+      "whyItMatters": "Even with perfect mechanism and scheduling choices, standard libraries impose up to 1.79× slowdown on pure collectives and 4.5× higher access latency — overheads PK eliminates by design, not by cleverness.",
+      "coreMechanism": "NCCL forces two-way synchronization on every transfer (sender and receiver must handshake even for one-sided pushes) and stages data through small pre-allocated intermediate buffers, adding an extra copy per message. NVSHMEM's API performs a global-memory load to fetch the peer's address plus a full thread-group sync on every remote access. These costs amortize away for huge messages but dominate fine-grained traffic. PK instead pre-exchanges peer memory mappings once at setup, keeps peer addresses in registers, and writes directly into pre-allocated destination buffers with one-way signaling — yielding up to 1.79× on all-reduce (B200, small matrices) and ~20 GB/s more sustained bandwidth.",
+      "keyFigureRef": "Fig. 6"
+    },
+    {
+      "id": "peer-memory-mapping",
+      "name": "How one GPU dereferences another GPU's memory",
+      "whyItMatters": "Device-initiated communication — the foundation of every PK primitive — only works because a peer GPU's physical HBM can be mapped into the local virtual address space, after which a plain pointer dereference rides NVLink.",
+      "coreMechanism": "Each process controlling a GPU has its own virtual address space, so peer access requires creating a mapping from local virtual addresses to remote physical HBM. CUDA IPC exports a memory handle as a 64-byte stub shared across processes; the manual VMM path exports physical allocations as Linux file descriptors passed over Unix sockets, which additionally permits binding memory into a multicast object — the prerequisite for NVSwitch in-network acceleration. Once mapped, a kernel just loads or stores through the pointer and the NVLink/NVSwitch fabric handles the transfer transparently. PK wraps this entire OS-level dance in utilities so it never appears in user kernel code.",
+      "keyFigureRef": "Figs. 19–21",
+      "foundational": true
+    },
+    {
+      "id": "tile-abstraction-and-template",
+      "name": "Eight tile-granularity primitives plus one loader/consumer/storer/communicator template",
+      "whyItMatters": "This is how the paper's analysis becomes a usable system: the primitives expose only the winning mechanism per functionality, and the template makes both scheduling strategies expressible in <50 lines of added device code.",
+      "coreMechanism": "PK generalizes ThunderKittens' tile-based programming (16×16 register tiles, shared-memory tiles, HBM layouts) to multiple GPUs via the Parallel Global Layout — identically shaped buffers on all devices addressed by tile coordinates. On top sit eight primitives: async single-thread P2P stores and atomic-add stores (TMA-backed), warp-level in-network reduce/all_reduce (register-backed), and four signal/wait/barrier synchronizers. The program template assigns warps to four roles — loader (HBM/peer reads), consumer (tensor-core math), storer (HBM/peer writes), communicator (dedicated SMs for inter-SM overlap) — and auto-tunes the SM split between compute and communication, since Fig. 5 shows the optimal split shifts with problem size (small problems need proportionally more communication SMs).",
+      "keyFigureRef": "Fig. 1 (right), Fig. 18"
+    },
+    {
+      "id": "parallelism-patterns-validated",
+      "name": "One framework, four parallelism patterns: the generality claim in numbers",
+      "whyItMatters": "The central claim is that the three principles generalize; the evidence is that the same small primitive set matches or beats specialized systems across tensor, data, sequence, and expert parallelism on both Hopper and Blackwell.",
+      "coreMechanism": "Sharding a model creates recurring communication motifs: all-gather before a GEMM, reduce-scatter/all-reduce after (tensor/data parallelism); ring-passing KV blocks or all-to-all head exchanges in attention (sequence parallelism); token scatter/gather around expert MLPs (expert parallelism). PK kernels for each achieve 1.06–1.68× over non-overlapped cuBLAS+NCCL and 1.07–5.63× over the Triton-Distributed compiler on fused GEMMs; 4.08× over xDiT on Ring Attention (fusing NCCL-stream overlap into one kernel with dedicated communication SMs restores L2 reuse); 1.01–1.39× over YunChang on Ulysses (a direct fine-grained all-to-all removes tensor-reshape copies NCCL forces); and 0.92–1.22× vs the hand-tuned Comet on MoE dispatch — each with <50 lines of communication code. Compiler baselines meanwhile prove brittle: Triton-Distributed, tuned for H800s, sometimes runs slower than no overlap at all on H100s.",
+      "keyFigureRef": "Figs. 7–12"
+    }
+  ]
+}

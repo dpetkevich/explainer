@@ -1,0 +1,339 @@
+{
+  "title": "How Shor's Algorithm Goes From Millions of Qubits to Ten Thousand",
+  "hook": "RSA-2048 and 256-bit elliptic-curve keys protect almost all of today's internet traffic. Breaking them with Shor's algorithm was assumed to need a quantum computer with millions of physical qubits, decades away. This paper argues the real number is 10,000 to 26,000, a drop of two to three orders of magnitude. That drop isn't because the qubits themselves got better. The key idea: swap an error-correcting code that only talks to its nearest neighbors for one that can wire any two qubits together. That swap turns most of the huge qubit budget from wasted overhead into usable qubits that actually compute. You'll follow one specific 256-bit key from the first scene to the last, watching the machine needed to break it shrink from millions of qubits to ten thousand.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Start with the target — a 256-bit elliptic-curve key — and the two physical facts standing in the way: real qubits are noisy, and the standard fix for that noise, the surface code, is wasteful. This part ends at the limitation the rest of the paper attacks."
+    },
+    {
+      "title": "The new technology",
+      "lede": "The surface code wastes qubits because it only wires neighbors together. This part shows the paper's fix:\n- a code that wires qubits at a distance\n- hardware (moving atoms) that can physically build those wires\n- the surgery and zone architecture that turns both into a working machine"
+    },
+    {
+      "title": "Why it beats existing tech",
+      "lede": "With the new code and architecture built up, put it head-to-head against the surface-code baseline from part 1 on the same two keys, then see how spending more qubits buys back speed."
+    },
+    {
+      "title": "Why now",
+      "lede": "The numbers in part 3 aren't hypothetical — check them against neutral-atom hardware that already exists, then close the loop on what a 10-day break of a 256-bit key means today."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "cracking-the-key",
+      "conceptId": "shors-algorithm-crypto-threat",
+      "part": "The basic building blocks",
+      "title": "Shor's algorithm turns an unbreakable-looking key into a period-finding problem",
+      "teaches": "Shor's algorithm exploits quantum superposition to find a hidden periodicity in factoring and elliptic-curve problems, giving an exponential speedup over any known classical attack.",
+      "requires": [],
+      "caption": "This explainer follows one target: a 256-bit elliptic-curve key, the kind protecting most of today's secure web traffic and cryptocurrency wallets.",
+      "visualMetaphor": "Two bars on a shared log-scale time axis: 'best classical attack' (grows so fast with key size it runs off the chart) versus 'Shor's algorithm on a quantum computer' (stays comparatively short). A slider moves the key size from 192 to 256 bits (the standard elliptic-curve sizes) and both bars update.",
+      "animatedVariable": {
+        "name": "key size (bits)",
+        "control": "slider",
+        "range": "192 to 256 bits",
+        "whatChangesOnScreen": "the classical-attack bar grows explosively while the quantum-attack bar grows only mildly, visually separating the two approaches"
+      },
+      "quantitativeAnchor": "256-bit elliptic-curve key; no known classical algorithm can break it in a practical amount of time, but this paper estimates a quantum computer could do it in about 10 days.",
+      "physicsChecks": [
+        "the classical-attack bar increases far faster than the quantum-attack bar as key size grows",
+        "at 256 bits, the quantum-attack bar is labeled with the paper's ~10-day estimate",
+        "moving the slider never shrinks either bar — both are monotonically increasing in key size"
+      ]
+    },
+    {
+      "id": "noisy-qubits",
+      "conceptId": "qubits-and-decoherence",
+      "part": "The basic building blocks",
+      "title": "Physical qubits fail thousands of times more often than Shor's algorithm can tolerate",
+      "teaches": "A qubit is defined, and its per-gate error rate (0.1%-1% today) compounds over the billions of gates Shor's algorithm needs, so the net error must reach roughly 1 in 10 billion.",
+      "requires": [
+        "cracking-the-key"
+      ],
+      "caption": "Running Shor's algorithm on that 256-bit key takes billions of quantum operations, and each one can go wrong.",
+      "visualMetaphor": "A single qubit icon next to a row of gate operations (compressed to represent billions). A curve tracks the probability the whole computation is still correct after that many gates, plotted against a slider for the per-gate error rate.",
+      "animatedVariable": {
+        "name": "per-gate error rate p",
+        "control": "slider",
+        "range": "0.01% to 1%",
+        "whatChangesOnScreen": "the success-probability curve after a billion-gate run collapses toward zero at typical error rates and stays far above the 1-in-10-billion target line even at the slider's lowest setting"
+      },
+      "quantitativeAnchor": "today's best physical qubits: gate error rates around 0.05%-1%; Shor's algorithm needs the net error over billions of gates to stay below about 1 in 10 billion.",
+      "physicsChecks": [
+        "at p = 1%, success probability after a billion gates reads essentially 0",
+        "success probability strictly decreases as the number of gates increases at fixed p",
+        "even at the slider's minimum (0.01%), the curve stays far from the 1e-10 target line, showing raw qubits alone can't get there"
+      ]
+    },
+    {
+      "id": "encoding-against-noise",
+      "conceptId": "quantum-error-correction-basics",
+      "part": "The basic building blocks",
+      "title": "Spreading one qubit's information across many qubits suppresses errors exponentially",
+      "teaches": "A logical qubit is built from many physical qubits redundantly encoded; the threshold theorem says logical error rate falls as \\(P_L(p) \\approx a\\,p^{d/2}\\) as code distance \\(d\\) grows.",
+      "requires": [
+        "noisy-qubits"
+      ],
+      "caption": "Raw qubits can't reach 1-in-10-billion reliability alone, so redundancy does the work instead: spread one qubit's information across many.",
+      "visualMetaphor": "A grid of physical-qubit dots forming one encoded 'logical qubit', with overlaid check patterns labeled 'stabilizers'. The equation \\(P_L(p) \\approx a\\,p^{d/2}\\) sits above it, with each symbol named. A slider on distance \\(d\\) grows the grid and updates a log-scale readout of \\(P_L\\).",
+      "animatedVariable": {
+        "name": "code distance d",
+        "control": "slider",
+        "range": "4 to 24",
+        "whatChangesOnScreen": "the drawn code block visibly grows (more physical qubits) while the logical error rate readout drops from roughly 1e-2 toward 1e-10 or lower"
+      },
+      "quantitativeAnchor": "at distance 16-24 and physical error rate 0.1%, logical error rate reaches 1e-7 to 1e-11, below the 1-in-10-billion target.",
+      "physicsChecks": [
+        "logical error rate decreases monotonically as d increases, for fixed p below threshold",
+        "the number of physical qubits drawn in the block increases with d, making the cost visible",
+        "if p is toggled above threshold p_th, increasing d no longer helps, showing the threshold condition matters"
+      ]
+    },
+    {
+      "id": "surface-code-tax",
+      "conceptId": "surface-code-overhead-problem",
+      "part": "The basic building blocks",
+      "title": "The standard code only talks to its neighbors, so it wastes almost all its qubits",
+      "teaches": "The surface code's 2D nearest-neighbor wiring limits it to roughly 1 logical qubit per few hundred physical qubits, so scaling to Shor's algorithm's needs costs millions of physical qubits.",
+      "requires": [
+        "encoding-against-noise"
+      ],
+      "caption": "That single logical qubit is a surface-code patch, the field's default design — but its neighbor-only wiring is expensive at scale.",
+      "visualMetaphor": "A large 2D lattice of physical qubits connected only to nearest neighbors, with one logical-qubit patch highlighted needing hundreds of physical qubits. A slider for 'logical qubits needed' extends the lattice and totals the physical qubit count.",
+      "animatedVariable": {
+        "name": "logical qubits needed",
+        "control": "slider",
+        "range": "10 to 1,500",
+        "whatChangesOnScreen": "total physical qubit count scales up with the slider, reaching 1-20 million once the slider approaches the ~1,500 logical qubits Shor's algorithm actually requires"
+      },
+      "quantitativeAnchor": "prior estimates: surface-code architectures need about 1 million to 20 million physical qubits to run RSA-2048 or ECC-256.",
+      "physicsChecks": [
+        "physical qubit count scales roughly linearly with the number of logical qubits requested",
+        "at the slider's maximum (~1,500 logical qubits), the total reaches the millions, matching the paper's baseline",
+        "the drawn grid connects only nearest neighbors at every slider setting, never showing a long-range link"
+      ]
+    },
+    {
+      "id": "the-expensive-gate",
+      "conceptId": "clifford-vs-nonclifford-gates",
+      "part": "The new technology",
+      "title": "Most gates in a circuit are free to correct for; the Toffoli gate is not",
+      "teaches": "Clifford gates (Hadamard, CNOT, Pauli) can be tracked symbolically for free, but Toffoli/T gates need a pre-manufactured magic state — and Shor's algorithm's cost is almost entirely Toffoli gates.",
+      "requires": [
+        "surface-code-tax"
+      ],
+      "caption": "The million-qubit tax above comes from brute-force error correction, but not every gate even costs the same to run in the first place.",
+      "visualMetaphor": "A circuit diagram split in two: Clifford gates drawn as arrows that pass through for free (pushed to the end of the circuit), a Toffoli gate drawn as a toll booth consuming one magic-state token. Toggle between 'execute every gate directly' and 'Pauli-based: only pay tolls for Toffolis.'",
+      "animatedVariable": {
+        "name": "gate type view",
+        "control": "toggle",
+        "range": "Clifford gates / Toffoli gates",
+        "whatChangesOnScreen": "switching highlights which gates in the sample circuit require a magic-state token versus which are absorbed for free, with a running token counter"
+      },
+      "quantitativeAnchor": "RSA-2048's arithmetic needs about 6.5 billion Toffoli gates; ECC-256 needs far fewer, since elliptic-curve arithmetic is cheaper than modular exponentiation.",
+      "physicsChecks": [
+        "toggling to 'Clifford' highlights the majority of gates, each with zero token cost",
+        "toggling to 'Toffoli' highlights only a small fraction of gates, each consuming exactly one magic-state token",
+        "the token counter increments only on Toffoli gates, never on Clifford gates"
+      ]
+    },
+    {
+      "id": "packing-more-logic-per-block",
+      "conceptId": "high-rate-qldpc-codes",
+      "part": "The new technology",
+      "title": "Letting checks connect distant qubits packs far more logical qubits into the same block",
+      "teaches": "Lifted-product qLDPC codes use nonlocal check connectivity to reach a ~28% encoding rate, versus the surface code's ~0.1%, a ~161x improvement at matched distance.",
+      "requires": [
+        "the-expensive-gate",
+        "surface-code-tax"
+      ],
+      "caption": "The surface code's overhead and the costly Toffoli gates from the scene before both need reliable qubits. A nonlocal check code — called qLDPC — packs far more logical qubits into the same physical block.",
+      "visualMetaphor": "Two block diagrams at equal physical qubit count (5,278): left is surface-code patches with only nearest-neighbor wires, packing a handful of logical qubits; right is a qLDPC block with long crossing wires, packing 1,480 logical qubits. Toggle between them.",
+      "animatedVariable": {
+        "name": "code family",
+        "control": "toggle",
+        "range": "surface code / qLDPC (lifted-product)",
+        "whatChangesOnScreen": "at fixed 5,278 physical qubits, the logical-qubit counter jumps from a handful to 1,480 when switching to qLDPC, and long nonlocal wires appear in the diagram"
+      },
+      "quantitativeAnchor": "a 5,278-physical-qubit qLDPC block encodes 1,480 logical qubits at distance ≤24 — a task that would need 161x more physical qubits in a surface code.",
+      "physicsChecks": [
+        "physical qubit count is held fixed (5,278) across the toggle",
+        "logical qubit count is dramatically higher only in qLDPC mode, and only where the wiring diagram shows long-range connections",
+        "the encoding-rate readout jumps from roughly 0.1-1% to about 28% when switching to qLDPC"
+      ]
+    },
+    {
+      "id": "atoms-that-move",
+      "conceptId": "reconfigurable-atom-connectivity",
+      "part": "The new technology",
+      "title": "Optical tweezers can physically move atoms, wiring any two qubits together on demand",
+      "teaches": "Neutral-atom hardware moves individual atoms with laser tweezers before triggering an entangling gate, physically realizing the nonlocal wiring the qLDPC code needs.",
+      "requires": [
+        "packing-more-logic-per-block"
+      ],
+      "caption": "The qLDPC block above needs qubits that aren't neighbors to talk; reconfigurable atom tweezers make that connection physically real.",
+      "visualMetaphor": "A 2D array of atoms held in tweezer traps. Pressing play slides two distant atoms across the array to meet, entangle (a Rydberg glow), and slide back — repeated for the long-range connections from the previous scene's wiring diagram. A grayed-out fixed-wire chip alongside cannot do the same move.",
+      "animatedVariable": {
+        "name": "gate step",
+        "control": "play-pause",
+        "range": "one cycle: move → entangle → return",
+        "whatChangesOnScreen": "two selected atoms physically translate across the trap array to complete a long-range connection, entangle, then return to their storage positions"
+      },
+      "quantitativeAnchor": "arrays trapping over 6,100 coherent atoms have been demonstrated, along with optical tweezer masks with 360,000 trap sites.",
+      "physicsChecks": [
+        "during play, only the two selected atoms move; every other atom in the array stays fixed",
+        "the grayed-out fixed-wire chip cannot perform the same long-range pairing",
+        "after the cycle, the moved atoms return to their original positions, ready for the next operation"
+      ]
+    },
+    {
+      "id": "surgery-without-opening-the-patient",
+      "conceptId": "code-surgery-ppms",
+      "part": "The new technology",
+      "title": "A temporary ancilla reads out one logical operation without disturbing the rest of the data",
+      "teaches": "Code surgery couples a small ancilla to just the physical qubits under one target logical operator, measures its stabilizers for about \\(2d/3\\) cycles, and reads out the answer.",
+      "requires": [
+        "atoms-that-move"
+      ],
+      "caption": "Now that atoms can reach any qubit in the block, watch the actual move: an ancilla — a helper qubit attached just to take a measurement — touches one logical operator, the qubit pattern that encodes the answer.",
+      "visualMetaphor": "The 1,480-logical-qubit qLDPC block with one small ancilla patch highlighted, touching only the physical qubits under a single target logical operator. Step through cycles showing the ancilla's stabilizer measurements accumulate into one answer, then detach.",
+      "animatedVariable": {
+        "name": "surgery cycle",
+        "control": "slider",
+        "range": "cycle 1 to 2d/3 (e.g., 1 to 16)",
+        "whatChangesOnScreen": "the ancilla's measurement record fills in cycle by cycle until the logical operator's value is determined, while the rest of the memory block stays visually undisturbed"
+      },
+      "quantitativeAnchor": "measuring one logical operator takes about \\(2d/3\\) surgery cycles, and the ancilla only needs to match that operator's physical footprint, not the full 5,278-qubit block.",
+      "physicsChecks": [
+        "ancilla size stays small and fixed no matter how large the surrounding memory block is",
+        "only the physical qubits under the target operator ever connect to the ancilla",
+        "after 2d/3 cycles the readout stabilizes to a definite value instead of continuing to fluctuate"
+      ]
+    },
+    {
+      "id": "the-four-zone-chip",
+      "conceptId": "architecture-zones",
+      "part": "The new technology",
+      "title": "Splitting the chip into memory, processor, resource, and operation zones keeps the ancilla small",
+      "teaches": "A small subset of logical qubits is teleported from the large memory block into a small processor zone to meet a magic state manufactured in a resource zone, using ancillas in an operation zone.",
+      "requires": [
+        "surgery-without-opening-the-patient",
+        "the-expensive-gate"
+      ],
+      "caption": "Doing surgery on the whole 1,480-qubit memory block would be impractical, so only 10-148 qubits move at a time to meet a magic state.",
+      "visualMetaphor": "A floor plan with four labeled zones, each showing its physical-qubit count as a STATIC always-visible annotation (present in every slider position, not just mid-animation): Memory (~85% of the total), Processor (small), Resource (magic-state factory), Operation (ancillas, ~10–20% of the total ≈ 1,100–2,200 of ~11,000). The two moving pieces are explicitly labeled on the diagram AND in a legend: a red circle = one logical qubit, a gold diamond = one magic state. A slider steps through four phases (teleport in → magic state arrives → Toffoli gate → teleport out); the tokens move between zones but the four counts stay visible throughout. EVERY label carries a one-line plain gloss where it appears: code distance d — how many physical qubits deep the redundancy is; magic state — a pre-manufactured resource qubit that enables one Toffoli gate (the gate the surface code cannot do for free); ancilla — a temporary helper qubit; Toffoli gate — the expensive 3-input gate Shors algorithm is mostly made of; code surgery — coupling a small ancilla to just the qubits under one operator. Use code surgery (never lattice surgery); label the magic-state factorys internal steps plainly (prepare, purify) — no undefined jargon like cultivation or distillation. A one-line legend under the plan restates d, magic state, ancilla, and the two token shapes.",
+      "animatedVariable": {
+        "name": "cycle phase",
+        "control": "slider",
+        "range": "phase 1 (teleport in) → phase 2 (magic state arrives) → phase 3 (Toffoli) → phase 4 (teleport out)",
+        "whatChangesOnScreen": "The slider steps a labeled logical-qubit token and magic-state token through the four zones; the four zone qubit-counts are shown as STATIC always-visible labels the whole time, so at any slider position (including the maximum) every count — including Operation — is readable."
+      },
+      "quantitativeAnchor": "Operation-zone ancillas are ~10–20% of the ~11,000 total physical qubits (≈1,100–2,200), shown as a static count.",
+      "physicsChecks": [
+        "All four zone counts (Memory, Processor, Resource, Operation) are shown as static labels visible at every slider position, including the maximum; Operation reads a nonzero ~10–20% value in both screenshots.",
+        "Both moving tokens are labeled on the diagram and in a legend (red circle = logical qubit, gold diamond = magic state).",
+        "Every on-diagram term (d, magic state, ancilla, Toffoli, code surgery) has a plain-words gloss; no undefined term (cultivation, distillation, lattice surgery) appears."
+      ]
+    },
+    {
+      "id": "ten-thousand-vs-a-million",
+      "conceptId": "headline-resource-comparison",
+      "part": "Why it beats existing tech",
+      "title": "The same ECC-256 job that needed millions of qubits now needs about 10,000",
+      "teaches": "Head-to-head, the surface-code baseline (1-20 million qubits) versus this paper's qLDPC-plus-neutral-atom design (9,739-13,255 qubits) on the same two cryptographic targets.",
+      "requires": [
+        "the-four-zone-chip",
+        "surface-code-tax"
+      ],
+      "caption": "Put side by side on the same two keys and the same reliability target, the new architecture needs a roughly 100-1,000x smaller machine.",
+      "visualMetaphor": "A log-scale bar chart: 'surface code (prior estimates)' at 1-20 million versus 'qLDPC + neutral atoms (this paper)' at 9,739-13,255 (space-efficient), for ECC-256 and RSA-2048 side by side. Toggle between the two problems.",
+      "animatedVariable": {
+        "name": "target problem",
+        "control": "toggle",
+        "range": "ECC-256 / RSA-2048",
+        "whatChangesOnScreen": "bar heights update to the paper's specific numbers for each problem, but the log-scale gap between the surface-code bar and the qLDPC bar stays roughly two orders of magnitude either way"
+      },
+      "quantitativeAnchor": "ECC-256: about 1-6 million (surface code) versus 9,739-13,255 (this paper, space-efficient); RSA-2048: about 20 million (surface code) versus roughly 13,255 (this paper, space-efficient).",
+      "physicsChecks": [
+        "the qLDPC bar is at least ~100x shorter than the surface-code bar on the log scale, in both toggle states",
+        "switching problems changes bar heights but preserves the roughly two-order-of-magnitude ratio between the two architectures",
+        "RSA-2048's bars sit at or above ECC-256's bars in both architectures, since it's the harder problem"
+      ]
+    },
+    {
+      "id": "trading-qubits-for-speed",
+      "conceptId": "serial-vs-parallel-tradeoff",
+      "part": "Why it beats existing tech",
+      "title": "Running Toffoli gates one at a time is qubit-cheap but slow; running them in parallel costs more qubits but is fast",
+      "teaches": "A parallelism level \\(P\\) and a faster carry-lookahead adder trade physical qubits for runtime, per \\(\\tau_{Toff.} = \\frac{2d}{3\\beta_i}(4m_i+4\\beta_i+\\gamma_i)\\), bringing RSA-2048's runtime down from tens of thousands of days to about 100.",
+      "requires": [
+        "ten-thousand-vs-a-million"
+      ],
+      "caption": "The 13,255-qubit number above is the frugal option; spend roughly 10x more qubits and the same job finishes nearly 100x faster.",
+      "visualMetaphor": "Two connected axes: physical qubit count (10,000 to 100,000+) versus runtime in days (log scale). A slider for parallelism level \\(P\\) moves a point along the tradeoff curve, with two labeled reference points: 'space-efficient' and 'fully parallel.'",
+      "animatedVariable": {
+        "name": "parallelism level P",
+        "control": "slider",
+        "range": "1 to 1,160",
+        "whatChangesOnScreen": "the point moves along the qubit-count/runtime curve — runtime drops sharply while qubit count climbs — passing through the paper's two labeled reference configurations"
+      },
+      "quantitativeAnchor": "at full parallelism (P=1,160) with a carry-lookahead adder, RSA-2048 drops from ~1,000-43,000 days down to about 97-260 days, using roughly 19,000-102,000 qubits.",
+      "physicsChecks": [
+        "runtime strictly decreases as P increases, while qubit count strictly increases",
+        "at P=1, the point matches the space-efficient reference: ~13,000 qubits, tens of thousands of days",
+        "at P≈1,160, the point matches the parallel reference: roughly 19,000-102,000 qubits, ~100-260 days, and never exceeds those bounds"
+      ]
+    },
+    {
+      "id": "hardware-already-here",
+      "conceptId": "reconfigurable-atom-connectivity",
+      "part": "Why now",
+      "title": "The atom count this scheme needs is already within a few times of today's demonstrated arrays",
+      "teaches": "Reconfigurable neutral-atom arrays with 6,100+ coherent atoms and 360,000-site tweezer masks already exist, closing most of the gap to the 9,739-102,000 qubit requirement.",
+      "requires": [
+        "atoms-that-move",
+        "ten-thousand-vs-a-million"
+      ],
+      "caption": "The chip design from parts 2 and 3 needs 9,739 to 102,000 atoms. Current demonstrated arrays already reach 6,100+ atoms, more than half of the 9,739-atom low end.",
+      "visualMetaphor": "A progress bar with three markers: 'demonstrated today: 6,100 coherent atoms,' 'space-efficient target: 9,739-13,255,' and 'fully parallel target: up to ~102,000,' plus a note that tweezer masks with 360,000 trap sites already exist.",
+      "animatedVariable": {
+        "name": "milestone",
+        "control": "buttons",
+        "range": "demonstrated today / space-efficient target / parallel target",
+        "whatChangesOnScreen": "the progress-bar fill and the labeled gap-to-target number update between the three milestones"
+      },
+      "quantitativeAnchor": "demonstrated: over 6,100 coherent atoms in one array, tweezer masks with 360,000 trap sites; needed: 9,739-13,255 (space-efficient) to about 102,000 (fully parallel).",
+      "physicsChecks": [
+        "the 'demonstrated today' fill sits below the 'space-efficient target' mark, showing a remaining gap of roughly 2-4x, not 100-1000x",
+        "the 360,000-trap-site number is shown larger than every target in the range, since trap infrastructure isn't the bottleneck",
+        "switching to 'parallel target' widens the gap compared to 'space-efficient target,' consistent with it needing more qubits"
+      ]
+    },
+    {
+      "id": "what-this-means-today",
+      "conceptId": "headline-resource-comparison",
+      "part": "Why now",
+      "title": "Ten thousand reliable, reconfigurable qubits — not millions — stand between today's hardware and a 10-day break of ECC-256",
+      "teaches": "Closing the loop on the opening scene: with 9,739-13,255 physical qubits the paper estimates a 256-bit elliptic-curve key falls in about 10 days, and RSA-2048 in about 100-260 days.",
+      "requires": [
+        "hardware-already-here",
+        "trading-qubits-for-speed"
+      ],
+      "caption": "Every scene here fed one number: with 9,739-13,255 qubits, the ECC-256 key from the very first scene falls in about 10 days.",
+      "visualMetaphor": "Return to the opening lock diagram, now filled in with real numbers: '9,739-13,255 physical qubits, ~10 days' for ECC-256 and 'up to 102,000 qubits, ~97-260 days' for RSA-2048, next to the original 'classical: longer than the age of the universe' bar.",
+      "animatedVariable": {
+        "name": "target key",
+        "control": "toggle",
+        "range": "ECC-256 / RSA-2048",
+        "whatChangesOnScreen": "the displayed qubit count and runtime switch between the two final headline results, while the classical-attack bar from scene 1 stays fixed off the chart"
+      },
+      "quantitativeAnchor": "ECC-256 in about 10 days; RSA-2048 in about 97-260 days (parallel) or up to ~43,000 days (space-efficient) — using 9,739 to about 102,000 physical qubits, versus the 1-20 million qubits earlier estimates required.",
+      "physicsChecks": [
+        "the qubit-count and runtime numbers shown match exactly the ranges established in the two prior scenes, with no new unexplained numbers",
+        "ECC-256's runtime is shorter than RSA-2048's in every toggle state, consistent with it needing far fewer Toffoli gates",
+        "the classical-attack bar from the first scene remains unchanged — only the quantum-side numbers are being filled in"
+      ]
+    }
+  ]
+}

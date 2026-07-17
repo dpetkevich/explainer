@@ -1,0 +1,7 @@
+{
+  "source": "https://madrona-engine.github.io/shacklett_siggraph23.pdf",
+  "pedagogy": {
+    "version": "4.0.0",
+    "label": "One insight + one running example carried through connected scenes (story-discovery methodology)"
+  }
+}

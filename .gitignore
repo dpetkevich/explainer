@@ -1,8 +1,21 @@
 node_modules/
-explainers/
 *.env
 .env*
 .DS_Store
+
+# Explainer artifacts: ignore everything under explainers/ EXCEPT the files the
+# deployed app serves (the self-contained HTML + the JSON/MD chat reads). Keeps
+# source PDFs, scene HTML, and QA screenshots out of the repo.
+explainers/*
+!explainers/*/
+explainers/*/*
+!explainers/*/explainer.html
+!explainers/*/generation-meta.json
+!explainers/*/work/
+explainers/*/work/*
+!explainers/*/work/concept-map.json
+!explainers/*/work/storyboard.json
+!explainers/*/work/source.md
 
 # web app runtime data (SQLite, uploads)
 data/

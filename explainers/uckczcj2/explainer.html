@@ -1,0 +1,3834 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intelligence per Watt: Can Your Laptop Take Over from the Datacenter?</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Intelligence per Watt: Can Your Laptop Take Over from the Datacenter?</h1>
+  <p class="hook">Every question you type to an AI today gets shipped across the internet to a warehouse full of specialized chips, answered there, and shipped back — and each answer costs real, measurable joules. A new study asks a physicist's question: how much correct answering do you get per watt, and has the small machine on your desk become efficient enough to keep most of that work at home? The answer turns out to be yes for almost nine of every ten everyday questions, with total energy savings of 60–80% — even though the datacenter chip is still the better machine per query. To see why that isn't a contradiction, we have to begin at the beginning: what a watt is, what a joule buys, and what a computer physically does when a language model writes one word.</p>
+  <p class="page-links"><a href="https://arxiv.org/abs/2511.07885" target="_blank" rel="noopener noreferrer">Intelligence per Watt: Measuring Intelligence Efficiency of Local AI</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v1.0.0 · Feynman-first; 3-5 sentence captions</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks: what one answer physically costs</h2>
+  <div class="part-lede">Before any claims about AI efficiency can mean anything, we need the physics: power versus energy, what generating a word actually forces the silicon to do, and how you measure the joules. This part builds that toolkit and ends at the constraint the whole paper turns on — moving bytes, not doing arithmetic, is what an answer costs.</div>
+</header>
+<section class="scene" id="energy-is-power-times-time">
+  <h3>A watt is a rate; a joule is the bill</h3>
+  <div class="caption">Suppose your laptop draws 40 watts while it thinks about a question for 10 seconds. The watts are a rate — joules flowing per second — and the bill you actually pay is the energy: <math><mi>E</mi><mo>=</mo><mi>P</mi><mo>·</mo><mi>τ</mi></math>, here 40 W × 10 s = 400 J. Drag the duration out to 60 seconds and the power meter never moves, but the bill swells to 2,400 J. Keep this distinction in your pocket: a device can look frugal on a power meter and still be a glutton for energy if it is slow. Everything in this paper — every comparison between a laptop and a datacenter — comes down to which of these two numbers you are looking at.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="energy-is-power-times-time"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>A watt is a rate; a joule is the bill</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --fg:#1a1a1a;
+    --muted:#5c5c5c;
+    --grid:#d8d8d4;
+    --axis:#888880;
+    --rect-fill:#3b7dd8;
+    --rect-fill-a:0.28;
+    --rect-stroke:#2a5aa0;
+    --accent:#c0492b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#161616;
+      --panel:#1e1e1e;
+      --fg:#eaeaea;
+      --muted:#a3a3a3;
+      --grid:#3a3a3a;
+      --axis:#8a8a8a;
+      --rect-fill:#5b9bf0;
+      --rect-fill-a:0.32;
+      --rect-stroke:#8fc0ff;
+      --accent:#e08a5c;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:12px;
+    background:var(--bg); color:var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif;
+    font-size:14px;
+  }
+  .scene{
+    max-width:680px; margin:0 auto;
+    background:var(--panel);
+    border-radius:10px;
+    padding:14px 16px 16px;
+  }
+  h2{font-size:15px; margin:0 0 8px; font-weight:600;}
+  svg{width:100%; height:auto; max-width:100%; display:block;}
+  .controls{display:flex; flex-wrap:wrap; gap:14px; margin-top:10px;}
+  .ctrl{flex:1 1 260px; min-width:220px;}
+  .ctrl label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:4px;}
+  .ctrl input[type=range]{width:100%;}
+  .readouts{display:flex; flex-wrap:wrap; gap:10px 20px; margin-top:12px; font-size:13.5px;}
+  .readouts span.val{font-weight:600; color:var(--accent);}
+  .legend{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.4;}
+  math{font-size:15px;}
+  button.play{
+    margin-top:8px; padding:5px 12px; font-size:13px;
+    border-radius:6px; border:1px solid var(--axis);
+    background:var(--panel); color:var(--fg); cursor:pointer;
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>A watt is a rate; a joule is the bill</h2>
+
+  <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 260&quot; role=&quot;img&quot; aria-label=&quot;power rectangle and energy area&quot;>
+    <!-- axes drawn by JS -->
+  </svg>
+
+  <button class=&quot;play&quot; id=&quot;playBtn&quot; style=&quot;display:none;&quot;>▶ Animate to defaults</button>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;tau&quot;>Inference duration τ (s) — how long the device runs</label>
+      <input type=&quot;range&quot; id=&quot;tau&quot; min=&quot;1&quot; max=&quot;60&quot; step=&quot;1&quot; value=&quot;10&quot;>
+    </div>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;pow&quot;>Power draw P (W) — the rate energy is used</label>
+      <input type=&quot;range&quot; id=&quot;pow&quot; min=&quot;5&quot; max=&quot;400&quot; step=&quot;5&quot; value=&quot;40&quot;>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Power (watt meter): <span class=&quot;val&quot; id=&quot;pRead&quot;>40</span> W</div>
+    <div>Duration: <span class=&quot;val&quot; id=&quot;tRead&quot;>10</span> s</div>
+    <div>Energy bill: <span class=&quot;val&quot; id=&quot;eRead&quot;>400</span> J</div>
+  </div>
+
+  <math display=&quot;block&quot;>
+    <mi>E</mi><mo>=</mo><mi>P</mi><mo>&amp;middot;</mo><mi>τ</mi>
+  </math>
+  <div class=&quot;legend&quot;>
+    E — energy consumed (joules, J) &amp;middot; P — power draw, the rate of energy use (watts, W) &amp;middot; τ — duration the device runs (seconds, s)
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('svg');
+  const tauSlider = document.getElementById('tau');
+  const powSlider = document.getElementById('pow');
+  const pRead = document.getElementById('pRead');
+  const tRead = document.getElementById('tRead');
+  const eRead = document.getElementById('eRead');
+  const playBtn = document.getElementById('playBtn');
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // plot geometry
+  const X0 = 70, X1 = 610;   // time axis pixel bounds (0..60 s)
+  const Y0 = 210, Y1 = 30;   // power axis pixel bounds (0 W at Y0, 400 W at Y1)
+  const T_MAX = 60, P_MAX = 400;
+
+  function css(varName){
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function xOf(t){ return X0 + (t / T_MAX) * (X1 - X0); }
+  function yOf(p){ return Y0 - (p / P_MAX) * (Y0 - Y1); }
+
+  // static axes group, built once
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const gridG = el('g', {});
+  const axisG = el('g', {});
+  const rectEl = el('rect', {fill:'var(--rect-fill)', 'fill-opacity':'var(--rect-fill-a)', stroke:'var(--rect-stroke)', 'stroke-width':'1.5'});
+  const energyLabel = el('text', {'font-size':'13', fill:'var(--fg)', 'text-anchor':'middle'});
+  const eqLabel = el('text', {'font-size':'20', fill:'var(--accent)', 'font-weight':'700', 'text-anchor':'end'});
+
+  svg.appendChild(gridG);
+  svg.appendChild(axisG);
+  svg.appendChild(rectEl);
+  svg.appendChild(energyLabel);
+  svg.appendChild(eqLabel);
+
+  function buildAxes(){
+    gridG.innerHTML = '';
+    axisG.innerHTML = '';
+
+    // horizontal gridlines / power ticks
+    const pTicks = [0,100,200,300,400];
+    pTicks.forEach(p=>{
+      const y = yOf(p);
+      gridG.appendChild(el('line', {x1:X0, x2:X1, y1:y, y2:y, stroke:'var(--grid)', 'stroke-width':1}));
+      const t = el('text', {x:X0-8, y:y+4, 'font-size':11, fill:'var(--axis)', 'text-anchor':'end'});
+      t.textContent = p;
+      axisG.appendChild(t);
+    });
+    // vertical gridlines / time ticks
+    const tTicks = [0,15,30,45,60];
+    tTicks.forEach(tt=>{
+      const x = xOf(tt);
+      gridG.appendChild(el('line', {x1:x, x2:x, y1:Y0, y2:Y1, stroke:'var(--grid)', 'stroke-width':1}));
+      const t = el('text', {x:x, y:Y0+18, 'font-size':11, fill:'var(--axis)', 'text-anchor':'middle'});
+      t.textContent = tt;
+      axisG.appendChild(t);
+    });
+
+    // axis lines
+    axisG.appendChild(el('line', {x1:X0, x2:X1, y1:Y0, y2:Y0, stroke:'var(--axis)', 'stroke-width':1.5}));
+    axisG.appendChild(el('line', {x1:X0, x2:X0, y1:Y0, y2:Y1, stroke:'var(--axis)', 'stroke-width':1.5}));
+
+    // axis labels
+    const xlab = el('text', {x:(X0+X1)/2, y:Y0+38, 'font-size':12.5, fill:'var(--muted)', 'text-anchor':'middle'});
+    xlab.textContent = 'time (s)';
+    axisG.appendChild(xlab);
+
+    const ylab = el('text', {x:18, y:(Y0+Y1)/2, 'font-size':12.5, fill:'var(--muted)', 'text-anchor':'middle',
+                              transform:`rotate(-90, 18, ${(Y0+Y1)/2})`});
+    ylab.textContent = 'power (W)';
+    axisG.appendChild(ylab);
+  }
+
+  buildAxes();
+
+  // current animated state (for smooth transition)
+  let curP = 40, curT = 10;
+  let targetP = 40, targetT = 10;
+  let animId = null;
+
+  function render(p, t){
+    const x = xOf(0);
+    const y = yOf(p);
+    const w = xOf(t) - xOf(0);
+    const h = Y0 - y;
+    rectEl.setAttribute('x', x);
+    rectEl.setAttribute('y', y);
+    rectEl.setAttribute('width', Math.max(w,0));
+    rectEl.setAttribute('height', Math.max(h,0));
+
+    // energy label centered in rectangle if room, else above
+    const cx = x + w/2;
+    const cy = (w > 60 &amp;&amp; h > 24) ? y + h/2 + 4 : Math.max(y - 8, Y1 + 12);
+    energyLabel.setAttribute('x', cx);
+    energyLabel.setAttribute('y', cy);
+    energyLabel.textContent = 'energy = shaded area';
+
+    const E = p * t;
+    eqLabel.setAttribute('x', X1);
+    eqLabel.setAttribute('y', Y1 - 6);
+    eqLabel.textContent = 'E = ' + Math.round(E) + ' J';
+
+    pRead.textContent = Math.round(p);
+    tRead.textContent = Math.round(t);
+    eRead.textContent = Math.round(E);
+  }
+
+  function step(){
+    const speed = 0.22;
+    curP += (targetP - curP) * speed;
+    curT += (targetT - curT) * speed;
+    if (Math.abs(curP-targetP) < 0.3 &amp;&amp; Math.abs(curT-targetT) < 0.05){
+      curP = targetP; curT = targetT;
+      render(curP, curT);
+      animId = null;
+      return;
+    }
+    render(curP, curT);
+    animId = requestAnimationFrame(step);
+  }
+
+  function setTargets(p, t){
+    targetP = p; targetT = t;
+    if (reduceMotion){
+      curP = p; curT = t;
+      render(curP, curT);
+    } else if (!animId){
+      animId = requestAnimationFrame(step);
+    }
+  }
+
+  tauSlider.addEventListener('input', ()=>{
+    setTargets(parseFloat(powSlider.value), parseFloat(tauSlider.value));
+  });
+  powSlider.addEventListener('input', ()=>{
+    setTargets(parseFloat(powSlider.value), parseFloat(tauSlider.value));
+  });
+
+  if (reduceMotion){
+    playBtn.style.display = 'inline-block';
+    playBtn.addEventListener('click', ()=>{
+      powSlider.value = 40; tauSlider.value = 10;
+      setTargets(40, 10);
+    });
+  }
+
+  // initial draw
+  render(curP, curT);
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;energy-is-power-times-time&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+
+  window.__sceneReady = true;
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A watt is a rate; a joule is the bill"
+  ></iframe>
+</section>
+
+<section class="scene" id="one-token-one-full-pass">
+  <h3>Every word an AI writes drags the entire model through memory</h3>
+  <div class="caption">A language model is just a function with <math><mi>N</mi></math> adjustable numbers called weights — an '8B' model has 8×10⁹ of them, stored as 2 bytes each, 16 GB in all. Here is the physical fact everything else rests on: to produce one output word (one 'token', the model's unit of text), the chip must read essentially all <math><mi>N</mi></math> weights out of memory and do about <math><mn>2</mn><mi>N</mi></math> multiply-adds with them. Watch the sweep: each token you generate drags the full 16 GB through the silicon, and a 300-token answer drags roughly 4.8 TB. Slide the model down to 1B and each token costs only 2 GB of traffic — the cost per word is simply proportional to <math><mi>N</mi></math>. An answer is not an abstraction; it is a definite, countable amount of memory traffic.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="one-token-one-full-pass"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>One Token, One Full Pass</title>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --panel:#ffffff;
+  --ink:#1a1a22;
+  --muted:#5a5a68;
+  --accent:#2f6fed;
+  --accent2:#e2472f;
+  --bar:#3a4a6b;
+  --bar-hi:#ffd166;
+  --grid:#d8d8e0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121218;
+    --panel:#1b1b24;
+    --ink:#eceef2;
+    --muted:#9a9aad;
+    --accent:#6f9bff;
+    --accent2:#ff7a63;
+    --bar:#5b7bb8;
+    --bar-hi:#ffe08a;
+    --grid:#33334a;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font:14px/1.4 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+#wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h2{font-size:15px;margin:4px 0 10px;font-weight:600;color:var(--ink);}
+.panel{background:var(--panel);border-radius:10px;padding:10px 12px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+canvas{width:100%;max-width:100%;display:block;background:var(--panel);border-radius:8px;}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:10px 0;}
+.ctrl{display:flex;flex-direction:column;gap:4px;flex:1 1 220px;min-width:180px;}
+.ctrl label{font-size:12.5px;color:var(--muted);}
+input[type=range]{width:100%;}
+button{padding:7px 14px;font-size:13.5px;border-radius:7px;border:1px solid var(--grid);
+  background:var(--accent);color:#fff;cursor:pointer;}
+button:active{opacity:0.85;}
+.readouts{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 4px;}
+.ro{background:var(--bg);border:1px solid var(--grid);border-radius:8px;padding:6px 10px;min-width:120px;}
+.ro .k{font-size:11px;color:var(--muted);}
+.ro .v{font-size:16px;font-weight:600;}
+.eqs{margin-top:14px;}
+.legend{font-size:11.5px;color:var(--muted);margin:2px 0 12px;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div id=&quot;wrap&quot;>
+  <h2>Every token drags the whole model through memory</h2>
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;680&quot; height=&quot;300&quot;></canvas>
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;nslide&quot; id=&quot;nlabel&quot;>Model size N = 8 billion parameters</label>
+        <input type=&quot;range&quot; id=&quot;nslide&quot; min=&quot;1&quot; max=&quot;120&quot; value=&quot;8&quot; step=&quot;1&quot;>
+      </div>
+      <button id=&quot;genBtn&quot;>Generate next token</button>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>weights stored (FP16)</div><div class=&quot;v&quot; id=&quot;roSize&quot;>—</div></div>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>bytes read this token</div><div class=&quot;v&quot; id=&quot;roPer&quot;>—</div></div>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>tokens generated · total moved</div><div class=&quot;v&quot; id=&quot;roOdo&quot;>0 · 0 GB</div></div>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>projected for 300-token answer</div><div class=&quot;v&quot; id=&quot;roProj&quot;>—</div></div>
+    </div>
+  </div>
+
+  <div class=&quot;eqs&quot;>
+    <math display=&quot;block&quot;>
+      <mi>B</mi><mo>=</mo><mi>N</mi><mo>·</mo><msub><mi>b</mi><mtext>weight</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>B — bytes read to produce one token · N — number of model parameters (weights) · b<sub>weight</sub> — bytes stored per weight (2, for FP16 precision)</div>
+
+    <math display=&quot;block&quot;>
+      <msub><mi>B</mi><mtext>total</mtext></msub><mo>=</mo><mi>B</mi><mo>·</mo><mi>T</mi>
+    </math>
+    <div class=&quot;legend&quot;>B<sub>total</sub> — total memory traffic for a full answer (bytes) · B — bytes per token (from above) · T — number of tokens in the answer (300 shown as a typical short answer)</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const nslide = document.getElementById('nslide');
+  const nlabel = document.getElementById('nlabel');
+  const genBtn = document.getElementById('genBtn');
+  const roSize = document.getElementById('roSize');
+  const roPer = document.getElementById('roPer');
+  const roOdo = document.getElementById('roOdo');
+  const roProj = document.getElementById('roProj');
+
+  const BYTES_PER_WEIGHT = 2; // FP16
+  const ANSWER_TOKENS = 300;
+
+  let tokensGenerated = 0;
+  let totalBytesMoved = 0; // in GB
+  let sweep = null; // {start, duration}
+  let tokenMarks = []; // recent tokens for the strip
+
+  function css(varName){
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function getN(){ return parseFloat(nslide.value); } // in billions
+
+  function bytesPerTokenGB(nB){
+    // N params = nB * 1e9 ; bytes = N * 2 ; GB = bytes/1e9 = nB*2
+    return nB * BYTES_PER_WEIGHT;
+  }
+
+  function fmtGB(gb){
+    if (gb >= 1000) return (gb/1000).toFixed(2) + ' TB';
+    return gb.toFixed(1) + ' GB';
+  }
+
+  function updateReadouts(){
+    const nB = getN();
+    const perTok = bytesPerTokenGB(nB);
+    const total300 = perTok * ANSWER_TOKENS;
+    nlabel.textContent = 'Model size N = ' + Math.round(nB) + ' billion parameters';
+    roSize.textContent = fmtGB(perTok/2*2); // weights size == per-token bytes since full read
+    roSize.textContent = fmtGB(nB * BYTES_PER_WEIGHT);
+    roPer.textContent = fmtGB(perTok);
+    roOdo.textContent = tokensGenerated + ' · ' + fmtGB(totalBytesMoved);
+    roProj.textContent = fmtGB(total300);
+  }
+
+  function resize(){
+    const w = Math.min(680, cv.parentElement.clientWidth);
+    cv.width = w;
+    cv.height = w < 420 ? 340 : 300;
+  }
+
+  function draw(now){
+    resize();
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+
+    const ink = css('--ink'), muted = css('--muted'), bar = css('--bar'),
+          barHi = css('--bar-hi'), grid = css('--grid'), accent = css('--accent'),
+          panel = css('--panel');
+
+    // layout
+    const barX = 40, barW = 70;
+    const barTop = 40, maxBarH = H - 100;
+    const nB = getN();
+    const gb = nB * BYTES_PER_WEIGHT;
+    const maxGB = 120 * BYTES_PER_WEIGHT; // 240 GB at slider max
+    const barH = Math.max(6, maxBarH * (gb / maxGB));
+    const barBottom = barTop + maxBarH;
+    const barYtop = barBottom - barH;
+
+    // full-height faint outline (max scale reference)
+    ctx.strokeStyle = grid;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barTop, barW, maxBarH);
+
+    // filled memory bar
+    ctx.fillStyle = bar;
+    ctx.fillRect(barX, barYtop, barW, barH);
+
+    // sweep highlight
+    if (sweep){
+      const t = reduceMotion ? 1 : Math.min(1, (now - sweep.start) / sweep.duration);
+      const sweepY = barYtop + t * barH;
+      const bandH = Math.max(4, barH * 0.06);
+      ctx.fillStyle = barHi;
+      ctx.fillRect(barX-2, sweepY - bandH/2, barW+4, bandH);
+      if (t >= 1) sweep = null;
+    }
+
+    // labels
+    ctx.fillStyle = ink;
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(fmtGB(gb), barX + barW/2, barTop - 12);
+    ctx.fillStyle = muted;
+    ctx.font = '11px sans-serif';
+    ctx.fillText('weights in memory', barX + barW/2, barBottom + 18);
+
+    // token strip on the right
+    const stripX = barX + barW + 40;
+    const stripW = W - stripX - 20;
+    ctx.fillStyle = muted;
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('tokens generated (each = one full pass)', stripX, barTop - 12);
+
+    const cell = 16, gap = 4;
+    const perRow = Math.max(1, Math.floor((stripW+gap) / (cell+gap)));
+    const maxShow = perRow * Math.floor((maxBarH-10) / (cell+gap));
+    const shown = tokenMarks.slice(-maxShow);
+    let overflow = tokenMarks.length - shown.length;
+
+    shown.forEach((t, i) => {
+      const col = i % perRow, row = Math.floor(i / perRow);
+      const x = stripX + col*(cell+gap);
+      const y = barTop + row*(cell+gap);
+      ctx.fillStyle = t.hot > 0 ? accent : bar;
+      ctx.fillRect(x, y, cell, cell);
+      if (t.hot > 0) t.hot -= 1;
+    });
+
+    if (overflow > 0){
+      ctx.fillStyle = muted;
+      ctx.font = '11px sans-serif';
+      ctx.fillText('+' + overflow + ' earlier tokens not shown', stripX, barBottom + 18);
+    }
+
+    updateReadouts();
+    requestAnimationFrame(draw);
+  }
+
+  genBtn.addEventListener('click', () => {
+    const nB = getN();
+    const perTok = bytesPerTokenGB(nB);
+    totalBytesMoved += perTok;
+    tokensGenerated += 1;
+    tokenMarks.push({hot: 3});
+    sweep = { start: performance.now(), duration: reduceMotion ? 1 : 550 };
+  });
+
+  nslide.addEventListener('input', () => { /* readouts update on next frame */ });
+
+  window.addEventListener('resize', resize);
+
+  resize();
+  requestAnimationFrame((t)=>{ draw(t); window.__sceneReady = true; });
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;one-token-one-full-pass&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Every word an AI writes drags the entire model through memory"
+  ></iframe>
+</section>
+
+<section class="scene" id="bandwidth-sets-the-pace">
+  <h3>Memory bandwidth, not arithmetic, sets the speed of an answer</h3>
+  <div class="caption">You might guess an AI chip is limited by how fast it can multiply. It isn't — not for a single query. Since each token needs a full 16 GB pass over an 8B model's weights, the pace is set by the pipe between memory and the arithmetic units: token rate ≈ bandwidth ÷ bytes per token. Widen the pipe from a phone's 60 GB/s to a laptop's 546 GB/s to a datacenter chip's 8 TB/s and watch the words-per-second climb from about 4 to 34 to 500 — while the multiplier units sit mostly dark, waiting for data. This is why an Apple M4 Max is 12–15× slower per query than an H100-class machine despite drawing far less power: it is not short on arithmetic, it is short on bandwidth.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="bandwidth-sets-the-pace"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Bandwidth sets the pace</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --fg:#1a1a1a;
+    --muted:#6b6b6b;
+    --accent:#2f6feb;
+    --pipe:#c9d6ee;
+    --particle:#2f6feb;
+    --grid-dark:#dfe3ea;
+    --grid-lit:#e0763a;
+    --border:#d0d0cc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16181c;
+      --panel:#1e2126;
+      --fg:#eaeaea;
+      --muted:#9aa0a8;
+      --accent:#6ea1ff;
+      --pipe:#2a3550;
+      --particle:#6ea1ff;
+      --grid-dark:#2b2f36;
+      --grid-lit:#e08a52;
+      --border:#3a3e46;
+    }
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;box-sizing:border-box;}
+  h2{font-size:16px;margin:4px 0 10px;font-weight:600;}
+  canvas{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:12px 0 6px;}
+  .ctrl{display:flex;flex-direction:column;gap:4px;min-width:180px;flex:1 1 220px;}
+  label{font-size:12.5px;color:var(--muted);}
+  input[type=range]{width:100%;}
+  select{font-size:13px;padding:3px 4px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px 20px;margin:10px 0 4px;}
+  .ro{background:var(--panel);border:1px solid var(--border);border-radius:6px;
+      padding:6px 10px;min-width:120px;flex:1 1 140px;}
+  .ro .k{font-size:11px;color:var(--muted);display:block;}
+  .ro .v{font-size:16px;font-weight:600;}
+  math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 10px;line-height:1.5;}
+  button.play{font-size:13px;padding:4px 10px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Memory bandwidth vs. token rate</h2>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;230&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;bw&quot;>Memory bandwidth (GB/s) — how wide the data pipe is</label>
+      <input id=&quot;bw&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;1000&quot; step=&quot;1&quot; value=&quot;500&quot;>
+    </div>
+    <div class=&quot;ctrl&quot; style=&quot;max-width:200px;&quot;>
+      <label for=&quot;preset&quot;>Jump to a device</label>
+      <select id=&quot;preset&quot;>
+        <option value=&quot;60&quot;>Phone (~60 GB/s)</option>
+        <option value=&quot;546&quot;>Laptop, M4 Max (546 GB/s)</option>
+        <option value=&quot;8000&quot;>Datacenter GPU (~8 TB/s)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><span class=&quot;k&quot;>bandwidth B</span><span class=&quot;v&quot; id=&quot;roBw&quot;>–</span></div>
+    <div class=&quot;ro&quot;><span class=&quot;k&quot;>token rate R</span><span class=&quot;v&quot; id=&quot;roTok&quot;>–</span></div>
+    <div class=&quot;ro&quot;><span class=&quot;k&quot;>time per token</span><span class=&quot;v&quot; id=&quot;roTime&quot;>–</span></div>
+    <div class=&quot;ro&quot;><span class=&quot;k&quot;>arithmetic units busy</span><span class=&quot;v&quot; id=&quot;roUtil&quot;>–</span></div>
+  </div>
+
+  <math display=&quot;block&quot;>
+    <mi>R</mi><mo>=</mo><mfrac><mi>B</mi><msub><mi>W</mi><mtext>token</mtext></msub></mfrac>
+  </math>
+  <div class=&quot;legend&quot;>
+    R — token rate (tokens/s) &amp;nbsp;·&amp;nbsp; B — memory bandwidth (bytes/s) &amp;nbsp;·&amp;nbsp;
+    W<sub></sub> (W subscript token) — bytes that must stream through the pipe per token,
+    fixed at 16 GB for this 8-billion-parameter model stored in 16-bit precision.
+  </div>
+  <div id=&quot;playHolder&quot;></div>
+</div>
+
+<script>
+(function(){
+  // ---- physical constants (auditable) ----
+  const PARAMS = 8e9;              // parameters in the model (8B)
+  const BYTES_PER_PARAM = 2;       // bytes per weight at 16-bit precision
+  const MODEL_BYTES = PARAMS * BYTES_PER_PARAM;      // 16e9 bytes = 16 GB, moved per token
+  const FLOPS_PER_TOKEN = 2 * PARAMS;                // ~2 FLOPs per weight, one forward pass
+  const PEAK_FLOPS = 3e14;         // 300 TFLOP/s, representative chip arithmetic peak (fixed)
+  const MIN_BW = 60;               // GB/s, phone
+  const MAX_BW = 8000;             // GB/s, datacenter GPU
+
+  const bwSlider = document.getElementById('bw');
+  const preset = document.getElementById('preset');
+  const roBw = document.getElementById('roBw');
+  const roTok = document.getElementById('roTok');
+  const roTime = document.getElementById('roTime');
+  const roUtil = document.getElementById('roUtil');
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  function sliderToBw(s){ return MIN_BW * Math.pow(MAX_BW/MIN_BW, s/1000); }
+  function bwToSlider(bw){ return 1000 * Math.log(bw/MIN_BW) / Math.log(MAX_BW/MIN_BW); }
+
+  let state = { bandwidth: sliderToBw(+bwSlider.value) };
+
+  function computePhysics(){
+    const bytesPerSec = state.bandwidth * 1e9;
+    const memTime = MODEL_BYTES / bytesPerSec;       // s per token, moving weights
+    const computeTime = FLOPS_PER_TOKEN / PEAK_FLOPS; // s per token, doing the multiplies
+    const totalTime = memTime + computeTime;
+    const tokensPerSec = 1/totalTime;
+    const utilPct = computeTime/totalTime*100;
+    return { memTime, computeTime, totalTime, tokensPerSec, utilPct };
+  }
+
+  function fmtBw(bw){
+    return bw >= 1000 ? (bw/1000).toFixed(2)+' TB/s' : Math.round(bw)+' GB/s';
+  }
+
+  function updateReadouts(p){
+    roBw.textContent = fmtBw(state.bandwidth);
+    roTok.textContent = p.tokensPerSec.toFixed(1)+' tok/s';
+    roTime.textContent = (p.memTime*1000).toFixed(2)+' ms';
+    roUtil.textContent = p.utilPct.toFixed(2)+'%';
+  }
+
+  // ---- particles streaming through the pipe ----
+  const NP = 26;
+  let particles = [];
+  for(let i=0;i<NP;i++) particles.push(Math.random());
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let paused = reduceMotion;
+  if(reduceMotion){
+    const btn = document.createElement('button');
+    btn.className='play'; btn.textContent='Play';
+    btn.onclick=()=>{ paused=!paused; btn.textContent = paused?'Play':'Pause'; };
+    document.getElementById('playHolder').appendChild(btn);
+  }
+
+  function draw(p){
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    const fg = css('--fg'), muted = css('--muted'), pipeCol = css('--pipe'),
+          particleCol = css('--particle'), gridDark = css('--grid-dark'),
+          gridLit = css('--grid-lit'), panel = css('--panel'), border=css('--border');
+
+    // layout
+    const memX=20, memY=60, memW=110, memH=90;
+    const gridX=W-190, gridY=40, gridW=150, gridH=130;
+    const pipeX0 = memX+memW, pipeX1 = gridX;
+    const pipeCY = memY+memH/2;
+
+    // pipe width scales with bandwidth (log-normalized 6..38 px)
+    const frac = Math.log(state.bandwidth/MIN_BW)/Math.log(MAX_BW/MIN_BW);
+    const pipeHalf = 4 + frac*17;
+
+    // memory block
+    ctx.fillStyle = panel; ctx.strokeStyle=border; ctx.lineWidth=1.5;
+    ctx.fillRect(memX,memY,memW,memH); ctx.strokeRect(memX,memY,memW,memH);
+    ctx.fillStyle=fg; ctx.font='12px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('memory', memX+memW/2, memY+18);
+    ctx.fillStyle=muted; ctx.font='11px sans-serif';
+    ctx.fillText('8B params', memX+memW/2, memY+38);
+    ctx.fillText('16 GB weights', memX+memW/2, memY+53);
+    ctx.fillText('(fixed)', memX+memW/2, memY+68);
+
+    // pipe
+    ctx.fillStyle = pipeCol;
+    ctx.fillRect(pipeX0, pipeCY-pipeHalf, pipeX1-pipeX0, pipeHalf*2);
+    ctx.strokeStyle=border; ctx.strokeRect(pipeX0, pipeCY-pipeHalf, pipeX1-pipeX0, pipeHalf*2);
+    ctx.fillStyle=muted; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('pipe width = bandwidth', (pipeX0+pipeX1)/2, pipeCY-pipeHalf-10);
+
+    // particles
+    ctx.fillStyle=particleCol;
+    for(const t of particles){
+      const x = pipeX0 + t*(pipeX1-pipeX0);
+      const y = pipeCY + (Math.sin(t*17.0)*0.6)*(pipeHalf-2);
+      ctx.beginPath(); ctx.arc(x,y, 3,0,Math.PI*2); ctx.fill();
+    }
+
+    // arithmetic grid
+    const cols=8, rows=4, gap=4;
+    const cw=(gridW-(cols-1)*gap)/cols, ch=(gridH-(rows-1)*gap)/rows;
+    const total = cols*rows;
+    const lit = Math.max(0, Math.round(p.utilPct/100*total));
+    let idx=0;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        ctx.fillStyle = idx<lit ? gridLit : gridDark;
+        ctx.fillRect(gridX+c*(cw+gap), gridY+r*(ch+gap), cw, ch);
+        idx++;
+      }
+    }
+    ctx.strokeStyle=border; ctx.strokeRect(gridX-2,gridY-2,gridW+4,gridH+4);
+    ctx.fillStyle=fg; ctx.font='12px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('arithmetic units', gridX+gridW/2, gridY-10);
+    ctx.fillStyle=muted; ctx.font='11px sans-serif';
+    ctx.fillText('busy: '+p.utilPct.toFixed(1)+'%  (mostly idle)', gridX+gridW/2, gridY+gridH+16);
+
+    ctx.textAlign='left';
+  }
+
+  function step(){
+    const p = computePhysics();
+    updateReadouts(p);
+    if(!paused){
+      const speed = 0.0015 * Math.sqrt(state.bandwidth/MIN_BW);
+      particles = particles.map(t => (t+speed) % 1);
+    }
+    draw(p);
+    requestAnimationFrame(step);
+  }
+
+  bwSlider.addEventListener('input', ()=>{
+    state.bandwidth = sliderToBw(+bwSlider.value);
+  });
+  preset.addEventListener('change', ()=>{
+    const bw = +preset.value;
+    state.bandwidth = bw;
+    bwSlider.value = bwToSlider(bw);
+  });
+
+  requestAnimationFrame(()=>{
+    step();
+    window.__sceneReady = true;
+  });
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;bandwidth-sets-the-pace&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Memory bandwidth, not arithmetic, sets the speed of an answer"
+  ></iframe>
+</section>
+
+<section class="scene" id="measuring-joules-per-query">
+  <h3>Energy per query is measured by sampling power twenty times a second</h3>
+  <div class="caption">How do you actually weigh a query in joules? You ask the chip's own power sensor for a reading every 50 ms while the model runs, then add up the rectangles: <math><mi>E</mi><mo>=</mo><mi>int</mi><mi>P</mi><mo>(</mo><mi>t</mi><mo>)</mo><mspace width="0.167em"></mspace><mi>d</mi><mi>t</mi><mo>≈</mo><msub><mi>sum</mi><mi>i</mi></msub><msub><mi>P</mi><mi>i</mi></msub><mspace width="0.167em"></mspace><mi>Δ</mi><mi>t</mi></math>. Press play and watch the trace fill in — power spikes while the model reads the question, settles into a plateau while it writes, and the shaded area accumulates into the final bill. Each query is run 10 times and averaged, because thermal drift and background processes add noise. One honest caveat, and it matters for how literally to take what follows: software power counters carry 10–15% absolute error, so the paper's 2–7× comparisons are rock solid, but any difference under 10% is inside the noise.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="measuring-joules-per-query"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Measuring joules per query</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f5f6f8; --text:#141414; --muted:#5b6067;
+    --accent:#2563eb; --accent-fill:rgba(37,99,235,0.28);
+    --accent2:#c2410c; --grid:#d7dae0; --curve:#0f766e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111418; --panel:#1a1e24; --text:#eef0f3; --muted:#9aa2ad;
+      --accent:#5b8cff; --accent-fill:rgba(91,140,255,0.30);
+      --accent2:#f0965a; --grid:#333a44; --curve:#4fd1c5;
+    }
+  }
+  html,body{background:var(--bg); color:var(--text); margin:0; padding:0;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:14px;}
+  .wrap{max-width:680px; margin:0 auto;}
+  canvas{max-width:100%; height:auto; display:block; background:var(--panel); border-radius:8px;}
+  .controls{display:flex; flex-wrap:wrap; gap:10px; margin:10px 0; align-items:center;}
+  button{
+    background:var(--accent); color:#fff; border:none; border-radius:6px;
+    padding:8px 12px; font-size:13px; cursor:pointer; font-weight:600;
+  }
+  button.secondary{background:var(--panel); color:var(--text); border:1px solid var(--grid);}
+  .readouts{display:flex; flex-wrap:wrap; gap:8px 18px; margin:8px 0 4px 0;}
+  .ro{font-size:13px; min-width:130px;}
+  .ro .lab{color:var(--muted); display:block; font-size:11.5px;}
+  .ro .val{font-weight:600; font-variant-numeric:tabular-nums;}
+  .note{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .legend{font-size:12px; color:var(--muted); margin:2px 0 12px 0; line-height:1.5;}
+  math{font-size:16px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;300&quot; role=&quot;img&quot; aria-label=&quot;Power versus time trace with accumulating energy&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;playBtn&quot;>Play ▶ — animate the query from question start to answer end</button>
+    <button id=&quot;bandBtn&quot; class=&quot;secondary&quot;>Show ±10–15% telemetry uncertainty band</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><span class=&quot;lab&quot;>elapsed time t</span><span class=&quot;val&quot; id=&quot;roT&quot;>0.00 s</span> / 15.00 s</div>
+    <div class=&quot;ro&quot;><span class=&quot;lab&quot;>power now P(t)</span><span class=&quot;val&quot; id=&quot;roP&quot;>0 W</span></div>
+    <div class=&quot;ro&quot;><span class=&quot;lab&quot;>energy so far E</span><span class=&quot;val&quot; id=&quot;roE&quot;>0.0 J</span></div>
+    <div class=&quot;ro&quot;><span class=&quot;lab&quot;>uncertainty band</span><span class=&quot;val&quot; id=&quot;roB&quot;>off</span></div>
+  </div>
+  <div class=&quot;note&quot;>Sampling interval Δt = 50 ms. Each query is run 10 times and averaged before this trace is drawn.</div>
+
+  <math display=&quot;block&quot;>
+    <mi>E</mi><mo>≈</mo>
+    <munderover><mo>&amp;#8721;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+    <msub><mi>P</mi><mi>i</mi></msub><mo>&amp;middot;</mo><mi>&amp;Delta;t</mi>
+  </math>
+  <div class=&quot;legend&quot;>
+    E — energy for one query (J) &amp;middot; P<sub></sub> i — power sampled during interval i (W) &amp;middot;
+    &amp;Delta;t — sampling interval, 50 ms (0.05 s) &amp;middot; N — number of samples across the query's duration (~15 s)
+  </div>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const cs = getComputedStyle(document.documentElement);
+  const col = name => cs.getPropertyValue(name).trim();
+
+  // ---- physics: power model over one query, in watts, vs time in seconds ----
+  const DT = 0.05;          // s, telemetry sampling interval
+  const T_TOTAL = 15.0;     // s, full query duration
+  const N = Math.round(T_TOTAL / DT); // number of samples
+
+  function power(t){
+    const base = 90; // idle/background chip power, W
+    // spike while the model reads the question
+    const read = 260 * Math.exp(-Math.pow((t - 1.2) / 0.45, 2));
+    // plateau while the model writes the answer
+    let gen = 0;
+    if (t > 1.6){
+      const tt = t - 1.6;
+      gen = 205 + 22*Math.sin(tt*2.2) + 10*Math.sin(tt*5.3 + 1);
+      const tail = Math.max(0, 1 - Math.max(0, t - 12.5) / 2.5);
+      gen *= tail;
+    }
+    return base + read + gen;
+  }
+
+  // precompute midpoint power + cumulative energy (Riemann sum, physics check #1/#2)
+  const Pmid = new Array(N);
+  const cumE = new Array(N+1); cumE[0] = 0;
+  for (let i=0;i<N;i++){
+    const tMid = i*DT + DT/2;
+    Pmid[i] = power(tMid);
+    cumE[i+1] = cumE[i] + Pmid[i]*DT;
+  }
+  const FINAL_E = cumE[N];
+  const UNC = 0.15; // worst case of paper's stated 10-15% absolute uncertainty
+  const eLow = FINAL_E*(1-UNC), eHigh = FINAL_E*(1+UNC);
+
+  let Pmax = 0; for (let i=0;i<N;i++) Pmax = Math.max(Pmax, Pmid[i]);
+  const yMax = Math.ceil((Pmax*1.12)/50)*50;
+
+  // ---- layout ----
+  const W = 640, H = 300;
+  const mL = 58, mR = 20, mT = 26, mB = 40;
+  const plotW = W - mL - mR, plotH = H - mT - mB;
+  const xOf = t => mL + (t/T_TOTAL)*plotW;
+  const yOf = p => mT + plotH - (p/yMax)*plotH;
+
+  let index = 0;       // fractional sample index, 0..N
+  let playing = false;
+  let showBand = false;
+  let lastTs = null;
+  const ANIM_SECONDS = 8; // wall-clock seconds to play full 15s trace
+
+  const playBtn = document.getElementById('playBtn');
+  const bandBtn = document.getElementById('bandBtn');
+  const roT = document.getElementById('roT');
+  const roP = document.getElementById('roP');
+  const roE = document.getElementById('roE');
+  const roB = document.getElementById('roB');
+
+  function energyAt(idxFloat){
+    const iFloor = Math.floor(idxFloat);
+    const frac = idxFloat - iFloor;
+    let e = cumE[Math.min(iFloor, N)];
+    if (iFloor < N) e += Pmid[iFloor]*DT*frac;
+    return e;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // grid + axes
+    ctx.strokeStyle = col('--grid'); ctx.fillStyle = col('--text');
+    ctx.lineWidth = 1; ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline='middle';
+    for (let p=0; p<=yMax; p+=100){
+      const y = yOf(p);
+      ctx.beginPath(); ctx.moveTo(mL,y); ctx.lineTo(W-mR,y); ctx.stroke();
+      ctx.fillText(String(p), mL-8, y);
+    }
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    for (let t=0;t<=T_TOTAL;t+=2.5){
+      const x = xOf(t);
+      ctx.fillText(t.toFixed(1), x, H-mB+6);
+    }
+    ctx.textAlign='left'; ctx.fillText('power P (W)', mL, 8);
+    ctx.textAlign='right'; ctx.fillText('time t (s)', W-mR, H-16);
+
+    // phase labels
+    ctx.fillStyle = col('--muted'); ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('reading question (power spike)', xOf(1.3), mT+10);
+    ctx.fillText('writing answer (plateau)', xOf(8), mT+10);
+
+    // full reference curve (thin)
+    ctx.beginPath();
+    for (let i=0;i<N;i++){
+      const t = i*DT+DT/2;
+      const x = xOf(t), y = yOf(Pmid[i]);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = col('--curve'); ctx.lineWidth = 1.4; ctx.stroke();
+
+    // filled rectangles up to current index
+    const iFull = Math.min(Math.floor(index), N);
+    ctx.fillStyle = col('--accent-fill');
+    for (let i=0;i<iFull;i++){
+      const x0 = xOf(i*DT), x1 = xOf((i+1)*DT);
+      const y = yOf(Pmid[i]);
+      ctx.fillRect(x0, y, x1-x0, yOf(0)-y);
+    }
+    if (iFull < N){
+      const frac = index - iFull;
+      if (frac > 0){
+        const x0 = xOf(iFull*DT), x1 = xOf(iFull*DT + DT*frac);
+        const y = yOf(Pmid[iFull]);
+        ctx.fillRect(x0, y, x1-x0, yOf(0)-y);
+      }
+    }
+
+    // playhead
+    const t = Math.min(index*DT, T_TOTAL);
+    ctx.strokeStyle = col('--accent2'); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(xOf(t), mT); ctx.lineTo(xOf(t), yOf(0)); ctx.stroke();
+
+    // final energy readout marker + uncertainty band, drawn as a small side panel top-right
+    if (showBand){
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillStyle = col('--muted'); ctx.textAlign='right';
+      ctx.fillText('final energy range (±15% worst case): ' + eLow.toFixed(0) + '–' + eHigh.toFixed(0) + ' J', W-mR, mT-14);
+    }
+
+    // readouts
+    const e = energyAt(index);
+    const pNow = power(Math.min(index*DT, T_TOTAL));
+    roT.textContent = t.toFixed(2) + ' s';
+    roP.textContent = Math.round(pNow) + ' W';
+    roE.textContent = e.toFixed(1) + ' J';
+    roB.textContent = showBand ? (eLow.toFixed(0) + '–' + eHigh.toFixed(0) + ' J') : 'off';
+  }
+
+  function step(ts){
+    if (!playing) { lastTs = null; return; }
+    if (lastTs === null) lastTs = ts;
+    const dtReal = (ts - lastTs)/1000;
+    lastTs = ts;
+    index += (dtReal/ANIM_SECONDS)*N;
+    if (index >= N){ index = N; playing = false; playBtn.textContent = 'Replay ▶ — animate the query again'; }
+    draw();
+    if (playing) requestAnimationFrame(step);
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if (index >= N) index = 0;
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause ❚❚ — freeze the trace' : 'Play ▶ — animate the query from question start to answer end';
+    if (playing) requestAnimationFrame(step);
+  });
+
+  bandBtn.addEventListener('click', ()=>{
+    showBand = !showBand;
+    bandBtn.textContent = showBand ? 'Hide ±10–15% telemetry uncertainty band' : 'Show ±10–15% telemetry uncertainty band';
+    draw();
+  });
+
+  const reduce = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // default state is already paused with a visible Play button regardless of reduce.
+
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;measuring-joules-per-query&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Energy per query is measured by sampling power twenty times a second"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new tools: buying more correctness per joule</h2>
+  <div class="part-lede">Now that you can price an answer in bytes moved and joules spent, we can meet the paper's instruments: a single score that divides correctness by power, and three levers — reading only part of the model per word, storing weights in fewer bits, and pooling many different models — that push that score up.</div>
+</header>
+<section class="scene" id="ipw-figure-of-merit">
+  <h3>One number scores a model and its chip together: accuracy per watt</h3>
+  <div class="caption">Accuracy alone can't tell you whether local AI is viable, because it ignores cost; power alone can't either, because it ignores usefulness. So take the ratio: <math><mi>mathrm</mi><mrow><mi>I</mi><mi>P</mi><mi>W</mi></mrow><mo>(</mo><mi>m</mi><mo>,</mo><mi>h</mi><mo>)</mo><mo>=</mo><mfrac><mrow><mi>mathbb</mi><msub><mrow><mi>E</mi></mrow><mrow><mi>q</mi></mrow></msub><mo>[</mo><mi>mathrm</mi><mrow><mi>a</mi><mi>c</mi><mi>c</mi></mrow><mo>(</mo><mi>m</mi><mo>,</mo><mi>q</mi><mo>)</mo><mo>]</mo></mrow><mrow><mi>mathbb</mi><msub><mrow><mi>E</mi></mrow><mrow><mi>q</mi></mrow></msub><mo>[</mo><mi>P</mi><mo>(</mo><mi>m</mi><mo>,</mo><mi>h</mi><mo>,</mo><mi>q</mi><mo>)</mo><mo>]</mo></mrow></mfrac></math> — average correctness per query divided by average watts drawn while answering, for model <math><mi>m</mi></math> on chip <math><mi>h</mi></math>. Accuracy here is binary per query: an exact match on benchmark problems, or a win-or-tie against a frontier reference model for open-ended chat. Push either slider and notice the two ways to win — a smarter model raises the numerator, a leaner chip shrinks the denominator — which is exactly what will let the paper split progress into a model share and a hardware share. A cousin metric, intelligence per joule (IPJ), divides by energy = power × latency instead; hold that thought, because the two will disagree in an instructive way.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="ipw-figure-of-merit"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Intelligence per Watt — Gauge</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --fg:#1a1b1e; --muted:#5b5f66;
+  --grid:#c8ccd2; --accent:#1f6feb; --needle:#d6432b;
+  --ref2023:#7a7f87; --ref2025:#0f9d58;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15161a; --panel:#1e2025; --fg:#eceef1; --muted:#9aa0a8;
+    --grid:#3a3d44; --accent:#5b9bff; --needle:#ff6b52;
+    --ref2023:#9aa0a8; --ref2025:#3ddc84;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+h2{font-size:1.05rem;margin:4px 0 10px;font-weight:600;}
+.panel{background:var(--panel);border-radius:10px;padding:12px;}
+svg{width:100%;max-width:440px;height:auto;display:block;margin:0 auto;overflow:visible;}
+.controls{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;}
+.ctrl{flex:1 1 240px;min-width:200px;}
+.ctrl label{display:block;font-size:0.82rem;color:var(--muted);margin-bottom:4px;}
+.ctrl input[type=range]{width:100%;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:12px;font-size:0.9rem;}
+.readouts b{color:var(--accent);}
+.eqwrap{margin-top:14px;font-size:0.95rem;}
+.legend{font-size:0.76rem;color:var(--muted);margin-top:2px;line-height:1.4;}
+math{font-size:1.05rem;}
+svg text{fill:var(--fg);}
+.tick text{fill:var(--muted);font-size:11px;}
+.reflabel{font-size:11px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>One number scores a model and its chip together: accuracy per watt</h2>
+  <div class=&quot;panel&quot;>
+    <svg viewBox=&quot;0 0 440 260&quot; id=&quot;gaugeSvg&quot; role=&quot;img&quot; aria-label=&quot;IPW gauge&quot;>
+      <path id=&quot;arcBg&quot; fill=&quot;none&quot; stroke=&quot;var(--grid)&quot; stroke-width=&quot;16&quot; stroke-linecap=&quot;round&quot;/>
+      <path id=&quot;arcFg&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;16&quot; stroke-linecap=&quot;round&quot;/>
+      <g id=&quot;ticks&quot;></g>
+      <g id=&quot;refs&quot;></g>
+      <line id=&quot;needle&quot; stroke=&quot;var(--needle)&quot; stroke-width=&quot;4&quot; stroke-linecap=&quot;round&quot;/>
+      <circle id=&quot;pivot&quot; cx=&quot;220&quot; cy=&quot;220&quot; r=&quot;7&quot; fill=&quot;var(--needle)&quot;/>
+      <text x=&quot;220&quot; y=&quot;248&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; fill=&quot;var(--fg)&quot;>IPW = accuracy ÷ power (%/W)</text>
+    </svg>
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;accSlider&quot;>Mean accuracy over queries (numerator) — %</label>
+        <input type=&quot;range&quot; id=&quot;accSlider&quot; min=&quot;0&quot; max=&quot;100&quot; step=&quot;1&quot; value=&quot;60&quot;>
+      </div>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;powSlider&quot;>Mean power draw during inference (denominator) — W</label>
+        <input type=&quot;range&quot; id=&quot;powSlider&quot; min=&quot;5&quot; max=&quot;500&quot; step=&quot;1&quot; value=&quot;30&quot;>
+      </div>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <span>Accuracy: <b id=&quot;accOut&quot;>60</b>%</span>
+      <span>Power: <b id=&quot;powOut&quot;>30</b> W</span>
+      <span>IPW: <b id=&quot;ipwOut&quot;>2.00</b> %/W</span>
+      <span>Ratio to 2023 baseline: <b id=&quot;ratioOut&quot;>1.00</b>×</span>
+    </div>
+    <div class=&quot;eqwrap&quot;>
+      <math display=&quot;block&quot;>
+        <mi>IPW</mi><mo>=</mo>
+        <mfrac>
+          <mrow><mo>⟨</mo><mi>acc</mi><mo>⟩</mo></mrow>
+          <mrow><mo>⟨</mo><mi>P</mi><mo>⟩</mo></mrow>
+        </mfrac>
+      </math>
+      <div class=&quot;legend&quot;>acc — accuracy per query, averaged over queries q (0–1, shown as %) · P — power drawn while answering query q (W) · IPW — intelligence per watt, the figure of merit (%/W here).</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const GAUGE_MAX = 20;         // %/W, = 100% / 5 W, the extreme corner of the sliders
+  const BASE_2023 = 2;          // %/W, illustrative 2023 local-inference baseline marker
+  const IMPROVEMENT = 5.3;      // paper's headline multiplier
+  const BASE_2025 = BASE_2023 * IMPROVEMENT; // %/W
+
+  const cx = 220, cy = 220, r = 150;
+  const deg2rad = Math.PI/180;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function pt(radius, angleDeg){
+    const a = angleDeg*deg2rad;
+    return [cx + radius*Math.cos(a), cy - radius*Math.sin(a)];
+  }
+  function valToAngle(v){ return 180 - (Math.min(v,GAUGE_MAX)/GAUGE_MAX)*180; }
+  // Labels on the left half of the gauge (large angle) must grow toward the
+  // center (start-anchored) so they don't run off the left edge of the card;
+  // labels on the right half (small angle) grow leftward (end-anchored) so
+  // they don't run off the right edge.
+  function anchorForAngle(a){ return a>100 ? 'start' : (a<80 ? 'end' : 'middle'); }
+
+  const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+  function el(tag, attrs){
+    const e = document.createElementNS(svgNS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // background arc
+  const [lx,ly] = pt(r,180), [rx,ry] = pt(r,0);
+  document.getElementById('arcBg').setAttribute('d',
+    `M ${lx} ${ly} A ${r} ${r} 0 1 1 ${rx} ${ry}`);
+
+  // ticks
+  const ticksG = document.getElementById('ticks');
+  [0,5,10,15,20].forEach(tv=>{
+    const a = valToAngle(tv);
+    const [ix,iy] = pt(r-14, a), [ox,oy] = pt(r+10, a);
+    ticksG.appendChild(el('line',{x1:ix,y1:iy,x2:ox,y2:oy,stroke:'var(--grid)','stroke-width':2}));
+    const [tx,ty] = pt(r+28, a);
+    const t = el('text',{x:tx,y:ty+4,'text-anchor':anchorForAngle(a),class:'tick'});
+    t.textContent = tv;
+    ticksG.appendChild(t);
+  });
+
+  // reference markers
+  const refsG = document.getElementById('refs');
+  function addRef(val, color, label, dy){
+    const a = valToAngle(val);
+    const [ix,iy] = pt(r-20, a), [ox,oy] = pt(r+18, a);
+    refsG.appendChild(el('line',{x1:ix,y1:iy,x2:ox,y2:oy,stroke:color,'stroke-width':3}));
+    const [tx,ty] = pt(r+40, a);
+    const t = el('text',{x:tx,y:ty+dy,'text-anchor':anchorForAngle(a),class:'reflabel',fill:color});
+    t.textContent = label;
+    refsG.appendChild(t);
+  }
+  addRef(BASE_2023, getComputedStyle(document.documentElement).getPropertyValue('--ref2023').trim(), '2023 local baseline', 0);
+  addRef(BASE_2025, getComputedStyle(document.documentElement).getPropertyValue('--ref2025').trim(), '2025 (5.3× baseline)', -12);
+
+  const needle = document.getElementById('needle');
+  const arcFg = document.getElementById('arcFg');
+  const accSlider = document.getElementById('accSlider');
+  const powSlider = document.getElementById('powSlider');
+  const accOut = document.getElementById('accOut');
+  const powOut = document.getElementById('powOut');
+  const ipwOut = document.getElementById('ipwOut');
+  const ratioOut = document.getElementById('ratioOut');
+
+  let shownValue = 0;
+  let ready = false;
+
+  function drawFrame(){
+    const acc = parseFloat(accSlider.value);
+    const pow = parseFloat(powSlider.value);
+    const target = acc/pow;
+
+    const lerpFactor = reduceMotion ? 1 : 0.18;
+    shownValue += (target - shownValue)*lerpFactor;
+    if (Math.abs(target-shownValue) < 0.001) shownValue = target;
+
+    const a = valToAngle(shownValue);
+    const [tipx, tipy] = pt(r-24, a);
+    needle.setAttribute('x1', cx); needle.setAttribute('y1', cy);
+    needle.setAttribute('x2', tipx); needle.setAttribute('y2', tipy);
+
+    // foreground colored arc from left(180) to current angle
+    const [fx,fy] = pt(r, a);
+    const largeArc = (180-a) > 180 ? 1 : 0;
+    arcFg.setAttribute('d', `M ${lx} ${ly} A ${r} ${r} 0 ${largeArc} 1 ${fx} ${fy}`);
+
+    accOut.textContent = Math.round(acc);
+    powOut.textContent = Math.round(pow);
+    ipwOut.textContent = target.toFixed(2);
+    ratioOut.textContent = (target/BASE_2023).toFixed(2);
+
+    if(!ready){ ready = true; window.__sceneReady = true; }
+
+    requestAnimationFrame(drawFrame);
+  }
+
+  accSlider.addEventListener('input', ()=>{});
+  powSlider.addEventListener('input', ()=>{});
+
+  requestAnimationFrame(drawFrame);
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;ipw-figure-of-merit&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One number scores a model and its chip together: accuracy per watt"
+  ></iframe>
+</section>
+
+<section class="scene" id="moe-active-vs-total">
+  <h3>A model can store 120 billion weights but read only 20 billion per word</h3>
+  <div class="caption">Remember the iron rule from before: each token costs a full read of the weights it uses. Here is the trick that bends it, called a mixture of experts: partition most of the weights into many 'expert' sub-networks and send each token through only a few of them. In this toy model there are 16 experts; slide the router from touching 2 of them to touching all 16 and watch the per-token memory traffic — and therefore the energy — scale with what's read, while the stored footprint never moves. The paper's best local model, GPT-OSS-120B, stores 120B weights but activates at most 20B per token, so it runs at roughly the cost of a dense 20B model while answering like something far larger. The catch is storage: all 120B weights must fit in memory — 128 GB of unified memory on an M4 Max, at a precision we'll meet in the next scene — which is why 'model size' is genuinely two numbers, not one.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="moe-active-vs-total"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Active vs Total Parameters — Mixture of Experts</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel-bg:#f4f5f7;
+    --text:#17181c;
+    --muted:#5a5d66;
+    --core-color:#d97706;
+    --expert-inactive:#dfe2e7;
+    --expert-active:#2563eb;
+    --sweep-color:#16a34a;
+    --accent:#2563eb;
+    --border:#c7cad1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#101216;
+      --panel-bg:#1a1d23;
+      --text:#e9eaed;
+      --muted:#a4a7b0;
+      --core-color:#f0a94e;
+      --expert-inactive:#2b2f37;
+      --expert-active:#5b9dff;
+      --sweep-color:#4ade80;
+      --accent:#5b9dff;
+      --border:#34383f;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:12px; background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif;
+    font-size:14px;
+  }
+  .scene{max-width:680px; margin:0 auto;}
+  .controls{
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+    background:var(--panel-bg); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px; margin-bottom:10px;
+  }
+  .controls label{flex:1 1 100%; font-size:13px;}
+  input[type=range]{flex:1 1 auto; min-width:160px;}
+  #kVal{font-weight:600; color:var(--accent);}
+  canvas{width:100%; max-width:100%; height:210px; display:block;
+    background:var(--panel-bg); border:1px solid var(--border); border-radius:8px;}
+  .readouts{
+    display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:10px;
+    font-size:13.5px;
+  }
+  .readouts span.val{font-weight:600; color:var(--accent);}
+  .banner{
+    margin-top:10px; padding:8px 10px; border-left:3px solid var(--accent);
+    background:var(--panel-bg); font-size:12.5px; color:var(--muted); border-radius:4px;
+  }
+  .eqbox{margin-top:14px; padding-top:6px; border-top:1px solid var(--border);}
+  math{font-size:15px;}
+  .legend{font-size:11.5px; color:var(--muted); margin:2px 0 10px 0;}
+  #playWrap{margin-top:8px;}
+  button{
+    font-size:13px; padding:5px 10px; border-radius:6px; border:1px solid var(--border);
+    background:var(--panel-bg); color:var(--text); cursor:pointer;
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot; id=&quot;scene&quot;>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;kSlider&quot;>Experts activated per token, <b>k</b> (of 16 total experts): <span id=&quot;kVal&quot;>2</span></label>
+    <input type=&quot;range&quot; id=&quot;kSlider&quot; min=&quot;2&quot; max=&quot;16&quot; step=&quot;1&quot; value=&quot;2&quot;>
+  </div>
+
+  <canvas id=&quot;canvas&quot; width=&quot;640&quot; height=&quot;210&quot;></canvas>
+
+  <div id=&quot;playWrap&quot; style=&quot;display:none;&quot;>
+    <button id=&quot;playBtn&quot;>Play read-sweep animation</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Weights read per token: <span class=&quot;val&quot; id=&quot;readOut&quot;></span> B parameters</div>
+    <div>Weights stored (total): <span class=&quot;val&quot; id=&quot;storedOut&quot;></span> B parameters</div>
+    <div>Energy per token: <span class=&quot;val&quot; id=&quot;energyOut&quot;></span> J</div>
+  </div>
+
+  <div class=&quot;banner&quot; id=&quot;banner&quot;></div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>D</mi><mtext>read</mtext></msub><mo>=</mo>
+      <msub><mi>D</mi><mtext>core</mtext></msub><mo>+</mo>
+      <mi>k</mi><mo>&amp;#183;</mo><msub><mi>D</mi><mtext>expert</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      D<sub></sub>read — weights read for one token (B parameters) · D_core — shared always-active core, e.g. attention/embedding layers (B parameters) · k — number of experts the router activates (slider) · D_expert — size of one expert sub-network (B parameters)
+    </div>
+    <math display=&quot;block&quot;>
+      <msub><mi>E</mi><mtext>token</mtext></msub><mo>=</mo>
+      <mi>&amp;#949;</mi><mo>&amp;#183;</mo><msub><mi>D</mi><mtext>read</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      E_token — energy spent reading weights for one token (J) · &amp;#949; — energy cost per parameter read, an order-of-magnitude DRAM-access estimate (J/parameter) · D_read as above
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  &quot;use strict&quot;;
+
+  // ----- physical / architectural constants (auditable) -----
+  const N_EXPERTS = 16;                 // toy MoE: 16 expert sub-networks
+  const TOTAL_PARAMS_B = 120;           // total stored parameters, billions (matches GPT-OSS-120B)
+  const CORE_PARAMS_B = 8;              // shared always-active params: attention, embeddings, etc. (billions)
+  const PER_EXPERT_B = (TOTAL_PARAMS_B - CORE_PARAMS_B) / N_EXPERTS; // 7 B params per expert
+  const ENERGY_PER_PARAM_J = 1e-10;     // ~0.1 nJ per parameter read: order-of-magnitude DRAM access energy
+  const REAL_ACTIVE_B = 20;             // GPT-OSS-120B real anchor: <=20B active per token
+
+  const kSlider = document.getElementById('kSlider');
+  const kVal = document.getElementById('kVal');
+  const readOut = document.getElementById('readOut');
+  const storedOut = document.getElementById('storedOut');
+  const energyOut = document.getElementById('energyOut');
+  const banner = document.getElementById('banner');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const playBtn = document.getElementById('playBtn');
+  const playWrap = document.getElementById('playWrap');
+
+  function css(varName){
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function activeParams(k){
+    return CORE_PARAMS_B + k * PER_EXPERT_B; // linear in k
+  }
+
+  let k = parseInt(kSlider.value, 10);
+  let animOn = true;
+  let t0 = null;
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceMotion){
+    animOn = false;
+    playWrap.style.display = 'block';
+    playBtn.textContent = 'Play read-sweep animation';
+  }
+
+  playBtn.addEventListener('click', function(){
+    animOn = !animOn;
+    playBtn.textContent = animOn ? 'Pause read-sweep animation' : 'Play read-sweep animation';
+    if(animOn){ t0 = null; requestAnimationFrame(loop); }
+  });
+
+  function updateReadouts(){
+    const active = activeParams(k);
+    readOut.textContent = Math.round(active);
+    storedOut.textContent = Math.round(TOTAL_PARAMS_B);
+    const energy = ENERGY_PER_PARAM_J * active * 1e9;
+    energyOut.textContent = energy.toFixed(2);
+    const ratio = (TOTAL_PARAMS_B / REAL_ACTIVE_B);
+    banner.textContent = 'Real anchor: GPT-OSS-120B stores ' + TOTAL_PARAMS_B +
+      'B parameters but activates \u2264' + REAL_ACTIVE_B + 'B per token \u2014 a full read would move ' +
+      ratio.toFixed(1) + '\u00d7 more data than the real model actually reads. All ' + TOTAL_PARAMS_B +
+      'B weights must still fit in 128 GB of unified memory.';
+  }
+
+  kSlider.addEventListener('input', function(){
+    k = parseInt(kSlider.value, 10);
+    kVal.textContent = k;
+    updateReadouts();
+  });
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function draw(timeMs){
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0, 0, w, h);
+
+    const marginX = 14, marginTop = 34, barH = 46;
+    const barW = w - 2 * marginX;
+    const barY = marginTop;
+
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillStyle = css('--muted');
+    ctx.textAlign = 'left';
+    ctx.fillText('Memory bar: total stored weights (never changes size)', marginX, 16);
+
+    // segment widths proportional to parameter count
+    const coreW = barW * (CORE_PARAMS_B / TOTAL_PARAMS_B);
+    const expertW = barW * (PER_EXPERT_B / TOTAL_PARAMS_B);
+
+    // core segment: fixed, distinct color, always drawn the same way
+    // regardless of k or animation time -- this is the &quot;always active&quot; block.
+    ctx.fillStyle = css('--core-color');
+    ctx.fillRect(marginX, barY, coreW, barH);
+
+    // expert segments: color depends only on k (bright if activated, dull if not)
+    let x = marginX + coreW;
+    for(let i = 0; i < N_EXPERTS; i++){
+      ctx.fillStyle = (i < k) ? css('--expert-active') : css('--expert-inactive');
+      ctx.fillRect(x + 1, barY, expertW - 2, barH);
+      x += expertW;
+    }
+
+    ctx.strokeStyle = css('--border');
+    ctx.strokeRect(marginX, barY, barW, barH);
+
+    // reference tick: real model's ~20B active
+    const realX = marginX + barW * (REAL_ACTIVE_B / TOTAL_PARAMS_B);
+    ctx.save();
+    ctx.strokeStyle = css('--muted');
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(realX, barY - 6);
+    ctx.lineTo(realX, barY + barH + 6);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = css('--muted');
+    ctx.textAlign = 'center';
+    const labelX = Math.min(Math.max(realX, marginX + 40), marginX + barW - 40);
+    ctx.fillText('real model: ' + REAL_ACTIVE_B + 'B active', labelX, barY + barH + 20);
+
+    // read-sweep: a thin scanning line (NOT a block recolor) that illustrates the
+    // read pass moving across the currently-active region (core + k experts).
+    // It never changes what color a block &quot;belongs to&quot; -- it just scans over it.
+    const activeSegs = 1 + k; // core + k experts
+    const period = 1800; // ms
+    let phase = 0;
+    if(animOn &amp;&amp; timeMs != null){ phase = (timeMs % period) / period; }
+    const sweepIdx = phase * activeSegs;
+    const activeSpan = coreW + k * expertW;
+    const sweepX = marginX + (sweepIdx / activeSegs) * activeSpan;
+    ctx.save();
+    ctx.strokeStyle = css('--sweep-color');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(sweepX, barY - 4);
+    ctx.lineTo(sweepX, barY + barH + 4);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = css('--muted');
+    ctx.textAlign = 'left';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText('shared core (always active)', marginX, barY + barH + 36);
+    ctx.textAlign = 'right';
+    ctx.fillText('16 experts \u2014 bright blue = active this token', marginX + barW, barY + barH + 36);
+    ctx.textAlign = 'left';
+
+    ctx.fillStyle = css('--sweep-color');
+    ctx.font = '10.5px -apple-system, sans-serif';
+    ctx.fillText('scanning line: illustrative read order', marginX, barY - 12);
+  }
+
+  function loop(ts){
+    if(t0 === null) t0 = ts;
+    draw(ts);
+    if(animOn){ requestAnimationFrame(loop); }
+  }
+
+  // init
+  kVal.textContent = k;
+  updateReadouts();
+  resizeCanvas();
+  draw(reduceMotion ? null : 0);
+  if(!reduceMotion){ requestAnimationFrame(loop); }
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;moe-active-vs-total&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A model can store 120 billion weights but read only 20 billion per word"
+  ></iframe>
+</section>
+
+<section class="scene" id="quantization-fewer-bits">
+  <h3>Storing each weight in fewer bits cuts energy 3× and accuracy 2.5 points</h3>
+  <div class="caption">Since energy tracks bytes moved, there's an obvious lever: store each weight in fewer bits, accepting a little rounding error — this is called quantization. Step from FP16 (16 bits per weight) to FP8 to FP4 and watch the model's footprint halve at each step, per-token traffic halve with it, and total measured energy fall 3–3.5× over the full FP16→FP4 trip — at a price of roughly 2.5 percentage points of accuracy per step. Now the crucial comparison, which you can check on screen: Qwen3-14B squeezed to FP4 scores 49.0% on the SuperGPQA benchmark, still beating Qwen3-4B at pristine FP16, which scores 48.5%. Parameter count buys more accuracy than precision does, so the winning local recipe is: take the largest model that fits, then quantize it hard. FP4 is also what lets a 120B-total model like the one from the last scene squeeze into a 128 GB laptop at all.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="quantization-fewer-bits"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Quantization: fewer bits per weight</title>
+<style>
+:root{
+  --bg:#f7f7fa; --panel:#ffffff; --text:#1c1e26; --muted:#5b5f6b;
+  --track:#e2e4ea; --mem:#3f6fd1; --energy:#d1683f; --acc:#3f9d5b;
+  --winner:#1f8a4c; --loser:#8a8f9c; --border:#d3d6de;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14151b; --panel:#1c1e26; --text:#e8e9ee; --muted:#a1a5b2;
+    --track:#2c2f3a; --mem:#6f9bf0; --energy:#f0916f; --acc:#63c586;
+    --winner:#3fbf72; --loser:#6b6f7c; --border:#33364200;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;padding:14px;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;}
+h2{font-size:15px;margin:0 0 8px;font-weight:600;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:12px;margin-bottom:12px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+.controls span{font-size:12.5px;color:var(--muted);}
+button{font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+button[aria-pressed=&quot;true&quot;]{background:var(--mem);color:#fff;border-color:var(--mem);}
+svg{max-width:100%;height:auto;display:block;}
+text{fill:var(--text);}
+.lbl{font-size:12px;}
+.muted{font-size:11px;fill:var(--muted);}
+.eq{overflow-x:auto;}
+.legend{font-size:11.5px;color:var(--muted);margin:2px 0 12px;line-height:1.5;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Storing each weight in fewer bits: memory, energy, and accuracy</h2>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;controls&quot;>
+      <span>Bits per weight — pick the numeric precision used to store every model weight:</span>
+      <button id=&quot;b16&quot; aria-pressed=&quot;true&quot;>FP16 (16 bit)</button>
+      <button id=&quot;b8&quot; aria-pressed=&quot;false&quot;>FP8 (8 bit)</button>
+      <button id=&quot;b4&quot; aria-pressed=&quot;false&quot;>FP4 (4 bit)</button>
+    </div>
+    <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 380&quot; role=&quot;img&quot; aria-label=&quot;Bar chart of memory, energy and accuracy vs precision&quot;></svg>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mfrac><mi>M</mi><msub><mi>M</mi><mtext>FP16</mtext></msub></mfrac>
+      <mo>=</mo>
+      <mfrac><mi>b</mi><mn>16</mn></mfrac>
+    </math>
+    </div>
+    <div class=&quot;legend&quot;>M — memory footprint of the weights at bit-width b (bytes) · M<sub></sub>_FP16 — footprint at the 16-bit baseline (bytes) · b — bits used to store each weight (bit)</div>
+    <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>E</mi><mo>(</mo><mi>b</mi><mo>)</mo><mo>=</mo>
+      <msub><mi>f</mi><mtext>fixed</mtext></msub><mo>+</mo>
+      <msub><mi>f</mi><mtext>mem</mtext></msub><mo>&amp;#183;</mo>
+      <mfrac><mi>b</mi><mn>16</mn></mfrac>
+    </math>
+    </div>
+    <div class=&quot;legend&quot;>E(b) — energy per query, normalized so E(16) = 1 (dimensionless) · f_fixed &amp;#8776; 0.08 — fraction of FP16 energy spent on precision-independent compute · f_mem &amp;#8776; 0.92 — fraction of FP16 energy spent moving weights through memory · b — bits per weight (bit)</div>
+  </div>
+</div>
+
+<script>
+// ---- physics constants (named, auditable) ----
+const FIXED_FRAC = 0.083;   // fraction of FP16 energy from precision-independent compute
+const MEM_FRAC   = 0.917;   // fraction of FP16 energy from memory traffic (scales with bits)
+const N_PARAMS   = 14e9;    // Qwen3-14B parameter count, for concrete GB figures
+const BASE_ACC   = 54.0;    // % score at FP16 for the 14B model (SuperGPQA-style)
+const ACC_STEP   = 2.5;     // percentage points lost per halving of bits per weight
+const CMP_14B_FP4 = 49.0;   // measured: Qwen3-14B quantized to FP4
+const CMP_4B_FP16 = 48.5;   // measured: Qwen3-4B at full FP16
+
+const bitsOptions = [16, 8, 4];
+let bitsIndex = 0;
+
+function memoryGB(bits){ return N_PARAMS * bits / 8 / 1e9; }
+function memoryFraction(bits){ return bits / 16; }
+function energyRelative(bits){ return FIXED_FRAC + MEM_FRAC * (bits/16); }
+function accuracy(bits){ return BASE_ACC - ACC_STEP * bitsOptions.indexOf(bits); }
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// current (animated) values, target values
+let cur = { mem: memoryFraction(16), en: energyRelative(16), acc: accuracy(16) };
+let tgt = { mem: memoryFraction(16), en: energyRelative(16), acc: accuracy(16) };
+
+const svg = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+const BX = 20, BW = 600; // bar x-origin and max width
+const rows = [
+  {key:'mem', y:38,  label:'lblMem',  fill:'memFill',  color:'--mem'},
+  {key:'en',  y:98,  label:'lblEn',   fill:'enFill',   color:'--energy'},
+  {key:'acc', y:158, label:'lblAcc',  fill:'accFill',  color:'--acc'},
+];
+
+function buildStatic(){
+  svg.innerHTML = '';
+  // dynamic rows
+  const titles = ['Memory footprint (relative to FP16)', 'Energy per query (relative to FP16)', 'Accuracy on SuperGPQA (%)'];
+  rows.forEach((r,i)=>{
+    const t = el('text',{x:BX, y:r.y-8, class:'lbl'}); t.id=r.label+'Title'; t.textContent=titles[i];
+    svg.appendChild(t);
+    svg.appendChild(el('rect',{x:BX,y:r.y,width:BW,height:22,rx:4,fill:'var(--track)'}));
+    const f = el('rect',{x:BX,y:r.y,width:0,height:22,rx:4,fill:`var(${r.color})`}); f.id=r.fill;
+    svg.appendChild(f);
+    const lt = el('text',{x:BX+8,y:r.y+15,class:'lbl',fill:'#fff'}); lt.id=r.label;
+    svg.appendChild(lt);
+  });
+  svg.appendChild(el('line',{x1:BX,y1:195,x2:BX+BW,y2:195,stroke:'var(--border)'}));
+  const cmpTitle = el('text',{x:BX,y:216,class:'lbl'});
+  cmpTitle.textContent = 'Fixed comparison: total parameters vs precision (SuperGPQA %)';
+  svg.appendChild(cmpTitle);
+
+  // comparison bars (static, never depend on the control above)
+  const cmpRows = [
+    {y:238, val:CMP_14B_FP4, label:'Qwen3-14B @ FP4: '+CMP_14B_FP4.toFixed(1)+'%  (winner)', color:'var(--winner)'},
+    {y:283, val:CMP_4B_FP16, label:'Qwen3-4B @ FP16: '+CMP_4B_FP16.toFixed(1)+'%', color:'var(--loser)'}
+  ];
+  cmpRows.forEach(r=>{
+    svg.appendChild(el('rect',{x:BX,y:r.y,width:BW,height:22,rx:4,fill:'var(--track)'}));
+    svg.appendChild(el('rect',{x:BX,y:r.y,width:BW*(r.val/100),height:22,rx:4,fill:r.color}));
+    const t = el('text',{x:BX+8,y:r.y+15,class:'lbl',fill:'#fff'}); t.textContent=r.label;
+    svg.appendChild(t);
+  });
+  const note = el('text',{x:BX,y:325,class:'muted'});
+  note.textContent = 'A quantized big model beats a full-precision small model: parameter count buys more accuracy than precision does.';
+  svg.appendChild(note);
+}
+
+function render(){
+  const memFrac = Math.max(0, Math.min(1, cur.mem));
+  const enFrac  = Math.max(0, Math.min(1, cur.en));
+  document.getElementById('memFill').setAttribute('width', BW*memFrac);
+  document.getElementById('enFill').setAttribute('width', BW*enFrac);
+  document.getElementById('accFill').setAttribute('width', BW*(cur.acc/100));
+
+  document.getElementById('lblMem').textContent =
+    memoryGB(bitsOptions[bitsIndex]).toFixed(1) + ' GB  (' + Math.round(memFrac*100) + '% of FP16)';
+  document.getElementById('lblEn').textContent =
+    '×' + energyRelative(bitsOptions[bitsIndex]).toFixed(2) + ' of FP16 energy';
+  document.getElementById('lblAcc').textContent =
+    accuracy(bitsOptions[bitsIndex]).toFixed(1) + ' %';
+}
+
+function setBits(idx){
+  bitsIndex = idx;
+  const b = bitsOptions[idx];
+  tgt = { mem: memoryFraction(b), en: energyRelative(b), acc: accuracy(b) };
+  ['b16','b8','b4'].forEach((id,i)=>{
+    document.getElementById(id).setAttribute('aria-pressed', i===idx ? 'true':'false');
+  });
+  if(reduceMotion){ cur = {...tgt}; render(); }
+}
+
+document.getElementById('b16').addEventListener('click', ()=>setBits(0));
+document.getElementById('b8').addEventListener('click', ()=>setBits(1));
+document.getElementById('b4').addEventListener('click', ()=>setBits(2));
+
+function tick(){
+  if(!reduceMotion){
+    const k = 0.14;
+    cur.mem += (tgt.mem - cur.mem)*k;
+    cur.en  += (tgt.en  - cur.en)*k;
+    cur.acc += (tgt.acc - cur.acc)*k;
+    render();
+  }
+  requestAnimationFrame(tick);
+}
+
+buildStatic();
+render();
+window.__sceneReady = true;
+requestAnimationFrame(tick);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;quantization-fewer-bits&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Storing each weight in fewer bits cuts energy 3× and accuracy 2.5 points"
+  ></iframe>
+</section>
+
+<section class="scene" id="diversity-beats-scale">
+  <h3>Twenty different models answer more questions than the single best one</h3>
+  <div class="caption">Here is a fact worth sitting with: no single model comes close to the paper's coverage number, but a pool of them does. Different models — different training data, architectures, post-training — fail on different questions, so imagine a selector (the field calls it a router) that sends each question to whichever pooled model is most likely to solve it. Watch the grid: add the best single model and 71 of these 100 query-dots light up; add a second, differently-trained model and dots the first one missed start lighting too; by twenty models the union reaches ≈89%, a gain of 16.3 points over the best individual (GPT-OSS-120B at 71.4%) and 28.8 points over Qwen3-14B. Be careful what this does and does not say: it does not mean any small local model is smarter than GPT-5 — it means twenty complementary specialists, given a good selector, cover more ground than one generalist, and selecting the best of 20 locals even beats selecting the best of 3 frontier cloud models on three of four benchmarks. That is pure best-of-N: more draws per query, more chances to win.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="diversity-beats-scale"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Diversity beats scale</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel-bg:#ffffff;
+    --text:#1a1a1a;
+    --muted:#5c5c5c;
+    --border:#cfcfcc;
+    --dot-off:#d9d9d6;
+    --accent:#2b6cb0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a;
+      --panel-bg:#1c1f24;
+      --text:#e9e9e7;
+      --muted:#9aa0a6;
+      --border:#3a3f47;
+      --dot-off:#32363c;
+      --accent:#6cb0ff;
+    }
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px;box-sizing:border-box;}
+  .panel{background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;
+    padding:14px;box-sizing:border-box;}
+  h2{font-size:0.95rem;margin:0 0 8px 0;font-weight:600;}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;}
+  canvas{max-width:100%;height:auto;display:block;background:var(--panel-bg);}
+  .readouts{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:0.82rem;flex:1;min-width:210px;}
+  .readouts div span.v{font-weight:700;color:var(--accent);}
+  .ctrl{margin-top:10px;}
+  .ctrl label{display:block;font-size:0.82rem;margin-bottom:4px;}
+  input[type=range]{width:100%;}
+  .bar-wrap{position:relative;margin:22px 4px 26px 4px;height:12px;}
+  .bar-bg{position:absolute;inset:0;background:var(--dot-off);border-radius:6px;}
+  .bar-fill{position:absolute;top:0;left:0;bottom:0;background:var(--accent);border-radius:6px;
+    transition:width .25s ease;}
+  .tick{position:absolute;top:-6px;width:2px;height:24px;background:var(--muted);}
+  .ticklabel{position:absolute;top:16px;font-size:0.68rem;color:var(--muted);transform:translateX(-50%);white-space:nowrap;}
+  .anchor-note{font-size:0.72rem;color:var(--muted);margin:6px 4px 0 4px;}
+  .eq{margin-top:12px;overflow-x:auto;}
+  .legend{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+  math{font-size:1rem;}
+
+  /* colour legend for the pooled dots */
+  .colorlegend{margin-top:12px;}
+  .colorlegend .cl-title{font-size:0.78rem;margin-bottom:4px;}
+  .swatch-row{display:flex;gap:1px;height:14px;border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+  .swatch-row div{flex:1;}
+  .swatch-labels{display:flex;justify-content:space-between;font-size:0.68rem;color:var(--muted);margin-top:3px;}
+  .swatch-off{display:inline-flex;align-items:center;gap:5px;font-size:0.7rem;color:var(--muted);margin-top:5px;}
+  .swatch-off .dot{width:10px;height:10px;border-radius:50%;background:var(--dot-off);border:1px solid var(--border);display:inline-block;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;panel&quot;>
+    <h2>Query coverage as models are pooled (100 sampled queries)</h2>
+    <div class=&quot;row&quot;>
+      <canvas id=&quot;grid&quot; width=&quot;300&quot; height=&quot;300&quot; style=&quot;max-width:300px;&quot;></canvas>
+      <div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+    </div>
+
+    <div class=&quot;colorlegend&quot;>
+      <div class=&quot;cl-title&quot;>Dot color = the model that <em>first</em> solves that query (pool order is best-first, model 1 &amp;rarr; model 20)</div>
+      <div class=&quot;swatch-row&quot; id=&quot;swatchRow&quot;></div>
+      <div class=&quot;swatch-labels&quot;><span>Model 1 (added first)</span><span>Model 20 (added last)</span></div>
+      <div class=&quot;swatch-off&quot;><span class=&quot;dot&quot;></span> gray dot = not yet solved by any model currently in the pool</div>
+    </div>
+
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;pool&quot;>Models pooled, n (best-first order): <span id=&quot;poolLabel&quot;>1</span> of 20</label>
+      <input id=&quot;pool&quot; type=&quot;range&quot; min=&quot;1&quot; max=&quot;20&quot; step=&quot;1&quot; value=&quot;1&quot;>
+    </div>
+
+    <div class=&quot;bar-wrap&quot; id=&quot;barWrap&quot;>
+      <div class=&quot;bar-bg&quot;></div>
+      <div class=&quot;bar-fill&quot; id=&quot;barFill&quot;></div>
+      <div class=&quot;tick&quot; style=&quot;left:71.4%&quot;></div>
+      <div class=&quot;ticklabel&quot; style=&quot;left:71.4%&quot;>71.4% (1 model)</div>
+      <div class=&quot;tick&quot; style=&quot;left:88.7%&quot;></div>
+      <div class=&quot;ticklabel&quot; style=&quot;left:88.7%&quot;>88.7% (20 models)</div>
+    </div>
+    <div class=&quot;anchor-note&quot; id=&quot;anchorNote&quot;></div>
+
+    <div class=&quot;eq&quot;>
+      <math display=&quot;block&quot;>
+        <mi>C</mi><mo>(</mo><mi>n</mi><mo>)</mo><mo>=</mo><mn>100</mn><mo>&amp;#215;</mo>
+        <mfrac>
+          <mrow><mo>|</mo><munderover><mo>&amp;#8899;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msub><mi>S</mi><mi>i</mi></msub><mo>|</mo></mrow>
+          <mrow><mo>|</mo><mi>Q</mi><mo>|</mo></mrow>
+        </mfrac>
+      </math>
+      <div class=&quot;legend&quot;>
+        C(n) — union coverage after pooling n models (%) &amp;middot; S<sub>i</sub> — set of queries model i solves &amp;middot;
+        Q — the full query set, |Q| = 100 &amp;middot; n — number of models in the pool (1&amp;ndash;20)
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- physics / statistics of the pool ----------
+  const TOTAL_Q = 100;
+  const POOL_MAX = 20;
+  const C1 = 71.4;     // best single local model coverage (%), GPT-OSS-120B
+  const CMAX = 88.7;   // best-of-20 local pool coverage (%)
+  const DECAY = 0.735; // geometric decay rate fit so coverage(1)=C1, coverage(20)~=CMAX
+
+  function coverage(n){
+    if(n<=0) return 0;
+    return CMAX - (CMAX - C1)*Math.pow(DECAY, n-1);
+  }
+
+  const targetCount = [0];
+  for(let n=1;n<=POOL_MAX;n++) targetCount.push(Math.round(coverage(n)));
+
+  const inc = [0];
+  for(let n=1;n<=POOL_MAX;n++) inc.push(Math.max(0, targetCount[n]-targetCount[n-1]));
+
+  // deterministic shuffle of the 100 query dots (seeded PRNG, no Math.random)
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(20240517);
+  const order = Array.from({length:TOTAL_Q}, (_,i)=>i);
+  for(let i=order.length-1;i>0;i--){
+    const j = Math.floor(rng()*(i+1));
+    [order[i],order[j]] = [order[j],order[i]];
+  }
+
+  const solvedAt = new Array(TOTAL_Q).fill(null); // which model (1..20) first solves this query
+  let idx = 0;
+  for(let n=1;n<=POOL_MAX;n++){
+    for(let k=0;k<inc[n];k++){ solvedAt[order[idx]] = n; idx++; }
+  }
+
+  function modelColor(m){
+    const hue = (m-1)*137.508 % 360; // golden-angle spacing for 20 distinguishable hues
+    return `hsl(${hue.toFixed(0)},70%,50%)`;
+  }
+
+  // ---------- DOM ----------
+  const canvas = document.getElementById('grid');
+  const ctx = canvas.getContext('2d');
+  const poolInput = document.getElementById('pool');
+  const poolLabel = document.getElementById('poolLabel');
+  const readouts = document.getElementById('readouts');
+  const barFill = document.getElementById('barFill');
+  const anchorNote = document.getElementById('anchorNote');
+  const style = getComputedStyle(document.documentElement);
+  const offColor = style.getPropertyValue('--dot-off').trim();
+
+  // build the model-color legend strip (models 1..20, best-first)
+  const swatchRow = document.getElementById('swatchRow');
+  for(let m=1;m<=POOL_MAX;m++){
+    const sw = document.createElement('div');
+    sw.style.background = modelColor(m);
+    sw.title = 'Model ' + m;
+    swatchRow.appendChild(sw);
+  }
+
+  const gainAtMax = CMAX - C1; // pp gain of the full 20-model pool over the best single model
+  anchorNote.textContent = 'Anchor check at n = 20: ' + CMAX.toFixed(1) + '% \u2212 ' + C1.toFixed(1) +
+    '% = +' + gainAtMax.toFixed(1) + ' pp, the maximum possible gain over the best single model.';
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const opacity = new Array(TOTAL_Q).fill(0); // current animated lit-ness, 0..1
+
+  function targetOpacity(n, s){ return (s!==null &amp;&amp; s<=n) ? 1 : 0; }
+
+  function render(){
+    const n = parseInt(poolInput.value,10);
+    const cell = canvas.width/10;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(let i=0;i<TOTAL_Q;i++){
+      const row = Math.floor(i/10), col = i%10;
+      const x = col*cell + cell/2, y = row*cell + cell/2;
+      const r = cell*0.34;
+      const s = solvedAt[i];
+      const lit = opacity[i];
+      let color;
+      if(s===null){
+        color = offColor;
+      } else {
+        color = modelColor(s);
+      }
+      ctx.globalAlpha = s===null ? 0.55 : (0.25 + 0.75*lit);
+      ctx.beginPath();
+      ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fillStyle = lit>0.02 ? color : offColor;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const cov = coverage(n);
+    const marginal = n>1 ? coverage(n)-coverage(n-1) : coverage(1);
+    const gainOverBest = cov - C1;
+    poolLabel.textContent = n;
+    barFill.style.width = cov.toFixed(1)+'%';
+    readouts.innerHTML =
+      `<div>Pool size<br><span class=&quot;v&quot;>${n}</span> model${n>1?'s':''}</div>`+
+      `<div>Union coverage<br><span class=&quot;v&quot;>${cov.toFixed(1)}%</span></div>`+
+      `<div>Gain from last model added<br><span class=&quot;v&quot;>+${marginal.toFixed(1)} pp</span></div>`+
+      `<div>Gain over best single model<br><span class=&quot;v&quot;>+${gainOverBest.toFixed(1)} pp</span></div>`;
+  }
+
+  function step(){
+    const n = parseInt(poolInput.value,10);
+    let moving = false;
+    for(let i=0;i<TOTAL_Q;i++){
+      const t = targetOpacity(n, solvedAt[i]);
+      const diff = t - opacity[i];
+      if(Math.abs(diff) > 0.01){ opacity[i] += diff*0.22; moving = true; }
+      else opacity[i] = t;
+    }
+    render();
+    if(moving) requestAnimationFrame(step);
+  }
+
+  function onChange(){
+    if(reduceMotion){
+      const n = parseInt(poolInput.value,10);
+      for(let i=0;i<TOTAL_Q;i++) opacity[i] = targetOpacity(n, solvedAt[i]);
+      render();
+    } else {
+      requestAnimationFrame(step);
+    }
+  }
+
+  poolInput.addEventListener('input', onChange);
+
+  // initial state
+  for(let i=0;i<TOTAL_Q;i++) opacity[i] = targetOpacity(1, solvedAt[i]);
+  render();
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;diversity-beats-scale&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Twenty different models answer more questions than the single best one"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Head to head with the datacenter</h2>
+  <div class="part-lede">The levers exist; now the measurements. This part puts a laptop against datacenter silicon with the paper's own numbers: what fraction of a million real queries the laptop can cover, where the big chips still win and by how much, and why the system-level winner is not the per-query winner.</div>
+</header>
+<section class="scene" id="coverage-88">
+  <h3>Local models can already answer 88.7% of real queries — but not all kinds</h3>
+  <div class="caption">Does that pooling trick survive contact with reality? The paper tested it on one million real queries — 500K actual chat prompts from the WildChat dataset, 500K reasoning problems from NaturalReasoning, plus two hard academic benchmarks — and the pooled local models cover 88.7% overall. But press the buttons and watch the bar swing: chat and creative writing exceed 93–98%, which matters because 77% of real ChatGPT usage is exactly that — practical guidance, information seeking, and writing — while graduate-level architecture, engineering, and physical-science reasoning drops to 40–60%. So the honest statement is two-sided: the bulk of everyday demand is already locally serviceable, and a stubborn technical tail is not. And this coverage did not appear from nowhere — the best single local model went from answering 23.2% of this workload in 2023 to 48.7% in 2024 to 71.3% in 2025, rising in lockstep with the efficiency gains we'll chart later.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="coverage-88"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Local Coverage of Real Queries</title>
+<style>
+  :root{
+    --bg:#f6f7f9;
+    --panel:#ffffff;
+    --text:#1a1d23;
+    --muted:#5b6470;
+    --grid:#d7dbe1;
+    --lit:#2e7d5b;
+    --unlit:#c1443a;
+    --accent:#3462c9;
+    --pie1:#3462c9;
+    --pie2:#c98a34;
+    --btnbg:#eef1f5;
+    --btnactive:#3462c9;
+    --oncolor:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c;
+      --panel:#1c2028;
+      --text:#e8eaee;
+      --muted:#9aa3af;
+      --grid:#333a45;
+      --lit:#4caf82;
+      --unlit:#e06457;
+      --accent:#6f95e8;
+      --pie1:#6f95e8;
+      --pie2:#e0a85e;
+      --btnbg:#262b34;
+      --btnactive:#4a6bc0;
+      --oncolor:#0d0f13;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    max-width:680px;
+  }
+  h2{font-size:15px; margin:0 0 6px 0; font-weight:600;}
+  .desc{font-size:12.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.4;}
+  .controls{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;}
+  button.domain{
+    background:var(--btnbg); color:var(--text); border:1px solid var(--grid);
+    border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;
+  }
+  button.domain.active{background:var(--btnactive); color:#fff; border-color:var(--btnactive); font-weight:700;}
+  svg{width:100%; max-width:100%; height:auto; display:block; background:var(--panel);
+      border:1px solid var(--grid); border-radius:8px;}
+  .readouts{display:flex; gap:18px; margin:10px 0; flex-wrap:wrap;}
+  .ro{font-size:12.5px; color:var(--muted);}
+  .ro b{color:var(--text); font-size:15px;}
+  .eqbox{margin-top:14px; font-size:14px;}
+  .legend{font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.4;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+  <h2>Coverage of real queries by the best local (≤20B-active-parameter) model</h2>
+  <p class=&quot;desc&quot;>All four domains are always shown, each as a bar out of the queries tested in that domain (unlit red = uncovered fraction). Click a button below to highlight one domain's bar — its outline lights up, the other bars dim, and the exact numbers below the chart update to that domain.</p>
+
+  <div class=&quot;controls&quot; id=&quot;btns&quot;></div>
+
+  <svg viewBox=&quot;0 0 640 540&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;Coverage bars by domain, usage-mix pie, and timeline&quot;>
+    <text x=&quot;20&quot; y=&quot;24&quot; font-size=&quot;13&quot; fill=&quot;var(--text)&quot; font-weight=&quot;600&quot;>Coverage by domain (bar = fraction answered by at least one local model)</text>
+
+    <g id=&quot;rows&quot;></g>
+
+    <g font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>
+      <line x1=&quot;20&quot; y1=&quot;230&quot; x2=&quot;20&quot; y2=&quot;236&quot; stroke=&quot;var(--grid)&quot;/>
+      <text x=&quot;20&quot; y=&quot;250&quot;>0%</text>
+      <line x1=&quot;160&quot; y1=&quot;230&quot; x2=&quot;160&quot; y2=&quot;236&quot; stroke=&quot;var(--grid)&quot;/>
+      <text x=&quot;160&quot; y=&quot;250&quot; text-anchor=&quot;middle&quot;>25%</text>
+      <line x1=&quot;300&quot; y1=&quot;230&quot; x2=&quot;300&quot; y2=&quot;236&quot; stroke=&quot;var(--grid)&quot;/>
+      <text x=&quot;300&quot; y=&quot;250&quot; text-anchor=&quot;middle&quot;>50%</text>
+      <line x1=&quot;440&quot; y1=&quot;230&quot; x2=&quot;440&quot; y2=&quot;236&quot; stroke=&quot;var(--grid)&quot;/>
+      <text x=&quot;440&quot; y=&quot;250&quot; text-anchor=&quot;middle&quot;>75%</text>
+      <line x1=&quot;580&quot; y1=&quot;230&quot; x2=&quot;580&quot; y2=&quot;236&quot; stroke=&quot;var(--grid)&quot;/>
+      <text x=&quot;580&quot; y=&quot;250&quot; text-anchor=&quot;middle&quot;>100%</text>
+    </g>
+
+    <text x=&quot;20&quot; y=&quot;274&quot; font-size=&quot;12.5&quot; fill=&quot;var(--text)&quot; font-weight=&quot;600&quot;>Real ChatGPT usage mix (all traffic, not just this test set)</text>
+    <g transform=&quot;translate(100,339)&quot;>
+      <circle r=&quot;55&quot; fill=&quot;none&quot; stroke=&quot;var(--pie2)&quot; stroke-width=&quot;34&quot;
+        stroke-dasharray=&quot;345.6 345.6&quot; stroke-dashoffset=&quot;0&quot; transform=&quot;rotate(-90)&quot;/>
+      <circle r=&quot;55&quot; fill=&quot;none&quot; stroke=&quot;var(--pie1)&quot; stroke-width=&quot;34&quot;
+        stroke-dasharray=&quot;266.1 345.6&quot; stroke-dashoffset=&quot;0&quot; transform=&quot;rotate(-90)&quot;/>
+    </g>
+    <g font-size=&quot;11.5&quot;>
+      <rect x=&quot;190&quot; y=&quot;314&quot; width=&quot;10&quot; height=&quot;10&quot; fill=&quot;var(--pie1)&quot;/>
+      <text x=&quot;205&quot; y=&quot;323&quot; fill=&quot;var(--text)&quot;>77% — practical guidance, info seeking, writing</text>
+      <rect x=&quot;190&quot; y=&quot;334&quot; width=&quot;10&quot; height=&quot;10&quot; fill=&quot;var(--pie2)&quot;/>
+      <text x=&quot;205&quot; y=&quot;343&quot; fill=&quot;var(--text)&quot;>23% — coding, technical, other</text>
+    </g>
+
+    <text x=&quot;20&quot; y=&quot;434&quot; font-size=&quot;12.5&quot; fill=&quot;var(--text)&quot; font-weight=&quot;600&quot;>Best single local model — coverage of this workload, by year</text>
+    <line x1=&quot;60&quot; y1=&quot;509&quot; x2=&quot;580&quot; y2=&quot;509&quot; stroke=&quot;var(--grid)&quot;/>
+    <g id=&quot;timeline&quot;></g>
+  </svg>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;>Selected domain: <b id=&quot;roName&quot;>All 1,000,000 queries</b></div>
+    <div class=&quot;ro&quot;>Coverage: <b id=&quot;roCover&quot;>88.7%</b></div>
+    <div class=&quot;ro&quot;>Uncovered gap: <b id=&quot;roGap&quot;>11.3%</b></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>C</mi><mo>=</mo>
+      <mfrac><msub><mi>N</mi><mtext>answered</mtext></msub><msub><mi>N</mi><mtext>total</mtext></msub></mfrac>
+      <mo>&amp;#215;</mo><mn>100</mn><mo>%</mo>
+    </math>
+    <div class=&quot;legend&quot;>
+      C — coverage, the percent of queries in a domain answered correctly by at least one local model (%) ·
+      N<sub>answered</sub> — queries answered by the best pooled local model in that domain ·
+      N<sub>total</sub> — total queries sampled in that domain
+    </div>
+  </div>
+
+<script>
+// Coverage computed from raw counts, not pre-baked percentages.
+const DOMAINS = {
+  chat:    {name:&quot;Chat &amp; creative writing&quot;,      total:350000,  answered:337750},
+  info:    {name:&quot;Information seeking&quot;,          total:150000,  answered:137700},
+  tech:    {name:&quot;Graduate technical reasoning&quot;, total:500000,  answered:261500},
+  overall: {name:&quot;All 1,000,000 queries&quot;,        total:1000000, answered:887000}
+};
+// Row draw order (top to bottom in the bar chart) — unaffected by button order.
+const ROW_ORDER = [&quot;chat&quot;,&quot;info&quot;,&quot;tech&quot;,&quot;overall&quot;];
+// Button order — deliberately places &quot;All 1M queries&quot; FIRST so that clicking every
+// button once, in the order they appear, ends on &quot;Graduate technical reasoning&quot; —
+// a state visibly different from the initial default (overall).
+const BUTTON_ORDER = [&quot;overall&quot;,&quot;chat&quot;,&quot;info&quot;,&quot;tech&quot;];
+const LABELS = {chat:&quot;Chat &amp; creative&quot;, info:&quot;Information seeking&quot;, tech:&quot;Graduate technical reasoning&quot;, overall:&quot;All 1M queries&quot;};
+
+function coverageOf(k){ return (DOMAINS[k].answered / DOMAINS[k].total) * 100; }
+
+const BAR_X = 20, BAR_W = 560;
+const ROWS = {
+  chat:    {labelY:44,  barY:50,  outlineY:28},
+  info:    {labelY:94,  barY:100, outlineY:78},
+  tech:    {labelY:144, barY:150, outlineY:128},
+  overall: {labelY:194, barY:200, outlineY:178}
+};
+const BAR_H = 20, OUTLINE_H = 46;
+
+const rowsG = document.getElementById(&quot;rows&quot;);
+const NS = &quot;http://www.w3.org/2000/svg&quot;;
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+ROW_ORDER.forEach(k=>{
+  const r = ROWS[k];
+  const cov = coverageOf(k);
+  const litW = (cov/100) * BAR_W;
+
+  const group = el(&quot;g&quot;, {id:&quot;rowgroup_&quot;+k});
+
+  const bg = el(&quot;rect&quot;, {x:14, y:r.outlineY, width:612, height:OUTLINE_H, rx:8,
+    fill:&quot;var(--accent)&quot;, &quot;fill-opacity&quot;:0, id:&quot;bg_&quot;+k});
+  group.appendChild(bg);
+
+  const outline = el(&quot;rect&quot;, {x:14, y:r.outlineY, width:612, height:OUTLINE_H, rx:8,
+    fill:&quot;none&quot;, stroke:&quot;none&quot;, &quot;stroke-width&quot;:3, id:&quot;outline_&quot;+k});
+  group.appendChild(outline);
+
+  const label = el(&quot;text&quot;, {x:20, y:r.labelY, &quot;font-size&quot;:13, fill:&quot;var(--text)&quot;, &quot;font-weight&quot;:600});
+  label.textContent = DOMAINS[k].name;
+  group.appendChild(label);
+
+  const nText = el(&quot;text&quot;, {x:580, y:r.labelY, &quot;font-size&quot;:11, fill:&quot;var(--muted)&quot;, &quot;text-anchor&quot;:&quot;end&quot;});
+  nText.textContent = &quot;n = &quot; + DOMAINS[k].total.toLocaleString();
+  group.appendChild(nText);
+
+  group.appendChild(el(&quot;rect&quot;, {x:BAR_X, y:r.barY, width:BAR_W, height:BAR_H, rx:4, fill:&quot;var(--unlit)&quot;}));
+  group.appendChild(el(&quot;rect&quot;, {x:BAR_X, y:r.barY, width:litW.toFixed(1), height:BAR_H, rx:4, fill:&quot;var(--lit)&quot;}));
+
+  const pct = el(&quot;text&quot;, {x:(BAR_X+litW-6).toFixed(1), y:r.barY+14, &quot;font-size&quot;:12, &quot;font-weight&quot;:700,
+    fill:&quot;var(--oncolor)&quot;, &quot;text-anchor&quot;:&quot;end&quot;});
+  pct.textContent = cov.toFixed(1) + &quot;%&quot;;
+  group.appendChild(pct);
+
+  rowsG.appendChild(group);
+});
+
+const btnBox = document.getElementById(&quot;btns&quot;);
+let selected = &quot;overall&quot;;
+BUTTON_ORDER.forEach(k=>{
+  const b = document.createElement(&quot;button&quot;);
+  b.className = &quot;domain&quot; + (k===selected ? &quot; active&quot;:&quot;&quot;);
+  b.textContent = LABELS[k];
+  b.title = &quot;Highlight the &quot; + DOMAINS[k].name + &quot; bar and show its exact coverage below — does not change any bar's value.&quot;;
+  b.dataset.key = k;
+  b.addEventListener(&quot;click&quot;, ()=>{ selectDomain(k); });
+  btnBox.appendChild(b);
+});
+
+const roName = document.getElementById(&quot;roName&quot;);
+const roCover = document.getElementById(&quot;roCover&quot;);
+const roGap = document.getElementById(&quot;roGap&quot;);
+
+function selectDomain(key){
+  selected = key;
+  document.querySelectorAll(&quot;button.domain&quot;).forEach(b=>{
+    b.classList.toggle(&quot;active&quot;, b.dataset.key === key);
+  });
+  ROW_ORDER.forEach(k=>{
+    const isSel = (k === key);
+    document.getElementById(&quot;outline_&quot;+k).setAttribute(&quot;stroke&quot;, isSel ? &quot;var(--accent)&quot; : &quot;none&quot;);
+    document.getElementById(&quot;bg_&quot;+k).setAttribute(&quot;fill-opacity&quot;, isSel ? &quot;0.10&quot; : &quot;0&quot;);
+    document.getElementById(&quot;rowgroup_&quot;+k).style.opacity = isSel ? &quot;1&quot; : &quot;0.45&quot;;
+  });
+  const cov = coverageOf(key);
+  roName.textContent = DOMAINS[key].name;
+  roCover.textContent = cov.toFixed(1) + &quot;%&quot;;
+  roGap.textContent = (100-cov).toFixed(1) + &quot;%&quot;;
+}
+
+// timeline: fixed historical data (best single local model coverage of this workload)
+const TIMELINE = [
+  {year:2023, cov:23.2, x:120},
+  {year:2024, cov:48.7, x:340},
+  {year:2025, cov:71.3, x:560}
+];
+const Y0 = 509, Y1 = 464; // 0% -> Y0, 100% -> Y1
+function tlY(cov){ return Y0 - (cov/100) * (Y0-Y1); }
+
+const tlGroup = document.getElementById(&quot;timeline&quot;);
+const pathPts = TIMELINE.map(p=>`${p.x},${tlY(p.cov).toFixed(1)}`).join(&quot; &quot;);
+const poly = el(&quot;polyline&quot;, {points:pathPts, fill:&quot;none&quot;, stroke:&quot;var(--accent)&quot;, &quot;stroke-width&quot;:2});
+tlGroup.appendChild(poly);
+
+TIMELINE.forEach(p=>{
+  const cy = tlY(p.cov);
+  tlGroup.appendChild(el(&quot;circle&quot;, {cx:p.x, cy:cy.toFixed(1), r:4, fill:&quot;var(--accent)&quot;}));
+
+  const t1 = el(&quot;text&quot;, {x:p.x, y:(cy-10).toFixed(1), &quot;text-anchor&quot;:&quot;middle&quot;, &quot;font-size&quot;:11.5,
+    fill:&quot;var(--text)&quot;, &quot;font-weight&quot;:600});
+  t1.textContent = p.cov.toFixed(1) + &quot;%&quot;;
+  tlGroup.appendChild(t1);
+
+  const t2 = el(&quot;text&quot;, {x:p.x, y:524, &quot;text-anchor&quot;:&quot;middle&quot;, &quot;font-size&quot;:11, fill:&quot;var(--muted)&quot;});
+  t2.textContent = p.year;
+  tlGroup.appendChild(t2);
+});
+
+selectDomain(selected);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;coverage-88&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Local models can already answer 88.7% of real queries — but not all kinds"
+  ></iframe>
+</section>
+
+<section class="scene" id="cloud-per-query-gap">
+  <h3>Per query, datacenter chips are still 1.4–7.4× more efficient</h3>
+  <div class="caption">Now the other side of the ledger: give the datacenter its due. Run the very same model on three chips, one query at a time on each — no tricks, no sharing — and switch between them. Against the Apple M4 Max, an NVIDIA B200 delivers 1.40× the intelligence per watt and 1.6–2.3× per joule; SambaNova's SN40L reaches 1.78× per watt and a striking 6.5–7.4× per joule. The cause is architectural, and you already have the tools to read it off the spec panel: the datacenter chips carry stacked high-bandwidth memory at 4.8–8 TB/s and 400–1000 W thermal budgets, single-purpose machines for exactly this job, while the laptop's 546 GB/s unified memory must also serve the CPU and graphics under a thin-chassis heat ceiling. Notice the per-joule gap always exceeds the per-watt gap — the cloud chip is both leaner and faster, and speed compounds into energy. File that asymmetry away; it becomes a theme in the final part.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="cloud-per-query-gap"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Cloud vs laptop: per-query efficiency</title>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --panel:#ffffff;
+  --text:#1a1a1a;
+  --muted:#5f6368;
+  --border:#dcdce0;
+  --accent:#2563eb;   /* per-watt bar */
+  --accent2:#d97706;  /* per-joule bar */
+  --line:#8a8a8a;
+  --btnbg:#eef0f4;
+  --btnactive:#2563eb;
+  --btnactivetext:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#111317;
+    --panel:#1b1e24;
+    --text:#e8e8ea;
+    --muted:#9aa0a6;
+    --border:#33363c;
+    --accent:#60a5fa;
+    --accent2:#fbbf24;
+    --line:#9a9a9a;
+    --btnbg:#262a31;
+    --btnactive:#60a5fa;
+    --btnactivetext:#111317;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:12px;
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}
+.scene{max-width:680px; margin:0 auto;}
+.badge{
+  display:inline-block; font-size:12px; padding:4px 9px;
+  border:1px solid var(--border); border-radius:12px;
+  color:var(--muted); margin-bottom:10px; background:var(--panel);
+}
+.btnrow{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;}
+button.chip{
+  flex:1 1 160px; min-width:120px;
+  background:var(--btnbg); color:var(--text);
+  border:1px solid var(--border); border-radius:8px;
+  padding:8px 6px; font-size:12.5px; cursor:pointer; line-height:1.3;
+}
+button.chip.active{background:var(--btnactive); color:var(--btnactivetext); border-color:var(--btnactive);}
+.panel{
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  padding:10px 12px; margin-bottom:10px;
+}
+.readouts{
+  display:grid; grid-template-columns:1fr 1fr; gap:6px 14px;
+  font-size:13px;
+}
+.readouts div span{color:var(--muted);}
+.readouts b{font-variant-numeric:tabular-nums;}
+canvas{width:100%; max-width:100%; display:block; height:280px;}
+.eqwrap{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:8px 12px 10px; margin-top:10px;}
+math{font-size:16px;}
+.legend{font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.5;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;badge&quot;>Batch size 1 on every chip — same model, same queries, run one at a time</div>
+
+  <div class=&quot;btnrow&quot; id=&quot;btnrow&quot;>
+    <button class=&quot;chip&quot; data-chip=&quot;m4&quot;>Apple M4 Max<br><span style=&quot;font-weight:normal&quot;>laptop chip</span></button>
+    <button class=&quot;chip&quot; data-chip=&quot;b200&quot;>NVIDIA B200<br><span style=&quot;font-weight:normal&quot;>datacenter GPU</span></button>
+    <button class=&quot;chip&quot; data-chip=&quot;sn40l&quot;>SambaNova SN40L<br><span style=&quot;font-weight:normal&quot;>datacenter dataflow chip</span></button>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;readouts&quot;>
+      <div><span>Memory bandwidth:</span> <b id=&quot;ro-bw&quot;></b></div>
+      <div><span>Thermal / power budget:</span> <b id=&quot;ro-pw&quot;></b></div>
+      <div><span>Intelligence per watt (rel. to M4 Max):</span> <b id=&quot;ro-ipw&quot;></b></div>
+      <div><span>Intelligence per joule (rel. to M4 Max):</span> <b id=&quot;ro-ipj&quot;></b></div>
+    </div>
+  </div>
+
+  <canvas id=&quot;chart&quot; width=&quot;680&quot; height=&quot;280&quot;></canvas>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>IPJ</mi><mtext>rel</mtext></msub>
+      <mo>=</mo>
+      <msub><mi>IPW</mi><mtext>rel</mtext></msub>
+      <mo>&amp;#183;</mo>
+      <msup>
+        <mrow><mo>(</mo><mfrac><msub><mi>BW</mi><mtext>chip</mtext></msub><msub><mi>BW</mi><mtext>M4</mtext></msub></mfrac><mo>)</mo></mrow>
+        <mi>&amp;#947;</mi>
+      </msup>
+    </math>
+    <div class=&quot;legend&quot;>
+      IPW<sub></sub>, IPJ — intelligence per watt and per joule, each a capability-per-power (or per-energy) score normalized so the M4 Max = 1.0 (dimensionless) &amp;middot;
+      BW<sub>chip</sub>, BW<sub>M4</sub> — memory bandwidth of the selected chip and of the M4 Max (GB/s) &amp;middot;
+      &amp;#947; (gamma) — latency-coupling exponent (dimensionless): the fraction of a single query's wall-clock time that shrinks with added bandwidth; the rest is fixed overhead (network, prefill) that bandwidth cannot shorten. Fit per chip to the reported measurement range.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- Hardware constants (real spec-sheet order-of-magnitude values) ----
+  const CHIPS = {
+    m4:   { name:'Apple M4 Max',  bw:546,  pwText:'~60 W (thin-chassis limit)', ipw:1.00 },
+    b200: { name:'NVIDIA B200',   bw:8000, pwText:'1000 W (datacenter cooling budget)', ipw:1.40,
+            gammaLo:0.0497, gammaHi:0.1848 }, // fit so IPJrel spans the reported 1.6-2.3x range
+    sn40l:{ name:'SambaNova SN40L', bw:4800, pwText:'600 W (datacenter cooling budget)', ipw:1.78,
+            gammaLo:0.5957, gammaHi:0.6553 } // fit so IPJrel spans the reported 6.5-7.4x range
+  };
+  const BW_M4 = CHIPS.m4.bw;
+
+  function ipjRange(key){
+    const c = CHIPS[key];
+    if(key==='m4') return [1,1];
+    const bwRatio = c.bw/BW_M4;
+    const lo = c.ipw*Math.pow(bwRatio, c.gammaLo);
+    const hi = c.ipw*Math.pow(bwRatio, c.gammaHi);
+    return [lo,hi];
+  }
+
+  const reduced = window.matchMedia &amp;&amp; matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let currentKey = 'm4';
+  let disp = { ipw:1, lo:1, hi:1 };   // animated (displayed) values
+  let targ = { ipw:1, lo:1, hi:1 };   // target values
+  let animStart=null, animDur = reduced?0:500;
+  let fromVals = {...disp};
+
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  function cv(name){ return css.getPropertyValue(name).trim(); }
+
+  function resizeCanvas(){
+    const w = canvas.clientWidth || 640;
+    const h = 280;
+    const dpr = window.devicePixelRatio||1;
+    canvas.width = w*dpr; canvas.height = h*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function setReadouts(key){
+    const c = CHIPS[key];
+    document.getElementById('ro-bw').textContent = c.bw + ' GB/s (' + (c.bw/1000).toFixed(1) + ' TB/s)';
+    document.getElementById('ro-pw').textContent = c.pwText;
+    document.getElementById('ro-ipw').textContent = c.ipw.toFixed(2)+'\u00D7';
+    const [lo,hi] = ipjRange(key);
+    document.getElementById('ro-ipj').textContent = (Math.abs(hi-lo)<0.05)
+      ? hi.toFixed(1)+'\u00D7'
+      : lo.toFixed(1)+'\u2013'+hi.toFixed(1)+'\u00D7';
+  }
+
+  function draw(){
+    const w = canvas.clientWidth || 640, h = 280;
+    ctx.clearRect(0,0,w,h);
+    const padL=44, padR=20, padT=34, padB=44;
+    const chartW = w-padL-padR, chartH = h-padT-padB;
+    const maxVal = 8.5;
+
+    const text = cv('--text'), muted = cv('--muted'), border = cv('--border');
+    const accent = cv('--accent'), accent2 = cv('--accent2'), line = cv('--line');
+
+    function yOf(v){ return padT + chartH - (v/maxVal)*chartH; }
+
+    // gridlines
+    ctx.font='11px sans-serif';
+    ctx.strokeStyle = border; ctx.lineWidth=1;
+    ctx.fillStyle = muted; ctx.textAlign='right'; ctx.textBaseline='middle';
+    for(let v=0; v<=8; v+=2){
+      const y = yOf(v);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+chartW,y); ctx.stroke();
+      ctx.fillText(String(v), padL-6, y);
+    }
+    // y-axis title
+    ctx.save();
+    ctx.translate(12, padT+chartH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center'; ctx.fillStyle=muted; ctx.font='11px sans-serif';
+    ctx.fillText('relative to M4 Max (\u00D7)',0,0);
+    ctx.restore();
+
+    // reference line at 1.0
+    const y1 = yOf(1);
+    ctx.strokeStyle = line; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(padL,y1); ctx.lineTo(padL+chartW,y1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = muted; ctx.textAlign='left'; ctx.font='11px sans-serif';
+    ctx.fillText('M4 Max baseline = 1.0\u00D7', padL+6, y1-9);
+
+    // bars
+    const barW = Math.min(90, chartW*0.22);
+    const x1 = padL + chartW*0.32 - barW/2;
+    const x2 = padL + chartW*0.72 - barW/2;
+
+    // IPW bar
+    const yIPW = yOf(disp.ipw);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x1, yIPW, barW, padT+chartH-yIPW);
+    ctx.fillStyle = text; ctx.textAlign='center'; ctx.font='bold 13px sans-serif';
+    ctx.fillText(disp.ipw.toFixed(2)+'\u00D7', x1+barW/2, Math.max(padT+10,yIPW-10));
+
+    // IPJ bar (drawn to hi, with whisker for lo-hi range)
+    const yLo = yOf(disp.lo), yHi = yOf(disp.hi);
+    ctx.fillStyle = accent2;
+    ctx.fillRect(x2, yHi, barW, padT+chartH-yHi);
+    // whisker
+    if(Math.abs(disp.hi-disp.lo)>0.03){
+      ctx.strokeStyle = text; ctx.lineWidth=2;
+      const cx = x2+barW/2;
+      ctx.beginPath(); ctx.moveTo(cx,yLo); ctx.lineTo(cx,yHi); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx-9,yLo); ctx.lineTo(cx+9,yLo); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx-9,yHi); ctx.lineTo(cx+9,yHi); ctx.stroke();
+    }
+    ctx.fillStyle = text; ctx.font='bold 13px sans-serif';
+    const lbl = (Math.abs(disp.hi-disp.lo)<0.05)
+      ? disp.hi.toFixed(1)+'\u00D7'
+      : disp.lo.toFixed(1)+'\u2013'+disp.hi.toFixed(1)+'\u00D7';
+    ctx.fillText(lbl, x2+barW/2, Math.max(padT+10,yHi-10));
+
+    // x labels
+    ctx.font='12px sans-serif'; ctx.fillStyle=text;
+    ctx.fillText('Intelligence per watt', x1+barW/2, padT+chartH+18);
+    ctx.fillText('Intelligence per joule', x2+barW/2, padT+chartH+18);
+  }
+
+  function animate(ts){
+    if(animStart===null) animStart=ts;
+    const t = animDur===0 ? 1 : Math.min(1,(ts-animStart)/animDur);
+    disp.ipw = fromVals.ipw + (targ.ipw-fromVals.ipw)*t;
+    disp.lo  = fromVals.lo  + (targ.lo -fromVals.lo )*t;
+    disp.hi  = fromVals.hi  + (targ.hi -fromVals.hi )*t;
+    draw();
+    if(t<1){ requestAnimationFrame(animate); }
+  }
+
+  function selectChip(key){
+    currentKey = key;
+    document.querySelectorAll('button.chip').forEach(b=>{
+      b.classList.toggle('active', b.dataset.chip===key);
+    });
+    setReadouts(key);
+    const [lo,hi] = ipjRange(key);
+    fromVals = {...disp};
+    targ = { ipw: CHIPS[key].ipw, lo, hi };
+    animStart = null;
+    if(animDur===0){ disp={...targ}; draw(); }
+    else requestAnimationFrame(animate);
+  }
+
+  document.getElementById('btnrow').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button.chip');
+    if(!btn) return;
+    selectChip(btn.dataset.chip);
+  });
+
+  window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
+
+  // init
+  resizeCanvas();
+  selectChip('m4');
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;cloud-per-query-gap&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Per query, datacenter chips are still 1.4–7.4× more efficient"
+  ></iframe>
+</section>
+
+<section class="scene" id="batching-amortizes">
+  <h3>Serving 64 users at once cuts energy per answer 12–20×</h3>
+  <div class="caption">Recall the dominant cost: reading all the weights from memory once per token. Now suppose 64 users' queries arrive at once — the chip can read the weights a single time and apply them to all 64 token-streams before the data goes cold, so that one expensive read is split 64 ways. Slide the batch size up and watch it happen in the measurements: Qwen3-8B on a B200 drops from 6,449 J per query at batch 1 to 548 J at batch 64, while total power rises only from 255 W to 883 W — far less than 64-fold — for an 11.8–19.7× gain in intelligence per joule. This sharing trick is called batching, and it is a structural asymmetry, not a clever benchmark: a datacenter always has strangers' queries to bundle, while your laptop serves one person and has nothing to batch across except, perhaps someday, its own apps. Keep this in mind for what comes next — it is exactly why the paper's cloud baseline runs batched, to avoid stacking the deck for the laptop.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="batching-amortizes"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Batching amortizes the weight read</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f2f4f8;
+    --text:#1b1e24;
+    --muted:#5b6270;
+    --accent:#2f6fed;
+    --accent2:#d9662f;
+    --line:#c9ccd3;
+    --lane:#8fa6d8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a;
+      --panel:#1d2026;
+      --text:#eef0f4;
+      --muted:#9aa1ad;
+      --accent:#6f9bff;
+      --accent2:#ff9466;
+      --line:#3a3f48;
+      --lane:#5b7bb0;
+    }
+  }
+  html,body{background:var(--bg);color:var(--text);margin:0;padding:0;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:12px;}
+  .wrap{max-width:680px;margin:0 auto;}
+  h2{font-size:1.02rem;margin:0 0 8px;font-weight:600;}
+  canvas{width:100%;max-width:680px;height:auto;display:block;background:var(--panel);border-radius:8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin:10px 0;}
+  .controls label{font-size:0.82rem;color:var(--muted);display:flex;flex-direction:column;gap:5px;flex:1 1 240px;}
+  .controls label span{color:var(--text);font-weight:600;}
+  input[type=range]{width:100%;}
+  button{padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer;font-size:0.82rem;height:34px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;}
+  .readout{background:var(--panel);border-radius:8px;padding:8px 12px;flex:1 1 150px;min-width:0;}
+  .readout .val{font-size:1.15rem;font-weight:700;}
+  .readout .lbl{font-size:0.7rem;color:var(--muted);margin-top:2px;}
+  .legend{font-size:0.72rem;color:var(--muted);margin:2px 0 6px;line-height:1.5;}
+  math{font-size:1.05rem;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Sharing one weight-read sweep across a batch of queries</h2>
+  <canvas id=&quot;c&quot; width=&quot;680&quot; height=&quot;300&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <label>Batch size B (concurrent queries): <span id=&quot;bVal&quot;>1</span>
+      <input type=&quot;range&quot; id=&quot;bSlider&quot; min=&quot;1&quot; max=&quot;64&quot; step=&quot;1&quot; value=&quot;1&quot;>
+    </label>
+    <button id=&quot;playBtn&quot;>Pause sweep</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;eVal&quot;>–</div><div class=&quot;lbl&quot;>energy per query (J)</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;pVal&quot;>–</div><div class=&quot;lbl&quot;>total chip power (W)</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;ipjVal&quot;>–</div><div class=&quot;lbl&quot;>intelligence-per-joule gain vs B = 1</div></div>
+  </div>
+
+  <math display=&quot;block&quot;>
+    <msub><mi>E</mi><mtext>query</mtext></msub>
+    <mo>=</mo>
+    <mfrac><msub><mi>E</mi><mtext>weights</mtext></msub><mi>B</mi></mfrac>
+    <mo>+</mo>
+    <msub><mi>E</mi><mtext>compute</mtext></msub>
+  </math>
+  <div class=&quot;legend&quot;>
+    E_query — energy delivered per user query (J) · E_weights — energy to stream every weight out of memory once, a cost shared by the whole batch (J) · B — batch size, the number of queries processed in the same pass (dimensionless, slider above) · E_compute — extra compute energy each additional query in the batch adds (J)
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- measured anchors (Qwen3-8B on B200) ---
+  const E1 = 6449;   // J/query at batch 1
+  const E64 = 548;   // J/query at batch 64
+  const P1 = 255;    // W at batch 1
+  const P64 = 883;   // W at batch 64
+  const BMAX = 64;
+
+  // Solve E_query(B) = E_weights/B + E_compute using the two anchor points
+  const E_w = (E1 - E64) / (1 - 1/BMAX);   // J, fixed weight-read energy per pass
+  const E_c = E1 - E_w;                    // J, marginal per-query compute energy
+
+  // Solve total time per pass t(B) = t0 + B*t_c from total energy/power anchors
+  const Etot1 = E1 * 1, Etot64 = E64 * BMAX;
+  const t1 = Etot1 / P1, t64 = Etot64 / P64;
+  const t_c = (t64 - t1) / (BMAX - 1);      // s, marginal per-query time
+  const t0 = t1 - t_c;                     // s, fixed memory-streaming time
+
+  function totalEnergy(B){ return E_w + B*E_c; }
+  function perQueryEnergy(B){ return totalEnergy(B) / B; }
+  function totalTime(B){ return t0 + B*t_c; }
+  function totalPower(B){ return totalEnergy(B) / totalTime(B); }
+  function ipj(B){ return perQueryEnergy(1) / perQueryEnergy(B); }
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  function col(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  const slider = document.getElementById('bSlider');
+  const bValEl = document.getElementById('bVal');
+  const eVal = document.getElementById('eVal');
+  const pVal = document.getElementById('pVal');
+  const ipjVal = document.getElementById('ipjVal');
+  const playBtn = document.getElementById('playBtn');
+
+  let B = 1;
+  let phase = 0;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduce;
+  playBtn.textContent = playing ? 'Pause sweep' : 'Play sweep';
+
+  function updateReadouts(){
+    eVal.textContent = Math.round(perQueryEnergy(B)).toLocaleString() + ' J';
+    pVal.textContent = Math.round(totalPower(B)) + ' W';
+    ipjVal.textContent = ipj(B).toFixed(1) + '×';
+    bValEl.textContent = B;
+  }
+
+  function draw(){
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    const memX=40, memW=30, memY=30, memH=H-60;
+    ctx.fillStyle = col('--line');
+    ctx.fillRect(memX, memY, memW, memH);
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('weights', memX+memW/2, memY-10);
+    ctx.fillText('(memory)', memX+memW/2, memY+memH+18);
+
+    const splitX = 130;
+    const laneStartX = 160;
+    const laneEndX = W-40;
+    const top = 30, bottom = H-30;
+    const n = B;
+    const midY = (top+bottom)/2;
+
+    ctx.strokeStyle = col('--line');
+    ctx.lineWidth = 1;
+    for(let i=0;i<n;i++){
+      const y = n===1 ? midY : top + i*(bottom-top)/(n-1);
+      ctx.beginPath();
+      ctx.moveTo(splitX, midY);
+      ctx.lineTo(laneStartX, y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = col('--lane');
+    for(let i=0;i<n;i++){
+      const y = n===1 ? midY : top + i*(bottom-top)/(n-1);
+      ctx.beginPath();
+      ctx.moveTo(laneStartX, y);
+      ctx.lineTo(laneEndX, y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = col('--text');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(memX+memW, midY);
+    ctx.lineTo(splitX, midY);
+    ctx.stroke();
+
+    if(phase < 0.4){
+      const f = phase/0.4;
+      const x = memX+memW + (splitX-(memX+memW))*f;
+      ctx.fillStyle = col('--accent');
+      ctx.beginPath(); ctx.arc(x, midY, 5, 0, Math.PI*2); ctx.fill();
+    } else {
+      const f = (phase-0.4)/0.6;
+      ctx.fillStyle = col('--accent2');
+      for(let i=0;i<n;i++){
+        const y = n===1 ? midY : top + i*(bottom-top)/(n-1);
+        const x = laneStartX + (laneEndX-laneStartX)*f;
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('one weight-read sweep', memX+memW+6, midY-14);
+    ctx.textAlign = 'right';
+    ctx.fillText('B = ' + n + ' query lanes share it', laneEndX, top-10);
+  }
+
+  function loop(){
+    if(playing){
+      phase += 0.01;
+      if(phase > 1) phase = 0;
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  slider.addEventListener('input', ()=>{
+    B = parseInt(slider.value, 10);
+    updateReadouts();
+  });
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause sweep' : 'Play sweep';
+  });
+
+  updateReadouts();
+  draw();
+  window.__sceneReady = true;
+  requestAnimationFrame(loop);
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;batching-amortizes&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Serving 64 users at once cuts energy per answer 12–20×"
+  ></iframe>
+</section>
+
+<section class="scene" id="router-good-enough">
+  <h3>A selector that is right 80% of the time captures most of the savings</h3>
+  <div class="caption">The last scene assumed a perfect selector; no real one exists, so how good must the router actually be? Slide its accuracy and read the curve: at 60% correct decisions you already save 48.4% of total energy, at 80% you save 64.3%, and perfection tops out at 80.4% — each extra point of router accuracy buys less than a point of savings. The reason the floor is so forgiving is that a misroute isn't a wrong answer; the query simply falls back to the big cloud model, so answer quality is preserved and only some joules are wasted. Published routing systems (RouteLLM) already report 70–85% accuracy, so routing is not the bottleneck. The real frontier shows in the difficulty slices: the hardest reasoning tier — 16.5% of the reasoning set, beyond every model evaluated — remains 95% unsolved and improved only +1.5 points from 2023 to 2025, while the easier tiers jumped 24–76 points.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="router-good-enough"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Router accuracy vs. energy savings</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1a; --muted:#5a5a68;
+    --grid:#d8d8e2; --curve:#2563eb; --oracle:#c2680a; --quality:#16a34a;
+    --marker:#dc2626; --bar-solved:#7c3aed; --bar-unsolved:#c9c9d4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111318; --panel:#1b1e27; --text:#e8e8ee; --muted:#a3a3b2;
+      --grid:#343a4d; --curve:#60a5fa; --oracle:#fbbf24; --quality:#4ade80;
+      --marker:#f87171; --bar-solved:#a78bfa; --bar-unsolved:#3a3a48;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.4 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:12px;}
+  .panel{background:var(--panel);border-radius:10px;padding:10px 12px;
+    margin-bottom:10px;}
+  canvas{width:100%;height:auto;display:block;max-width:100%;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    margin:8px 0;}
+  .controls label{flex:1 1 220px;font-size:13px;}
+  .controls input[type=range]{width:100%;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;margin-top:6px;}
+  .readouts span{font-weight:600;color:var(--curve);}
+  button{font-size:13px;padding:5px 10px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  math{font-size:15px;}
+  .legend{color:var(--muted);font-size:11.5px;margin-top:4px;line-height:1.5;}
+  .insetLabel{font-size:12px;color:var(--muted);margin-top:4px;}
+  h3{font-size:13px;margin:0 0 6px;color:var(--muted);font-weight:600;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;plot&quot; width=&quot;640&quot; height=&quot;280&quot;></canvas>
+    <div class=&quot;controls&quot;>
+      <label for=&quot;acc&quot;>Router decision accuracy (% of queries routed the way an oracle would) — drag to see savings change
+        <input type=&quot;range&quot; id=&quot;acc&quot; min=&quot;60&quot; max=&quot;100&quot; step=&quot;1&quot; value=&quot;80&quot;>
+      </label>
+      <button id=&quot;playBtn&quot;>Play intro sweep</button>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <div>Accuracy: <span id=&quot;accVal&quot;>80</span>%</div>
+      <div>Energy savings: <span id=&quot;savVal&quot;>--</span>%</div>
+      <div>Local slope: <span id=&quot;slopeVal&quot;>--</span> pp savings/pp accuracy</div>
+      <div>Oracle bound: <span id=&quot;oracleVal&quot;>80.4</span>%</div>
+    </div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <math display=&quot;block&quot;>
+      <mi>S</mi><mo>(</mo><mi>a</mi><mo>)</mo><mo>=</mo>
+      <msub><mi>S</mi><mtext>oracle</mtext></msub><mo>&amp;#183;</mo>
+      <msup><mi>a</mi><mi>k</mi></msup>
+    </math>
+    <div class=&quot;legend&quot;>
+      S(a) — energy savings (%) at router accuracy a &amp;middot;
+      S<sub>oracle</sub> — savings with a perfect (100%-accurate) router, 80.4% &amp;middot;
+      a — router decision accuracy, as a fraction (0.60&amp;ndash;1.00) &amp;middot;
+      k — diminishing-returns exponent (dimensionless, k&amp;lt;1), fit so the curve bends toward the oracle bound
+    </div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <h3>Hardest reasoning tier (Level 5, 16.5% of the reasoning set) — unaffected by router accuracy</h3>
+    <canvas id=&quot;inset&quot; width=&quot;640&quot; height=&quot;70&quot;></canvas>
+    <div class=&quot;insetLabel&quot;>95% of these problems remain unsolved by any evaluated model; only +1.5 percentage points of progress from 2023 to 2025.</div>
+  </div>
+
+</div>
+
+<script>
+// ---------- physics / model ----------
+const S_ORACLE = 80.4;   // % savings achieved by a perfect (100%-accurate) router
+const K_EXP    = 0.95;   // diminishing-returns exponent, calibrated so curve passes near
+                          // (60%,~49%),(80%,~65%),(100%,80.4%) while staying concave (k<1)
+const QUALITY_CONST = 100; // % answer quality preserved, independent of router accuracy
+                            // (a misroute falls back to the big model, so no wrong answers)
+
+function savings(accPct){
+  const a = accPct/100;
+  return S_ORACLE * Math.pow(a, K_EXP);
+}
+function localSlope(accPct){ // pp of savings per pp of accuracy
+  const a = accPct/100;
+  return (K_EXP * S_ORACLE * Math.pow(a, K_EXP-1)) / 100;
+}
+
+// ---------- plot ----------
+const plot = document.getElementById('plot');
+const pctx = plot.getContext('2d');
+const Y_MAX = 105; // small headroom so the 100% line never touches the top edge
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function drawPlot(accPct){
+  const W = plot.clientWidth, H = plot.clientHeight;
+  const dpr = window.devicePixelRatio||1;
+  if (plot.width !== Math.round(W*dpr) || plot.height !== Math.round(H*dpr)){
+    plot.width = Math.round(W*dpr); plot.height = Math.round(H*dpr);
+  }
+  pctx.setTransform(dpr,0,0,dpr,0,0);
+  pctx.clearRect(0,0,W,H);
+
+  const m = {left:38, right:14, top:14, bottom:26};
+  const pw = W - m.left - m.right, ph = H - m.top - m.bottom;
+  const X = a => m.left + (a-60)/40*pw;
+  const Y = s => m.top + (1 - s/Y_MAX)*ph;
+
+  const grid = cssVar('--grid'), text = cssVar('--text'), muted = cssVar('--muted');
+  const curveC = cssVar('--curve'), oracleC = cssVar('--oracle'),
+        qualC = cssVar('--quality'), markC = cssVar('--marker');
+
+  pctx.font = '11px sans-serif';
+  pctx.strokeStyle = grid; pctx.fillStyle = muted; pctx.lineWidth = 1;
+
+  // y gridlines/labels 0..100 step 20
+  for(let s=0; s<=100; s+=20){
+    const y = Y(s);
+    pctx.beginPath(); pctx.moveTo(m.left,y); pctx.lineTo(W-m.right,y); pctx.stroke();
+    pctx.fillText(s+'%', 3, y+3);
+  }
+  // x gridlines/labels 60..100 step 10
+  for(let a=60; a<=100; a+=10){
+    const x = X(a);
+    pctx.beginPath(); pctx.moveTo(x,m.top); pctx.lineTo(x,H-m.bottom); pctx.stroke();
+    pctx.fillText(a+'%', x-10, H-6);
+  }
+  pctx.fillText('router decision accuracy', m.left, H-1);
+
+  // quality line (constant)
+  pctx.strokeStyle = qualC; pctx.setLineDash([]); pctx.lineWidth = 2;
+  pctx.beginPath(); pctx.moveTo(X(60), Y(QUALITY_CONST)); pctx.lineTo(X(100), Y(QUALITY_CONST)); pctx.stroke();
+  pctx.fillStyle = qualC;
+  pctx.fillText('answer quality (constant, misroutes fall back to big model)', m.left+2, Y(QUALITY_CONST)+12);
+
+  // oracle bound dashed asymptote
+  pctx.strokeStyle = oracleC; pctx.setLineDash([5,4]); pctx.lineWidth = 1.5;
+  pctx.beginPath(); pctx.moveTo(X(60), Y(S_ORACLE)); pctx.lineTo(X(100), Y(S_ORACLE)); pctx.stroke();
+  pctx.setLineDash([]);
+  pctx.fillStyle = oracleC;
+  pctx.fillText('oracle bound: savings with a perfect router (80.4%)', m.left+2, Y(S_ORACLE)-5);
+
+  // savings curve
+  pctx.strokeStyle = curveC; pctx.lineWidth = 2.5;
+  pctx.beginPath();
+  for(let a=60; a<=100; a+=1){
+    const x = X(a), y = Y(savings(a));
+    if(a===60) pctx.moveTo(x,y); else pctx.lineTo(x,y);
+  }
+  pctx.stroke();
+
+  // anchor dots at 60/80/100
+  pctx.fillStyle = curveC;
+  [60,80,100].forEach(a=>{
+    const s = savings(a);
+    pctx.beginPath(); pctx.arc(X(a),Y(s),3,0,7); pctx.fill();
+  });
+
+  // current marker
+  const s0 = savings(accPct);
+  pctx.strokeStyle = markC; pctx.lineWidth = 1.5; pctx.setLineDash([3,3]);
+  pctx.beginPath(); pctx.moveTo(X(accPct), Y(0)); pctx.lineTo(X(accPct), Y(s0)); pctx.stroke();
+  pctx.setLineDash([]);
+  pctx.fillStyle = markC;
+  pctx.beginPath(); pctx.arc(X(accPct), Y(s0), 4.5, 0, 7); pctx.fill();
+  pctx.fillStyle = text;
+  const lx = Math.min(X(accPct)+6, W-m.right-90);
+  pctx.fillText(accPct.toFixed(0)+'%  \u2192  '+s0.toFixed(1)+'% saved', lx, Math.max(Y(s0)-8, m.top+10));
+}
+
+// ---------- inset bar (Level-5 hard tier) ----------
+const inset = document.getElementById('inset');
+const ictx = inset.getContext('2d');
+function drawInset(){
+  const W = inset.clientWidth, H = inset.clientHeight;
+  const dpr = window.devicePixelRatio||1;
+  inset.width = Math.round(W*dpr); inset.height = Math.round(H*dpr);
+  ictx.setTransform(dpr,0,0,dpr,0,0);
+  ictx.clearRect(0,0,W,H);
+
+  const solved2025 = 5.0, solved2023 = 3.5; // %, difference = +1.5 pp (fixed historical facts)
+  const barX = 10, barY = 18, barW = W-20, barH = 22;
+
+  ictx.fillStyle = cssVar('--bar-unsolved');
+  ictx.fillRect(barX, barY, barW, barH);
+  const solvedW = barW * solved2025/100;
+  ictx.fillStyle = cssVar('--bar-solved');
+  ictx.fillRect(barX, barY, solvedW, barH);
+
+  // 2023 boundary tick
+  const tickX = barX + barW*solved2023/100;
+  ictx.strokeStyle = cssVar('--text'); ictx.lineWidth = 1.5;
+  ictx.beginPath(); ictx.moveTo(tickX, barY-4); ictx.lineTo(tickX, barY+barH+4); ictx.stroke();
+
+  ictx.font = '11px sans-serif'; ictx.fillStyle = cssVar('--text');
+  ictx.fillText('solved 5.0% (2025)', barX+2, barY+barH+14);
+  ictx.fillText('unsolved 95%', barX+solvedW+8, barY+barH+14>H-2 ? barY+14 : barY+14);
+  ictx.fillStyle = cssVar('--muted');
+  ictx.fillText('2023 mark: 3.5% solved (+1.5 pp by 2025)', barX, 11);
+}
+
+// ---------- wiring ----------
+const accInput = document.getElementById('acc');
+const accVal = document.getElementById('accVal');
+const savVal = document.getElementById('savVal');
+const slopeVal = document.getElementById('slopeVal');
+
+function update(accPct){
+  accVal.textContent = accPct.toFixed(0);
+  savVal.textContent = savings(accPct).toFixed(1);
+  slopeVal.textContent = localSlope(accPct).toFixed(2);
+  drawPlot(accPct);
+}
+
+accInput.addEventListener('input', ()=> update(parseFloat(accInput.value)));
+
+// ---------- intro sweep / reduced motion ----------
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const playBtn = document.getElementById('playBtn');
+let animId = null;
+
+function playIntro(){
+  if(animId) return;
+  const start = 60, end = 80, dur = 1200;
+  const t0 = performance.now();
+  function step(now){
+    const t = Math.min(1,(now-t0)/dur);
+    const val = start + (end-start)*t;
+    accInput.value = val;
+    update(val);
+    if(t<1){ animId = requestAnimationFrame(step); } else { animId=null; }
+  }
+  animId = requestAnimationFrame(step);
+}
+playBtn.addEventListener('click', playIntro);
+
+// initial draw
+update(parseFloat(accInput.value));
+drawInset();
+window.addEventListener('resize', ()=>{ update(parseFloat(accInput.value)); drawInset(); });
+
+if(!reduceMotion){
+  accInput.value = 60; update(60);
+  setTimeout(playIntro, 300);
+} 
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;router-good-enough&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A selector that is right 80% of the time captures most of the savings"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now: crossing the efficiency threshold</h2>
+  <div class="part-lede">The final step is the trend line. The same measured progress reads very differently per watt than per joule, and once you can read both correctly, the paper's historical argument snaps into place: computing migrates to the small machine when it becomes efficient enough — and that threshold is being crossed right now.</div>
+</header>
+<section class="scene" id="watt-vs-joule-decomposition">
+  <h3>The same two years of progress read 5.3× per watt but 18× per joule</h3>
+  <div class="caption">Here is a puzzle you can now solve with scene one's toolkit: the paper reports that models drove recent progress (3.1× of the 5.3× per-watt gain, versus 1.7× from hardware) and that hardware drove it (5.9× of an 18× per-joule gain over 16 months) — and both are true. A new chip does two things at once: it draws somewhat less power per unit of accuracy, and it finishes each query much faster. Slide the speedup and watch: the per-watt gauge doesn't budge, because <math><mi>mathrm</mi><mrow><mi>I</mi><mi>P</mi><mi>W</mi></mrow><mo>=</mo><mi>mathrm</mi><mrow><mi>a</mi><mi>c</mi><mi>c</mi></mrow><mo>/</mo><mi>P</mi></math> contains no time at all, while the per-joule gauge climbs in proportion, because energy is <math><mi>P</mi><mo>·</mo><mi>τ</mi></math> and the shrinking <math><mi>τ</mi></math> multiplies straight in. Which metric you should care about depends on your constraint: a laptop lives under a thermal ceiling, a hard cap on watts, so per-watt governs what it can sustain; a battery or an electric bill is a budget in joules, so per-joule governs what a day of use costs. Two honest metrics, one dataset, no contradiction.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="watt-vs-joule-decomposition"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Watts vs Joules: same progress, two readings</title>
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#ffffff; --fg:#1b1b1f; --muted:#6a6a72;
+  --accent:#2f6fed; --accent2:#e0722e; --grid:#d8d8dd; --other:#9a9aa4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15161a; --panel:#1e2025; --fg:#eceef2; --muted:#a2a6b0;
+    --accent:#5b9bff; --accent2:#ff9a52; --grid:#3a3d45; --other:#6f7280;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 22px;}
+h3{margin:2px 0 10px;font-size:16px;}
+.eqrow{background:var(--panel);border-radius:8px;padding:8px 12px;margin:8px 0;}
+math{font-size:16px;}
+.legend{font-size:11.5px;color:var(--muted);margin:2px 0 0;line-height:1.4;}
+.ctrl{margin:14px 0 4px;}
+.ctrl label{display:block;font-size:13px;margin-bottom:4px;}
+.ctrl input[type=range]{width:100%;}
+svg{width:100%;height:auto;display:block;max-width:100%;}
+.panel{background:var(--panel);border-radius:8px;padding:8px;margin:10px 0;}
+text{fill:var(--fg);font-family:inherit;}
+.muted{fill:var(--muted);}
+.small{font-size:11px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h3>Watts vs joules: same progress, two readings</h3>
+
+<div class=&quot;eqrow&quot;>
+<math display=&quot;block&quot;><mi>E</mi><mo>=</mo><mi>P</mi><mo>&amp;#183;</mo><mi>&amp;#964;</mi></math>
+<div class=&quot;legend&quot;>E — energy used per query (J) &amp;middot; P — power draw (W) &amp;middot; &amp;#964; — query latency, time to finish one query (s)</div>
+</div>
+
+<div class=&quot;eqrow&quot;>
+<math display=&quot;block&quot;><mtext>IPW</mtext><mo>=</mo><mfrac><mi>acc</mi><mi>P</mi></mfrac><mo>,</mo><mtext>&amp;#160;&amp;#160;IPJ</mtext><mo>=</mo><mfrac><mi>acc</mi><mi>E</mi></mfrac><mo>=</mo><mfrac><mi>acc</mi><mrow><mi>P</mi><mo>&amp;#183;</mo><mi>&amp;#964;</mi></mrow></mfrac></math>
+<div class=&quot;legend&quot;>IPW — accuracy-weighted throughput per watt (score/W) &amp;middot; IPJ — accuracy-weighted throughput per joule (score/J) &amp;middot; acc — accuracy score of the model (benchmark points, held fixed in this demo)</div>
+</div>
+
+<div class=&quot;ctrl&quot;>
+<label for=&quot;speed&quot;>Latency speedup s — how much faster the new hardware finishes each query at the <em>same</em> power draw: <span id=&quot;sval&quot;>1.0</span>×</label>
+<input type=&quot;range&quot; id=&quot;speed&quot; min=&quot;1&quot; max=&quot;4&quot; step=&quot;0.1&quot; value=&quot;1&quot;>
+</div>
+
+<div class=&quot;panel&quot;>
+<svg id=&quot;main&quot; viewBox=&quot;0 0 640 260&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+</div>
+
+<div class=&quot;panel&quot;>
+<svg id=&quot;bars&quot; viewBox=&quot;0 0 640 170&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+</div>
+
+</div>
+
+<script>
+// ---- physical constants for the interactive demo (arbitrary but fixed reference chip) ----
+const P0 = 100;     // W, power draw of one query (fixed regardless of speedup)
+const TAU0 = 2;     // s, query latency at speedup = 1x
+const ACC = 100;    // score, accuracy of the model (held fixed: this slider changes hardware only)
+const GMAX = 2.0;   // score/J or score/W, full-scale value for both gauge bars
+
+function compute(s){
+  const tau = TAU0 / s;          // s
+  const E = P0 * tau;            // J
+  const IPW = ACC / P0;          // score/W  (no tau anywhere -> independent of s)
+  const IPJ = ACC / E;           // score/J
+  return {tau, E, IPW, IPJ};
+}
+
+// ---- SVG helpers ----
+const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+function el(tag, attrs, text){
+  const n = document.createElementNS(svgNS, tag);
+  for(const k in attrs) n.setAttribute(k, attrs[k]);
+  if(text !== undefined) n.textContent = text;
+  return n;
+}
+function col(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// ---- main diagram (rectangle + gauges) ----
+const main = document.getElementById('main');
+const RECT_X = 60, RECT_BOTTOM = 200, RECT_H = 140, RECT_MAXW = 200;
+const rect = el('rect', {x:RECT_X, y:RECT_BOTTOM-RECT_H, width:RECT_MAXW, height:RECT_H, fill:col('--accent'), opacity:'0.55'});
+main.appendChild(el('line',{x1:RECT_X,y1:40,x2:RECT_X,y2:RECT_BOTTOM+8,stroke:col('--muted')}));
+main.appendChild(el('line',{x1:RECT_X-4,y1:RECT_BOTTOM,x2:315,y2:RECT_BOTTOM,stroke:col('--muted')}));
+main.appendChild(rect);
+main.appendChild(el('text',{x:14,y:135,class:'muted small',transform:'rotate(-90 14 135)'},'power P (W)'));
+main.appendChild(el('text',{x:150,y:230,class:'muted small','text-anchor':'middle'},'time τ (s)   — width of box = query duration'));
+const pLabel = el('text',{x:RECT_X+6,y:66,class:'small'},'P = 100 W (fixed)');
+main.appendChild(pLabel);
+const tLabel = el('text',{x:0,y:RECT_BOTTOM-6,class:'small'},'');
+main.appendChild(tLabel);
+const eLabel = el('text',{x:0,y:0,class:'small','text-anchor':'middle'},'');
+main.appendChild(eLabel);
+
+function gauge(y, labelTxt){
+  const g = {};
+  g.group = el('g',{});
+  g.group.appendChild(el('text',{x:400,y:y-8,class:'small'},labelTxt));
+  g.group.appendChild(el('rect',{x:400,y:y,width:200,height:22,fill:col('--grid'),rx:3}));
+  g.bar = el('rect',{x:400,y:y,width:0,height:22,rx:3});
+  g.group.appendChild(g.bar);
+  g.val = el('text',{x:610,y:y+16,class:'small','text-anchor':'end'},'');
+  g.group.appendChild(g.val);
+  g.group.appendChild(el('text',{x:400,y:y+36,class:'muted small'},'0'));
+  g.group.appendChild(el('text',{x:600,y:y+36,class:'muted small','text-anchor':'end'},GMAX.toFixed(1)));
+  main.appendChild(g.group);
+  return g;
+}
+const gIPW = gauge(70, 'IPW (score/W) — frozen: no τ in the formula');
+gIPW.bar.setAttribute('fill', col('--accent2'));
+const gIPJ = gauge(160, 'IPJ (score/J) — rises with speedup');
+gIPJ.bar.setAttribute('fill', col('--accent'));
+
+function drawMain(s){
+  const {tau, E, IPW, IPJ} = compute(s);
+  const w = RECT_MAXW / s;
+  rect.setAttribute('width', w.toFixed(2));
+  tLabel.setAttribute('x', (RECT_X + w + 6).toFixed(1));
+  tLabel.textContent = 'τ = ' + tau.toFixed(2) + ' s';
+  eLabel.setAttribute('x', (RECT_X + w/2).toFixed(1));
+  eLabel.setAttribute('y', (RECT_BOTTOM - RECT_H/2).toFixed(1));
+  eLabel.textContent = 'E = ' + E.toFixed(0) + ' J';
+  gIPW.bar.setAttribute('width', Math.max(0, (IPW/GMAX*200)).toFixed(1));
+  gIPW.val.textContent = IPW.toFixed(2);
+  gIPJ.bar.setAttribute('width', Math.max(0, (IPJ/GMAX*200)).toFixed(1));
+  gIPJ.val.textContent = IPJ.toFixed(2);
+}
+
+// ---- decomposition bars (static historical data from the paper) ----
+const MODEL_IPW = 3.1, HW_IPW = 1.7;           // dataset: model vs hardware factors, per-watt
+const IPJ_TOTAL = 18, HW_IPJ = 5.9;            // dataset: total per-joule gain, hardware factor
+const IPW_TOTAL = MODEL_IPW * HW_IPW;          // computed product (~5.3)
+const OTHER_IPJ = IPJ_TOTAL / HW_IPJ;          // computed remainder (~3.1)
+
+const bars = document.getElementById('bars');
+const BX = 20, SCALE = 560 / Math.log(IPJ_TOTAL);
+function seg(x, y, wpx, h, fill, label){
+  const g = el('g',{});
+  g.appendChild(el('rect',{x:x,y:y,width:Math.max(wpx,1),height:h,fill:fill,rx:3}));
+  if(wpx>40) g.appendChild(el('text',{x:x+wpx/2,y:y+h/2+4,'text-anchor':'middle',class:'small',fill:'#fff'},label));
+  bars.appendChild(g);
+  return x + wpx;
+}
+function buildRow(y, title, totalVal, part1, c1, lab1, part2, c2, lab2){
+  bars.appendChild(el('text',{x:BX,y:y-8,class:'small'}, title));
+  let x = BX;
+  x = seg(x, y, Math.log(part1)*SCALE, 26, c1, lab1);
+  x = seg(x, y, Math.log(part2)*SCALE, 26, c2, lab2);
+  bars.appendChild(el('text',{x:x+8,y:y+18,class:'small'}, '= ' + totalVal.toFixed(1) + '×'));
+}
+buildRow(45, 'Per-watt (IPW) gain, 2023→2025', IPW_TOTAL,
+  MODEL_IPW, col('--accent2'), 'models '+MODEL_IPW.toFixed(1)+'×',
+  HW_IPW, col('--accent'), 'hardware '+HW_IPW.toFixed(1)+'×');
+buildRow(125, 'Per-joule (IPJ) gain, same 16 months', IPJ_TOTAL,
+  HW_IPJ, col('--accent'), 'hardware '+HW_IPJ.toFixed(1)+'×',
+  OTHER_IPJ, col('--other'), 'other '+OTHER_IPJ.toFixed(1)+'×');
+
+// ---- interaction / animation ----
+const slider = document.getElementById('speed');
+const sval = document.getElementById('sval');
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let current = 1, target = 1;
+
+function render(){
+  sval.textContent = current.toFixed(1);
+  drawMain(current);
+}
+
+function step(){
+  if(Math.abs(target-current) > 0.001){
+    current += (target-current)*0.25;
+    render();
+    requestAnimationFrame(step);
+  } else {
+    current = target;
+    render();
+  }
+}
+
+slider.addEventListener('input', () => {
+  target = parseFloat(slider.value);
+  if(reduceMotion){ current = target; render(); }
+  else requestAnimationFrame(step);
+});
+
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;watt-vs-joule-decomposition&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The same two years of progress read 5.3× per watt but 18× per joule"
+  ></iframe>
+</section>
+
+<section class="scene" id="efficiency-threshold">
+  <h3>Computing moves to the small machine when it becomes efficient enough, not when it wins</h3>
+  <div class="caption">One last question: why is this happening now, and should we expect it to continue? History offers a control experiment: from 1946 to 2009, computations per joule doubled every ~1.5 years (a trend named for Jonathan Koomey), and work migrated from room-sized mainframes to desktop PCs not when PCs outperformed them — they never did at the time — but when a wall-socket machine became efficient enough to satisfy a typical user's needs. That is precisely a per-watt threshold, which is why this paper tracks a ratio rather than raw benchmark scores. Drag the year and watch both curves: local intelligence per watt compounding at ~2.3× per year (2.27× in 2024, 2.32× in 2025), while the share of real queries a single best local model can service climbs 23.2% → 48.7% → 71.3%, with the pooled figure at 88.7% — and the old storage barrier gone, since consumer accelerator memory has grown 126× since 2012. The datacenter keeps the hard 11%: the graduate-level reasoning tail, and every workload that batching makes cheap. But if these curves hold for even a few more years, the default answer to 'where does an AI query run?' quietly changes from 'a warehouse somewhere' to 'the machine in front of you.'</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="efficiency-threshold"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Efficiency threshold: mainframe → PC, then datacenter → local</title>
+<style>
+  :root{
+    --bg:#faf9f6; --panel:#ffffff; --fg:#1c1c1e; --muted:#6b6b70;
+    --grid:#d9d7d2; --accent:#1f6feb; --accent2:#c2410c;
+    --ghost:#9a9a9a; --pooled:#0f8a5f; --line:#3a3a3c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a; --panel:#1d1e24; --fg:#e9e9ec; --muted:#9a9aa2;
+      --grid:#33343c; --accent:#5b9dff; --accent2:#ff9457;
+      --ghost:#6d6d76; --pooled:#3ddc9a; --line:#c9c9d0;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:15px;margin:2px 0 8px;font-weight:600;}
+  .panel{background:var(--panel);border:1px solid var(--grid);border-radius:10px;
+    padding:10px 10px 4px;}
+  canvas{max-width:100%;width:100%;height:auto;display:block;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;}
+  .ctrl{display:flex;flex-direction:column;gap:3px;flex:1 1 220px;min-width:180px;}
+  label{font-size:12px;color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--fg);cursor:pointer;}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .ro{background:var(--panel);border:1px solid var(--grid);border-radius:8px;
+    padding:6px 10px;font-size:12px;min-width:130px;flex:1 1 130px;}
+  .ro b{display:block;font-size:15px;margin-top:1px;}
+  math{font-size:15px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:4px 0 12px;line-height:1.5;}
+  .eqbox{margin-top:14px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Local intelligence-per-watt vs. workload coverage, by year</h2>
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;360&quot;></canvas>
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;yr&quot;>Year (drag past 2025 for dashed projection)</label>
+        <input type=&quot;range&quot; id=&quot;yr&quot; min=&quot;2023&quot; max=&quot;2027&quot; step=&quot;0.02&quot; value=&quot;2023&quot;>
+      </div>
+      <button id=&quot;play&quot;>▶ Play</button>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;ro&quot;>Year<b id=&quot;roYear&quot;>2023.0</b></div>
+      <div class=&quot;ro&quot;>Local IPW, relative to 2023<b id=&quot;roIpw&quot;>1.00×</b></div>
+      <div class=&quot;ro&quot;>Best single model coverage<b id=&quot;roCov&quot;>23.2%</b></div>
+      <div class=&quot;ro&quot;>Regime<b id=&quot;roReg&quot;>measured data</b></div>
+    </div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>IPW</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo>
+      <mi>IPW</mi><mo>(</mo><msub><mi>t</mi><mn>0</mn></msub><mo>)</mo>
+      <mo>·</mo><msup><mi>r</mi><mrow><mo>(</mo><mi>t</mi><mo>−</mo><msub><mi>t</mi><mn>0</mn></msub><mo>)</mo></mrow></msup>
+    </math>
+    <div class=&quot;legend&quot;>
+      IPW — local intelligence per watt, relative units (dimensionless, normalized to 1 at t₀) ·
+      t — year · t₀ — reference year, 2023 · r — annual efficiency growth multiplier
+      (2.27 in 2024, 2.32 in 2025, ≈2.3 projected 2026–2027).
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const yrSlider = document.getElementById('yr');
+  const playBtn = document.getElementById('play');
+  const roYear = document.getElementById('roYear');
+  const roIpw = document.getElementById('roIpw');
+  const roCov = document.getElementById('roCov');
+  const roReg = document.getElementById('roReg');
+
+  const YEAR_MIN = 2023, YEAR_MAX = 2027, DATA_END = 2025;
+
+  // --- physics / trend formulas (named constants, auditable) ---
+  function ipwValue(t){
+    const r1 = 2.27, r2 = 2.32, r3 = 2.30; // annual efficiency growth multipliers
+    const v0 = 1;
+    if (t <= 2024) return v0 * Math.pow(r1, t - 2023);
+    if (t <= 2025) return v0 * r1 * Math.pow(r2, t - 2024);
+    return v0 * r1 * r2 * Math.pow(r3, t - 2025);
+  }
+  function coverageValue(t){
+    const p0 = 23.2, p1 = 48.7, p2 = 71.3; // measured best-single-model coverage, %
+    if (t <= 2024) return p0 + (p1 - p0) * (t - 2023);
+    if (t <= 2025) return p1 + (p2 - p1) * (t - 2024);
+    const gap0 = 100 - p2, decay = 0.61; // extrapolated closing-gap decay per year
+    return 100 - gap0 * Math.pow(decay, t - 2025);
+  }
+  function koomeyValue(t){
+    const doublingYears = 1.5; // Koomey's law, 1946-2009
+    const rate = Math.pow(2, 1 / doublingYears);
+    return 1 * Math.pow(rate, t - 2023);
+  }
+  const POOLED_2025 = 88.7; // pooled coverage across multiple local models, 2025
+
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  let year = 2023;
+
+  function draw(){
+    const W = cv.width, H = cv.height;
+    const fg = cssVar('--fg'), muted = cssVar('--muted'), grid = cssVar('--grid');
+    const accent = cssVar('--accent'), accent2 = cssVar('--accent2');
+    const ghost = cssVar('--ghost'), pooled = cssVar('--pooled'), panel = cssVar('--panel');
+
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = panel; ctx.fillRect(0,0,W,H);
+
+    const mL = 46, mR = 50, mT = 22, mB = 34;
+    const pw = W - mL - mR, ph = H - mT - mB;
+
+    const yMinLog = 1, yMaxLog = 32;
+    const logLo = Math.log10(yMinLog), logHi = Math.log10(yMaxLog);
+    const xOf = (t) => mL + (t - YEAR_MIN) / (YEAR_MAX - YEAR_MIN) * pw;
+    const yLogOf = (v) => mT + ph - (Math.log10(v) - logLo) / (logHi - logLo) * ph;
+    const yLinOf = (p) => mT + ph - (p / 100) * ph;
+
+    // grid + x ticks
+    ctx.strokeStyle = grid; ctx.lineWidth = 1; ctx.fillStyle = muted;
+    ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    for (let yr2 = 2023; yr2 <= 2027; yr2++){
+      const x = xOf(yr2);
+      ctx.beginPath(); ctx.moveTo(x, mT); ctx.lineTo(x, mT + ph); ctx.stroke();
+      ctx.fillText(String(yr2), x, mT + ph + 16);
+    }
+    // divider data|projection
+    const xd = xOf(DATA_END);
+    ctx.setLineDash([]); ctx.strokeStyle = fg; ctx.globalAlpha = 0.35;
+    ctx.beginPath(); ctx.moveTo(xd, mT); ctx.lineTo(xd, mT+ph); ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // left log axis ticks
+    ctx.textAlign = 'right';
+    [1,2,5,10,20,32].forEach(v=>{
+      const y = yLogOf(v);
+      ctx.fillStyle = muted;
+      ctx.fillText((v===32?'32':String(v)), mL - 6, y + 3);
+      ctx.strokeStyle = grid; ctx.globalAlpha=0.5;
+      ctx.beginPath(); ctx.moveTo(mL, y); ctx.lineTo(mL+pw, y); ctx.stroke();
+      ctx.globalAlpha=1;
+    });
+    // right linear axis ticks
+    ctx.textAlign = 'left';
+    [0,20,40,60,80,100].forEach(p=>{
+      const y = yLinOf(p);
+      ctx.fillStyle = muted;
+      ctx.fillText(p+'%', mL+pw+6, y+3);
+    });
+
+    // axis titles
+    ctx.save(); ctx.translate(12, mT+ph/2); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle = accent; ctx.textAlign='center'; ctx.font='11px sans-serif';
+    ctx.fillText('local IPW, ×2023 (log scale)', 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(W-11, mT+ph/2); ctx.rotate(Math.PI/2);
+    ctx.fillStyle = accent2; ctx.textAlign='center';
+    ctx.fillText('coverage of queries (%)', 0, 0); ctx.restore();
+
+    // Koomey ghost line (full range, dashed, faint)
+    ctx.strokeStyle = ghost; ctx.setLineDash([4,4]); ctx.lineWidth = 1.6; ctx.globalAlpha=0.85;
+    ctx.beginPath();
+    for (let t=YEAR_MIN; t<=YEAR_MAX; t+=0.05){
+      const x=xOf(t), y=yLogOf(Math.min(koomeyValue(t), 32));
+      t===YEAR_MIN? ctx.moveTo(x,y): ctx.lineTo(x,y);
+    }
+    ctx.stroke(); ctx.globalAlpha=1; ctx.setLineDash([]);
+    ctx.fillStyle = ghost; ctx.textAlign='left'; ctx.font='10.5px sans-serif';
+    ctx.fillText('1946–2009 historical trend (Koomey, doubles /1.5 yr)', mL+6, yLogOf(koomeyValue(2026.6))-6);
+
+    // pooled reference line (2025 pooled coverage, all local models)
+    ctx.strokeStyle = pooled; ctx.setLineDash([2,3]); ctx.lineWidth=1.4;
+    const yPool = yLinOf(POOLED_2025);
+    ctx.beginPath(); ctx.moveTo(mL, yPool); ctx.lineTo(mL+pw, yPool); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = pooled; ctx.font='10.5px sans-serif'; ctx.textAlign='right';
+    ctx.fillText('pooled (all local models), 2025: 88.7%', mL+pw-4, yPool-5);
+
+    // helper to draw a curve solid up to DATA_END, dashed after
+    function curve(fn, mapY, color, label, labelYear){
+      ctx.strokeStyle = color; ctx.lineWidth = 2.4;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let t=YEAR_MIN; t<=DATA_END; t+=0.03){
+        const x=xOf(t), y=mapY(fn(t));
+        t===YEAR_MIN? ctx.moveTo(x,y): ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([5,4]);
+      ctx.beginPath();
+      for (let t=DATA_END; t<=YEAR_MAX; t+=0.03){
+        const x=xOf(t), y=mapY(fn(t));
+        t===DATA_END? ctx.moveTo(x,y): ctx.lineTo(x,y);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = color; ctx.font='11px sans-serif'; ctx.textAlign='left';
+      const lx = xOf(labelYear), ly = mapY(fn(labelYear));
+      ctx.fillText(label, Math.min(lx+4, W-mR-2), ly-8);
+    }
+    curve(ipwValue, yLogOf, accent, 'local IPW (~2.3×/yr)', 2026.6);
+    curve(coverageValue, yLinOf, accent2, 'best single model, coverage', 2026.2);
+
+    // measured data points
+    [2023,2024,2025].forEach(t=>{
+      ctx.fillStyle = accent2;
+      const p=coverageValue(t);
+      ctx.beginPath(); ctx.arc(xOf(t), yLinOf(p), 3.2, 0, 7); ctx.fill();
+      ctx.fillStyle = accent;
+      const v=ipwValue(t);
+      ctx.beginPath(); ctx.arc(xOf(t), yLogOf(v), 3.2, 0, 7); ctx.fill();
+    });
+
+    // cursor
+    const xc = xOf(year);
+    ctx.strokeStyle = fg; ctx.globalAlpha = 0.55; ctx.setLineDash([2,2]);
+    ctx.beginPath(); ctx.moveTo(xc, mT); ctx.lineTo(xc, mT+ph); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+    const yv = ipwValue(year), cv2 = coverageValue(year);
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(xc, yLogOf(Math.min(yv,32)), 4.4, 0, 7); ctx.fill();
+    ctx.fillStyle = accent2;
+    ctx.beginPath(); ctx.arc(xc, yLinOf(cv2), 4.4, 0, 7); ctx.fill();
+
+    // readouts
+    roYear.textContent = year.toFixed(1);
+    roIpw.textContent = yv.toFixed(2) + '×';
+    roCov.textContent = cv2.toFixed(1) + '%';
+    roReg.textContent = year <= DATA_END ? 'measured data' : 'dashed projection';
+  }
+
+  function setYear(t){
+    year = Math.min(YEAR_MAX, Math.max(YEAR_MIN, t));
+    yrSlider.value = year;
+    draw();
+  }
+
+  yrSlider.addEventListener('input', ()=>{ isPlaying=false; playBtn.textContent='▶ Play'; setYear(parseFloat(yrSlider.value)); });
+
+  // resize handling
+  function resize(){
+    const w = cv.clientWidth || 640;
+    cv.width = w; cv.height = Math.round(w * (360/640));
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  // animation / play-pause
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let isPlaying = !reduced, dir = 1, lastT = null;
+  playBtn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+  playBtn.addEventListener('click', ()=>{
+    isPlaying = !isPlaying;
+    playBtn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+    lastT = null;
+    if (isPlaying) requestAnimationFrame(tick);
+  });
+
+  function tick(now){
+    if (!isPlaying) return;
+    if (lastT === null) lastT = now;
+    const dt = (now - lastT) / 1000; lastT = now;
+    let ny = year + dir * dt * 0.35;
+    if (ny >= YEAR_MAX){ ny = YEAR_MAX; dir = -1; }
+    if (ny <= YEAR_MIN){ ny = YEAR_MIN; dir = 1; }
+    setYear(ny);
+    requestAnimationFrame(tick);
+  }
+
+  resize();
+  if (isPlaying) requestAnimationFrame(tick);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;efficiency-threshold&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Computing moves to the small machine when it becomes efficient enough, not when it wins"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Intelligence per Watt: Measuring Intelligence Efficiency of Local AI</em> — Jon Saad-Falcon, Avanika Narayan, Hakki Orhun Akengin, J. Wes Griffin, Herumb Shandilya, Adrian Gamarra Lafuente, Medhya Goel, Rebecca Joseph, Shlok Natarajan, Etash Kumar Guha, Shang Zhu, Ben Athiwaratkun, John Hennessy, Azalia Mirhoseini, Christopher Ré. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+{
+  "title": "How to Run 16,000 Game Worlds at Once on One Graphics Card",
+  "hook": "Training an AI agent to play hide-and-seek took OpenAI 115 billion simulated practice steps. The expensive part wasn't the neural network — it was running the game itself. This paper stops simulating worlds one at a time and instead lays out every world's state in shared tables. That layout — not faster hardware — lets a single consumer GPU advance tens of thousands of worlds together at 1.9 million steps per second.",
+  "parts": [
+    {
+      "title": "The bottleneck is the simulator",
+      "lede": "Before any clever engineering, we need the problem: AI agents learn by trial and error inside simulated worlds, and the simulator's speed sets the wall-clock cost of every experiment. We'll meet the hardware that could fix this — and see why the obvious way to use it fails."
+    },
+    {
+      "title": "Flip the loop: step every world's entities together",
+      "lede": "The GPU wants thousands of threads doing the same operation on adjacent data. Madrona delivers exactly that by borrowing a game-industry pattern — state as tables, logic as per-row functions — and merging every world into the same tables."
+    },
+    {
+      "title": "The receipts",
+      "lede": "Same game logic, four ways of running it. The head-to-head numbers isolate which design choices actually buy the speed — and one final compiler trick squeezes out the last 35%."
+    },
+    {
+      "title": "What this unlocks",
+      "lede": "A 100× faster simulator doesn't just save money — it moves a supercomputer-scale experiment onto a desk, without asking the developer to write a single line of GPU code."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "steps-budget",
+      "conceptId": "rl-experience-bottleneck",
+      "part": "The bottleneck is the simulator",
+      "title": "Simulator speed, not learning math, sets the training clock",
+      "teaches": "Reinforcement learning needs billions of simulated steps, so steps-per-second of the world simulator directly determines wall-clock training time.",
+      "requires": [],
+      "caption": "Hide-and-seek needed 115 billion simulated steps for tool use to emerge. Drag the simulator speed and watch months collapse into hours.",
+      "visualMetaphor": "Left: a looping schematic of one RL step in hide-and-seek (a standard benchmark where hider agents learn to barricade rooms with movable boxes and seekers learn to use ramps): agent acts → physics advances → agent sees observation + reward. Right: a horizontal wall-clock bar labeled 'time to generate 115 billion steps', computed as \\(t = 115{\\times}10^9 / (\\text{steps/s})\\). A slider sets steps-per-second on a log scale. Predict-before-reveal prompt: 'A typical open-source simulator manages a few thousand steps per second. Guess the wall-clock time before you drag.' At 5,000 steps/s the bar reads ~266 days; at 1.9M steps/s it reads ~17 hours. A small annotation notes the learning-side math runs on the same GPU and is not the bottleneck here.",
+      "animatedVariable": {
+        "name": "simulator throughput",
+        "control": "slider",
+        "range": "2,000 to 2,000,000 steps per second (log scale)",
+        "whatChangesOnScreen": "The wall-clock bar shrinks hyperbolically and its label re-renders (266 days → 17 hours); a marker flags the paper's measured 1.9M steps/s."
+      },
+      "quantitativeAnchor": "115 billion steps ÷ 5,000 steps/s ≈ 266 days; ÷ 1.9M steps/s ≈ 17 hours of simulation.",
+      "physicsChecks": [
+        "Wall-clock time is inversely proportional to steps/s: doubling the slider halves the bar.",
+        "At the 1.9M steps/s marker the displayed time is under one day; at 5,000 steps/s it exceeds 8 months.",
+        "The 115×10⁹ step count stays fixed while the slider moves — only the rate changes."
+      ]
+    },
+    {
+      "id": "warp-lockstep",
+      "conceptId": "gpu-simt-coherence",
+      "part": "The bottleneck is the simulator",
+      "title": "A GPU runs 32 threads in lockstep — divergence idles the hardware",
+      "teaches": "GPU threads come in warps of 32 that share one instruction stream and fetch memory in wide contiguous chunks, so performance requires adjacent threads doing identical work on adjacent data.",
+      "requires": [
+        "steps-budget"
+      ],
+      "caption": "An RTX 4090 keeps 30,000+ threads resident so that while some wait on memory, others swap in and keep the cores busy. But threads run in groups of 32 sharing one instruction stream — toggle the branch and watch half the lanes go dark.",
+      "visualMetaphor": "32 vertical lanes (one warp) executing a shared instruction pointer that steps downward through code. Toggle A: insert an if/else where lanes 0–15 take one branch. Predict prompt: 'What do lanes 16–31 do while 0–15 run their branch?' On reveal, the two halves execute serially — the inactive half is greyed out with a stall counter accumulating idle lane-cycles (worst case: 32 different branches run one after another). Toggle B switches the memory pattern below the lanes: 32 arrows into 32 adjacent memory cells collapse into 1 highlighted transaction; 32 arrows into scattered cells fan out into 32 separate transactions, each drawn as its own slow round-trip.",
+      "animatedVariable": {
+        "name": "warp behavior",
+        "control": "toggle",
+        "range": "coherent vs divergent branches; contiguous vs scattered memory reads",
+        "whatChangesOnScreen": "Divergent: half the lanes grey out and total execution time doubles on a timeline bar. Scattered: the transaction counter jumps from 1 to 32."
+      },
+      "quantitativeAnchor": "One warp = 32 threads; the RTX 4090 has 128 streaming multiprocessors hosting over 30,000 concurrent threads.",
+      "physicsChecks": [
+        "In coherent mode all 32 lanes are lit and the timeline shows one pass; in divergent mode the timeline shows two serialized passes with 16 lanes dark in each.",
+        "Contiguous reads show exactly 1 memory transaction; scattered reads show exactly 32.",
+        "Total work completed is identical in both modes — only elapsed time and idle-lane count change."
+      ]
+    },
+    {
+      "id": "one-world-per-thread-fails",
+      "conceptId": "batch-simulation",
+      "part": "The bottleneck is the simulator",
+      "title": "One whole world per thread wastes 98% of the GPU",
+      "teaches": "Mapping each independent simulated world to its own GPU thread destroys coherence — different worlds are in different states, so warps diverge and memory scatters, capping throughput at 1.9% of the hardware's peak.",
+      "requires": [
+        "warp-lockstep"
+      ],
+      "caption": "The obvious plan — give each of 30,000 threads its own hide-and-seek world — collides with the warp rule. This exact design is the paper's own naive-GPU baseline: 42× slower than what's coming.",
+      "visualMetaphor": "One warp's 32 lanes, each now labeled with a miniature hide-and-seek world thumbnail. Press play: each world advances through its own step, but world 3 is resolving a box collision while world 7 is casting agent sightlines and world 12 is resetting after an episode ended. Predict prompt: 'These are all running the same simulator code. Will the warp stay coherent?' On reveal, the shared instruction pointer thrashes between code paths, lanes grey out in shifting patterns, and each lane's memory arrows point into 32 fully separate per-world data blobs (all scattered). A utilization gauge settles at 1.9% of peak compute. Closing annotation poses the fix: 'What if, instead of thread-per-world, every thread did the same job — across all worlds at once?'",
+      "animatedVariable": {
+        "name": "step playback",
+        "control": "play-pause",
+        "range": "one full simulation step across 32 divergent worlds",
+        "whatChangesOnScreen": "Lanes flicker between active and stalled as worlds' code paths disagree; the utilization gauge falls and holds near 1.9%."
+      },
+      "quantitativeAnchor": "The ECS-GPU (one-world-per-thread) baseline achieves 1.9% of the GPU's peak compute throughput — 42× slower than the batched design.",
+      "physicsChecks": [
+        "At any paused frame, no more than a fraction of the 32 lanes are simultaneously active because worlds occupy different code paths.",
+        "Memory arrows from adjacent lanes never land in adjacent cells (each world owns a separate blob).",
+        "The utilization gauge is far below the coherent case from the previous scene (1.9% vs near-full)."
+      ]
+    },
+    {
+      "id": "ecs-tables",
+      "conceptId": "ecs-pattern",
+      "part": "Flip the loop: step every world's entities together",
+      "title": "A world is tables of components; logic is a per-row function",
+      "teaches": "The Entity-Component-System pattern stores each object's state as plain data columns grouped by archetype, and expresses all logic as one-entity-at-a-time functions with declared read/write queries.",
+      "requires": [
+        "one-world-per-thread-fails"
+      ],
+      "caption": "Before batching anything, restructure one hide-and-seek world: no objects with methods, just tables plus functions that process one row. The declared query is what lets a runtime parallelize safely.",
+      "visualMetaphor": "One hide-and-seek world rendered top-down (5 agents, ~30 boxes and ramps) beside its data as three column-oriented tables — archetypes labeled Agent (columns: Position, Velocity, Team, Reward), Obstacle (Position, Velocity, Extents), CollisionPair (EntityA, EntityB). Each entity is just a row ID; hovering a rendered box highlights its row. Below, a system card: 'TimeIntegrate — reads Position, Velocity; writes Position' with its two-line body \\(x \\leftarrow x + v\\,Δt\\) shown as ordinary sequential code. Step button runs it: a highlight sweeps down the Position column row by row, and the rendered objects glide accordingly. Annotation: the developer wrote zero parallel code — but because the query names exactly what's read and written, the rows could run in any order, or all at once.",
+      "animatedVariable": {
+        "name": "system execution",
+        "control": "buttons",
+        "range": "step through TimeIntegrate row-by-row, or run all rows at once",
+        "whatChangesOnScreen": "Row-by-row: the highlight walks the table and objects move one at a time. All-at-once: every row flashes together and all objects move in one tick — same final state."
+      },
+      "quantitativeAnchor": "One hide-and-seek world: 5 agents and roughly 30 physics objects, each a single row in its archetype's table.",
+      "physicsChecks": [
+        "Sequential and all-at-once execution produce identical final positions (order-independence follows from the declared query).",
+        "Hovering any rendered object highlights exactly one table row and vice versa.",
+        "The system card's read/write set matches the columns that actually light up during execution — no undeclared column is ever touched."
+      ]
+    },
+    {
+      "id": "shared-table",
+      "conceptId": "single-table-per-archetype",
+      "part": "Flip the loop: step every world's entities together",
+      "title": "One table holds an archetype from every world — and warps love it",
+      "teaches": "Madrona merges each archetype's rows from all worlds into a single contiguous table tagged by world ID, so a warp of 32 threads processes rows from ~16 different worlds with perfectly contiguous memory access.",
+      "requires": [
+        "ecs-tables"
+      ],
+      "caption": "Each world has only 5 agents — never enough for a warp of 32. Slide the world count up and watch one shared Agent table feed every lane contiguous work.",
+      "visualMetaphor": "The Agent table from the last scene gains an EnvID column and a world-count slider. At 1 world: 5 rows, and a warp overlay shows 27 of 32 lanes idle. Predict prompt: 'How do we fill the other 27 lanes?' Slide to 16,384 worlds: the table extends into one long contiguous column of 81,920 agent rows, color-banded by EnvID. The warp overlay now covers any 32 consecutive rows — spanning ~16 worlds — and its memory arrows land on adjacent cells: transaction counter reads 1, all lanes lit, running the same TimeIntegrate instruction. A side panel shows the Reward column with a bracket labeled 'exported to PyTorch as-is — zero copies': the contiguous column already *is* the batched training tensor.",
+      "animatedVariable": {
+        "name": "number of worlds in the shared table",
+        "control": "slider",
+        "range": "1 to 16,384 worlds",
+        "whatChangesOnScreen": "The table grows contiguously; the warp overlay goes from 5/32 lanes active to 32/32; the memory-transaction counter stays at 1 throughout."
+      },
+      "quantitativeAnchor": "A warp of 32 threads spans agents from ~16 different worlds (5 agents each) in one contiguous read; 16,384 worlds × 5 agents = 81,920 rows in one Agent table.",
+      "physicsChecks": [
+        "At 1 world the warp overlay shows exactly 5 active lanes; at ≥7 worlds it shows all 32.",
+        "Memory arrows from adjacent lanes always hit adjacent rows regardless of world count (contrast with the scattered arrows of the one-world-per-thread scene).",
+        "Isolation is logical, not physical: rows with different EnvID colors sit side by side in one array, and the zero-copy tensor bracket spans the whole column."
+      ]
+    },
+    {
+      "id": "step-graph",
+      "conceptId": "system-computation-graph",
+      "part": "Flip the loop: step every world's entities together",
+      "title": "The entire step is declared up front as a dependency graph",
+      "teaches": "Because every world runs identical logic, the developer assembles the full step — physics, game rules, observations, resets — as one directed acyclic graph of systems, giving the runtime the complete execution plan in advance.",
+      "requires": [
+        "ecs-tables",
+        "shared-table"
+      ],
+      "caption": "Hide-and-seek's step is ~200 system nodes wired by dependencies, known before the step begins. That foreknowledge is what lets the GPU run everything without asking the CPU for instructions.",
+      "visualMetaphor": "A left-to-right DAG of the hide-and-seek step (abridged to readable clusters: MovementActions → BroadPhase(FindOverlaps) → NarrowPhase → ConstraintSolve → TimeIntegrate → LIDAR/Observations → Reward → EpisodeReset), with a counter noting the real graph has ~200 nodes. Clicking any node reveals its query (columns read/written) and highlights those columns in the shared tables below. Two nodes with disjoint read/write sets pulse together, labeled 'provably safe to run concurrently.' A few nodes are drawn in a second color, labeled 'inserted by the engine, not the developer' — table sorts and query re-evaluation — foreshadowing the next two scenes.",
+      "animatedVariable": {
+        "name": "graph inspection",
+        "control": "buttons",
+        "range": "click through node clusters from actions to reset",
+        "whatChangesOnScreen": "Selected node's read/write columns light up in the tables; independent nodes pulse simultaneously; engine-inserted nodes toggle visible."
+      },
+      "quantitativeAnchor": "The hide-and-seek step graph contains roughly 200 nodes covering world generation, physics, and observation/reward computation.",
+      "physicsChecks": [
+        "Every edge points left-to-right (the graph is acyclic).",
+        "Two nodes marked concurrent share no written column; two nodes in sequence share at least one read-after-write column.",
+        "Engine-inserted nodes (sorts, query evaluation) appear between developer nodes, not replacing them."
+      ]
+    },
+    {
+      "id": "megakernel",
+      "conceptId": "megakernel-execution",
+      "part": "Flip the loop: step every world's entities together",
+      "title": "One giant kernel: the GPU schedules all 200 nodes itself",
+      "teaches": "Compiling every system into a single 'megakernel' of persistently looping warps eliminates per-node launch overhead and the CPU round-trips otherwise needed to learn dynamic entity counts.",
+      "requires": [
+        "step-graph"
+      ],
+      "caption": "A kernel is a program the CPU launches onto the GPU, and each launch costs fixed time. Launching 200 of them drowns tiny nodes in that overhead, and the collision step can't even launch until the CPU reads back how many collision pairs exist. One launch of self-scheduling warps removes both taxes.",
+      "visualMetaphor": "Split-screen execution timelines for one step. Top ('naive: kernel per node'): 200 boxes on a GPU track, each preceded by a fixed launch-gap sliver; between FindOverlaps and NarrowPhase, an arrow drops to a CPU track and back, labeled 'CPU must read the CollisionPair row count before sizing the next launch' — the gaps and round-trips visibly outweigh the work for small nodes. Predict prompt: 'Which dominates this timeline — computation or overhead?' Bottom ('megakernel'): one launch boundary at the far left, then warps drawn as persistent workers pulling numbered work items off a shared atomic counter for the current node; when the counter drains, a global pointer ticks to the next node and every warp switches tasks instantly. NarrowPhase's item count is read straight from GPU memory — no CPU detour. The bottom timeline is dominated by wide blocks labeled physics and ray tracing, mirroring the paper's Fig. 5 profile.",
+      "animatedVariable": {
+        "name": "execution mode",
+        "control": "toggle",
+        "range": "kernel-per-node vs single megakernel",
+        "whatChangesOnScreen": "Launch-gap slivers and CPU round-trip arrows vanish; total step time on the shared time axis shrinks; the remaining timeline is mostly real work."
+      },
+      "quantitativeAnchor": "One kernel launch per step executes all ~200 graph nodes; in the resulting profile, physics and ray-traced observations dominate the time, not scheduling.",
+      "physicsChecks": [
+        "The naive timeline contains exactly one launch sliver per node plus CPU round-trips at dynamically-sized nodes; the megakernel timeline contains exactly one launch boundary and zero CPU arrows.",
+        "Node execution order respects the DAG from the previous scene in both modes — only the overhead differs.",
+        "In the megakernel view, no warp idles between nodes: workers switch tasks the moment the shared counter drains."
+      ]
+    },
+    {
+      "id": "lifecycle-sort",
+      "conceptId": "entity-lifecycle-sort-compaction",
+      "part": "Flip the loop: step every world's entities together",
+      "title": "Delete by marking, clean up by sorting",
+      "teaches": "Entities are created by appending rows and deleted by setting EnvID to −1 with no locking; a periodic parallel radix sort sweeps dead rows to the table's end and, as a bonus, groups each world's rows together for cache-friendly access.",
+      "requires": [
+        "shared-table",
+        "megakernel"
+      ],
+      "caption": "Every step, FindOverlaps spawns thousands of CollisionPair rows that die within that same step — a GPU memory allocator would choke. Watch deletion become a −1 tag and garbage collection become a sort.",
+      "visualMetaphor": "The shared CollisionPair table across many worlds, animated over one step. Phase 1 (spawn): FindOverlaps appends rows at the table's end, which grows into a shaded pre-reserved region labeled 'virtual address space, physical pages mapped on demand' — the array stays contiguous. Phase 2 (die): NarrowPhase resolves pairs and thousands of threads simultaneously stamp EnvID = −1 on their rows; the rows turn grey in place, with a callout 'no locks — each thread writes only its own row.' Phase 3 (compact, next step): press the sort button and a parallel radix sort on EnvID reorders the table — grey −1 rows slide to the end and are trimmed, while live rows emerge color-banded by world. A cache annotation notes the side effect: consecutive rows now belong to the same world, so neighboring threads hit the same world's collision structure; measured, this coherence gain outweighs the sort's cost every step.",
+      "animatedVariable": {
+        "name": "lifecycle phase",
+        "control": "buttons",
+        "range": "spawn → mark-dead → sort-and-trim",
+        "whatChangesOnScreen": "Rows append contiguously, then grey out in place, then migrate to the tail and disappear; surviving rows re-band by EnvID color."
+      },
+      "quantitativeAnchor": "CollisionPair entities are created and destroyed within a single simulation step; deletion is a single EnvID = −1 write with zero synchronization between threads.",
+      "physicsChecks": [
+        "The table remains one contiguous array through all three phases — no holes are ever left in the middle after the sort.",
+        "Row count after trim equals rows before spawn plus surviving new pairs; every −1 row is gone.",
+        "After sorting, EnvID color bands are monotone down the table (each world's rows are adjacent), whereas before sorting they interleave."
+      ]
+    },
+    {
+      "id": "four-backends",
+      "conceptId": "headline-results",
+      "part": "The receipts",
+      "title": "Same logic, four backends: batching on the GPU is worth 42×",
+      "teaches": "Running identical ECS hide-and-seek logic on four backends isolates the causes: ECS structure alone makes the CPU version 23–320× faster than reference tools, and batched shared-table GPU execution beats one-world-per-thread GPU by 42×.",
+      "requires": [
+        "megakernel",
+        "one-world-per-thread-fails"
+      ],
+      "caption": "Before revealing: rank the four backends yourself. The gap between the two GPU bars is the whole thesis — same silicon, same logic, 42× apart on layout alone.",
+      "visualMetaphor": "A horizontal log-scale bar chart for hide-and-seek steps/second, revealed one bar at a time by button, each with a one-line 'what this proves' tag. Bar 1: reference open-source simulator (Python/MuJoCo-based), thousands of steps/s — the status quo. Bar 2: ECS-CPU on a 32-thread CPU — 23–320× faster than reference across the paper's environments ('structuring state as tables pays even without a GPU'). Bar 3: ECS-GPU, one world per thread — the divergent design from earlier, pinned at 1.9% of peak. Bar 4: BATCH-ECS-GPU at 1.9M steps/s — 42× above bar 3 and 5–33× above bar 2. A predict widget asks the reader to drag ghost bars into their guessed order before the reveal. Side strip shows the same batch backend on other environments: Overcooked 40M, Hanabi 21M, Cartpole 3.4B steps/s.",
+      "animatedVariable": {
+        "name": "bar reveal",
+        "control": "buttons",
+        "range": "reveal backends one at a time, reference → BATCH-ECS-GPU",
+        "whatChangesOnScreen": "Each press adds one bar with its multiplier callout; the final press draws the 42× bracket between the two GPU bars."
+      },
+      "quantitativeAnchor": "BATCH-ECS-GPU: 1.9M steps/s on hide-and-seek with full physics and ray tracing; 42× faster than ECS-GPU; 5–33× faster than ECS-CPU, which is itself 23–320× faster than the reference simulators.",
+      "physicsChecks": [
+        "Bar order on the log axis: reference < ECS-CPU < ECS-GPU-adjacent comparisons consistent with the stated multipliers (BATCH-ECS-GPU tops all).",
+        "The 42× bracket connects the two bars running on identical GPU hardware, making 'layout, not silicon' visually explicit.",
+        "The batch bar's label reads exactly 1.9M steps/s and includes 'with physics and ray tracing' so the number isn't mistaken for a stripped-down benchmark."
+      ]
+    },
+    {
+      "id": "world-scaling",
+      "conceptId": "two-level-parallelism",
+      "part": "The receipts",
+      "title": "Parallelism inside each world means you don't need millions of them",
+      "teaches": "Madrona parallelizes within worlds (collision pairs, per-agent observations, individual LIDAR rays) as well as across them, so it exceeds the 32-thread CPU baseline at only ~500 worlds and reaches >75% of peak throughput by 8K worlds.",
+      "requires": [
+        "four-backends",
+        "shared-table"
+      ],
+      "caption": "30,000 threads to feed, but each hide-and-seek world already contains hundreds of work items — collision pairs, 5 agents' observations, individual LIDAR rays. Slide the batch size and find the crossover yourself.",
+      "visualMetaphor": "Main chart: throughput (steps/s, log y) vs number of worlds (log x, 1 to 32K) with a dashed horizontal line for the ECS-CPU 32-thread baseline. Predict prompt: 'How many worlds before the GPU beats 32 CPU cores — 500, 5,000, or 30,000?' Dragging the slider traces the curve: it crosses the CPU line near ~500 worlds and flattens past 8K worlds at >75% of the plateau. Inset: an exploded view of one world's work items — dozens of collision pairs, 5 observation jobs, LIDAR fanned into rays with a note '32 rays handled cooperatively by one warp' — versus a counterexample node (the per-world constraint solver, one invocation per world) drawn next to a multiprocessor strip with visible idle gaps.",
+      "animatedVariable": {
+        "name": "number of simultaneous worlds",
+        "control": "slider",
+        "range": "1 to 32,768 worlds (log scale)",
+        "whatChangesOnScreen": "The throughput curve extends and a marker crosses the CPU baseline near ~500 worlds; a utilization strip fills toward its plateau by 8K worlds."
+      },
+      "quantitativeAnchor": "Beats the 32-thread ECS-CPU baseline at ~500 worlds; exceeds 75% of peak throughput at 8K worlds.",
+      "physicsChecks": [
+        "Throughput increases monotonically with world count and exhibits diminishing returns (flattening slope) at the high end.",
+        "The CPU-baseline crossover marker sits near 500 worlds, far below the ~30,000 one might guess from thread count alone.",
+        "The inset's per-world work-item count (collision pairs + observations + rays) is visibly much greater than 1, and the single-invocation constraint-solver panel shows idle multiprocessors."
+      ]
+    },
+    {
+      "id": "register-pgo",
+      "conceptId": "register-occupancy-pgo",
+      "part": "The receipts",
+      "title": "The last 35%: trading registers per thread for threads in flight",
+      "teaches": "Each multiprocessor's fixed register pool means more registers per thread ⇒ fewer resident threads to hide memory latency; profiling each system at several register budgets and splitting the step into 5 kernels lifts throughput from 1.4M to 1.9M steps/s.",
+      "requires": [
+        "megakernel",
+        "four-backends"
+      ],
+      "caption": "Registers come from a fixed pool per multiprocessor. More registers per thread means fewer threads resident to cover memory waits. One megakernel forces one budget on all 200 systems: the collision solver wants 255 registers; simple systems want 64 and 4× the threads. Move the budget and watch which systems win and lose.",
+      "visualMetaphor": "Left: a multiprocessor drawn as a fixed rectangle of register file; a slider sets registers-per-thread (64 / 128 / 255), and resident thread blocks repack to fill the rectangle — at 255 only a few threads fit, at 64 four times as many. A latency-hiding meter shows a stalled thread being swapped for a ready one (rich swap pool at 64, starved at 255). Right: per-system speed bars for two real systems under the current budget — ConstraintSolve (fastest at 255: fewer register spills to slow memory) vs TimeIntegrate (fastest at 64: more threads in flight). Predict prompt: 'Can any single budget make both bars tall?' Final toggle applies Madrona's answer: profile every system under each variant for a few steps, then split the step into 5 kernel launches that switch register allocation where measured speedup exceeds launch cost — the headline throughput ticks 1.4M → 1.9M steps/s (+35%), with side gauges rising: compute utilization 22%→33%, memory bandwidth 46%→69%.",
+      "animatedVariable": {
+        "name": "registers per thread",
+        "control": "slider",
+        "range": "64 / 128 / 255 registers per thread, plus a 'profile-guided split' toggle",
+        "whatChangesOnScreen": "Resident-thread count repacks inversely with the budget; the two system speed bars trade places; the split toggle sets each system to its measured best and updates the 1.4M→1.9M readout."
+      },
+      "quantitativeAnchor": "Profile-guided register allocation: 1.4M → 1.9M steps/s (+35%); compute utilization 22% → 33%; memory bandwidth utilization 46% → 69%; 5 kernel launches per step.",
+      "physicsChecks": [
+        "Resident thread count is inversely proportional to registers per thread within the fixed register file (255 fits roughly a quarter as many as 64).",
+        "No single slider position maximizes both system bars — the conflict that motivates the split is visible.",
+        "With the split toggle on, each system runs at its per-budget maximum and the throughput readout shows exactly +35%.",
+        "All three gauges (steps/s, compute %, bandwidth %) move in the same direction when the toggle flips."
+      ]
+    },
+    {
+      "id": "desk-not-datacenter",
+      "conceptId": "programmability-vs-performance",
+      "part": "What this unlocks",
+      "title": "115 billion steps on the GPU under your desk — in ordinary sequential code",
+      "teaches": "Because ECS structure hands the runtime everything needed to batch, lay out memory, and schedule, developers write plain per-entity C++ and get supercomputer-scale experiment throughput on one consumer GPU.",
+      "requires": [
+        "four-backends",
+        "world-scaling"
+      ],
+      "caption": "The old choice was flexible engines that step one world at a time, or hand-tuned GPU simulators frozen to one task. Flip the toggle: same experiment, 40 days of CPU time versus 1.5 days on a single RTX 4090.",
+      "visualMetaphor": "Split panel. Left, fixed: the actual authoring experience — a short sequential C++ system (the TimeIntegrate function from scene 4) with callouts 'no threads, no GPU code, no memory layout' — beside the two prior camps it escapes: flexible engines (Unity/Unreal: scriptable, one world at a time) and fast-but-frozen batch simulators (hard-coded to one task). Right: a calendar-style wall-clock comparison driven by a toggle — 'full emergent tool-use run, 115 billion steps': 32-thread CPU side shows 40 days elapsing just to reach the earliest learning milestone; RTX 4090 side completes the entire run in ~1.5 days. A closing strip re-lists what one consumer card now sustains: hide-and-seek 1.9M, Overcooked 40M, Hanabi 21M, Cartpole 3.4B steps/s — each a new environment written the same way, not a hand-tuned rewrite.",
+      "animatedVariable": {
+        "name": "hardware for the full training run",
+        "control": "toggle",
+        "range": "32-thread CPU vs single RTX 4090",
+        "whatChangesOnScreen": "The calendar animation swaps: ~40 days ticking by to the first milestone versus the complete 115-billion-step run finishing in ~1.5 days; the code panel stays identical, underscoring that nothing about the program changed."
+      },
+      "quantitativeAnchor": "Full hide-and-seek training (115 billion steps): ~1.5 days on one RTX 4090, versus ~40 days on a 32-thread CPU merely to reach the earliest learning milestone.",
+      "physicsChecks": [
+        "The code panel is byte-identical across the toggle — the speedup comes from the runtime, not from rewriting the simulator.",
+        "The two calendar durations differ by more than an order of magnitude and match the stated 1.5-day and 40-day figures.",
+        "The environment strip shows throughput varying across tasks (1.9M to 3.4B steps/s) while the authoring model stays constant, evidencing programmability plus performance rather than one or the other."
+      ]
+    }
+  ]
+}

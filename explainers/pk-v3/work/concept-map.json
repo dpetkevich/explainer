@@ -1,0 +1,112 @@
+{
+  "paper": {
+    "title": "ParallelKittens: Systematic and Practical Simplification of Multi-GPU AI Kernels",
+    "authors": [
+      "Stuart H. Sul",
+      "Simran Arora",
+      "Benjamin F. Spector",
+      "Christopher Ré"
+    ],
+    "oneSentenceClaim": "Multi-GPU AI workloads are increasingly bottlenecked by data transfer between GPUs, not by compute. This work identifies three simple principles governing multi-GPU kernel performance and packages them into a small programming toolkit called ParallelKittens. With under 50 lines of extra code, it matches or beats hand-tuned kernels, achieving up to 2.33x speedup for common AI workloads.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "General familiarity with GPU programming concepts (threads, kernels)",
+    "Basic understanding of matrix multiplication and neural network training",
+    "No prior knowledge of CUDA internals, NVLink, or distributed training frameworks assumed"
+  ],
+  "concepts": [
+    {
+      "id": "communication-bottleneck",
+      "name": "Communication has overtaken compute as the bottleneck",
+      "whyItMatters": "This is the core problem the paper exists to solve: if GPUs sit idle waiting for data from other GPUs, all the raw FLOP/s improvements in newer chips are wasted.",
+      "coreMechanism": "From Nvidia A100 to B200, tensor core throughput improved 7.2x and memory bandwidth improved 5.1x, but the links connecting GPUs together improved far less: NVLink only 3x and inter-node links (PCIe/InfiniBand) only 2x. Because compute grew faster than the 'pipes' between chips, moving data between GPUs now often takes longer than computing on it, and communication can eat over 50% of total execution time in large language model workloads.",
+      "foundational": true
+    },
+    {
+      "id": "compute-communication-overlap",
+      "name": "Overlapping compute and communication",
+      "whyItMatters": "This is the fundamental technique the entire paper is built around: instead of doing computation, then waiting for communication, then doing more computation, you do both simultaneously so the slower one determines total time.",
+      "coreMechanism": "A GPU has separate physical units for tensor math (Tensor Cores), simple arithmetic (CUDA cores), and data movement (TMA, copy engine). If you keep the compute units busy while data is moving in the background, the wall-clock time becomes roughly the max of compute time and communication time instead of their sum.",
+      "keyEquation": "T_{kernel} = T_{launch} + \\max(T_{comp}, T_{mem}, T_{comm}) + T_{non-overlap} + T_{sync}",
+      "foundational": true
+    },
+    {
+      "id": "gpu-memory-hierarchy",
+      "name": "GPU memory hierarchy and SMs",
+      "whyItMatters": "Every design decision in the paper (which mechanism to use, how to schedule work) is dictated by the size/speed/access-pattern tradeoffs at each rung of this hierarchy.",
+      "coreMechanism": "A GPU chip has ~130+ Streaming Multiprocessors (SMs), each with 64 KB of super-fast private registers and 227 KB of shared memory (33 TB/s). All SMs share a 50 MB L2 cache (12 TB/s) backed by 80 GB of HBM (3 TB/s). To talk to another GPU's HBM, data must cross NVLink at only 450 GB/s per GPU — over 6x slower than local HBM access. This steep drop-off from on-chip to inter-GPU bandwidth is exactly why inter-GPU transfer is the new bottleneck.",
+      "foundational": true
+    },
+    {
+      "id": "three-transfer-mechanisms",
+      "name": "Three ways to move data between GPUs: copy engine, TMA, registers",
+      "whyItMatters": "Choosing the wrong mechanism for a given communication pattern is the single biggest reason existing systems (Triton Distributed, Flux, CUTLASS) become slower than doing nothing at all on certain problem sizes.",
+      "coreMechanism": "The copy engine is a dedicated DMA unit launched by the CPU host; it hits 81-82% of theoretical NVLink bandwidth but only if messages are huge (≥256 MB) — below that, overhead from re-invoking transfers kills efficiency. The Tensor Memory Accelerator (TMA) is launched by a single GPU thread asynchronously, reaching ~74-78% of peak bandwidth with messages as small as 2 KB, letting other threads keep computing during the transfer. Plain register-level load/store instructions (ld/st) are the least efficient (~70-76%) and need ~76 SMs fully occupied to saturate bandwidth versus only ~15 for TMA, but they are the only mechanism that supports in-network reduction (accumulating values inside the switch fabric itself).",
+      "keyFigureRef": "Fig. 2, Fig. 3, Table 1, Table 2",
+      "misconception": "One might assume 'more parallel hardware always helps' — but register-level transfers actually need to occupy 3.2-5.1x more SMs than TMA to hit the same bandwidth, which directly steals SMs away from useful computation."
+    },
+    {
+      "id": "device-vs-host-initiated",
+      "name": "Device-initiated vs host-initiated communication",
+      "whyItMatters": "This is why PK abandons the copy engine (despite its raw bandwidth advantage) in favor of TMA/register ops for almost everything except huge bulk weight transfers.",
+      "coreMechanism": "Host-initiated (copy engine) transfers are triggered by the CPU and only work well for one giant contiguous block moved all at once — fine for something like shipping entire model shards in fully-sharded data parallelism, where overlap is trivial (just use separate CUDA streams). But fine-grained communication, like the constant small token exchanges in Mixture-of-Experts, needs per-tile control that only device-initiated (TMA/register) transfers can give, since a single thread inside the kernel itself can trigger them without stalling the rest of the SM."
+    },
+    {
+      "id": "inter-sm-vs-intra-sm-scheduling",
+      "name": "Inter-SM vs intra-SM scheduling",
+      "whyItMatters": "This is one of the paper's three central principles: no single scheduling strategy wins everywhere, and picking the wrong one for a workload causes measured slowdowns of over 3x (e.g., applying Flux's intra-SM design to GEMM all-reduce).",
+      "coreMechanism": "Intra-SM overlapping splits threads *within* the same SM into a compute pool and a communication pool, so every SM does both jobs at once; this keeps 100% of Tensor Cores active (compute scales linearly with SM count) and avoids the ~832 ns latency of syncing through HBM (vs. ~64 ns for on-chip sync). Inter-SM overlapping instead dedicates entire separate SMs purely to communication, sacrificing some compute SMs but enabling patterns intra-SM can't do, like in-network reduction or bulk prefetching for cache reuse. Intra-SM wins when communication and compute have matching granularity (e.g., 1.2x faster for GEMM reduce-scatter); inter-SM wins when it unlocks bandwidth-reducing tricks (e.g., 3.62x faster for GEMM all-reduce via in-network reduction, 1.57x for all-gather GEMM).",
+      "keyFigureRef": "Fig. 4, Fig. 5",
+      "misconception": "It's tempting to think dedicating more SMs to compute is always better since Tensor Cores are the expensive resource — but for all-reduce, letting a few SMs offload reduction into the NVSwitch fabric cuts communication volume by roughly a factor of N (number of GPUs), which outweighs the lost compute SMs."
+    },
+    {
+      "id": "in-network-acceleration",
+      "name": "In-network (in-switch) reduction via NVSwitch multicast",
+      "whyItMatters": "This is the mechanism behind the paper's largest single speedup (3.62x for GEMM all-reduce) and explains why register-level instructions, despite being the least bandwidth-efficient transfer mode, are still indispensable.",
+      "coreMechanism": "Normally, an all-reduce (every GPU summing values across all peers) requires N-1 separate point-to-point writes, each limited by the sender/receiver's 450 GB/s NVLink port, so peer writes queue up and serialize. NVSwitch supports a 'multicast object' — a virtual address that maps to physical memory on all participating devices simultaneously — plus PTX instructions like multimem.red and multimem.ld_reduce that perform the summation *inside the switch hardware itself* as data flows through, so each GPU issues one operation instead of N-1, cutting communication time by roughly a factor of N.",
+      "keyFigureRef": "Fig. 22"
+    },
+    {
+      "id": "communication-hiding-threshold",
+      "name": "Analytical threshold for fully hiding communication behind compute",
+      "whyItMatters": "This gives a concrete, checkable prediction (K ≳ 2197 for BF16 on H100) that the paper verifies experimentally, showing the cost model isn't just qualitative hand-waving — it makes falsifiable numeric claims.",
+      "coreMechanism": "For a fused GEMM+reduce-scatter kernel, the time to compute one output tile scales with the reduction dimension K linearly (more matmul work), while the communication time per tile is fixed by tile size and bandwidth. Setting compute time ≥ communication time and solving for K gives the point past which communication becomes essentially free (hidden). Measured on H100 GPUs, at K=2048 the non-overlapped communication fraction is already down to 26%, and by K=4096 it's under 1%.",
+      "keyEquation": "K \\geq \\frac{sR}{2B}",
+      "keyFigureRef": "Table 3"
+    },
+    {
+      "id": "library-design-overhead",
+      "name": "Hidden overhead in general-purpose communication libraries (NCCL, NVSHMEM)",
+      "whyItMatters": "This is the third of the paper's three core principles: even with the right transfer mechanism and scheduling, using an off-the-shelf library like NCCL still leaves 1.7-4.5x performance on the table due to conservative default design choices.",
+      "coreMechanism": "NCCL requires two-way synchronization (sender and receiver both acknowledge readiness) even for simple point-to-point sends, and routes data through small pre-allocated staging buffers rather than writing directly to the final destination — both add latency that's negligible for huge transfers but dominates for small, frequent ones. NVSHMEM similarly re-fetches peer addresses from memory (__ldg) and forces thread-group syncs on every access instead of caching addresses in registers. PK removes both categories of overhead by using pre-allocated destination buffers for direct one-way writes and keeping peer addresses in registers, yielding up to 1.79x faster all-reduce and 4.5x lower latency for fine-grained access.",
+      "keyFigureRef": "Fig. 6"
+    },
+    {
+      "id": "remote-cache-non-reuse",
+      "name": "Remote memory isn't cached locally (far-sided L2 caching)",
+      "whyItMatters": "This explains a specific failure mode of naive intra-SM overlapping in attention workloads (like Ring Attention) and motivates using dedicated communication SMs to prefetch shared data once instead of redundantly.",
+      "coreMechanism": "When GPU A reads data from GPU B's HBM, that data gets cached in GPU B's L2 cache, not GPU A's — so every subsequent access from A still has to cross NVLink again rather than hitting a local cache. In Ring Attention, if every thread block on a GPU independently pulls the same Key/Value tensor from a peer, the same bytes get re-transferred over the link redundantly, saturating NVLink fast. Instead, dedicating a few SMs to bulk-fetch the KV tensor once into local HBM (which other thread blocks can then freely reuse) substantially cuts total NVLink traffic."
+    },
+    {
+      "id": "sm-partitioning-tradeoff",
+      "name": "Optimal SM split between compute and communication depends on problem size",
+      "whyItMatters": "This justifies why PK auto-tunes the SM allocation at runtime rather than hardcoding it, since a fixed split (as competitor frameworks often use) will be suboptimal across the wide range of matrix sizes seen in practice.",
+      "coreMechanism": "For inter-SM overlapping, if you dedicate too few SMs to communication, communication becomes the bottleneck and compute SMs sit idle waiting; if you dedicate too many, you waste compute throughput that would have scaled linearly with more compute SMs. Larger workloads have proportionally more compute work relative to a fixed communication volume, so they benefit from allocating more SMs to compute; smaller workloads need a relatively larger share of SMs on communication.",
+      "keyFigureRef": "Fig. 5"
+    },
+    {
+      "id": "tile-based-programming",
+      "name": "Tile-based abstraction (ThunderKittens tiles extended to multi-GPU)",
+      "whyItMatters": "This is the core design insight that lets ParallelKittens condense complex multi-GPU logic into under 50 lines of code — by giving programmers one consistent unit of data (a tile) at every memory level instead of forcing them to hand-manage raw pointers and byte offsets.",
+      "coreMechanism": "PK defines matching data structures at each hierarchy level — a 16x16 tile in registers, a shared tile in SMEM enabling single-thread asynchronous loads/stores to peer HBM, and a new 'Parallel Global Layout' (PGL) representing identically-shaped memory regions replicated across all GPUs' HBM. Because all eight new PK primitives (like store_async, all_reduce, signal/wait) operate on these same tile-shaped objects, a programmer who already knows ThunderKittens' single-GPU tile programming model can extend to multi-GPU with minimal new concepts, rather than learning a completely separate low-level API (like raw NVSHMEM or CUTLASS)."
+    },
+    {
+      "id": "virtual-memory-mapping",
+      "name": "Cross-process peer memory mapping (why multi-GPU setup is hard)",
+      "whyItMatters": "This explains the plumbing complexity PK hides from users — without it, achieving direct GPU-to-GPU access from separate processes (the standard multi-GPU launch model via torchrun) requires manually juggling OS-level file descriptors, which is exactly the kind of 'non-essential complexity' the paper claims to abstract away.",
+      "coreMechanism": "Each GPU process runs in its own virtual address space, so a pointer valid in one process's memory space means nothing in another's; a new mapping must be created in the requesting process that points at the peer physical memory. CUDA IPC does this by exporting a 64-byte handle shareable via Unix sockets, but can't access NVSwitch's in-network acceleration. Manual Virtual Memory Management (VMM) instead exports physical memory as a Linux file descriptor and transfers it via a socket control message, enabling multicast-based in-network reduction, but requires custom memory allocators since PyTorch's default cudaMalloc doesn't respect the required 2MB alignment granularity.",
+      "keyFigureRef": "Fig. 19, Fig. 20, Fig. 21"
+    }
+  ]
+}

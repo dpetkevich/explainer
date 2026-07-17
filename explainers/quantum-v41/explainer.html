@@ -1,0 +1,3782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Shor's Algorithm Goes From Millions of Qubits to Ten Thousand</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How Shor's Algorithm Goes From Millions of Qubits to Ten Thousand</h1>
+  <p class="hook">RSA-2048 and 256-bit elliptic-curve keys protect almost all of today's internet traffic. Breaking them with Shor's algorithm was assumed to need a quantum computer with millions of physical qubits, decades away. This paper argues the real number is 10,000 to 26,000, a drop of two to three orders of magnitude. That drop isn't because the qubits themselves got better. The key idea: swap an error-correcting code that only talks to its nearest neighbors for one that can wire any two qubits together. That swap turns most of the huge qubit budget from wasted overhead into usable qubits that actually compute. You'll follow one specific 256-bit key from the first scene to the last, watching the machine needed to break it shrink from millions of qubits to ten thousand.</p>
+  <p class="page-links"><a href="https://arxiv.org/abs/2603.28627" target="_blank" rel="noopener noreferrer">Shor's algorithm is possible with as few as 10,000 reconfigurable atomic qubits</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.1.0 · Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Start with the target — a 256-bit elliptic-curve key — and the two physical facts standing in the way: real qubits are noisy, and the standard fix for that noise, the surface code, is wasteful. This part ends at the limitation the rest of the paper attacks.</div>
+</header>
+<section class="scene" id="cracking-the-key">
+  <h3>Shor's algorithm turns an unbreakable-looking key into a period-finding problem</h3>
+  <div class="caption">This explainer follows one target: a 256-bit elliptic-curve key, the kind protecting most of today's secure web traffic and cryptocurrency wallets.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="cracking-the-key"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Cracking the Key — Shor's Algorithm</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel-bg:#f4f6f9;
+    --text:#1a1e26;
+    --muted:#5a6472;
+    --grid:#d3d8e0;
+    --classical:#c94a4a;
+    --quantum:#2f7fb0;
+    --accent:#c98a1e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#11141b;
+      --panel-bg:#1b1f2a;
+      --text:#e7eaf1;
+      --muted:#9aa4b5;
+      --grid:#3a4150;
+      --classical:#ff7b7b;
+      --quantum:#6fc6f2;
+      --accent:#f2c25e;
+    }
+  }
+  html,body{background:var(--bg); color:var(--text); margin:0; padding:0;}
+  .scene{max-width:680px; margin:0 auto; padding:14px 14px 20px; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; box-sizing:border-box;}
+  h2{font-size:15px; margin:0 0 8px 0;}
+  .controls{margin-bottom:8px;}
+  .controls label{display:block; font-size:13px; margin-bottom:4px;}
+  .controls input[type=range]{width:100%; max-width:100%;}
+  canvas{width:100%; height:auto; display:block; max-width:100%; border-radius:6px;}
+  .readouts{list-style:none; padding:0; margin:10px 0 4px 0; font-size:13px;}
+  .readouts li{padding:5px 2px; border-bottom:1px solid var(--grid); display:flex; justify-content:space-between; gap:8px;}
+  .readouts li span.val{color:var(--text); font-weight:600;}
+  .eqs{margin-top:14px; display:flex; flex-wrap:wrap; gap:20px;}
+  .eq-block{flex:1 1 260px; min-width:230px;}
+  .legend{font-size:11px; color:var(--muted); margin-top:2px; line-height:1.4;}
+  math{font-size:15px;}
+  .caption-note{font-size:11px; color:var(--muted); margin-top:10px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Best classical attack vs. Shor's algorithm on a quantum computer</h2>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;keySlider&quot;>Key size n (bits): <span id=&quot;keyVal&quot;>192</span> bits — drag to see how each attack's time scales</label>
+    <input type=&quot;range&quot; id=&quot;keySlider&quot; min=&quot;192&quot; max=&quot;256&quot; step=&quot;1&quot; value=&quot;192&quot;>
+  </div>
+
+  <canvas id=&quot;chart&quot; width=&quot;640&quot; height=&quot;380&quot; aria-label=&quot;Bar chart comparing classical and quantum attack times&quot;></canvas>
+
+  <ul class=&quot;readouts&quot;>
+    <li>Classical attack time (Pollard's rho) <span class=&quot;val&quot; id=&quot;roClassical&quot;>—</span></li>
+    <li>Quantum attack time (Shor's algorithm) <span class=&quot;val&quot; id=&quot;roQuantum&quot;>—</span></li>
+    <li>Quantum speedup factor <span class=&quot;val&quot; id=&quot;roSpeedup&quot;>—</span></li>
+  </ul>
+
+  <div class=&quot;eqs&quot;>
+    <div class=&quot;eq-block&quot;>
+      <math display=&quot;block&quot;>
+        <msub><mi>T</mi><mtext>classical</mtext></msub><mo>=</mo>
+        <mfrac>
+          <mrow><msqrt><mfrac><mi>π</mi><mn>4</mn></mfrac></msqrt><mo>&amp;#183;</mo><msup><mn>2</mn><mrow><mi>n</mi><mo>/</mo><mn>2</mn></mrow></msup></mrow>
+          <msub><mi>R</mi><mtext>C</mtext></msub>
+        </mfrac>
+      </math>
+      <div class=&quot;legend&quot;>T<sub></sub>classical — expected time to solve the elliptic-curve key by Pollard's rho (s) &amp;middot; n — key size (bits) &amp;middot; R_C — assumed classical throughput, 10<sup>18</sup> operations/s (roughly an exascale supercomputer)</div>
+    </div>
+    <div class=&quot;eq-block&quot;>
+      <math display=&quot;block&quot;>
+        <msub><mi>T</mi><mtext>quantum</mtext></msub><mo>=</mo><mi>A</mi><mo>&amp;#183;</mo><msup><mi>n</mi><mn>3</mn></msup>
+      </math>
+      <div class=&quot;legend&quot;>T_quantum — time for Shor's algorithm on a quantum computer (s) &amp;middot; n — key size (bits) &amp;middot; A — circuit-time constant, fixed so n = 256 gives 10 days (this paper's estimate), reflecting Shor's ~n³ gate scaling</div>
+    </div>
+  </div>
+  <div class=&quot;caption-note&quot;>Both times are for the same 256-bit-class elliptic-curve key used to secure most web traffic and crypto wallets.</div>
+</div>
+
+<script>
+(function(){
+  const PI = Math.PI;
+  const POLLARD_CONST = Math.sqrt(PI/4);           // Pollard's rho expected-step constant for ECDLP
+  const CLASSICAL_OPS_PER_SEC = 1e18;               // assumed classical throughput, ops/s
+  const SECONDS_PER_YEAR = 365.25*86400;
+  const QUANTUM_DAYS_AT_256 = 10;                   // paper's estimate at 256-bit
+  const QUANTUM_CONST_A = (QUANTUM_DAYS_AT_256*86400)/Math.pow(256,3); // s per bit^3
+
+  function classicalTimeSeconds(n){
+    const ops = POLLARD_CONST*Math.pow(2, n/2);
+    return ops/CLASSICAL_OPS_PER_SEC;
+  }
+  function quantumTimeSeconds(n){
+    return QUANTUM_CONST_A*Math.pow(n,3);
+  }
+
+  function toSuper(str){
+    const map={'0':'\u2070','1':'\u00b9','2':'\u00b2','3':'\u00b3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079','-':'\u207b'};
+    return str.split('').map(c=>map[c]||c).join('');
+  }
+  function formatSci(value){
+    if(value<=0) return '0';
+    if(value<1000) return (value<1? value.toFixed(2): Math.round(value).toString());
+    let exp = Math.floor(Math.log10(value));
+    let mant = value/Math.pow(10,exp);
+    mant = Math.round(mant*10)/10;
+    if(mant>=10){ mant=1; exp+=1; }
+    return mant.toFixed(1)+'\u00d710'+toSuper(exp.toString());
+  }
+  function classicalLabel(sec){
+    return formatSci(sec/SECONDS_PER_YEAR)+' yr';
+  }
+  function quantumLabel(sec){
+    const days = sec/86400;
+    if(days<1) return (days*24).toFixed(1)+' hr';
+    return days.toFixed(1)+' days';
+  }
+
+  const AXIS_MAX_LOG = 15; // log10(seconds)
+  const TICKS = [
+    [0,'1 s'],[3.556,'1 hr'],[4.937,'1 day'],
+    [7.499,'1 yr'],[10.499,'1000 yr'],[13.499,'1 million yr']
+  ];
+
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const LOGICAL_W = 640, LOGICAL_H = 380;
+  const marginL=86, marginR=40, marginT=54, marginB=54;
+  const chartW = LOGICAL_W-marginL-marginR;
+  const chartH = LOGICAL_H-marginT-marginB;
+
+  function colors(){
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      panelBg: cs.getPropertyValue('--panel-bg').trim(),
+      text: cs.getPropertyValue('--text').trim(),
+      muted: cs.getPropertyValue('--muted').trim(),
+      grid: cs.getPropertyValue('--grid').trim(),
+      classical: cs.getPropertyValue('--classical').trim(),
+      quantum: cs.getPropertyValue('--quantum').trim(),
+      accent: cs.getPropertyValue('--accent').trim()
+    };
+  }
+
+  function wrapText(text,x,y,lh){
+    text.split('\n').forEach((line,i)=> ctx.fillText(line, x, y+i*lh));
+  }
+
+  function drawBar(x,w,logVal,color,name,valueText){
+    const capped = Math.min(logVal, AXIS_MAX_LOG);
+    const h = chartH*(capped/AXIS_MAX_LOG);
+    const yTop = marginT+chartH-h;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, yTop, w, h);
+    ctx.fillStyle = colors().text;
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    wrapText(name, x+w/2, marginT+chartH+18, 13);
+    if(logVal>AXIS_MAX_LOG){
+      ctx.beginPath();
+      ctx.moveTo(x+w/2-8, marginT+10);
+      ctx.lineTo(x+w/2, marginT-6);
+      ctx.lineTo(x+w/2+8, marginT+10);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.fillStyle = colors().text;
+      ctx.font = '11px sans-serif';
+      ctx.fillText('off chart \u2014 '+valueText, x+w/2, marginT-10);
+    } else {
+      ctx.fillStyle = colors().text;
+      ctx.font = '11px sans-serif';
+      ctx.fillText(valueText, x+w/2, yTop-8);
+    }
+  }
+
+  let animLogC=null, animLogQ=null, targetLogC=0, targetLogQ=0, animating=false;
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function drawChart(){
+    const C = colors();
+    ctx.clearRect(0,0,LOGICAL_W,LOGICAL_H);
+    ctx.fillStyle = C.panelBg;
+    ctx.fillRect(0,0,LOGICAL_W,LOGICAL_H);
+
+    ctx.fillStyle = C.text;
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Time to break the key (log scale)', 10, 18);
+
+    ctx.font = '12px sans-serif';
+    TICKS.forEach(([val,label])=>{
+      const y = marginT + chartH*(1-val/AXIS_MAX_LOG);
+      ctx.strokeStyle = C.grid;
+      ctx.beginPath(); ctx.moveTo(marginL,y); ctx.lineTo(marginL+chartW,y); ctx.stroke();
+      ctx.fillStyle = C.muted;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, marginL-8, y);
+    });
+    ctx.textBaseline = 'alphabetic';
+
+    const barW=110, gap=60;
+    const totalW = barW*2+gap;
+    const startX = marginL + (chartW-totalW)/2;
+
+    drawBar(startX, barW, animLogC, C.classical, 'Classical attack\n(Pollard\'s rho)', classicalLabel(classicalTimeSeconds(currentN)));
+    drawBar(startX+barW+gap, barW, animLogQ, C.quantum, 'Shor\'s algorithm\n(quantum computer)', quantumLabel(quantumTimeSeconds(currentN)));
+
+    const anchorLogQ = Math.log10(quantumTimeSeconds(256));
+    const yAnchor = marginT + chartH*(1-anchorLogQ/AXIS_MAX_LOG);
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle = C.accent;
+    ctx.beginPath(); ctx.moveTo(marginL,yAnchor); ctx.lineTo(marginL+chartW,yAnchor); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = C.accent;
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('paper estimate: 10 days @ 256-bit key', marginL+6, yAnchor-6);
+
+    ctx.strokeStyle = C.text;
+    ctx.beginPath();
+    ctx.moveTo(marginL, marginT);
+    ctx.lineTo(marginL, marginT+chartH);
+    ctx.lineTo(marginL+chartW, marginT+chartH);
+    ctx.stroke();
+  }
+
+  let currentN = 192;
+
+  function step(){
+    animLogC += (targetLogC-animLogC)*0.18;
+    animLogQ += (targetLogQ-animLogQ)*0.18;
+    drawChart();
+    if(Math.abs(targetLogC-animLogC)>0.002 || Math.abs(targetLogQ-animLogQ)>0.002){
+      requestAnimationFrame(step);
+    } else {
+      animLogC = targetLogC; animLogQ = targetLogQ;
+      drawChart();
+      animating = false;
+    }
+  }
+
+  function update(n){
+    currentN = n;
+    const cSec = classicalTimeSeconds(n);
+    const qSec = quantumTimeSeconds(n);
+    targetLogC = Math.log10(cSec);
+    targetLogQ = Math.log10(qSec);
+    if(animLogC===null){ animLogC=targetLogC; animLogQ=targetLogQ; }
+
+    document.getElementById('roClassical').textContent = formatSci(cSec/SECONDS_PER_YEAR)+' years';
+    document.getElementById('roQuantum').textContent = quantumLabel(qSec);
+    document.getElementById('roSpeedup').textContent = formatSci(cSec/qSec)+'\u00d7 faster';
+
+    if(reduceMotion){
+      animLogC = targetLogC; animLogQ = targetLogQ;
+      drawChart();
+    } else if(!animating){
+      animating = true;
+      requestAnimationFrame(step);
+    }
+  }
+
+  const slider = document.getElementById('keySlider');
+  const keyVal = document.getElementById('keyVal');
+  slider.addEventListener('input', ()=>{
+    const n = parseInt(slider.value,10);
+    keyVal.textContent = n;
+    update(n);
+  });
+
+  update(192);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;cracking-the-key&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Shor's algorithm turns an unbreakable-looking key into a period-finding problem"
+  ></iframe>
+</section>
+
+<section class="scene" id="noisy-qubits">
+  <h3>Physical qubits fail thousands of times more often than Shor's algorithm can tolerate</h3>
+  <div class="caption">Running Shor's algorithm on that 256-bit key takes billions of quantum operations, and each one can go wrong.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="noisy-qubits"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Noisy Qubits</title>
+<style>
+ :root{
+   --bg:#ffffff; --panel:#f5f7fa; --text:#1b1f24; --muted:#5b6570;
+   --grid:#d7dce2; --curve:#2563eb; --target:#dc2626; --cursor:#059669; --border:#c9d0d8;
+ }
+ @media (prefers-color-scheme:dark){
+   :root{
+     --bg:#12151a; --panel:#1a1f26; --text:#e7ebf0; --muted:#9aa4b2;
+     --grid:#333a44; --curve:#60a5fa; --target:#f87171; --cursor:#34d399; --border:#3a4048;
+   }
+ }
+ *{box-sizing:border-box;}
+ html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+   font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+ .wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+ .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+ .eqwrap{text-align:center;margin:2px 0 4px;}
+ math{font-size:1.25em;}
+ .legend{font-size:12px;color:var(--muted);margin:6px 0 10px;line-height:1.45;}
+ canvas{width:100%;max-width:100%;height:auto;display:block;background:transparent;}
+ .ctrl{margin:10px 0;}
+ .ctrl label{display:block;font-size:13px;margin-bottom:4px;}
+ .ctrl b{color:var(--curve);}
+ input[type=range]{width:100%;}
+ ul.readouts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 12px;}
+ ul.readouts li{font-size:12.5px;background:var(--bg);border:1px solid var(--border);
+   border-radius:6px;padding:4px 8px;}
+ ul.readouts b{color:var(--curve);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+ <div class=&quot;panel&quot;>
+   <div class=&quot;eqwrap&quot;>
+     <math display=&quot;block&quot;>
+       <mi>P</mi><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo>
+       <msup><mrow><mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>p</mi><mo>)</mo></mrow><mi>N</mi></msup>
+     </math>
+   </div>
+   <div class=&quot;legend&quot;>
+     P(N) — probability the whole computation is still correct after N gates (unitless, 0 to 1) ·
+     p — per-gate error rate: chance any single gate operation fails (unitless, 0 to 1) ·
+     N — total number of gate operations run so far (count)
+   </div>
+   <canvas id=&quot;chart&quot; width=&quot;640&quot; height=&quot;340&quot; aria-label=&quot;success probability versus number of gates&quot;></canvas>
+   <div class=&quot;ctrl&quot;>
+     <label for=&quot;pSlider&quot;>Per-gate error rate p — how often one gate fails: <b id=&quot;pVal&quot;>0.100%</b></label>
+     <input type=&quot;range&quot; id=&quot;pSlider&quot; min=&quot;-4&quot; max=&quot;-2&quot; step=&quot;0.01&quot; value=&quot;-3&quot;>
+   </div>
+   <div class=&quot;ctrl&quot;>
+     <label for=&quot;nSlider&quot;>Gates run so far, N — drag to move the cursor along the run: <b id=&quot;nVal&quot;>1.0×10⁹</b></label>
+     <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;0&quot; max=&quot;9&quot; step=&quot;0.01&quot; value=&quot;9&quot;>
+   </div>
+   <ul class=&quot;readouts&quot; id=&quot;readouts&quot;></ul>
+ </div>
+</div>
+<script>
+(function(){
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const pSlider = document.getElementById('pSlider');
+  const nSlider = document.getElementById('nSlider');
+  const pVal = document.getElementById('pVal');
+  const nVal = document.getElementById('nVal');
+  const readoutsEl = document.getElementById('readouts');
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  const log10 = x => Math.log(x)/Math.LN10;
+  const FLOOR = -12;   // display floor for success probability (log10)
+  const TARGET = -10;  // Shor's tolerance: net error must stay below 1 in 10 billion
+
+  const supMap = {'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+  const sup = s => String(s).split('').map(c=>supMap[c]||c).join('');
+  const fmtPow10 = e => '10' + sup(Math.round(e));
+
+  function fmtN(N){
+    if(N < 1e6) return Math.round(N).toLocaleString();
+    const e = Math.floor(log10(N));
+    const mant = N/Math.pow(10,e);
+    return mant.toFixed(1) + '\u00d7' + fmtPow10(e);
+  }
+  function fmtProb(logp){
+    if(logp <= FLOOR) return '< ' + fmtPow10(FLOOR);
+    const val = Math.pow(10, logp);
+    if(val >= 0.001) return val.toFixed(4);
+    const e = Math.floor(logp);
+    const mant = Math.pow(10, logp - e);
+    return mant.toFixed(2) + '\u00d7' + fmtPow10(e);
+  }
+
+  const W = canvas.width, H = canvas.height;
+  const marginL = 68, marginR = 18, marginT = 16, marginB = 42;
+  const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
+
+  const xForLogN = t => marginL + (t/9)*plotW; // t = log10(N)
+  function yForLogP(lp){
+    const c = Math.max(FLOOR, Math.min(0, lp));
+    const t = (c - FLOOR)/(0 - FLOOR);
+    return (H - marginB) - t*plotH;
+  }
+
+  function draw(){
+    const pLog = parseFloat(pSlider.value);
+    const p = Math.pow(10, pLog);
+    const nLog = parseFloat(nSlider.value);
+    const N = Math.pow(10, nLog);
+
+    pVal.textContent = (p*100).toFixed(3) + '%';
+    nVal.textContent = fmtN(N);
+
+    ctx.clearRect(0,0,W,H);
+    const text = cssVar('--text'), muted = cssVar('--muted'), grid = cssVar('--grid');
+    const curveC = cssVar('--curve'), targetC = cssVar('--target'), cursorC = cssVar('--cursor');
+
+    ctx.font = '11px sans-serif';
+    ctx.lineWidth = 1;
+    for(let e=0; e>=FLOOR; e-=2){
+      const y = yForLogP(e);
+      ctx.strokeStyle = grid;
+      ctx.beginPath(); ctx.moveTo(marginL,y); ctx.lineTo(W-marginR,y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText(e===0?'1':fmtPow10(e), marginL-6, y);
+    }
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    [0,3,6,9].forEach(e=>{
+      const x = xForLogN(e);
+      ctx.strokeStyle = grid;
+      ctx.beginPath(); ctx.moveTo(x,marginT); ctx.lineTo(x,H-marginB); ctx.stroke();
+      ctx.fillStyle = muted;
+      ctx.fillText(e===9?'1 billion':(e===0?'1':fmtPow10(e)), x, H-marginB+6);
+    });
+    ctx.fillStyle = muted; ctx.textAlign='center';
+    ctx.fillText('Number of gates run, N', marginL+plotW/2, H-16);
+    ctx.save(); ctx.translate(14, marginT+plotH/2); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';
+    ctx.fillText('Probability computation is still correct, P(N)', 0,0);
+    ctx.restore();
+
+    // target line
+    const ty = yForLogP(TARGET);
+    ctx.setLineDash([5,4]); ctx.strokeStyle = targetC; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(marginL,ty); ctx.lineTo(W-marginR,ty); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = targetC; ctx.textAlign='left'; ctx.textBaseline='bottom';
+    ctx.fillText('target: net error < 1 in 10 billion', marginL+4, ty-3);
+
+    // success-probability curve
+    ctx.strokeStyle = curveC; ctx.lineWidth = 2; ctx.beginPath();
+    for(let px=0; px<=plotW; px++){
+      const t = (px/plotW)*9;
+      const Nx = Math.pow(10,t);
+      const lp = Nx*log10(1-p);
+      const y = yForLogP(lp);
+      const x = marginL+px;
+      if(px===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = curveC; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillText('success curve at p = '+(p*100).toFixed(3)+'%', marginL+6, marginT+12);
+
+    // gate-count cursor
+    const cx = xForLogN(nLog);
+    const clp = N*log10(1-p);
+    const cy = yForLogP(clp);
+    ctx.strokeStyle = cursorC; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx,marginT); ctx.lineTo(cx,H-marginB); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.fillStyle = cursorC; ctx.fill();
+    ctx.textAlign = cx > W-100 ? 'right' : 'left';
+    const tx = ctx.textAlign==='right' ? cx-6 : cx+6;
+    ctx.fillText('N cursor', tx, Math.max(marginT+10, cy-8));
+
+    // readouts
+    const logP_N = N*log10(1-p);
+    const Nhalf = Math.log(2) / (-Math.log(1-p));
+    readoutsEl.innerHTML =
+      '<li>per-gate error p: <b>'+(p*100).toFixed(3)+'%</b></li>'+
+      '<li>gates so far N: <b>'+fmtN(N)+'</b></li>'+
+      '<li>success probability at N: <b>'+fmtProb(logP_N)+'</b></li>'+
+      '<li>gates until 50% failure chance: <b>'+fmtN(Nhalf)+'</b></li>';
+  }
+
+  pSlider.addEventListener('input', draw);
+  nSlider.addEventListener('input', draw);
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;noisy-qubits&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Physical qubits fail thousands of times more often than Shor's algorithm can tolerate"
+  ></iframe>
+</section>
+
+<section class="scene" id="encoding-against-noise">
+  <h3>Spreading one qubit's information across many qubits suppresses errors exponentially</h3>
+  <div class="caption">Raw qubits can't reach 1-in-10-billion reliability alone, so redundancy does the work instead: spread one qubit's information across many.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="encoding-against-noise"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Encoding against noise</title>
+<style>
+:root{
+  --bg:#f7f7fa;
+  --panel:#ffffff;
+  --fg:#1a1a22;
+  --muted:#5c5c6b;
+  --accent:#2b6cb0;   /* X-stabilizer */
+  --accent2:#c05621;  /* Z-stabilizer */
+  --qubit:#2f3542;
+  --border:#d3d3dc;
+  --good:#1a7a4c;
+  --bad:#b0342d;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15151b;
+    --panel:#1e1e26;
+    --fg:#eaeaf0;
+    --muted:#a3a3b3;
+    --accent:#5aa2e6;
+    --accent2:#e6923a;
+    --qubit:#dcdce6;
+    --border:#3a3a46;
+    --good:#3fc987;
+    --bad:#ea6b62;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 18px;}
+math{font-size:1.15em;color:var(--fg);}
+.legend{font-size:12.5px;color:var(--muted);line-height:1.5;margin:2px 0 14px;}
+.stage{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;}
+.diagram-wrap{flex:0 0 auto;background:var(--panel);border:1px solid var(--border);
+  border-radius:10px;padding:10px;}
+canvas{display:block;width:100%;max-width:280px;height:auto;}
+.diag-label{font-size:11px;color:var(--muted);text-align:center;margin-top:4px;}
+.readouts{flex:1 1 200px;min-width:180px;background:var(--panel);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;}
+.readouts ul{list-style:none;margin:0;padding:0;}
+.readouts li{display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;
+  border-bottom:1px solid var(--border);}
+.readouts li:last-child{border-bottom:none;}
+.readouts .val{font-variant-numeric:tabular-nums;font-weight:600;text-align:right;}
+.readouts .val.bad{color:var(--bad);}
+.readouts .val.good{color:var(--good);}
+.note{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.45;}
+.controls{margin-top:14px;display:flex;flex-direction:column;gap:12px;}
+.ctrl-row label{display:block;font-size:13px;margin-bottom:4px;}
+input[type=range]{width:100%;}
+select{font-size:13px;padding:3px 6px;}
+.key{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:6px;}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+<math display=&quot;block&quot;>
+  <msub><mi>P</mi><mi>L</mi></msub><mo>&amp;#8776;</mo><mi>a</mi>
+  <msup><mrow><mo>(</mo><mfrac><mi>p</mi><msub><mi>p</mi><mtext>th</mtext></msub></mfrac><mo>)</mo></mrow>
+       <mrow><mi>d</mi><mo>/</mo><mn>2</mn></mrow></msup>
+</math>
+<div class=&quot;legend&quot;>
+<b>P<sub style=&quot;font-size:.8em&quot;>L</sub></b> — logical error rate (chance the encoded qubit fails, 0&amp;ndash;1) ·
+<b>a</b> — order-1 prefactor · <b>p</b> — physical error rate per operation on each raw qubit ·
+<b>p<sub style=&quot;font-size:.8em&quot;>th</sub></b> — threshold error rate (&amp;asymp;1%, fixed by the code) ·
+<b>d</b> — code distance, the grid size of the encoding below.
+Formula only holds for <b>p &amp;lt; p<sub style=&quot;font-size:.8em&quot;>th</sub></b>; at or above threshold the encoding gives no benefit and P<sub style=&quot;font-size:.8em&quot;>L</sub> saturates near 1 rather than following this power law.
+</div>
+
+<div class=&quot;stage&quot;>
+  <div class=&quot;diagram-wrap&quot;>
+    <canvas id=&quot;grid&quot; width=&quot;320&quot; height=&quot;320&quot;></canvas>
+    <div class=&quot;diag-label&quot;>1 logical qubit &amp;nbsp;=&amp;nbsp; d&amp;times;d physical qubits + stabilizer checks</div>
+    <div class=&quot;key&quot;>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--qubit)&quot;></span>physical qubit</span>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--accent)&quot;></span>X-stabilizer check</span>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--accent2)&quot;></span>Z-stabilizer check</span>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <ul>
+      <li><span>Code distance d</span><span class=&quot;val&quot; id=&quot;rD&quot;>–</span></li>
+      <li><span>Physical qubits N = d²</span><span class=&quot;val&quot; id=&quot;rN&quot;>–</span></li>
+      <li><span>Physical error rate p</span><span class=&quot;val&quot; id=&quot;rP&quot;>–</span></li>
+      <li><span>Logical error rate P<sub style=&quot;font-size:.8em&quot;>L</sub></span><span class=&quot;val&quot; id=&quot;rL&quot;>–</span></li>
+    </ul>
+    <div class=&quot;note&quot; id=&quot;noteText&quot;></div>
+  </div>
+</div>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrl-row&quot;>
+    <label for=&quot;dSlider&quot;>Code distance d (grid size) — grows the encoded block from 4 to 24 qubits per side</label>
+    <input type=&quot;range&quot; id=&quot;dSlider&quot; min=&quot;4&quot; max=&quot;24&quot; step=&quot;1&quot; value=&quot;20&quot;>
+  </div>
+  <div class=&quot;ctrl-row&quot;>
+    <label for=&quot;pSelect&quot;>Physical error rate regime — sets p relative to the threshold p<sub style=&quot;font-size:.8em&quot;>th</sub> = 1%</label>
+    <select id=&quot;pSelect&quot;>
+      <option value=&quot;0.001&quot;>below threshold: p = 0.1% (typical target hardware)</option>
+      <option value=&quot;0.02&quot;>above threshold: p = 2% (noisier than p_th — encoding backfires)</option>
+    </select>
+  </div>
+</div>
+
+</div>
+
+<script>
+(function(){
+  const A_PREFACTOR = 1;      // dimensionless prefactor, order-unity
+  const P_TH = 0.01;          // threshold error rate, fixed by this code family
+
+  const dSlider = document.getElementById('dSlider');
+  const pSelect = document.getElementById('pSelect');
+  const rD = document.getElementById('rD');
+  const rN = document.getElementById('rN');
+  const rP = document.getElementById('rP');
+  const rL = document.getElementById('rL');
+  const noteText = document.getElementById('noteText');
+  const canvas = document.getElementById('grid');
+  const ctx = canvas.getContext('2d');
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function superscript(n){
+    const map = {'-':'\u207B','0':'\u2070','1':'\u00B9','2':'\u00B2','3':'\u00B3',
+      '4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079'};
+    return String(n).split('').map(c=>map[c]||c).join('');
+  }
+
+  function fmtExp(x){
+    if (x <= 0) return '0';
+    const e = Math.floor(Math.log10(x));
+    const m = x / Math.pow(10, e);
+    return m.toFixed(1) + ' \u00D7 10' + superscript(e);
+  }
+
+  // Raw perturbative formula; only physically meaningful for p < P_TH.
+  function rawLogicalErrorRate(p, d){
+    return A_PREFACTOR * Math.pow(p / P_TH, d / 2);
+  }
+
+  function drawGrid(d){
+    const qubit = cssVar('--qubit');
+    const accent = cssVar('--accent');
+    const accent2 = cssVar('--accent2');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const margin = 24;
+    const size = W - 2 * margin;
+    const step = size / (d - 1 || 1);
+
+    // stabilizer check overlays: alternating squares over 2x2 blocks of qubits
+    for (let i = 0; i < d - 1; i++){
+      for (let j = 0; j < d - 1; j++){
+        const x = margin + i * step;
+        const y = margin + j * step;
+        ctx.fillStyle = ((i + j) % 2 === 0) ? accent : accent2;
+        ctx.globalAlpha = 0.22;
+        ctx.fillRect(x, y, step, step);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // physical qubit dots
+    const r = Math.max(1.6, Math.min(4.5, 90 / d));
+    ctx.fillStyle = qubit;
+    for (let i = 0; i < d; i++){
+      for (let j = 0; j < d; j++){
+        const x = margin + i * step;
+        const y = margin + j * step;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function update(){
+    const d = parseInt(dSlider.value, 10);
+    const p = parseFloat(pSelect.value);
+    const N = d * d;
+    const belowThreshold = p < P_TH;
+    const rawPL = rawLogicalErrorRate(p, d);
+    // Physical probabilities cannot exceed 1. Below threshold the formula
+    // always stays under 1; above threshold it is not a valid approximation
+    // at all (the perturbative expansion assumes p < p_th), so we clamp the
+    // displayed value and flag it rather than showing a nonsense number > 1.
+    const PL = Math.min(rawPL, 1);
+
+    rD.textContent = d;
+    rN.textContent = N;
+    rP.textContent = (p * 100).toFixed(2) + '%';
+
+    if (belowThreshold){
+      rL.textContent = fmtExp(PL);
+      rL.className = 'val ' + (PL < 1e-8 ? 'good' : '');
+      noteText.textContent = 'Below threshold: increasing d suppresses P_L exponentially toward the target of 1 failure in 10 billion (1e-10).';
+    } else {
+      rL.textContent = '\u2248 1 (saturated)';
+      rL.className = 'val bad';
+      noteText.textContent = 'Above threshold (p \u2265 p_th): the power-law approximation is invalid. In practice the code provides no protection, so P_L saturates near 1 no matter how large d gets.';
+    }
+
+    drawGrid(d);
+  }
+
+  dSlider.addEventListener('input', update);
+  pSelect.addEventListener('change', update);
+
+  update();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;encoding-against-noise&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Spreading one qubit's information across many qubits suppresses errors exponentially"
+  ></iframe>
+</section>
+
+<section class="scene" id="surface-code-tax">
+  <h3>The standard code only talks to its neighbors, so it wastes almost all its qubits</h3>
+  <div class="caption">That single logical qubit is a surface-code patch, the field's default design — but its neighbor-only wiring is expensive at scale.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="surface-code-tax"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Surface-code overhead</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f4f6f9;
+    --text:#1b1e24;
+    --muted:#5a6270;
+    --line:#7c8896;
+    --dot:#34495e;
+    --accent:#e0663d;
+    --accent-bg:rgba(224,102,61,0.14);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c;
+      --panel:#1c212a;
+      --text:#e8ebf0;
+      --muted:#97a1b0;
+      --line:#4b5a68;
+      --dot:#9fb4c7;
+      --accent:#ff8a5c;
+      --accent-bg:rgba(255,138,92,0.18);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{background:var(--bg);color:var(--text);}
+  body{
+    margin:0 auto;
+    max-width:680px;
+    padding:14px;
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+    font-size:14px;
+  }
+  h1{font-size:15px;margin:0 0 4px;font-weight:600;}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:10px;}
+  .panel{
+    background:var(--panel);
+    border-radius:10px;
+    padding:12px;
+  }
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .ctrl-group{display:flex;flex-direction:column;gap:3px;flex:1 1 220px;min-width:180px;}
+  label{font-size:12.5px;color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{
+    padding:6px 10px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:var(--bg);
+    color:var(--text);
+    font-size:12.5px;
+    cursor:pointer;
+    height:30px;
+    align-self:flex-end;
+  }
+  canvas{
+    width:100%;
+    height:auto;
+    max-width:100%;
+    display:block;
+    background:var(--bg);
+    border-radius:8px;
+  }
+  .readouts{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:10px;
+    font-size:12.5px;
+  }
+  .readout{
+    background:var(--bg);
+    border-radius:6px;
+    padding:6px 10px;
+    border:1px solid var(--line);
+    flex:1 1 150px;
+  }
+  .readout b{display:block;font-size:14px;}
+  .eqwrap{margin-top:12px;text-align:center;}
+  math{font-size:16px;color:var(--text);}
+  .legend{
+    color:var(--muted);
+    font-size:11.5px;
+    text-align:center;
+    margin-top:4px;
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+  <h1>The surface code only wires each qubit to its neighbors</h1>
+  <div class=&quot;sub&quot;>Every physical qubit talks to the ones next to it — nothing farther. That means each logical qubit needs a whole patch of physical qubits around it.</div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl-group&quot;>
+        <label for=&quot;nLogical&quot;>Logical qubits needed: <b id=&quot;nLogicalVal&quot;>10</b></label>
+        <input type=&quot;range&quot; id=&quot;nLogical&quot; min=&quot;10&quot; max=&quot;1500&quot; step=&quot;10&quot; value=&quot;10&quot;>
+      </div>
+      <button id=&quot;playBtn&quot;>Play pulse animation</button>
+    </div>
+
+    <canvas id=&quot;canvas&quot; width=&quot;640&quot; height=&quot;380&quot;></canvas>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;>Physical qubits per logical patch (d = 25)<b id=&quot;perPatch&quot;>–</b></div>
+      <div class=&quot;readout&quot;>Total physical qubits needed<b id=&quot;total&quot;>–</b></div>
+      <div class=&quot;readout&quot;>Shor's RSA-2048 needs ~1,500 logical qubits<b>(anchor point)</b></div>
+    </div>
+
+    <div class=&quot;eqwrap&quot;>
+      <math display=&quot;block&quot;>
+        <mi>N</mi><mo>=</mo><mi>n</mi><mo>·</mo><mo>(</mo><mn>2</mn><msup><mi>d</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn><mo>)</mo>
+      </math>
+      <div class=&quot;legend&quot;>N — total physical qubits · n — logical qubits requested (slider) · d — code distance, fixed at 25 (sets the logical error rate) · 2d²−1 — physical qubits in one surface-code patch</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('nLogical');
+  const nLogicalVal = document.getElementById('nLogicalVal');
+  const perPatchEl = document.getElementById('perPatch');
+  const totalEl = document.getElementById('total');
+  const playBtn = document.getElementById('playBtn');
+
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  const D = 25; // code distance, fixed (typical value for below-threshold logical error rate)
+  const PER_PATCH = 2*D*D - 1; // physical qubits per logical-qubit patch
+
+  const CAP_PATCHES = 64; // max patches actually drawn on screen
+  const DOTS_PER_SIDE = 4; // dots per patch side, schematic only
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduceMotion;
+  playBtn.textContent = playing ? 'Pause pulse animation' : 'Play pulse animation';
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause pulse animation' : 'Play pulse animation';
+  });
+
+  function fmt(n){ return Math.round(n).toLocaleString(); }
+
+  function drawScene(pulse){
+    const n = parseInt(slider.value, 10);
+    const total = n * PER_PATCH;
+    nLogicalVal.textContent = fmt(n);
+    perPatchEl.textContent = fmt(PER_PATCH);
+    totalEl.textContent = fmt(total);
+
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    const bg = cssVar('--bg');
+    const line = cssVar('--line');
+    const dot = cssVar('--dot');
+    const accent = cssVar('--accent');
+    const accentBg = cssVar('--accent-bg');
+    const text = cssVar('--text');
+    const muted = cssVar('--muted');
+
+    // title inside canvas
+    ctx.fillStyle = text;
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Physical qubit lattice — each dot links only to its nearest neighbors', 12, 20);
+
+    const drawn = Math.min(n, CAP_PATCHES);
+    const cols = Math.ceil(Math.sqrt(drawn));
+    const rows = Math.ceil(drawn/cols);
+
+    const marginSide = 16, marginTop = 34, marginBottom = 46;
+    const availW = W - 2*marginSide;
+    const availH = H - marginTop - marginBottom;
+    const cellW = availW/cols, cellH = availH/rows;
+    const cellMin = Math.min(cellW, cellH);
+    const patchSize = cellMin * 0.78;
+    const gapW = cellW - patchSize, gapH = cellH - patchSize;
+
+    // store positions for neighbor-connecting lines
+    const pos = [];
+    for(let i=0;i<drawn;i++){
+      const r = Math.floor(i/cols), c = i % cols;
+      const x0 = marginSide + c*cellW + gapW/2;
+      const y0 = marginTop + r*cellH + gapH/2;
+      pos.push({x0,y0,r,c});
+    }
+
+    // draw inter-patch connectors first (behind patches), nearest patch only
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    for(let i=0;i<drawn;i++){
+      const p = pos[i];
+      const cx = p.x0 + patchSize/2, cy = p.y0 + patchSize/2;
+      const rightIdx = i+1;
+      if(p.c+1 < cols &amp;&amp; rightIdx < drawn &amp;&amp; pos[rightIdx].r === p.r){
+        const q = pos[rightIdx];
+        ctx.beginPath();
+        ctx.moveTo(p.x0+patchSize, cy);
+        ctx.lineTo(q.x0, cy);
+        ctx.stroke();
+      }
+      const downIdx = i+cols;
+      if(downIdx < drawn){
+        const q = pos[downIdx];
+        ctx.beginPath();
+        ctx.moveTo(cx, p.y0+patchSize);
+        ctx.lineTo(cx, q.y0);
+        ctx.stroke();
+      }
+    }
+
+    // draw each patch: small dot lattice with nearest-neighbor lines
+    const step = patchSize/(DOTS_PER_SIDE-1);
+    for(let i=0;i<drawn;i++){
+      const p = pos[i];
+      const isHighlight = (i === 0);
+
+      if(isHighlight){
+        const alpha = 0.55 + 0.35*Math.sin(pulse*2*Math.PI);
+        ctx.fillStyle = accentBg;
+        ctx.fillRect(p.x0-4, p.y0-4, patchSize+8, patchSize+8);
+        ctx.strokeStyle = accent;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 2.2;
+        ctx.strokeRect(p.x0-4, p.y0-4, patchSize+8, patchSize+8);
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1;
+      // internal grid lines
+      for(let gy=0; gy<DOTS_PER_SIDE; gy++){
+        ctx.beginPath();
+        ctx.moveTo(p.x0, p.y0+gy*step);
+        ctx.lineTo(p.x0+patchSize, p.y0+gy*step);
+        ctx.stroke();
+      }
+      for(let gx=0; gx<DOTS_PER_SIDE; gx++){
+        ctx.beginPath();
+        ctx.moveTo(p.x0+gx*step, p.y0);
+        ctx.lineTo(p.x0+gx*step, p.y0+patchSize);
+        ctx.stroke();
+      }
+      // dots
+      ctx.fillStyle = isHighlight ? accent : dot;
+      const r = Math.max(1.4, step*0.12);
+      for(let gy=0; gy<DOTS_PER_SIDE; gy++){
+        for(let gx=0; gx<DOTS_PER_SIDE; gx++){
+          ctx.beginPath();
+          ctx.arc(p.x0+gx*step, p.y0+gy*step, r, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // label for highlighted patch
+    if(drawn > 0){
+      const p0 = pos[0];
+      ctx.fillStyle = accent;
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'left';
+      const lx = p0.x0 + patchSize + 8;
+      const ly = p0.y0 + patchSize/2;
+      const labelX = Math.min(lx, W - 210);
+      ctx.fillText('1 logical qubit', labelX, ly - 6);
+      ctx.fillText('= ' + fmt(PER_PATCH) + ' physical qubits', labelX, ly + 10);
+    }
+
+    // overflow note
+    if(n > CAP_PATCHES){
+      ctx.fillStyle = muted;
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('+ ' + fmt(n - CAP_PATCHES) + ' more identical patches, same nearest-neighbor pattern', W/2, H - 26);
+    }
+
+    ctx.fillStyle = muted;
+    ctx.font = '11.5px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('every line drawn = a nearest-neighbor link (no long-range wiring anywhere in the lattice)', W/2, H - 10);
+
+    if(bg){/* keep lint quiet about unused var in some engines */}
+  }
+
+  let phase = 0;
+  function frame(t){
+    if(playing){
+      phase = (t/900) % 1;
+    }
+    drawScene(phase);
+    requestAnimationFrame(frame);
+  }
+
+  slider.addEventListener('input', () => drawScene(phase));
+
+  requestAnimationFrame(frame);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;surface-code-tax&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The standard code only talks to its neighbors, so it wastes almost all its qubits"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">The surface code wastes qubits because it only wires neighbors together. This part shows the paper's fix:<ul><li>a code that wires qubits at a distance</li><li>hardware (moving atoms) that can physically build those wires</li><li>the surgery and zone architecture that turns both into a working machine</li></ul></div>
+</header>
+<section class="scene" id="the-expensive-gate">
+  <h3>Most gates in a circuit are free to correct for; the Toffoli gate is not</h3>
+  <div class="caption">The million-qubit tax above comes from brute-force error correction, but not every gate even costs the same to run in the first place.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="the-expensive-gate"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The Expensive Gate</title>
+<style>
+  :root{
+    --bg:#f6f6f9; --panel:#ffffff; --ink:#1a1a1f; --muted:#6b6b76;
+    --wire:#8a8a96; --clifford:#2e8b57; --toffoli:#c9414f; --dim:#c3c3cc;
+    --accent:#3a6ea5; --border:#dcdce2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#131318; --panel:#1d1d25; --ink:#eceef2; --muted:#a0a0ac;
+      --wire:#71717e; --clifford:#5fca8c; --toffoli:#ff7b86; --dim:#3c3c46;
+      --accent:#7db1e8; --border:#33333d;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+  h1{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px 12px;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;margin-bottom:8px;}
+  .toggle-group{display:flex;gap:6px;flex:1 1 260px;flex-wrap:wrap;}
+  .toggle-btn{flex:1 1 130px;padding:8px 6px;font-size:12.5px;border:1px solid var(--border);
+    background:var(--panel);color:var(--ink);border-radius:7px;cursor:pointer;}
+  .toggle-btn.active{border-color:var(--accent);color:var(--accent);font-weight:700;}
+  .small-btn{padding:8px 12px;font-size:12.5px;border:1px solid var(--border);background:var(--panel);
+    color:var(--ink);border-radius:7px;cursor:pointer;white-space:nowrap;}
+  .hint{font-size:11px;color:var(--muted);margin:2px 0 0;max-width:520px;}
+  .boxnote{font-size:11px;color:var(--muted);margin:8px 0 0;padding:6px 8px;border-left:2px solid var(--accent);
+    background:var(--bg);border-radius:4px;}
+  svg{display:block;width:100%;max-width:100%;height:auto;}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .stat{flex:1 1 150px;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+    padding:6px 10px;}
+  .stat .lbl{font-size:10.5px;color:var(--muted);}
+  .stat .val{font-size:16px;font-weight:700;}
+  .eqwrap{margin-top:14px;text-align:center;}
+  math{font-size:17px;}
+  .legend{font-size:11px;color:var(--muted);text-align:center;margin-top:4px;}
+  ul.anchor{margin:10px 0 0;padding-left:18px;font-size:12px;color:var(--ink);}
+  ul.anchor li{margin-bottom:3px;}
+  ul.anchor b{color:var(--ink);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Sample quantum circuit — which gates cost a magic-state token?</h1>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;controls&quot;>
+      <div class=&quot;toggle-group&quot; role=&quot;group&quot; aria-label=&quot;Gate type view&quot;>
+        <button id=&quot;btnClifford&quot; class=&quot;toggle-btn active&quot;>Clifford gates (free)</button>
+        <button id=&quot;btnToffoli&quot; class=&quot;toggle-btn&quot;>Toffoli gates (cost tokens)</button>
+      </div>
+      <button id=&quot;playPause&quot; class=&quot;small-btn&quot;>Pause</button>
+    </div>
+    <p class=&quot;hint&quot;>Toggle switches which gate family is highlighted in the circuit below. Pause/play only stops the decorative pulse — it changes nothing physical.</p>
+
+    <svg id=&quot;circuit&quot; viewBox=&quot;0 0 680 260&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;Circuit diagram&quot;></svg>
+
+    <p class=&quot;boxnote&quot; id=&quot;boxNote&quot;></p>
+
+    <div class=&quot;stats&quot;>
+      <div class=&quot;stat&quot;><div class=&quot;lbl&quot;>current view</div><div class=&quot;val&quot; id=&quot;modeLabel&quot;>Clifford gates</div></div>
+      <div class=&quot;stat&quot;><div class=&quot;lbl&quot;>magic-state tokens used</div><div class=&quot;val&quot; id=&quot;tokenCount&quot;>0</div></div>
+      <div class=&quot;stat&quot;><div class=&quot;lbl&quot;>gates highlighted</div><div class=&quot;val&quot; id=&quot;fracLabel&quot;>10 of 12 (83%)</div></div>
+    </div>
+
+    <div class=&quot;eqwrap&quot;>
+      <math display=&quot;block&quot;>
+        <msub><mi>N</mi><mtext>tokens</mtext></msub>
+        <mo>=</mo>
+        <msub><mi>N</mi><mtext>Toffoli</mtext></msub>
+      </math>
+      <div class=&quot;legend&quot;>N<sub>tokens</sub> — magic-state tokens consumed by the circuit &amp;middot; N<sub>Toffoli</sub> — number of Toffoli gates present (H, X, CNOT gates each cost 0, however many there are).</div>
+    </div>
+
+    <ul class=&quot;anchor&quot;>
+      <li><b>RSA-2048</b> factoring: &amp;asymp; <span id=&quot;rsaVal&quot;></span> &amp;times; 10<sup>9</sup> Toffoli gates required</li>
+      <li><b>ECC-256</b> (elliptic-curve discrete log): far fewer — point addition avoids costly modular exponentiation</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function(){
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const COLOR = {
+    panel: cssVar('--panel'), ink: cssVar('--ink'), muted: cssVar('--muted'),
+    wire: cssVar('--wire'), cliff: cssVar('--clifford'), toff: cssVar('--toffoli'),
+    dim: cssVar('--dim'), accent: cssVar('--accent')
+  };
+
+  // Named physical constant (quantitative anchor from the paper's cost estimate)
+  const RSA_TOFFOLI = 6.5e9; // approximate Toffoli-gate count to factor RSA-2048
+  document.getElementById('rsaVal').textContent = (RSA_TOFFOLI/1e9).toFixed(1);
+
+  const qY = [75, 140, 205]; // pixel rows for qubit 0,1,2
+  const gates = [
+    {type:'H', clifford:true, wires:[0]},
+    {type:'CNOT', clifford:true, wires:[0,1], control:0, target:1},
+    {type:'X', clifford:true, wires:[2]},
+    {type:'H', clifford:true, wires:[1]},
+    {type:'TOFFOLI', clifford:false, wires:[0,1,2], controls:[0,1], target:2},
+    {type:'CNOT', clifford:true, wires:[1,2], control:1, target:2},
+    {type:'H', clifford:true, wires:[0]},
+    {type:'X', clifford:true, wires:[1]},
+    {type:'TOFFOLI', clifford:false, wires:[0,1,2], controls:[0,2], target:1},
+    {type:'CNOT', clifford:true, wires:[0,2], control:0, target:2},
+    {type:'H', clifford:true, wires:[2]},
+    {type:'X', clifford:true, wires:[0]}
+  ];
+  const total = gates.length;
+  const toffoliCount = gates.filter(g=>!g.clifford).length;
+  const cliffordCount = total - toffoliCount;
+  const startX = 90, endX = 545;
+  const xs = gates.map((_,i)=> startX + i*(endX-startX)/(gates.length-1));
+
+  function svgEl(tag, attrs, text){
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text!==undefined) e.textContent = text;
+    return e;
+  }
+
+  function buildGateGroup(gate, x, mode){
+    const highlighted = mode==='clifford' ? gate.clifford : !gate.clifford;
+    const color = highlighted ? (gate.clifford ? COLOR.cliff : COLOR.toff) : COLOR.dim;
+    const g = svgEl('g', {opacity: highlighted ? 1 : 0.35});
+
+    if (gate.type==='H' || gate.type==='X'){
+      const y = qY[gate.wires[0]];
+      g.appendChild(svgEl('rect',{x:x-14,y:y-14,width:28,height:28,rx:6,fill:COLOR.panel,stroke:color,'stroke-width':2}));
+      g.appendChild(svgEl('text',{x:x,y:y+5,'text-anchor':'middle','font-size':13,'font-weight':700,fill:color}, gate.type));
+    } else if (gate.type==='CNOT'){
+      const yc=qY[gate.control], yt=qY[gate.target];
+      g.appendChild(svgEl('line',{x1:x,y1:Math.min(yc,yt),x2:x,y2:Math.max(yc,yt),stroke:color,'stroke-width':2}));
+      g.appendChild(svgEl('circle',{cx:x,cy:yc,r:5,fill:color}));
+      g.appendChild(svgEl('circle',{cx:x,cy:yt,r:10,fill:COLOR.panel,stroke:color,'stroke-width':2}));
+      g.appendChild(svgEl('line',{x1:x-6,y1:yt,x2:x+6,y2:yt,stroke:color,'stroke-width':2}));
+      g.appendChild(svgEl('line',{x1:x,y1:yt-6,x2:x,y2:yt+6,stroke:color,'stroke-width':2}));
+    } else if (gate.type==='TOFFOLI'){
+      const ys = gate.wires.map(w=>qY[w]);
+      const yt = qY[gate.target];
+      g.appendChild(svgEl('line',{x1:x,y1:Math.min(...ys),x2:x,y2:Math.max(...ys),stroke:color,'stroke-width':2}));
+      gate.controls.forEach(c=> g.appendChild(svgEl('circle',{cx:x,cy:qY[c],r:5,fill:color})));
+      g.appendChild(svgEl('circle',{cx:x,cy:yt,r:10,fill:COLOR.panel,stroke:color,'stroke-width':2}));
+      g.appendChild(svgEl('line',{x1:x-6,y1:yt,x2:x+6,y2:yt,stroke:color,'stroke-width':2}));
+      g.appendChild(svgEl('line',{x1:x,y1:yt-6,x2:x,y2:yt+6,stroke:color,'stroke-width':2}));
+      if (mode==='toffoli'){
+        // dashed selection box around this Toffoli gate, kept well clear of the header row above
+        g.appendChild(svgEl('rect',{x:x-18,y:60,width:36,height:160,fill:'none',stroke:color,'stroke-width':1.5,'stroke-dasharray':'4 3'}));
+        g.appendChild(svgEl('text',{x:x,y:50,'text-anchor':'middle','font-size':10,fill:color,'font-weight':700},'Toffoli'));
+        g.appendChild(svgEl('text',{x:x,y:236,'text-anchor':'middle','font-size':10.5,fill:color,'font-weight':700},'\u22121 token'));
+      }
+    }
+    if (mode==='clifford' &amp;&amp; gate.clifford){
+      g.appendChild(svgEl('path',{d:`M${x-8},34 L${x+6},34 M${x+1},29 L${x+7},34 L${x+1},39`,stroke:COLOR.cliff,'stroke-width':2,fill:'none'}));
+    }
+    return {g, highlighted};
+  }
+
+  const svg = document.getElementById('circuit');
+  const boxNote = document.getElementById('boxNote');
+  let pulsable = [];
+  let mode = 'clifford';
+
+  function render(){
+    svg.innerHTML = '';
+    pulsable = [];
+    svg.appendChild(svgEl('text',{x:340,y:16,'text-anchor':'middle','font-size':12,fill:COLOR.muted},
+      `Sample circuit — ${cliffordCount} Clifford gates + ${toffoliCount} Toffoli gates`));
+
+    [0,1,2].forEach(i=>{
+      svg.appendChild(svgEl('line',{x1:45,y1:qY[i],x2:580,y2:qY[i],stroke:COLOR.wire,'stroke-width':1.5}));
+      svg.appendChild(svgEl('text',{x:22,y:qY[i]+5,'font-size':13,fill:COLOR.ink},'q'+i));
+    });
+
+    if (mode==='clifford'){
+      svg.appendChild(svgEl('line',{x1:90,y1:34,x2:585,y2:34,stroke:COLOR.cliff,'stroke-width':1.5,'stroke-dasharray':'3 3',opacity:0.6}));
+    }
+
+    gates.forEach((gate,i)=>{
+      const {g, highlighted} = buildGateGroup(gate, xs[i], mode);
+      svg.appendChild(g);
+      if (highlighted) pulsable.push(g);
+    });
+
+    // collector box
+    const tokenCount = mode==='toffoli' ? toffoliCount : 0;
+    svg.appendChild(svgEl('rect',{x:585,y:40,width:85,height:195,rx:8,fill:COLOR.panel,stroke:COLOR.accent,'stroke-width':1.5}));
+    if (mode==='clifford'){
+      svg.appendChild(svgEl('text',{x:627,y:105,'text-anchor':'middle','font-size':11,fill:COLOR.ink,'font-weight':700},'Pauli frame'));
+      svg.appendChild(svgEl('text',{x:627,y:120,'text-anchor':'middle','font-size':9.5,fill:COLOR.muted},'tracked classically'));
+      svg.appendChild(svgEl('text',{x:627,y:145,'text-anchor':'middle','font-size':13,fill:COLOR.cliff,'font-weight':700},'0 tokens'));
+    } else {
+      svg.appendChild(svgEl('text',{x:627,y:100,'text-anchor':'middle','font-size':11,fill:COLOR.ink,'font-weight':700},'Magic-state'));
+      svg.appendChild(svgEl('text',{x:627,y:114,'text-anchor':'middle','font-size':11,fill:COLOR.ink,'font-weight':700},'factory'));
+      svg.appendChild(svgEl('text',{x:627,y:145,'text-anchor':'middle','font-size':13,fill:COLOR.toff,'font-weight':700},tokenCount+' tokens'));
+    }
+
+    document.getElementById('modeLabel').textContent = mode==='clifford' ? 'Clifford gates' : 'Toffoli gates';
+    document.getElementById('tokenCount').textContent = Math.round(tokenCount);
+    const highlightedCount = mode==='clifford' ? cliffordCount : toffoliCount;
+    const pct = Math.round((highlightedCount/total)*100);
+    document.getElementById('fracLabel').textContent = `${highlightedCount} of ${total} (${pct}%)`;
+
+    // Same box, same running tally — only its meaning changes with the toggle. Explain both, plainly.
+    if (mode==='clifford'){
+      boxNote.textContent = 'Right-hand box = &quot;Pauli frame&quot;: a classical record of which Pauli corrections are still owed on each qubit — free to update, so Clifford gates add nothing to it.';
+    } else {
+      boxNote.textContent = 'Same box, now called a &quot;magic-state factory&quot; counter: each Toffoli gate needs one pre-manufactured magic state, so it ticks up by 1 token per Toffoli instead of staying free.';
+    }
+  }
+
+  const btnC = document.getElementById('btnClifford');
+  const btnT = document.getElementById('btnToffoli');
+  function setMode(m){
+    mode = m;
+    btnC.classList.toggle('active', m==='clifford');
+    btnT.classList.toggle('active', m==='toffoli');
+    render();
+  }
+  btnC.addEventListener('click', ()=>setMode('clifford'));
+  btnT.addEventListener('click', ()=>setMode('toffoli'));
+
+  // Decorative pulse animation, respecting reduced-motion preference
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduced;
+  const playBtn = document.getElementById('playPause');
+  playBtn.textContent = playing ? 'Pause' : 'Play';
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+  });
+  function animate(t){
+    if (playing){
+      const phase = t/500;
+      const op = (0.65 + 0.35*Math.sin(phase)).toFixed(2);
+      pulsable.forEach(g=> g.setAttribute('opacity', op));
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  setMode('clifford');
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;the-expensive-gate&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Most gates in a circuit are free to correct for; the Toffoli gate is not"
+  ></iframe>
+</section>
+
+<section class="scene" id="packing-more-logic-per-block">
+  <h3>Letting checks connect distant qubits packs far more logical qubits into the same block</h3>
+  <div class="caption">The surface code's overhead and the costly Toffoli gates from the scene before both need reliable qubits. A nonlocal check code — called qLDPC — packs far more logical qubits into the same physical block.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="packing-more-logic-per-block"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Packing more logic per block</title>
+<style>
+  :root{
+    --bg:#f7f7fa;
+    --panel:#ffffff;
+    --ink:#1b1e26;
+    --muted:#5b6070;
+    --dot:#b9bec9;
+    --dot-active:#4f7cff;
+    --edge-local:#4f7cff;
+    --edge-nonlocal:#e0523a;
+    --patch-border:#2c3e70;
+    --accent:#e0523a;
+    --track:#d8dbe4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161c;
+      --panel:#1d2029;
+      --ink:#eef0f5;
+      --muted:#9aa0b2;
+      --dot:#3a3f4d;
+      --dot-active:#7c9dff;
+      --edge-local:#7c9dff;
+      --edge-nonlocal:#ff8a6b;
+      --patch-border:#a9bcff;
+      --accent:#ff8a6b;
+      --track:#3a3f4d;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  h2.small{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--muted);}
+  .panel{background:var(--panel);border-radius:10px;padding:12px;margin-bottom:12px;}
+  .row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;}
+  svg{width:100%;max-width:100%;height:auto;display:block;}
+  .ctrl{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .ctrl label{font-size:13px;color:var(--muted);}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .modeLabel{font-weight:600;font-size:14px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px;}
+  .stat{flex:1 1 130px;background:var(--bg);border-radius:8px;padding:8px 10px;}
+  .stat .k{font-size:11px;color:var(--muted);}
+  .stat .v{font-size:18px;font-weight:700;}
+  .eqwrap{margin-top:6px;}
+  math{font-size:17px;}
+  .legend{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  .note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+  ul.list{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--muted);}
+  ul.list li{margin-bottom:2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <h2 class=&quot;small&quot;>Physical qubit block: 5,278 qubits, held fixed</h2>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;toggle&quot;>Code family — slide to switch wiring: <span class=&quot;modeLabel&quot; id=&quot;modeLabel&quot;>Surface code</span></label>
+      <input type=&quot;range&quot; id=&quot;toggle&quot; min=&quot;0&quot; max=&quot;1&quot; step=&quot;1&quot; value=&quot;0&quot;>
+    </div>
+    <svg id=&quot;diagram&quot; viewBox=&quot;0 0 300 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+    <div class=&quot;note&quot; id=&quot;diagNote&quot;>144-qubit schematic sample of the full 5,278-qubit block. Blue lines = check connections between qubits.</div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;stat&quot;><div class=&quot;k&quot;>physical qubits</div><div class=&quot;v&quot; id=&quot;rN&quot;>5,278</div></div>
+      <div class=&quot;stat&quot;><div class=&quot;k&quot;>logical qubits, k</div><div class=&quot;v&quot; id=&quot;rK&quot;>9</div></div>
+      <div class=&quot;stat&quot;><div class=&quot;k&quot;>encoding rate, k/n</div><div class=&quot;v&quot; id=&quot;rRate&quot;>0.17%</div></div>
+      <div class=&quot;stat&quot;><div class=&quot;k&quot;>code distance, d</div><div class=&quot;v&quot; id=&quot;rD&quot;>≤ 24</div></div>
+    </div>
+    <ul class=&quot;list&quot; id=&quot;summaryList&quot;></ul>
+  </div>
+
+  <div class=&quot;panel eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>R</mi><mo>=</mo><mfrac><mi>k</mi><mi>n</mi></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>R — encoding rate (fraction) · k — number of logical qubits stored · n — number of physical qubits used (fixed at 5,278)</div>
+    <div class=&quot;legend&quot;>Surface-code patch cost: n<sub style=&quot;font-size:10px&quot;>patch</sub> = d² = 24² = 576 physical qubits per logical qubit (local checks only reach neighbors, so each logical qubit needs its own patch).</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const N_TOTAL = 5278;          // physical qubits, fixed across toggle
+  const D = 24;                  // code distance (matched between families)
+  const D2 = D*D;                // physical qubits per surface-code patch
+  const K_SURFACE = Math.floor(N_TOTAL / D2);        // patches that fit -> logical qubits
+  const K_QLDPC = 1480;                              // reported lifted-product qLDPC construction
+  const RATE_SURFACE = K_SURFACE / N_TOTAL * 100;
+  const RATE_QLDPC = K_QLDPC / N_TOTAL * 100;
+  const RATIO = (K_QLDPC * D2) / N_TOTAL;             // extra physical qubits surface code would need
+
+  const svg = document.getElementById('diagram');
+  const toggle = document.getElementById('toggle');
+  const modeLabel = document.getElementById('modeLabel');
+  const rK = document.getElementById('rK');
+  const rRate = document.getElementById('rRate');
+  const diagNote = document.getElementById('diagNote');
+  const summaryList = document.getElementById('summaryList');
+
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // ---- grid geometry: 12x12 dots, grouped into 3x3 patches of 4x4 ----
+  const GRID = 12, PATCH = 4, PATCHES_PER_SIDE = GRID / PATCH;
+  const margin = 34, size = 232;
+  const step = size / (GRID - 1);
+  function pos(i,j){ return [margin + i*step, margin + j*step]; }
+
+  // deterministic &quot;random&quot; long-range edges for qLDPC wiring
+  function qldpcEdges(){
+    const edges = [];
+    for(let idx=0; idx<GRID*GRID; idx++){
+      const target = (idx*53 + 91) % (GRID*GRID);
+      const i1 = idx % GRID, j1 = Math.floor(idx/GRID);
+      const i2 = target % GRID, j2 = Math.floor(target/GRID);
+      const dist = Math.abs(i1-i2) + Math.abs(j1-j2);
+      if(dist >= 7 &amp;&amp; edges.length < 46){
+        edges.push([i1,j1,i2,j2]);
+      }
+    }
+    return edges;
+  }
+
+  function render(){
+    const mode = toggle.value === '1' ? 'qldpc' : 'surface';
+    modeLabel.textContent = mode === 'qldpc' ? 'qLDPC (lifted-product)' : 'Surface code';
+
+    const dotColor = cssVar('--dot');
+    const dotActive = cssVar('--dot-active');
+    const edgeLocal = cssVar('--edge-local');
+    const edgeNonlocal = cssVar('--edge-nonlocal');
+    const patchBorder = cssVar('--patch-border');
+    const ink = cssVar('--ink');
+    const muted = cssVar('--muted');
+
+    let els = [];
+
+    if(mode === 'surface'){
+      // patch borders + local edges only inside each patch
+      for(let pi=0; pi<PATCHES_PER_SIDE; pi++){
+        for(let pj=0; pj<PATCHES_PER_SIDE; pj++){
+          const [x0,y0] = pos(pi*PATCH, pj*PATCH);
+          const [x1,y1] = pos(pi*PATCH+PATCH-1, pj*PATCH+PATCH-1);
+          els.push(`<rect x=&quot;${x0-6}&quot; y=&quot;${y0-6}&quot; width=&quot;${x1-x0+12}&quot; height=&quot;${y1-y0+12}&quot; rx=&quot;6&quot;
+            fill=&quot;none&quot; stroke=&quot;${patchBorder}&quot; stroke-width=&quot;1.4&quot; stroke-dasharray=&quot;3 3&quot; opacity=&quot;0.8&quot;/>`);
+        }
+      }
+      // local mesh edges (nearest neighbor only)
+      for(let i=0;i<GRID;i++){
+        for(let j=0;j<GRID;j++){
+          const [x,y] = pos(i,j);
+          if(i%PATCH !== PATCH-1 &amp;&amp; i<GRID-1){
+            const [x2,y2]=pos(i+1,j);
+            els.push(`<line x1=&quot;${x}&quot; y1=&quot;${y}&quot; x2=&quot;${x2}&quot; y2=&quot;${y2}&quot; stroke=&quot;${edgeLocal}&quot; stroke-width=&quot;1&quot; opacity=&quot;0.6&quot;/>`);
+          }
+          if(j%PATCH !== PATCH-1 &amp;&amp; j<GRID-1){
+            const [x2,y2]=pos(i,j+1);
+            els.push(`<line x1=&quot;${x}&quot; y1=&quot;${y}&quot; x2=&quot;${x2}&quot; y2=&quot;${y2}&quot; stroke=&quot;${edgeLocal}&quot; stroke-width=&quot;1&quot; opacity=&quot;0.6&quot;/>`);
+          }
+        }
+      }
+      // annotate one patch
+      const [ax,ay] = pos(1.5,-0.9);
+      els.push(`<text x=&quot;${ax}&quot; y=&quot;${ay+2}&quot; font-size=&quot;8.6&quot; fill=&quot;${ink}&quot; text-anchor=&quot;middle&quot;>1 patch = 576 qubits</text>`);
+      els.push(`<text x=&quot;${ax}&quot; y=&quot;${ay+11}&quot; font-size=&quot;8.6&quot; fill=&quot;${ink}&quot; text-anchor=&quot;middle&quot;>→ 1 logical qubit</text>`);
+    } else {
+      // qLDPC long-range edges spanning the whole block
+      const edges = qldpcEdges();
+      edges.forEach(([i1,j1,i2,j2])=>{
+        const [x1,y1]=pos(i1,j1), [x2,y2]=pos(i2,j2);
+        els.push(`<line x1=&quot;${x1}&quot; y1=&quot;${y1}&quot; x2=&quot;${x2}&quot; y2=&quot;${y2}&quot; stroke=&quot;${edgeNonlocal}&quot; stroke-width=&quot;0.9&quot; opacity=&quot;0.45&quot;/>`);
+      });
+      const [ax,ay] = pos(4,-0.9);
+      els.push(`<text x=&quot;${ax}&quot; y=&quot;${ay+2}&quot; font-size=&quot;8.6&quot; fill=&quot;${ink}&quot; text-anchor=&quot;middle&quot;>long-range checks link</text>`);
+      els.push(`<text x=&quot;${ax}&quot; y=&quot;${ay+11}&quot; font-size=&quot;8.6&quot; fill=&quot;${ink}&quot; text-anchor=&quot;middle&quot;>distant qubits (nonlocal)</text>`);
+    }
+
+    // dots on top
+    for(let i=0;i<GRID;i++){
+      for(let j=0;j<GRID;j++){
+        const [x,y] = pos(i,j);
+        const c = mode === 'qldpc' ? dotActive : dotColor;
+        els.push(`<circle cx=&quot;${x}&quot; cy=&quot;${y}&quot; r=&quot;2.6&quot; fill=&quot;${c}&quot;/>`);
+      }
+    }
+
+    // bottom banner text
+    const bannerY = margin + size + 22;
+    if(mode === 'surface'){
+      els.push(`<text x=&quot;150&quot; y=&quot;${bannerY}&quot; font-size=&quot;10.5&quot; fill=&quot;${muted}&quot; text-anchor=&quot;middle&quot;>9 patches fit in 5,278 qubits → 9 logical qubits</text>`);
+    } else {
+      els.push(`<text x=&quot;150&quot; y=&quot;${bannerY}&quot; font-size=&quot;10.5&quot; fill=&quot;${muted}&quot; text-anchor=&quot;middle&quot;>same 5,278 qubits → 1,480 logical qubits</text>`);
+    }
+
+    svg.innerHTML = els.join('');
+
+    // readouts
+    rK.textContent = mode === 'qldpc' ? K_QLDPC.toLocaleString() : K_SURFACE.toLocaleString();
+    rRate.textContent = (mode === 'qldpc' ? RATE_QLDPC : RATE_SURFACE).toFixed(2) + '%';
+    diagNote.textContent = mode === 'qldpc'
+      ? '144-qubit schematic sample of the full 5,278-qubit block. Red lines = nonlocal check connections spanning the block.'
+      : '144-qubit schematic sample of the full 5,278-qubit block. Blue lines = check connections between nearest neighbors only.';
+
+    summaryList.innerHTML = `
+      <li>Surface code: ${K_SURFACE} logical qubits from 5,278 physical qubits → rate ${RATE_SURFACE.toFixed(2)}%</li>
+      <li>qLDPC: ${K_QLDPC.toLocaleString()} logical qubits from the same 5,278 physical qubits → rate ${RATE_QLDPC.toFixed(1)}%</li>
+      <li>Matching qLDPC's 1,480 logical qubits with surface-code patches would need ${(K_QLDPC*D2).toLocaleString()} physical qubits — about ${RATIO.toFixed(0)}× more than 5,278</li>
+    `;
+  }
+
+  toggle.addEventListener('input', render);
+  render();
+
+  window.__sceneReady = true;
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;packing-more-logic-per-block&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Letting checks connect distant qubits packs far more logical qubits into the same block"
+  ></iframe>
+</section>
+
+<section class="scene" id="atoms-that-move">
+  <h3>Optical tweezers can physically move atoms, wiring any two qubits together on demand</h3>
+  <div class="caption">The qLDPC block above needs qubits that aren't neighbors to talk; reconfigurable atom tweezers make that connection physically real.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="atoms-that-move"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Atoms That Move — reconfigurable tweezer wiring</title>
+<style>
+  :root{
+    --bg:#f7f7fa; --panel:#ffffff; --text:#1b1e26; --muted:#5b6072;
+    --atom:#7c8296; --atomMover:#1f6feb; --glow:#e8590c; --wire:#9aa0b4;
+    --bad:#d0342c; --home:#c7cad6; --border:#d7d9e3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161d; --panel:#1c1f29; --text:#eef0f6; --muted:#9aa0b8;
+      --atom:#5a6178; --atomMover:#5bb0ff; --glow:#ff8a3d; --wire:#454b60;
+      --bad:#ff6b61; --home:#3a3f52; --border:#2c3040;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:15px;margin:2px 0 8px;font-weight:600;}
+  .panels{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+  canvas{max-width:100%;height:auto;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:12px;}
+  .ctrl{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);}
+  .ctrl input[type=range]{width:200px;}
+  button{font-size:13px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button:hover{background:var(--home);}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:12px;font-size:13px;}
+  .readouts div span.v{color:var(--atomMover);font-weight:600;}
+  .eqbox{margin-top:14px;padding-top:8px;border-top:1px solid var(--border);}
+  math{font-size:16px;}
+  .legend{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;}
+  .anchor{font-size:12px;color:var(--muted);margin-top:10px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Reconfigurable wiring: tweezers move atoms to make the connection</h2>
+  <div class=&quot;panels&quot;>
+    <canvas id=&quot;left&quot; width=&quot;300&quot; height=&quot;236&quot;></canvas>
+    <canvas id=&quot;right&quot; width=&quot;300&quot; height=&quot;236&quot;></canvas>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;playBtn&quot;>▶ Play</button>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;prog&quot;>Cycle progress (%) — drag to scrub move → entangle → return</label>
+      <input type=&quot;range&quot; id=&quot;prog&quot; min=&quot;0&quot; max=&quot;100&quot; value=&quot;0&quot; step=&quot;1&quot;>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Gate step: <span class=&quot;v&quot; id=&quot;phaseLabel&quot;>idle</span></div>
+    <div>Progress: <span class=&quot;v&quot; id=&quot;progVal&quot;>0</span>%</div>
+    <div>Move distance: <span class=&quot;v&quot; id=&quot;distVal&quot;>–</span> µm</div>
+    <div>One-way transport time: <span class=&quot;v&quot; id=&quot;timeVal&quot;>–</span> µs</div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>t</mi><mo>=</mo><mn>2</mn><msqrt><mfrac><mi>d</mi><mi>a</mi></mfrac></msqrt>
+    </math>
+    <div class=&quot;legend&quot;>
+      t — one-way transport time (s) · d — distance the atom travels between trap sites (m) ·
+      a — maximum acceleration the tweezer beam can impose before the atom is lost from the trap (m/s²), triangular (accelerate-then-decelerate) motion assumed.
+    </div>
+  </div>
+
+  <div class=&quot;anchor&quot;>Experimental anchor: arrays holding over 6,100 coherent atoms, and optical tweezer masks with 360,000 trap sites, have been demonstrated.</div>
+</div>
+
+<script>
+(function(){
+  const cs = getComputedStyle(document.documentElement);
+  const C = k => cs.getPropertyValue(k).trim();
+  const COL = {atom:C('--atom'), mover:C('--atomMover'), glow:C('--glow'),
+    wire:C('--wire'), bad:C('--bad'), home:C('--home'), text:C('--text'), muted:C('--muted')};
+
+  // ---- grid geometry ----
+  const COLS=7, ROWS=5, SPACING=40, MX=30, MY=46;
+  function pos(col,row){ return {x: MX+col*SPACING, y: MY+row*SPACING}; }
+  const A_ = {c:1,r:1}, B_ = {c:5,r:3};
+  const A = pos(A_.c,A_.r), B = pos(B_.c,B_.r);
+  const dx=B.x-A.x, dy=B.y-A.y, len=Math.hypot(dx,dy);
+  const ux=dx/len, uy=dy/len;
+  const GAP=16; // px gap kept at closest approach (Rydberg blockade separation)
+  const mid = {x:(A.x+B.x)/2, y:(A.y+B.y)/2};
+  const mA = {x:mid.x-ux*GAP/2, y:mid.y-uy*GAP/2};
+  const mB = {x:mid.x+ux*GAP/2, y:mid.y+uy*GAP/2};
+
+  // ---- physics: transport kinematics ----
+  const SPACING_UM = 5;           // µm between adjacent trap sites (typical value)
+  const A_MAX = 1.0e5;            // m/s^2, max transport acceleration before atom loss
+  const latticeDist = Math.hypot(B_.c-A_.c, B_.r-A_.r); // in lattice units
+  const d_um = latticeDist*SPACING_UM;
+  const d_m = d_um*1e-6;
+  const t_move_s = 2*Math.sqrt(d_m/A_MAX);
+  const t_move_us = t_move_s*1e6;
+  document.getElementById('distVal').textContent = d_um.toFixed(1);
+  document.getElementById('timeVal').textContent = t_move_us.toFixed(1);
+
+  function lerp(a,b,f){return a+(b-a)*f;}
+  function ease(x){return x*x*(3-2*x);}
+
+  function phaseInfo(t){
+    if(t<0.35) return {phase:'move', local:t/0.35};
+    if(t<0.65) return {phase:'entangle', local:(t-0.35)/0.30};
+    return {phase:'return', local:(t-0.65)/0.35};
+  }
+  function moverPositions(t){
+    const {phase,local} = phaseInfo(t);
+    let pa,pb;
+    if(phase==='move'){
+      const e=ease(Math.min(local,1));
+      pa={x:lerp(A.x,mA.x,e), y:lerp(A.y,mA.y,e)};
+      pb={x:lerp(B.x,mB.x,e), y:lerp(B.y,mB.y,e)};
+    } else if(phase==='entangle'){
+      pa={...mA}; pb={...mB};
+    } else {
+      const e=ease(Math.min(local,1));
+      pa={x:lerp(mA.x,A.x,e), y:lerp(mA.y,A.y,e)};
+      pb={x:lerp(mB.x,B.x,e), y:lerp(mB.y,B.y,e)};
+    }
+    return {pa,pb,phase};
+  }
+
+  function drawGridDots(ctx, skip){
+    ctx.fillStyle = COL.atom;
+    for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++){
+      if(skip &amp;&amp; ((c===A_.c&amp;&amp;r===A_.r)||(c===B_.c&amp;&amp;r===B_.r))) continue;
+      const p=pos(c,r);
+      ctx.beginPath(); ctx.arc(p.x,p.y,5,0,7); ctx.fill();
+    }
+  }
+
+  function drawTitle(ctx,txt){
+    ctx.fillStyle = COL.text; ctx.font='600 12px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(txt, 150, 18);
+  }
+
+  const leftCtx = document.getElementById('left').getContext('2d');
+  const rightCtx = document.getElementById('right').getContext('2d');
+
+  function drawLeft(t){
+    const ctx=leftCtx;
+    ctx.clearRect(0,0,300,236);
+    drawTitle(ctx,'Reconfigurable tweezer array');
+    drawGridDots(ctx,true);
+
+    // faint target line showing the intended long-range wiring
+    ctx.setLineDash([3,4]);
+    ctx.strokeStyle = COL.muted; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // home slots (empty trap outlines)
+    ctx.strokeStyle = COL.home; ctx.lineWidth=1.4;
+    [A,B].forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,7,0,7); ctx.stroke(); });
+
+    const {pa,pb,phase} = moverPositions(t);
+
+    if(phase==='entangle'){
+      const g = ctx.createRadialGradient(mid.x,mid.y,2, mid.x,mid.y,26);
+      g.addColorStop(0, COL.glow); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath(); ctx.arc(mid.x,mid.y,26,0,7); ctx.fill();
+      ctx.strokeStyle=COL.glow; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y); ctx.stroke();
+    }
+
+    ctx.fillStyle = COL.mover;
+    [pa,pb].forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,6.5,0,7); ctx.fill(); });
+
+    ctx.fillStyle = COL.text; ctx.font='11px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('qubit A', A.x+9, A.y-9);
+    ctx.fillText('qubit B', B.x+9, B.y-9);
+  }
+
+  function drawRight(ctx=rightCtx){
+    ctx.clearRect(0,0,300,236);
+    ctx.globalAlpha=0.55;
+    drawTitle(ctx,'Fixed-wire chip (frozen layout)');
+    drawGridDots(ctx,false);
+    ctx.strokeStyle = COL.wire; ctx.lineWidth=1.3;
+    for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++){
+      const p=pos(c,r);
+      if(c<COLS-1){ const q=pos(c+1,r); ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); }
+      if(r<ROWS-1){ const q=pos(c,r+1); ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); }
+    }
+    ctx.globalAlpha=1;
+    ctx.fillStyle = COL.mover;
+    [A,B].forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,6.5,0,7); ctx.fill(); });
+
+    ctx.setLineDash([4,4]); ctx.strokeStyle = COL.bad; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = COL.bad; ctx.lineWidth=2.4;
+    const m=mid;
+    ctx.beginPath(); ctx.moveTo(m.x-6,m.y-6); ctx.lineTo(m.x+6,m.y+6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(m.x-6,m.y+6); ctx.lineTo(m.x+6,m.y-6); ctx.stroke();
+
+    ctx.fillStyle = COL.bad; ctx.font='10.5px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('no direct link possible', 150, 226);
+  }
+
+  // ---- animation state ----
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing=false, t=0, lastTs=null;
+  const CYCLE_MS = 3000;
+  const playBtn=document.getElementById('playBtn');
+  const prog=document.getElementById('prog');
+  const phaseLabelEl=document.getElementById('phaseLabel');
+  const progValEl=document.getElementById('progVal');
+
+  function phaseText(p){
+    if(p==='move') return 'move out';
+    if(p==='entangle') return 'entangle (Rydberg gate)';
+    return 'return';
+  }
+
+  function render(){
+    drawLeft(t);
+    drawRight();
+    const {phase} = phaseInfo(t);
+    phaseLabelEl.textContent = phaseText(phase);
+    const pv = Math.round(t*100);
+    progValEl.textContent = pv;
+    prog.value = pv;
+  }
+
+  function tick(ts){
+    if(playing){
+      if(lastTs===null) lastTs=ts;
+      const dt = ts-lastTs; lastTs=ts;
+      t += dt/CYCLE_MS;
+      if(t>=1) t -= 1;
+      render();
+    } else {
+      lastTs=null;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    playing=!playing;
+    playBtn.textContent = playing? '⏸ Pause' : '▶ Play';
+  });
+  prog.addEventListener('input', ()=>{
+    playing=false; playBtn.textContent='▶ Play';
+    t = (+prog.value)/100;
+    render();
+  });
+
+  render();
+  requestAnimationFrame(tick);
+
+  window.__sceneReady = true;
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;atoms-that-move&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Optical tweezers can physically move atoms, wiring any two qubits together on demand"
+  ></iframe>
+</section>
+
+<section class="scene" id="surgery-without-opening-the-patient">
+  <h3>A temporary ancilla reads out one logical operation without disturbing the rest of the data</h3>
+  <div class="caption">Now that atoms can reach any qubit in the block, watch the actual move: an ancilla — a helper qubit attached just to take a measurement — touches one logical operator, the qubit pattern that encodes the answer.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="surgery-without-opening-the-patient"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Code surgery: reading one logical operator</title>
+<style>
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --text:#1a1d24; --muted:#5b616e;
+  --gridline:#d6d9e1; --qubit:#c7cbd6; --accent:#3b6fd8; --ancilla:#d9662f;
+  --success:#2f9e58; --warning:#d99a2b; --border:#c6cad2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --panel:#1c1f27; --text:#eceef3; --muted:#9aa1b0;
+    --gridline:#333846; --qubit:#454b5c; --accent:#6f9bff; --ancilla:#ff9560;
+    --success:#4fce85; --warning:#f0c060; --border:#3a3f4d;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 16px;}
+h1{font-size:15px;margin:0 0 8px;font-weight:600;}
+svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;}
+.controls{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0;align-items:flex-end;}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:12.5px;min-width:150px;flex:1;}
+.ctrl input[type=range]{width:100%;}
+.ctrl select{padding:3px;font-size:13px;}
+.eqwrap{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;margin:10px 0;}
+.legend{font-size:11.5px;color:var(--muted);margin-top:4px;}
+math{font-size:16px;}
+ul.readouts{list-style:none;margin:8px 0 0;padding:0;display:grid;
+  grid-template-columns:1fr 1fr;gap:6px 14px;}
+ul.readouts li{font-size:13px;background:var(--panel);border:1px solid var(--border);
+  border-radius:6px;padding:6px 9px;}
+ul.readouts b{display:block;font-size:12px;color:var(--muted);font-weight:500;}
+.note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+ul.colorlegend{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px 18px;}
+ul.colorlegend li{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.swatch{width:12px;height:12px;border-radius:2px;display:inline-block;border:1px solid var(--border);flex:none;}
+.pulse{animation:pulse 2.2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none;}}
+@media (max-width:420px){
+  ul.readouts{grid-template-columns:1fr;}
+  .ctrl{min-width:120px;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h1>Code surgery: an ancilla reads one logical operator without touching the rest of the block</h1>
+
+<svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+
+<ul class=&quot;colorlegend&quot;>
+  <li><span class=&quot;swatch&quot; style=&quot;background:var(--qubit)&quot;></span>gray square — cycle not yet measured</li>
+  <li><span class=&quot;swatch&quot; style=&quot;background:var(--success)&quot;></span>green square — this cycle's stabilizer reading agrees with the majority so far (stable outcome)</li>
+  <li><span class=&quot;swatch&quot; style=&quot;background:var(--warning)&quot;></span>orange square — this cycle's reading disagrees (fluctuating outcome, noise)</li>
+</ul>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrl&quot;>
+    <label for=&quot;cycleSlider&quot;>Surgery cycle t — step through the measurement (1 to 2d/3 = <span id=&quot;Tval&quot;>16</span>)</label>
+    <input type=&quot;range&quot; id=&quot;cycleSlider&quot; min=&quot;1&quot; max=&quot;16&quot; step=&quot;1&quot; value=&quot;1&quot;>
+  </div>
+  <div class=&quot;ctrl&quot;>
+    <label for=&quot;dSelect&quot;>Code distance d (qubits) — sets ancilla footprint and cycles needed</label>
+    <select id=&quot;dSelect&quot;>
+      <option value=&quot;12&quot;>12</option>
+      <option value=&quot;18&quot;>18</option>
+      <option value=&quot;24&quot; selected>24</option>
+      <option value=&quot;30&quot;>30</option>
+    </select>
+  </div>
+</div>
+
+<div class=&quot;eqwrap&quot;>
+<math display=&quot;block&quot;>
+  <mi>T</mi><mo>=</mo><mfrac><mrow><mn>2</mn><mi>d</mi></mrow><mn>3</mn></mfrac>
+</math>
+<div class=&quot;legend&quot;>T — surgery cycles needed to read out one logical operator · d — code distance (qubits an error chain must cross to fool the code)</div>
+</div>
+
+<ul class=&quot;readouts&quot;>
+  <li><b>Cycle</b><span id=&quot;roCycle&quot;>1 / 16</span></li>
+  <li><b>Ancilla footprint (fixed relative to block; scales with d)</b><span id=&quot;roFoot&quot;>24 physical qubits</span></li>
+  <li><b>Confidence in majority vote</b><span id=&quot;roConf&quot;>–</span></li>
+  <li><b>Status</b><span id=&quot;roStatus&quot;>still refining</span></li>
+</ul>
+<div class=&quot;note&quot;>The ancilla repeats the same stabilizer measurement each cycle; the readings are combined by <b>majority vote</b> (whichever outcome, agree or disagree, occurs more often across all cycles so far) to cancel out noisy single-cycle errors and settle on one logical bit. &quot;Confidence&quot; above is the computed probability that this majority-vote answer matches the true logical value — it climbs from 85.0% toward 100.0% as more cycles accumulate.</div>
+<div class=&quot;note&quot;>Ancilla couples only to the highlighted qubits under the target logical operator — the rest of the 5,278‑qubit block (gray) is never touched.</div>
+</div>
+
+<script>
+const NS = &quot;http://www.w3.org/2000/svg&quot;;
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+// ---- deterministic pseudo-random record of per-cycle stabilizer readings ----
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const P_CORRECT = 0.85; // probability one cycle's stabilizer reading agrees with the true logical value (below-threshold physical error rate)
+const rng = mulberry32(20240517);
+const MAXT = 20;
+const bits = Array.from({length: MAXT}, () => (rng() < P_CORRECT ? 1 : 0));
+
+// exact binomial: probability that a majority of t independent p-correct trials is correct
+function binomCoeff(n,k){ let r=1; for(let i=0;i<k;i++) r = r*(n-i)/(i+1); return r; }
+function majorityProb(t,p){
+  const thresh = Math.floor(t/2) + 1;
+  let s = 0;
+  for(let k=thresh;k<=t;k++) s += binomCoeff(t,k)*Math.pow(p,k)*Math.pow(1-p,t-k);
+  return s;
+}
+
+const svg = document.getElementById(&quot;diagram&quot;);
+const cycleSlider = document.getElementById(&quot;cycleSlider&quot;);
+const dSelect = document.getElementById(&quot;dSelect&quot;);
+
+const GRID_X = 24, GRID_Y = 26, CELL = 13, COLS = 22, ROWS = 9;
+
+function footprintCells(d){
+  const cells = [];
+  const col0 = 1, row0 = 3;
+  for(let i=0;i<d;i++){
+    const col = col0 + (i % 20);
+    const row = row0 + Math.floor(i/20);
+    cells.push({col,row});
+  }
+  return cells;
+}
+
+function cellCenter(col,row){
+  return [GRID_X + col*CELL + CELL/2, GRID_Y + row*CELL + CELL/2];
+}
+
+function draw(){
+  const d = +dSelect.value;
+  const T = Math.round(2*d/3);
+  cycleSlider.max = T;
+  let t = Math.min(+cycleSlider.value, T);
+  cycleSlider.value = t;
+
+  document.getElementById(&quot;Tval&quot;).textContent = T;
+  document.getElementById(&quot;roCycle&quot;).textContent = t + &quot; / &quot; + T;
+  document.getElementById(&quot;roFoot&quot;).textContent = d + &quot; physical qubits&quot;;
+
+  const conf = (majorityProb(t, P_CORRECT) * 100);
+  document.getElementById(&quot;roConf&quot;).textContent = conf.toFixed(1) + &quot;%&quot;;
+  const locked = t >= T;
+  document.getElementById(&quot;roStatus&quot;).textContent = locked ? &quot;LOCKED — final answer read out&quot; : &quot;still refining&quot;;
+  document.getElementById(&quot;roStatus&quot;).style.color = locked ? &quot;var(--success)&quot; : &quot;var(--warning)&quot;;
+
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+  // background block label
+  svg.appendChild(el(&quot;text&quot;,{x:GRID_X, y:16, &quot;font-size&quot;:13, fill:&quot;var(--muted)&quot;}))
+     .textContent = &quot;sample patch of the 5,278-qubit memory block&quot;;
+
+  // full grid: undisturbed qubits
+  const footprint = footprintCells(d);
+  const isFoot = new Set(footprint.map(c=>c.col+&quot;,&quot;+c.row));
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const key = c+&quot;,&quot;+r;
+      const rect = el(&quot;rect&quot;,{
+        x:GRID_X+c*CELL, y:GRID_Y+r*CELL, width:CELL-1.5, height:CELL-1.5,
+        rx:1.5,
+        fill: isFoot.has(key) ? &quot;var(--accent)&quot; : &quot;var(--qubit)&quot;,
+        stroke:&quot;var(--gridline)&quot;
+      });
+      svg.appendChild(rect);
+    }
+  }
+
+  // footprint label
+  const flab = el(&quot;text&quot;,{x:GRID_X, y:GRID_Y+ROWS*CELL+16, &quot;font-size&quot;:12.5, fill:&quot;var(--accent)&quot;});
+  flab.textContent = &quot;highlighted: target logical operator's footprint (d = &quot; + d + &quot; qubits)&quot;;
+  svg.appendChild(flab);
+
+  // ancilla node + connections (only to footprint qubits)
+  const ax = GRID_X + COLS*CELL + 46;
+  const ay = GRID_Y + (footprint[0].row + 0.5)*CELL + CELL*0.5;
+  const sampleIdx = [0, Math.floor(d/2), d-1];
+  sampleIdx.forEach(i=>{
+    const [qx,qy] = cellCenter(footprint[i].col, footprint[i].row);
+    svg.appendChild(el(&quot;line&quot;,{x1:ax, y1:ay, x2:qx, y2:qy, stroke:&quot;var(--ancilla)&quot;, &quot;stroke-width&quot;:1.4, &quot;stroke-dasharray&quot;:&quot;3,2&quot;}));
+  });
+  const ancGroup = el(&quot;g&quot;,{class:&quot;pulse&quot;});
+  ancGroup.appendChild(el(&quot;circle&quot;,{cx:ax, cy:ay, r:16, fill:&quot;var(--ancilla)&quot;, stroke:&quot;var(--border)&quot;}));
+  svg.appendChild(ancGroup);
+  const alab = el(&quot;text&quot;,{x:ax, y:ay+32, &quot;font-size&quot;:12.5, fill:&quot;var(--ancilla)&quot;, &quot;text-anchor&quot;:&quot;middle&quot;});
+  alab.textContent = &quot;ancilla&quot;;
+  svg.appendChild(alab);
+  const alab2 = el(&quot;text&quot;,{x:ax, y:ay+46, &quot;font-size&quot;:10.5, fill:&quot;var(--muted)&quot;, &quot;text-anchor&quot;:&quot;middle&quot;});
+  alab2.textContent = &quot;(temporary helper qubit)&quot;;
+  svg.appendChild(alab2);
+
+  // measurement record row
+  const recY = GRID_Y + ROWS*CELL + 42;
+  const recX0 = GRID_X;
+  const recW = COLS*CELL + 46 + 20;
+  const cw = recW / T;
+  svg.appendChild(el(&quot;text&quot;,{x:recX0, y:recY-8, &quot;font-size&quot;:12.5, fill:&quot;var(--text)&quot;}))
+     .textContent = &quot;ancilla measurement record (cycle 1 \u2192 &quot; + T + &quot;)&quot;;
+  for(let i=0;i<T;i++){
+    const active = i < t;
+    const agree = bits[i] === 1;
+    const fill = !active ? &quot;var(--qubit)&quot; : (agree ? &quot;var(--success)&quot; : &quot;var(--warning)&quot;);
+    svg.appendChild(el(&quot;rect&quot;,{
+      x: recX0 + i*cw, y: recY, width: cw-2, height: 20,
+      fill, stroke:&quot;var(--gridline)&quot;
+    }));
+  }
+  // ticks
+  [1, T].forEach((c)=>{
+    const x = recX0 + (c-1)*cw + cw/2;
+    svg.appendChild(el(&quot;text&quot;,{x, y:recY+34, &quot;font-size&quot;:10.5, fill:&quot;var(--muted)&quot;, &quot;text-anchor&quot;:&quot;middle&quot;}))
+       .textContent = &quot;cycle &quot; + c;
+  });
+  // current cycle marker
+  const curX = recX0 + (t-1)*cw + cw/2;
+  svg.appendChild(el(&quot;line&quot;,{x1:curX, y1:recY-4, x2:curX, y2:recY+24, stroke:&quot;var(--accent)&quot;, &quot;stroke-width&quot;:2}));
+
+  // stable readout callout
+  if(locked){
+    const lx = recX0 + recW - 4, ly = recY + 40;
+    const box = el(&quot;text&quot;,{x:lx, y:ly, &quot;font-size&quot;:13, fill:&quot;var(--success)&quot;, &quot;text-anchor&quot;:&quot;end&quot;, &quot;font-weight&quot;:&quot;600&quot;});
+    box.textContent = &quot;readout stable: logical value fixed&quot;;
+    svg.appendChild(box);
+  }
+}
+
+cycleSlider.addEventListener(&quot;input&quot;, draw);
+
+// Changing the code distance changes T = 2d/3, and we jump the cycle slider to the
+// new maximum so the reader always sees the fully-accumulated, stabilized readout
+// for the chosen d rather than being silently reset to cycle 1.
+dSelect.addEventListener(&quot;change&quot;, ()=>{
+  const d = +dSelect.value;
+  const T = Math.round(2*d/3);
+  cycleSlider.max = T;
+  cycleSlider.value = T;
+  draw();
+});
+
+draw();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;surgery-without-opening-the-patient&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A temporary ancilla reads out one logical operation without disturbing the rest of the data"
+  ></iframe>
+</section>
+
+<section class="scene" id="the-four-zone-chip">
+  <h3>Splitting the chip into memory, processor, resource, and operation zones keeps the ancilla small</h3>
+  <div class="caption">Doing surgery on the whole 1,480-qubit memory block would be impractical, so only 10-148 qubits move at a time to meet a magic state.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="the-four-zone-chip"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The four-zone chip</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --text:#17181a; --muted:#5a5f66; --border:#8a8f98;
+  --memory:#dce8ff; --processor:#ffe8c2; --resource:#ffd7d7; --operation:#d9f2e0;
+  --token-qubit:#c62839; --token-magic:#c98a12; --accent:#2b6cb0; --line:#33383f;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#131416; --panel:#1d1f22; --text:#eceef0; --muted:#a6acb4; --border:#7a7f88;
+    --memory:#213047; --processor:#4a3517; --resource:#4a2323; --operation:#1c3a29;
+    --token-qubit:#ff6b78; --token-magic:#ffcf5c; --accent:#7bb0ec; --line:#c7ccd3;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Arial,sans-serif;}
+.scene-wrap{max-width:680px;margin:0 auto;padding:12px 14px 20px;}
+h2{font-size:15px;margin:4px 0 8px;}
+h3{font-size:13px;margin:14px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+.phase-desc{font-size:13px;min-height:34px;padding:6px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;}
+svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);border:1px solid var(--border);border-radius:6px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;}
+.controls label{font-size:12.5px;flex:1 1 260px;}
+input[type=range]{width:100%;}
+button{font-size:12.5px;padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;}
+ul{margin:2px 0 0;padding-left:18px;font-size:12.5px;line-height:1.5;}
+li{margin-bottom:3px;}
+.small{font-size:12px;color:var(--muted);}
+math{font-size:15px;}
+.eqwrap{text-align:center;margin:6px 0 2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene-wrap&quot;>
+  <h2>The four-zone chip: teleport in → magic state → Toffoli → teleport out</h2>
+  <div class=&quot;phase-desc&quot; id=&quot;phaseDesc&quot;></div>
+
+  <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 460&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+    <!-- zones -->
+    <rect x=&quot;15&quot; y=&quot;60&quot; width=&quot;230&quot; height=&quot;380&quot; rx=&quot;8&quot; fill=&quot;var(--memory)&quot; stroke=&quot;var(--border)&quot;/>
+    <rect x=&quot;270&quot; y=&quot;60&quot; width=&quot;150&quot; height=&quot;150&quot; rx=&quot;8&quot; fill=&quot;var(--processor)&quot; stroke=&quot;var(--border)&quot;/>
+    <rect x=&quot;440&quot; y=&quot;60&quot; width=&quot;185&quot; height=&quot;150&quot; rx=&quot;8&quot; fill=&quot;var(--resource)&quot; stroke=&quot;var(--border)&quot;/>
+    <rect x=&quot;270&quot; y=&quot;230&quot; width=&quot;355&quot; height=&quot;210&quot; rx=&quot;8&quot; fill=&quot;var(--operation)&quot; stroke=&quot;var(--border)&quot;/>
+
+    <text x=&quot;130&quot; y=&quot;82&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--text)&quot;>MEMORY ZONE</text>
+    <text x=&quot;130&quot; y=&quot;99&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>stores logical qubits</text>
+    <text x=&quot;130&quot; y=&quot;380&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--text)&quot; id=&quot;memCount&quot;></text>
+    <text x=&quot;130&quot; y=&quot;398&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot; id=&quot;memLogical&quot;></text>
+    <text x=&quot;130&quot; y=&quot;418&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; font-style=&quot;italic&quot; fill=&quot;var(--muted)&quot;>d = code distance: qubits deep per logical qubit</text>
+
+    <text x=&quot;345&quot; y=&quot;82&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--text)&quot;>PROCESSOR ZONE</text>
+    <text x=&quot;345&quot; y=&quot;98&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>small — surgery happens here</text>
+    <text x=&quot;345&quot; y=&quot;196&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--text)&quot; id=&quot;procCount&quot;></text>
+
+    <text x=&quot;532&quot; y=&quot;82&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--text)&quot;>RESOURCE ZONE</text>
+    <text x=&quot;532&quot; y=&quot;98&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>magic-state factory</text>
+    <text x=&quot;532&quot; y=&quot;114&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--text)&quot;>prepare → purify</text>
+    <text x=&quot;532&quot; y=&quot;196&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--text)&quot; id=&quot;resCount&quot;></text>
+
+    <text x=&quot;447&quot; y=&quot;252&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--text)&quot;>OPERATION ZONE</text>
+    <text x=&quot;447&quot; y=&quot;269&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>ancillas for code surgery</text>
+    <text x=&quot;447&quot; y=&quot;288&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--text)&quot; id=&quot;opCount&quot;></text>
+    <text x=&quot;447&quot; y=&quot;306&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; font-style=&quot;italic&quot; fill=&quot;var(--muted)&quot;>ancilla = temporary helper qubit</text>
+
+    <!-- bridge (code surgery link) -->
+    <line id=&quot;bridge&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;0&quot; y2=&quot;0&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;2&quot; stroke-dasharray=&quot;6 5&quot; opacity=&quot;0&quot;/>
+    <text id=&quot;bridgeLabel&quot; x=&quot;0&quot; y=&quot;0&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--accent)&quot; opacity=&quot;0&quot;></text>
+
+    <!-- tokens -->
+    <polygon id=&quot;magicToken&quot; points=&quot;0,-9 9,0 0,9 -9,0&quot; fill=&quot;var(--token-magic)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1&quot;/>
+    <text id=&quot;magicLabel&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--text)&quot;></text>
+    <circle id=&quot;qubitToken&quot; r=&quot;9&quot; fill=&quot;var(--token-qubit)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1&quot;/>
+    <text id=&quot;qubitLabel&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--text)&quot;></text>
+
+    <!-- legend row -->
+    <circle cx=&quot;230&quot; cy=&quot;440&quot; r=&quot;7&quot; fill=&quot;var(--token-qubit)&quot; stroke=&quot;var(--line)&quot;/>
+    <text x=&quot;242&quot; y=&quot;444&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot;>= logical qubit</text>
+    <polygon points=&quot;360,433 367,440 360,447 353,440&quot; fill=&quot;var(--token-magic)&quot; stroke=&quot;var(--line)&quot;/>
+    <text x=&quot;373&quot; y=&quot;444&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot;>= magic state</text>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;phaseSlider&quot;>Cycle phase (1–4): <span id=&quot;phaseNum&quot;>1</span> of 4</label>
+    <input type=&quot;range&quot; id=&quot;phaseSlider&quot; min=&quot;1&quot; max=&quot;4&quot; step=&quot;1&quot; value=&quot;1&quot;>
+    <button id=&quot;playBtn&quot;>Play cycle</button>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>n</mi><mo>=</mo><mn>2</mn><msup><mi>d</mi><mn>2</mn></msup><mo>&amp;#8722;</mo><mn>1</mn>
+      <mo>=</mo><mn id=&quot;nval&quot;>449</mn>
+    </math>
+    <div class=&quot;small&quot;>n — physical qubits per logical qubit · d — code distance (qubits deep), here d = 15</div>
+  </div>
+
+  <h3>Zones (physical qubits, ~11,000 total)</h3>
+  <ul id=&quot;zoneList&quot;></ul>
+
+  <h3>Terms on the diagram</h3>
+  <ul>
+    <li><strong>d (code distance)</strong> — how many physical qubits deep the error-correcting redundancy is.</li>
+    <li><strong>magic state</strong> — a pre-manufactured resource qubit that enables one Toffoli gate (the gate the surface code can't do for free).</li>
+    <li><strong>ancilla</strong> — a temporary helper qubit.</li>
+    <li><strong>Toffoli gate</strong> — the expensive 3-input gate that Shor's algorithm is mostly built from.</li>
+    <li><strong>code surgery</strong> — coupling a small ancilla to just the qubits under one operator (never called &quot;lattice surgery&quot; here).</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+  // ---- physical constants (auditable) ----
+  const TOTAL = 11000;                 // total physical qubits on chip
+  const FRAC_MEMORY = 0.85;
+  const FRAC_OPERATION = 0.12;
+  const FRAC_PROCESSOR = 0.01;
+  const FRAC_RESOURCE = 1 - FRAC_MEMORY - FRAC_OPERATION - FRAC_PROCESSOR;
+  const D = 15;                        // code distance
+  const memQ = Math.round(TOTAL*FRAC_MEMORY);
+  const procQ = Math.round(TOTAL*FRAC_PROCESSOR);
+  const resQ = Math.round(TOTAL*FRAC_RESOURCE);
+  const opQ = Math.round(TOTAL*FRAC_OPERATION);
+  const physPerLogical = 2*D*D - 1;                  // n = 2d^2 - 1
+  const logicalInMemory = Math.round(memQ/physPerLogical);
+  const opPct = Math.round(FRAC_OPERATION*100);
+
+  document.getElementById('memCount').textContent = memQ.toLocaleString()+&quot; physical qubits&quot;;
+  document.getElementById('memLogical').textContent = &quot;\u2248 &quot;+logicalInMemory+&quot; logical qubits (d = &quot;+D+&quot;)&quot;;
+  document.getElementById('procCount').textContent = procQ.toLocaleString()+&quot; physical qubits&quot;;
+  document.getElementById('resCount').textContent = resQ.toLocaleString()+&quot; physical qubits&quot;;
+  document.getElementById('opCount').textContent = opQ.toLocaleString()+&quot; physical qubits (&quot;+opPct+&quot;% of &quot;+TOTAL.toLocaleString()+&quot;)&quot;;
+  document.getElementById('nval').textContent = physPerLogical;
+
+  document.getElementById('zoneList').innerHTML =
+    &quot;<li><strong>Memory</strong> \u2014 &quot;+memQ.toLocaleString()+&quot; qubits (\u2248&quot;+logicalInMemory+&quot; logical qubits, d=&quot;+D+&quot;). Stores the algorithm's data.</li>&quot;+
+    &quot;<li><strong>Processor</strong> \u2014 &quot;+procQ.toLocaleString()+&quot; qubits. Small area where a subset of logical qubits meet to interact.</li>&quot;+
+    &quot;<li><strong>Resource</strong> \u2014 &quot;+resQ.toLocaleString()+&quot; qubits. Magic-state factory: prepare \u2192 purify.</li>&quot;+
+    &quot;<li><strong>Operation</strong> \u2014 &quot;+opQ.toLocaleString()+&quot; qubits (&quot;+opPct+&quot;% of total). Ancillas that carry out code surgery.</li>&quot;;
+
+  // ---- geometry ----
+  // Token positions are offset from the static zone-caption text so they
+  // never render on top of a label (e.g. the processor zone's
+  // &quot;small — surgery happens here&quot; caption sits at y≈98; tokens there
+  // are kept below y≈130 with generous clearance in every phase).
+  const memoryCenter   = {x:130, y:250};
+  const procQubitPos   = {x:320, y:145};
+  const procMagicPos   = {x:372, y:172};
+  const resourceCenter = {x:532, y:152};
+  const operationCenter= {x:447, y:325};
+
+  const descs = [
+    &quot;Phase 1 \u2014 Teleport in: a logical qubit (red circle) moves from Memory into the Processor zone via code surgery through Operation-zone ancillas.&quot;,
+    &quot;Phase 2 \u2014 Magic state arrives: a magic state (gold diamond), prepared and purified in the Resource zone, moves into the Processor zone.&quot;,
+    &quot;Phase 3 \u2014 Toffoli gate: the logical qubit and magic state combine in the Processor zone, using Operation-zone ancillas for code surgery, to perform one Toffoli gate.&quot;,
+    &quot;Phase 4 \u2014 Teleport out: the logical qubit moves back from Processor to Memory via code surgery; the magic state is consumed.&quot;
+  ];
+
+  function targetsForPhase(p){
+    if(p===1) return {qubit:procQubitPos, magic:resourceCenter, magicVis:1, bridge:{a:memoryCenter,b:procQubitPos,label:&quot;code surgery: teleport in&quot;}};
+    if(p===2) return {qubit:procQubitPos, magic:procMagicPos, magicVis:1, bridge:null};
+    if(p===3) return {qubit:procQubitPos, magic:procMagicPos, magicVis:1, bridge:{a:procQubitPos,b:operationCenter,label:&quot;code surgery: Toffoli&quot;}};
+    return       {qubit:memoryCenter, magic:procMagicPos, magicVis:0, bridge:{a:procQubitPos,b:memoryCenter,label:&quot;code surgery: teleport out&quot;}};
+  }
+
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let cur = {qx:procQubitPos.x, qy:procQubitPos.y, mx:resourceCenter.x, my:resourceCenter.y, mo:1};
+  let raf = null;
+
+  const qubitEl = document.getElementById('qubitToken');
+  const qubitLbl = document.getElementById('qubitLabel');
+  const magicEl = document.getElementById('magicToken');
+  const magicLbl = document.getElementById('magicLabel');
+  const bridgeEl = document.getElementById('bridge');
+  const bridgeLbl = document.getElementById('bridgeLabel');
+
+  function paint(){
+    qubitEl.setAttribute('cx', cur.qx); qubitEl.setAttribute('cy', cur.qy);
+    qubitLbl.setAttribute('x', cur.qx); qubitLbl.setAttribute('y', cur.qy-15);
+    qubitLbl.textContent = &quot;logical qubit&quot;;
+    magicEl.setAttribute('transform', 'translate('+cur.mx+','+cur.my+')');
+    magicLbl.setAttribute('x', cur.mx); magicLbl.setAttribute('y', cur.my+20);
+    magicLbl.textContent = &quot;magic state&quot;;
+    magicEl.setAttribute('opacity', cur.mo.toFixed(2));
+    magicLbl.setAttribute('opacity', cur.mo.toFixed(2));
+  }
+
+  function setBridge(bridge){
+    if(!bridge){ bridgeEl.setAttribute('opacity',0); bridgeLbl.setAttribute('opacity',0); return; }
+    bridgeEl.setAttribute('x1',bridge.a.x); bridgeEl.setAttribute('y1',bridge.a.y);
+    bridgeEl.setAttribute('x2',bridge.b.x); bridgeEl.setAttribute('y2',bridge.b.y);
+    bridgeEl.setAttribute('opacity',1);
+    const mx=(bridge.a.x+bridge.b.x)/2, my=(bridge.a.y+bridge.b.y)/2 - 8;
+    bridgeLbl.setAttribute('x',mx); bridgeLbl.setAttribute('y',my);
+    bridgeLbl.textContent = bridge.label;
+    bridgeLbl.setAttribute('opacity',1);
+  }
+
+  function animateTo(target){
+    setBridge(target.bridge);
+    const start = {qx:cur.qx, qy:cur.qy, mx:cur.mx, my:cur.my, mo:cur.mo};
+    const end = {qx:target.qubit.x, qy:target.qubit.y, mx:target.magic.x, my:target.magic.y, mo:target.magicVis};
+    if(reduced){ cur = end; paint(); return; }
+    const dur = 550; const t0 = performance.now();
+    if(raf) cancelAnimationFrame(raf);
+    function step(t){
+      let f = Math.min(1, (t-t0)/dur);
+      const e = f<0.5 ? 2*f*f : -1+(4-2*f)*f; // easeInOutQuad
+      cur.qx = start.qx + (end.qx-start.qx)*e;
+      cur.qy = start.qy + (end.qy-start.qy)*e;
+      cur.mx = start.mx + (end.mx-start.mx)*e;
+      cur.my = start.my + (end.my-start.my)*e;
+      cur.mo = start.mo + (end.mo-start.mo)*e;
+      paint();
+      if(f<1) raf = requestAnimationFrame(step);
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  const slider = document.getElementById('phaseSlider');
+  const phaseNum = document.getElementById('phaseNum');
+  const phaseDesc = document.getElementById('phaseDesc');
+
+  function goToPhase(p){
+    phaseNum.textContent = p;
+    phaseDesc.textContent = descs[p-1];
+    animateTo(targetsForPhase(p));
+  }
+
+  slider.addEventListener('input', function(){ goToPhase(parseInt(slider.value,10)); });
+
+  // ---- optional autoplay ----
+  let playing = false, playTimer = null;
+  const playBtn = document.getElementById('playBtn');
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    playBtn.textContent = playing ? &quot;Pause cycle&quot; : &quot;Play cycle&quot;;
+    if(playing){
+      playTimer = setInterval(function(){
+        let p = parseInt(slider.value,10) + 1;
+        if(p>4) p=1;
+        slider.value = p;
+        goToPhase(p);
+      }, 1500);
+    } else {
+      clearInterval(playTimer);
+    }
+  });
+
+  // ---- init (phase 1, no entrance animation) ----
+  setBridge(targetsForPhase(1).bridge);
+  paint();
+  phaseNum.textContent = 1;
+  phaseDesc.textContent = descs[0];
+
+  window.__sceneReady = true;
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;the-four-zone-chip&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Splitting the chip into memory, processor, resource, and operation zones keeps the ancilla small"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing tech</h2>
+  <div class="part-lede">With the new code and architecture built up, put it head-to-head against the surface-code baseline from part 1 on the same two keys, then see how spending more qubits buys back speed.</div>
+</header>
+<section class="scene" id="ten-thousand-vs-a-million">
+  <h3>The same ECC-256 job that needed millions of qubits now needs about 10,000</h3>
+  <div class="caption">Put side by side on the same two keys and the same reliability target, the new architecture needs a roughly 100-1,000x smaller machine.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="ten-thousand-vs-a-million"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>10,000 vs a Million Qubits</title>
+<style>
+  :root{
+    --bg:#f7f7fa;
+    --panel:#ffffff;
+    --text:#1a1a22;
+    --muted:#5a5a68;
+    --grid:#d6d6e0;
+    --surface-color:#c85a54;
+    --qldpc-color:#3a7d63;
+    --accent:#2255aa;
+    --btn-bg:#eceef4;
+    --btn-active:#2255aa;
+    --btn-active-text:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161c;
+      --panel:#1e1f27;
+      --text:#eceef2;
+      --muted:#9a9aae;
+      --grid:#33343f;
+      --surface-color:#e07a72;
+      --qldpc-color:#5cbd94;
+      --accent:#7fb0ff;
+      --btn-bg:#2a2b35;
+      --btn-active:#7fb0ff;
+      --btn-active-text:#101018;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 16px 18px;}
+  h2.title{font-size:15px;font-weight:600;margin:0 0 10px;line-height:1.35;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
+  .controls span.label{font-size:12px;color:var(--muted);margin-right:4px;}
+  button.toggle{
+    font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--btn-bg);color:var(--text);cursor:pointer;font-weight:600;
+  }
+  button.toggle.active{background:var(--btn-active);color:var(--btn-active-text);border-color:var(--btn-active);}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  .readouts{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;}
+  .readouts li{font-size:12.5px;color:var(--muted);}
+  .readouts b{color:var(--text);}
+  .foot{font-size:11px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2 class=&quot;title&quot;>Qubits needed to break a key at target reliability: surface code vs. this paper's design</h2>
+
+  <div class=&quot;controls&quot;>
+    <span class=&quot;label&quot;>Target key (toggle changes bar heights below):</span>
+    <button class=&quot;toggle active&quot; id=&quot;btnECC&quot;>ECC-256</button>
+    <button class=&quot;toggle&quot; id=&quot;btnRSA&quot;>RSA-2048</button>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 400&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;bar chart&quot;></svg>
+
+  <ul class=&quot;readouts&quot; id=&quot;readouts&quot;></ul>
+  <div class=&quot;foot&quot;>Bars span the paper's reported low–high estimate; log scale on the qubit-count axis.</div>
+</div>
+
+<script>
+(function(){
+  const NS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('chart');
+  const W = 640, H = 400;
+  const plotLeft = 78, plotRight = 20, plotTop = 34, plotBottom = 300;
+  const plotW = W - plotLeft - plotRight;
+  const plotH = plotBottom - plotTop;
+
+  // Named constants: log-scale bounds (qubit count)
+  const MIN_LOG = 3;      // 1,000 qubits
+  const MAX_LOG = 7.35;   // ~22,000,000 qubits
+
+  // Real reported estimates from the paper's comparison (min, max qubits)
+  const DATA = {
+    'ECC-256': {
+      surface: [1.0e6, 6.0e6],
+      qldpc:   [9739, 13255]
+    },
+    'RSA-2048': {
+      surface: [15.0e6, 20.0e6],
+      qldpc:   [13000, 13255]
+    }
+  };
+
+  let current = 'ECC-256';
+  // animated state (interpolated on toggle)
+  let anim = { surfaceMin: DATA[current].surface[0], surfaceMax: DATA[current].surface[1],
+               qldpcMin: DATA[current].qldpc[0], qldpcMax: DATA[current].qldpc[1] };
+  let target = {...anim};
+  let animStart = null;
+  const DURATION = 500; // ms
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function y(v){
+    const clamped = Math.max(v, Math.pow(10, MIN_LOG));
+    const l = Math.log10(clamped);
+    const frac = (l - MIN_LOG) / (MAX_LOG - MIN_LOG);
+    return plotBottom - frac * plotH;
+  }
+
+  function fmt(n){
+    return Math.round(n).toLocaleString('en-US');
+  }
+
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+
+  function el(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function draw(){
+    clearSvg();
+    const textColor = cssVar('--text');
+    const mutedColor = cssVar('--muted');
+    const gridColor = cssVar('--grid');
+    const surfCol = cssVar('--surface-color');
+    const qCol = cssVar('--qldpc-color');
+    const panelCol = cssVar('--panel');
+
+    svg.appendChild(el('rect', {x:0, y:0, width:W, height:H, fill:panelCol}));
+
+    // gridlines + y-axis ticks at powers of ten
+    const ticks = [1e3, 1e4, 1e5, 1e6, 1e7];
+    ticks.forEach(t => {
+      const yy = y(t);
+      svg.appendChild(el('line', {x1:plotLeft, x2:W-plotRight, y1:yy, y2:yy,
+        stroke:gridColor, 'stroke-width':1}));
+      const lbl = el('text', {x:plotLeft-8, y:yy+4, 'text-anchor':'end',
+        'font-size':11, fill:mutedColor});
+      lbl.textContent = t>=1e6 ? (t/1e6)+&quot;M&quot; : t>=1e3 ? (t/1e3)+&quot;k&quot; : t;
+      svg.appendChild(lbl);
+    });
+
+    // axis titles
+    const yTitle = el('text', {x:16, y:plotTop-12, 'font-size':11.5, fill:mutedColor});
+    yTitle.textContent = &quot;qubits required (log scale)&quot;;
+    svg.appendChild(yTitle);
+
+    // baseline axis
+    svg.appendChild(el('line', {x1:plotLeft, x2:W-plotRight, y1:plotBottom, y2:plotBottom,
+      stroke:gridColor, 'stroke-width':1.5}));
+
+    const barW = 130;
+    const gapCenter = plotW/2;
+    const x1 = plotLeft + gapCenter*0.5 - barW/2;
+    const x2 = plotLeft + gapCenter*1.5 - barW/2;
+
+    // Surface-code bar (range rect)
+    const sTop = y(anim.surfaceMax), sBot = y(anim.surfaceMin);
+    svg.appendChild(el('rect', {x:x1, y:sTop, width:barW, height:Math.max(2, sBot-sTop),
+      fill:surfCol, opacity:0.85, rx:3}));
+    // qLDPC bar
+    const qTop = y(anim.qldpcMax), qBot = y(anim.qldpcMin);
+    svg.appendChild(el('rect', {x:x2, y:qTop, width:barW, height:Math.max(2, qBot-qTop),
+      fill:qCol, opacity:0.9, rx:3}));
+
+    // value labels above bars
+    const v1 = el('text', {x:x1+barW/2, y:sTop-8, 'text-anchor':'middle',
+      'font-size':12, 'font-weight':'600', fill:textColor});
+    v1.textContent = fmt(anim.surfaceMin)+&quot; \u2013 &quot;+fmt(anim.surfaceMax);
+    svg.appendChild(v1);
+
+    const v2 = el('text', {x:x2+barW/2, y:qTop-8, 'text-anchor':'middle',
+      'font-size':12, 'font-weight':'600', fill:textColor});
+    v2.textContent = fmt(anim.qldpcMin)+&quot; \u2013 &quot;+fmt(anim.qldpcMax);
+    svg.appendChild(v2);
+
+    // bar name labels below axis
+    const n1 = el('text', {x:x1+barW/2, y:plotBottom+20, 'text-anchor':'middle',
+      'font-size':12, fill:textColor});
+    n1.textContent = &quot;surface code&quot;;
+    svg.appendChild(n1);
+    const n1b = el('text', {x:x1+barW/2, y:plotBottom+35, 'text-anchor':'middle',
+      'font-size':10.5, fill:mutedColor});
+    n1b.textContent = &quot;(prior estimates)&quot;;
+    svg.appendChild(n1b);
+
+    const n2 = el('text', {x:x2+barW/2, y:plotBottom+20, 'text-anchor':'middle',
+      'font-size':12, fill:textColor});
+    n2.textContent = &quot;qLDPC + neutral atoms&quot;;
+    svg.appendChild(n2);
+    const n2b = el('text', {x:x2+barW/2, y:plotBottom+35, 'text-anchor':'middle',
+      'font-size':10.5, fill:mutedColor});
+    n2b.textContent = &quot;(this paper)&quot;;
+    svg.appendChild(n2b);
+
+    // problem label top-right
+    const probLbl = el('text', {x:W-plotRight, y:plotTop-12, 'text-anchor':'end',
+      'font-size':12.5, 'font-weight':'700', fill:cssVar('--accent')});
+    probLbl.textContent = current;
+    svg.appendChild(probLbl);
+
+    updateReadouts();
+  }
+
+  function updateReadouts(){
+    const ul = document.getElementById('readouts');
+    ul.innerHTML = '';
+    const ratio = anim.surfaceMax / anim.qldpcMax;
+    const items = [
+      [&quot;target problem&quot;, current],
+      [&quot;surface code range&quot;, fmt(anim.surfaceMin)+&quot; \u2013 &quot;+fmt(anim.surfaceMax)+&quot; qubits&quot;],
+      [&quot;this paper's range&quot;, fmt(anim.qldpcMin)+&quot; \u2013 &quot;+fmt(anim.qldpcMax)+&quot; qubits&quot;],
+      [&quot;size ratio&quot;, &quot;~&quot;+Math.round(ratio)+&quot;\u00d7 fewer qubits&quot;]
+    ];
+    items.forEach(([k,v])=>{
+      const li = document.createElement('li');
+      li.innerHTML = k+': <b>'+v+'</b>';
+      ul.appendChild(li);
+    });
+  }
+
+  function animate(ts){
+    if(animStart === null) animStart = ts;
+    const t = Math.min(1, (ts - animStart) / DURATION);
+    const e = t<1 ? (1 - Math.pow(1-t, 3)) : 1; // ease-out cubic
+    anim.surfaceMin = lerp0.surfaceMin + (target.surfaceMin - lerp0.surfaceMin)*e;
+    anim.surfaceMax = lerp0.surfaceMax + (target.surfaceMax - lerp0.surfaceMax)*e;
+    anim.qldpcMin   = lerp0.qldpcMin   + (target.qldpcMin   - lerp0.qldpcMin)*e;
+    anim.qldpcMax   = lerp0.qldpcMax   + (target.qldpcMax   - lerp0.qldpcMax)*e;
+    draw();
+    if(t < 1) requestAnimationFrame(animate);
+  }
+
+  let lerp0 = {...anim};
+
+  function setProblem(name){
+    if(name === current) return;
+    current = name;
+    document.getElementById('btnECC').classList.toggle('active', name==='ECC-256');
+    document.getElementById('btnRSA').classList.toggle('active', name==='RSA-2048');
+    lerp0 = {...anim};
+    target = {
+      surfaceMin: DATA[current].surface[0],
+      surfaceMax: DATA[current].surface[1],
+      qldpcMin: DATA[current].qldpc[0],
+      qldpcMax: DATA[current].qldpc[1]
+    };
+    if(reduceMotion){
+      anim = {...target};
+      draw();
+    } else {
+      animStart = null;
+      requestAnimationFrame(animate);
+    }
+  }
+
+  document.getElementById('btnECC').addEventListener('click', ()=>setProblem('ECC-256'));
+  document.getElementById('btnRSA').addEventListener('click', ()=>setProblem('RSA-2048'));
+
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;ten-thousand-vs-a-million&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The same ECC-256 job that needed millions of qubits now needs about 10,000"
+  ></iframe>
+</section>
+
+<section class="scene" id="trading-qubits-for-speed">
+  <h3>Running Toffoli gates one at a time is qubit-cheap but slow; running them in parallel costs more qubits but is fast</h3>
+  <div class="caption">The 13,255-qubit number above is the frugal option; spend roughly 10x more qubits and the same job finishes nearly 100x faster.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="trading-qubits-for-speed"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Trading Qubits for Speed</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --fg:#1a1a1e; --muted:#5b5b66; --grid:#d8d8e0;
+    --accent:#8b3fd1; --curve:#2f6fb0; --point:#d1453f; --panel:#ffffff;
+    --ref:#3d8f5a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15151a; --fg:#e8e8ee; --muted:#a3a3b0; --grid:#33333d;
+      --accent:#c07df0; --curve:#6fa8dc; --point:#ff7a6e; --panel:#1e1e26;
+      --ref:#6fd196;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:12px; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+  }
+  .wrap{max-width:680px; margin:0 auto;}
+  h2{font-size:15px; margin:2px 0 8px 0; font-weight:600;}
+  .eqbox{background:var(--panel); border-radius:8px; padding:8px 12px; margin-bottom:10px;}
+  math{font-size:16px;}
+  .legend{font-size:11px; color:var(--muted); margin-top:4px; line-height:1.5;}
+  .sub{font-size:11px; color:var(--muted); margin-top:4px;}
+  .controls{display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin:10px 0;}
+  .ctrl{display:flex; flex-direction:column; gap:3px; min-width:220px; flex:1;}
+  label{font-size:12px; color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{
+    padding:6px 12px; font-size:12px; border-radius:6px; border:1px solid var(--grid);
+    background:var(--panel); color:var(--fg); cursor:pointer;
+  }
+  svg{width:100%; max-width:100%; height:auto; display:block; background:var(--panel); border-radius:8px;}
+  text{fill:var(--fg); font-family:inherit;}
+  .axis-label{fill:var(--muted); font-size:11px;}
+  .tick{fill:var(--muted); font-size:10px;}
+  .grid-line{stroke:var(--grid); stroke-width:1;}
+  ul.readout{list-style:none; margin:8px 0 4px 0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:4px 10px;}
+  ul.readout li{font-size:12px; background:var(--panel); border-radius:6px; padding:6px 8px;}
+  ul.readout b{color:var(--fg);}
+  .capt{font-size:11px; color:var(--muted); margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Serial vs. parallel Toffoli execution — qubit / runtime tradeoff</h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <msub><mi>τ</mi><mtext>Toff</mtext></msub>
+        <mo>=</mo>
+        <mfrac>
+          <mrow><mn>2</mn><mi>d</mi></mrow>
+          <mrow><mn>3</mn><msub><mi>β</mi><mi>i</mi></msub></mrow>
+        </mfrac>
+        <mo>(</mo><mn>4</mn><msub><mi>m</mi><mi>i</mi></msub><mo>+</mo>
+        <mn>4</mn><msub><mi>β</mi><mi>i</mi></msub><mo>+</mo>
+        <msub><mi>γ</mi><mi>i</mi></msub><mo>)</mo>
+      </mrow>
+    </math>
+    <div class=&quot;legend&quot;>
+      τ<sub>Toff</sub> — time for one Toffoli gate (surface-code cycles) · d — code distance (dimensionless) ·
+      β<sub>i</sub> — ancilla routing width (logical qubits) · m<sub>i</sub> — measurement rounds per lookahead level ·
+      γ<sub>i</sub> — gate-depth overhead constant
+    </div>
+    <div class=&quot;sub&quot; id=&quot;worked&quot;></div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;pSlider&quot;>Parallelism level P (Toffoli gates run at once, 1–1160) — drag to move the point along the tradeoff curve</label>
+      <input type=&quot;range&quot; id=&quot;pSlider&quot; min=&quot;1&quot; max=&quot;1160&quot; value=&quot;1&quot; step=&quot;1&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>Play</button>
+  </div>
+
+  <svg id=&quot;plot&quot; viewBox=&quot;0 0 640 400&quot; role=&quot;img&quot; aria-label=&quot;qubit vs runtime tradeoff plot&quot;></svg>
+
+  <ul class=&quot;readout&quot; id=&quot;readout&quot;></ul>
+  <div class=&quot;capt&quot;>Curve traces every P from 1 (all Toffolis serial) to 1,160 (max parallel lanes the carry-lookahead adder supports).</div>
+</div>
+
+<script>
+(function(){
+  const NS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('plot');
+  const slider = document.getElementById('pSlider');
+  const playBtn = document.getElementById('playBtn');
+  const readoutEl = document.getElementById('readout');
+  const workedEl = document.getElementById('worked');
+
+  // ---- Named physical constants (surface-code Toffoli timing) ----
+  const d       = 27;    // surface-code distance (dimensionless)
+  const beta_i  = 5;     // ancilla routing width (logical qubits)
+  const m_i     = 9;     // measurement rounds per carry-lookahead level
+  const gamma_i = 4;     // gate-depth overhead constant
+  const t_cycle = 1e-6;  // surface-code cycle time (s)
+
+  const tauToffCycles  = (2*d)/(3*beta_i) * (4*m_i + 4*beta_i + gamma_i); // cycles per Toffoli
+  const tauToffSeconds = tauToffCycles * t_cycle;                        // seconds per Toffoli
+
+  workedEl.textContent = &quot;d=27, β_i=5, m_i=9, γ_i=4 → τ_Toff = &quot; + tauToffCycles.toFixed(0) +
+    &quot; cycles ≈ &quot; + (tauToffSeconds*1e6).toFixed(0) + &quot; μs (cycle time = 1 μs)&quot;;
+
+  // Total Toffoli-gate count for RSA-2048 modular exponentiation (windowed-arithmetic estimate)
+  const N_Toff = 1.2e13;
+
+  // Serial (P=1) runtime derived directly from the timing formula above
+  const T1_days = N_Toff * tauToffSeconds / 86400; // ~30,000 days
+
+  // Amdahl's-law parallel fraction: share of the Toffoli workload that P lanes can share
+  const f = 0.99586;
+  function runtimeDays(P){ return T1_days * ((1-f) + f/P); }
+
+  // Physical-qubit cost: fixed register + per-lane ancilla/routing overhead
+  const Qbase = 13225; // physical qubits for logical register + one Toffoli factory (P=1)
+  const qLane = 30;    // extra physical qubits per unit of parallelism
+  function qubitsOf(P){ return Qbase + qLane * P; }
+
+  // ---- Plot geometry ----
+  const W=640, H=400, padL=72, padR=30, padT=26, padB=54;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const xMin=10000, xMax=110000, yMin=50, yMax=50000;
+
+  function xPix(q){ const t=(Math.log10(q)-Math.log10(xMin))/(Math.log10(xMax)-Math.log10(xMin)); return padL + t*plotW; }
+  function yPix(t){ const s=(Math.log10(t)-Math.log10(yMin))/(Math.log10(yMax)-Math.log10(yMin)); return padT + (1-s)*plotH; }
+
+  function el(tag, attrs){
+    const e=document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function buildStaticPlot(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const qTicks=[10000,30000,50000,70000,100000];
+    const tTicks=[100,300,1000,3000,10000,30000];
+
+    qTicks.forEach(q=>{
+      const x=xPix(q);
+      svg.appendChild(el('line',{x1:x,y1:padT,x2:x,y2:padT+plotH,class:'grid-line'}));
+      const t=el('text',{x:x,y:padT+plotH+16,class:'tick','text-anchor':'middle'});
+      t.textContent=(q>=1000? (q/1000)+'k':q);
+      svg.appendChild(t);
+    });
+    tTicks.forEach(v=>{
+      const y=yPix(v);
+      svg.appendChild(el('line',{x1:padL,y1:y,x2:padL+plotW,y2:y,class:'grid-line'}));
+      const t=el('text',{x:padL-8,y:y+3,class:'tick','text-anchor':'end'});
+      t.textContent=(v>=1000? (v/1000)+'k':v);
+      svg.appendChild(t);
+    });
+
+    const xl=el('text',{x:padL+plotW/2,y:H-10,class:'axis-label','text-anchor':'middle'});
+    xl.textContent='Physical qubits (log scale)';
+    svg.appendChild(xl);
+
+    const yl=el('text',{x:16,y:padT+plotH/2,class:'axis-label','text-anchor':'middle',
+      transform:'rotate(-90 16 '+(padT+plotH/2)+')'});
+    yl.textContent='Runtime (days, log scale)';
+    svg.appendChild(yl);
+
+    // tradeoff curve: geometric sampling in P
+    const Ps=[1,2,3,5,8,13,20,32,50,80,125,195,300,460,700,1000,1160];
+    let d0=&quot;&quot;;
+    Ps.forEach((P,i)=>{
+      const x=xPix(qubitsOf(P)), y=yPix(runtimeDays(P));
+      d0 += (i===0? &quot;M&quot;:&quot;L&quot;) + x.toFixed(1) + &quot;,&quot; + y.toFixed(1) + &quot; &quot;;
+    });
+    svg.appendChild(el('path',{d:d0, fill:'none', stroke:'var(--curve)', 'stroke-width':2}));
+
+    // reference points
+    function refPoint(P,label,dx,dy){
+      const x=xPix(qubitsOf(P)), y=yPix(runtimeDays(P));
+      svg.appendChild(el('circle',{cx:x,cy:y,r:4,fill:'var(--ref)'}));
+      const t=el('text',{x:x+dx,y:y+dy,class:'tick', fill:'var(--ref)'});
+      t.textContent=label;
+      svg.appendChild(t);
+    }
+    refPoint(1,'space-efficient (P=1)',6,-8);
+    refPoint(1160,'fully parallel (P≈1160)',-150,16);
+
+    // moving dot
+    const dot=el('circle',{id:'movingDot', r:6, fill:'var(--point)', stroke:'var(--fg)', 'stroke-width':1});
+    svg.appendChild(dot);
+  }
+
+  function updateDot(P){
+    const dot=document.getElementById('movingDot');
+    dot.setAttribute('cx', xPix(qubitsOf(P)));
+    dot.setAttribute('cy', yPix(runtimeDays(P)));
+  }
+
+  function updateReadout(P){
+    const Q=qubitsOf(P), T=runtimeDays(P), speedup=T1_days/T;
+    readoutEl.innerHTML =
+      '<li><b>Parallelism P:</b> ' + Math.round(P) + '</li>' +
+      '<li><b>Physical qubits:</b> ' + Math.round(Q).toLocaleString() + '</li>' +
+      '<li><b>Runtime:</b> ' + (T<1000? T.toFixed(1): Math.round(T)) + ' days</li>' +
+      '<li><b>Speedup vs. serial:</b> ' + speedup.toFixed(1) + '×</li>';
+  }
+
+  function render(P){
+    updateDot(P);
+    updateReadout(P);
+  }
+
+  buildStaticPlot();
+  render(1);
+
+  function onSliderMove(){
+    stopPlay();
+    render(parseFloat(slider.value));
+  }
+  slider.addEventListener('input', onSliderMove);
+  slider.addEventListener('change', onSliderMove);
+
+  // ---- Play sweep: one-shot animation from current P up to P=1160, then stops there ----
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing=false, rafId=null, animStart=null;
+  const animDuration = 2200; // ms, one full serial->parallel sweep
+  const lnMin=Math.log(1), lnMax=Math.log(1160);
+
+  function frame(ts){
+    if(animStart===null) animStart=ts;
+    let u=(ts-animStart)/animDuration;
+    if(u>1) u=1;
+    const P = Math.exp(lnMin + u*(lnMax-lnMin));
+    slider.value = P;
+    render(P);
+    if(u<1){
+      rafId = requestAnimationFrame(frame);
+    } else {
+      // land exactly on the fully-parallel endpoint and stop
+      slider.value = 1160;
+      render(1160);
+      stopPlay();
+    }
+  }
+  function startPlay(){
+    if(reduceMotion){
+      // no auto-motion: jump straight to the fully-parallel endpoint
+      slider.value = 1160;
+      render(1160);
+      return;
+    }
+    playing=true; playBtn.textContent='Pause';
+    animStart=null;
+    rafId = requestAnimationFrame(frame);
+  }
+  function stopPlay(){
+    playing=false; playBtn.textContent='Play';
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId=null;
+  }
+  playBtn.addEventListener('click', ()=>{ playing? stopPlay(): startPlay(); });
+  // start paused (visible Play button); nothing auto-animates on load
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;trading-qubits-for-speed&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Running Toffoli gates one at a time is qubit-cheap but slow; running them in parallel costs more qubits but is fast"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now</h2>
+  <div class="part-lede">The numbers in part 3 aren't hypothetical — check them against neutral-atom hardware that already exists, then close the loop on what a 10-day break of a 256-bit key means today.</div>
+</header>
+<section class="scene" id="hardware-already-here">
+  <h3>The atom count this scheme needs is already within a few times of today's demonstrated arrays</h3>
+  <div class="caption">The chip design from parts 2 and 3 needs 9,739 to 102,000 atoms. Current demonstrated arrays already reach 6,100+ atoms, more than half of the 9,739-atom low end.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="hardware-already-here"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Hardware Already Here — Atom Array Progress</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f5f6fa;
+    --text:#1a1a2e;
+    --muted:#5a5a72;
+    --border:#ccccd8;
+    --track:#e2e2ea;
+    --fill:#2f6fed;
+    --target-zone: rgba(255,140,0,0.35);
+    --target-line:#d94f04;
+    --accent:#0a8f5b;
+    --btn-bg:#eef0f8;
+    --btn-active:#2f6fed;
+    --btn-active-text:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12131c;
+      --panel:#1b1c29;
+      --text:#e7e7f2;
+      --muted:#a5a5bd;
+      --border:#33344a;
+      --track:#26273a;
+      --fill:#5b9bff;
+      --target-zone: rgba(255,170,60,0.38);
+      --target-line:#ff9d4d;
+      --accent:#3ee08c;
+      --btn-bg:#22233a;
+      --btn-active:#5b9bff;
+      --btn-active-text:#0b0c14;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  h1{font-size:1.05rem;line-height:1.35;margin:0 0 10px;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  button{
+    font-size:0.82rem;padding:7px 10px;border-radius:7px;border:1px solid var(--border);
+    background:var(--btn-bg);color:var(--text);cursor:pointer;flex:1 1 150px;
+  }
+  button.active{background:var(--btn-active);color:var(--btn-active-text);border-color:var(--btn-active);}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  .readouts{list-style:none;margin:10px 0 4px;padding:0;display:grid;gap:6px;}
+  .readouts li{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;font-size:0.82rem;display:flex;justify-content:space-between;gap:8px;}
+  .readouts li b{font-weight:600;}
+  .eqwrap{margin-top:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:8px 10px;}
+  math{font-size:1rem;}
+  .legend{font-size:0.72rem;color:var(--muted);margin-top:4px;line-height:1.4;}
+  .trapbox{margin-top:10px;font-size:0.78rem;background:var(--panel);border:1px dashed var(--border);
+    border-radius:8px;padding:8px 10px;color:var(--text);}
+  .trapbox b{color:var(--accent);font-size:0.95rem;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Reconfigurable atom arrays: how far from today's hardware to the chip design's requirement?</h1>
+
+  <div class=&quot;controls&quot; id=&quot;btns&quot;></div>
+
+  <svg id=&quot;bar&quot; viewBox=&quot;0 0 640 210&quot; role=&quot;img&quot; aria-label=&quot;Progress bar of atoms demonstrated versus target&quot;>
+    <text id=&quot;milestoneTitle&quot; x=&quot;320&quot; y=&quot;13&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; fill=&quot;var(--muted)&quot;></text>
+
+    <rect x=&quot;40&quot; y=&quot;40&quot; width=&quot;560&quot; height=&quot;34&quot; rx=&quot;6&quot; fill=&quot;var(--track)&quot;/>
+    <rect id=&quot;zoneRect&quot; x=&quot;40&quot; y=&quot;40&quot; width=&quot;0&quot; height=&quot;34&quot; fill=&quot;var(--target-zone)&quot;/>
+    <rect id=&quot;fillRect&quot; x=&quot;40&quot; y=&quot;40&quot; width=&quot;0&quot; height=&quot;34&quot; rx=&quot;6&quot; fill=&quot;var(--fill)&quot;/>
+    <line id=&quot;targetLine&quot; x1=&quot;600&quot; y1=&quot;34&quot; x2=&quot;600&quot; y2=&quot;84&quot; stroke=&quot;var(--target-line)&quot; stroke-width=&quot;3&quot;/>
+    <line id=&quot;demoLine&quot; x1=&quot;40&quot; y1=&quot;34&quot; x2=&quot;40&quot; y2=&quot;88&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;3&quot;/>
+
+    <text id=&quot;demoLabel&quot; x=&quot;40&quot; y=&quot;29&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--accent)&quot;></text>
+    <text id=&quot;targetLabel&quot; x=&quot;600&quot; y=&quot;102&quot; text-anchor=&quot;end&quot; font-size=&quot;12&quot; fill=&quot;var(--target-line)&quot;></text>
+    <text x=&quot;40&quot; y=&quot;102&quot; text-anchor=&quot;start&quot; font-size=&quot;12&quot; fill=&quot;var(--muted)&quot;>0 atoms</text>
+
+    <text id=&quot;gapLabel&quot; x=&quot;320&quot; y=&quot;128&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--text)&quot;></text>
+    <text id=&quot;gapLabel2&quot; x=&quot;320&quot; y=&quot;144&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--muted)&quot;></text>
+  </svg>
+
+  <ul class=&quot;readouts&quot; id=&quot;readouts&quot;></ul>
+
+  <div class=&quot;trapbox&quot; id=&quot;trapbox&quot;></div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>gap</mi><mo>=</mo><msub><mi>N</mi><mtext>target</mtext></msub><mo>&amp;#8722;</mo><msub><mi>N</mi><mtext>today</mtext></msub>
+      <mo>,</mo>
+      <mtext>&amp;#160;&amp;#160;ratio</mtext><mo>=</mo>
+      <mfrac><msub><mi>N</mi><mtext>target</mtext></msub><msub><mi>N</mi><mtext>today</mtext></msub></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>N<sub></sub>target — atoms this milestone requires (atoms) &amp;middot; N<sub></sub>today — atoms held in the largest coherent array demonstrated so far, 6,100 (atoms) &amp;middot; gap — additional atoms still needed &amp;middot; ratio — how many times bigger the target is than today's array.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const demonstrated = 6100;      // atoms — largest coherent tweezer array demonstrated (2023-24 results)
+  const trapSites = 360000;       // trap sites — largest static tweezer mask fabricated to date
+  const milestones = [
+    {key:'today',   label:'Demonstrated today',           low:6100,   high:6100,   sub:'6,100+ coherent atoms held in one array today'},
+    {key:'space',   label:'Space-efficient target',       low:9739,   high:13255,  sub:'Chip design needs 9,739\u201313,255 atoms (compact routing)'},
+    {key:'parallel',label:'Fully parallel target',         low:102000, high:102000, sub:'Chip design needs \u2248102,000 atoms (fully parallel routing)'}
+  ];
+  let idx = 1; // default to space-efficient view
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const barX = 40, barW = 560;
+  const fillRect = document.getElementById('fillRect');
+  const zoneRect = document.getElementById('zoneRect');
+  const targetLine = document.getElementById('targetLine');
+  const demoLine = document.getElementById('demoLine');
+  const demoLabel = document.getElementById('demoLabel');
+  const targetLabel = document.getElementById('targetLabel');
+  const milestoneTitle = document.getElementById('milestoneTitle');
+  const gapLabel = document.getElementById('gapLabel');
+  const gapLabel2 = document.getElementById('gapLabel2');
+  const readouts = document.getElementById('readouts');
+  const trapbox = document.getElementById('trapbox');
+  const btnWrap = document.getElementById('btns');
+
+  let current = {fillW:0, zoneX:0, zoneW:0, targetX:barX+barW, demoX:barX};
+
+  function apply(s){
+    fillRect.setAttribute('width', Math.max(0,s.fillW).toFixed(1));
+    zoneRect.setAttribute('x', s.zoneX.toFixed(1));
+    zoneRect.setAttribute('width', Math.max(0,s.zoneW).toFixed(1));
+    targetLine.setAttribute('x1', s.targetX.toFixed(1));
+    targetLine.setAttribute('x2', s.targetX.toFixed(1));
+    demoLine.setAttribute('x1', s.demoX.toFixed(1));
+    demoLine.setAttribute('x2', s.demoX.toFixed(1));
+    demoLabel.setAttribute('x', s.demoX.toFixed(1));
+  }
+
+  function animateTo(target, dur){
+    if(reducedMotion){ current=target; apply(current); return; }
+    const start = {...current};
+    const t0 = performance.now();
+    function step(t){
+      const p = Math.min(1,(t-t0)/dur);
+      const e = 1-Math.pow(1-p,3);
+      const s = {};
+      for(const k in target) s[k]=start[k]+(target[k]-start[k])*e;
+      apply(s);
+      if(p<1) requestAnimationFrame(step); else current=target;
+    }
+    requestAnimationFrame(step);
+  }
+
+  function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+
+  function render(){
+    const m = milestones[idx];
+    const full = m.high;
+    const demoPct = Math.min(1, demonstrated/full);
+    const lowPct = Math.min(1, m.low/full);
+    const fillW = demoPct*barW;
+    const zoneX = barX + lowPct*barW;
+    const zoneW = (m.low<m.high) ? (barW - lowPct*barW) : 0;
+    const targetX = barX + barW;
+    const demoX = barX + fillW;
+
+    animateTo({fillW, zoneX, zoneW, targetX, demoX}, 650);
+
+    milestoneTitle.textContent = m.sub;
+    demoLabel.textContent = '6,100 today';
+    targetLabel.textContent = (m.low===m.high) ? ('target: '+fmt(m.high)) :
+      ('target: '+fmt(m.low)+'\u2013'+fmt(m.high));
+
+    // gap / ratio annotation
+    let gapText, gapText2;
+    if(demonstrated >= m.high){
+      gapText = 'gap = 0 — target already met by today\u2019s array';
+      gapText2 = '';
+    } else if(m.low===m.high){
+      const gap = m.high-demonstrated, ratio = m.high/demonstrated;
+      gapText = 'gap = ' + fmt(gap) + ' atoms short';
+      gapText2 = 'ratio = ' + ratio.toFixed(1) + '\u00d7 today\u2019s array';
+    } else {
+      const gapLo = m.low-demonstrated, gapHi = m.high-demonstrated;
+      const ratLo = m.low/demonstrated, ratHi = m.high/demonstrated;
+      gapText = 'gap = ' + fmt(gapLo) + '\u2013' + fmt(gapHi) + ' atoms short';
+      gapText2 = 'ratio = ' + ratLo.toFixed(1) + '\u00d7\u2013' + ratHi.toFixed(1) + '\u00d7 today\u2019s array';
+    }
+    gapLabel.textContent = gapText;
+    gapLabel2.textContent = gapText2;
+
+    readouts.innerHTML = '';
+    const items = [
+      ['Demonstrated today', fmt(demonstrated) + ' atoms (largest coherent array)'],
+      ['Selected milestone', m.label],
+      ['Target size needed', (m.low===m.high? fmt(m.high) : fmt(m.low)+'\u2013'+fmt(m.high)) + ' atoms'],
+      ['Gap to close', gapText.replace('gap = ','')]
+    ];
+    items.forEach(([k,v])=>{
+      const li = document.createElement('li');
+      li.innerHTML = '<span>'+k+'</span><b>'+v+'</b>';
+      readouts.appendChild(li);
+    });
+
+    trapbox.innerHTML = 'Tweezer trap masks already fabricated: <b>' + fmt(trapSites) +
+      ' sites</b> — larger than every target above, so trap infrastructure is not the bottleneck.';
+  }
+
+  function makeButtons(){
+    milestones.forEach((m,i)=>{
+      const b = document.createElement('button');
+      b.textContent = m.label;
+      b.addEventListener('click', ()=>{ idx=i; updateButtons(); render(); });
+      b.dataset.idx = i;
+      btnWrap.appendChild(b);
+    });
+    updateButtons();
+  }
+  function updateButtons(){
+    [...btnWrap.children].forEach((b,i)=> b.classList.toggle('active', i===idx));
+  }
+
+  makeButtons();
+  render();
+
+  window.__sceneReady = true;
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;hardware-already-here&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The atom count this scheme needs is already within a few times of today's demonstrated arrays"
+  ></iframe>
+</section>
+
+<section class="scene" id="what-this-means-today">
+  <h3>Ten thousand reliable, reconfigurable qubits — not millions — stand between today's hardware and a 10-day break of ECC-256</h3>
+  <div class="caption">Every scene here fed one number: with 9,739-13,255 qubits, the ECC-256 key from the very first scene falls in about 10 days.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="what-this-means-today"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>What this means today</title>
+<style>
+:root{
+  --bg:#f7f7fa;
+  --panel:#ffffff;
+  --fg:#1b1e26;
+  --muted:#5b6270;
+  --grid:#c9cdd6;
+  --quantum:#2f6fed;
+  --quantum-dim:#a9c4fb;
+  --classical:#d1495b;
+  --accent:#0f7a5a;
+  --border:#d7dae1;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c;
+    --panel:#1d2029;
+    --fg:#e8e9ee;
+    --muted:#9aa0ac;
+    --grid:#3a3f4c;
+    --quantum:#6ea0ff;
+    --quantum-dim:#324a80;
+    --classical:#ff8a94;
+    --accent:#4fd3a3;
+    --border:#333846;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:14px; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+  font-size:14px;
+}
+.scene{max-width:680px; margin:0 auto;}
+h1{font-size:15px; font-weight:600; margin:0 0 10px 0;}
+.panel{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px;}
+.controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+.controls label{font-weight:600; font-size:13px;}
+select{font-size:13px; padding:4px 6px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--fg);}
+svg{width:100%; height:auto; max-width:100%; display:block;}
+ul.readouts{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
+ul.readouts li{display:flex; justify-content:space-between; gap:8px; border-bottom:1px dashed var(--border); padding-bottom:4px; font-size:13px;}
+ul.readouts li:last-child{border-bottom:none;}
+ul.readouts .label{color:var(--muted);}
+ul.readouts .val{font-weight:600; text-align:right;}
+math{font-size:15px;}
+.legend{color:var(--muted); font-size:11.5px; margin-top:4px; line-height:1.4;}
+.eqwrap{text-align:center;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Physical qubits needed, and time to break the key — filled in</h1>
+
+  <div class=&quot;panel controls&quot;>
+    <label for=&quot;keySel&quot;>Target key:</label>
+    <select id=&quot;keySel&quot;>
+      <option value=&quot;ecc&quot;>ECC-256</option>
+      <option value=&quot;rsa&quot;>RSA-2048</option>
+    </select>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 300&quot; role=&quot;img&quot; aria-label=&quot;Diagram of qubits and time to break the key&quot;>
+    </svg>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <ul class=&quot;readouts&quot; id=&quot;readouts&quot;></ul>
+  </div>
+
+  <div class=&quot;panel eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>reduction</mi><mo>=</mo>
+      <mfrac><msub><mi>N</mi><mtext>earlier</mtext></msub><msub><mi>N</mi><mtext>today</mtext></msub></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      N<sub></sub>earlier — qubit count from pre-paper estimates (1–20 million) &amp;middot;
+      N<sub></sub>today — physical qubits needed per this paper's estimate for the selected key (toggle above)
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- physical constants / anchors (all from the paper's estimates) ----
+const ECC_QUBITS_MIN = 9739, ECC_QUBITS_MAX = 13255, ECC_DAYS = 10;          // ECC-256
+const RSA_QUBITS_MAX = 102000, RSA_DAYS_MIN = 97, RSA_DAYS_MAX = 260;        // RSA-2048 (parallel factoring)
+const EARLIER_QUBITS_MIN = 1e6, EARLIER_QUBITS_MAX = 20e6;                    // earlier literature estimates
+const AGE_UNIVERSE_YEARS = 13.8e9, DAYS_PER_YEAR = 365.25;
+const CLASSICAL_DAYS = AGE_UNIVERSE_YEARS * DAYS_PER_YEAR;                    // ~5.04e12 days
+
+const AXIS_MIN_DAYS = 1, AXIS_MAX_DAYS = 10000;                              // chart spans 1 to 10,000 days
+const X0 = 170, X1 = 600, ROW_Q = 120, ROW_C = 200;
+
+const svg = document.getElementById('svg');
+const sel = document.getElementById('keySel');
+const readoutsEl = document.getElementById('readouts');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function xPos(days){
+  const t = (Math.log10(days) - Math.log10(AXIS_MIN_DAYS)) / (Math.log10(AXIS_MAX_DAYS) - Math.log10(AXIS_MIN_DAYS));
+  return X0 + t * (X1 - X0);
+}
+
+function dataFor(key){
+  if(key === 'ecc'){
+    return {
+      name:'ECC-256', qLo:ECC_QUBITS_MIN, qHi:ECC_QUBITS_MAX,
+      dLo:ECC_DAYS, dHi:ECC_DAYS,
+      qubitStr:`${ECC_QUBITS_MIN.toLocaleString()}–${ECC_QUBITS_MAX.toLocaleString()}`,
+      dayStr:`~${ECC_DAYS}`
+    };
+  }
+  return {
+    name:'RSA-2048', qLo:RSA_QUBITS_MAX, qHi:RSA_QUBITS_MAX,
+    dLo:RSA_DAYS_MIN, dHi:RSA_DAYS_MAX,
+    qubitStr:`up to ~${RSA_QUBITS_MAX.toLocaleString()}`,
+    dayStr:`${RSA_DAYS_MIN}–${RSA_DAYS_MAX}`
+  };
+}
+
+function reductionFactor(key){
+  const d = dataFor(key);
+  const lo = EARLIER_QUBITS_MIN / d.qHi;
+  const hi = EARLIER_QUBITS_MAX / d.qLo;
+  return {lo, hi};
+}
+
+// ---- SVG static chrome (axis, lock, classical arrow) drawn once ----
+function ns(tag){ return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+
+function buildStatic(){
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const fg = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim();
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const grid = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
+  const classical = getComputedStyle(document.documentElement).getPropertyValue('--classical').trim();
+
+  // lock icon
+  const lockG = ns('g');
+  const body = ns('rect');
+  body.setAttribute('x',35); body.setAttribute('y',100); body.setAttribute('width',70); body.setAttribute('height',55);
+  body.setAttribute('rx',8); body.setAttribute('fill','none'); body.setAttribute('stroke',fg); body.setAttribute('stroke-width',3);
+  const shackle = ns('path');
+  shackle.setAttribute('d','M 48 100 V 78 A 22 22 0 0 1 92 78 V 100');
+  shackle.setAttribute('fill','none'); shackle.setAttribute('stroke',fg); shackle.setAttribute('stroke-width',5);
+  const keyhole = ns('circle');
+  keyhole.setAttribute('cx',70); keyhole.setAttribute('cy',126); keyhole.setAttribute('r',6); keyhole.setAttribute('fill',fg);
+  lockG.appendChild(shackle); lockG.appendChild(body); lockG.appendChild(keyhole);
+  svg.appendChild(lockG);
+
+  const lockLabel = ns('text');
+  lockLabel.setAttribute('id','lockLabel');
+  lockLabel.setAttribute('x',70); lockLabel.setAttribute('y',175);
+  lockLabel.setAttribute('text-anchor','middle'); lockLabel.setAttribute('font-size','12'); lockLabel.setAttribute('font-weight','600');
+  lockLabel.setAttribute('fill',fg);
+  svg.appendChild(lockLabel);
+
+  // axis line + ticks
+  const axis = ns('line');
+  axis.setAttribute('x1',X0); axis.setAttribute('y1',235); axis.setAttribute('x2',X1); axis.setAttribute('y2',235);
+  axis.setAttribute('stroke',grid); axis.setAttribute('stroke-width',1.5);
+  svg.appendChild(axis);
+
+  const ticks = [1,10,100,1000,10000];
+  const tickLabels = ['1 day','10 days','100 days','1,000 days','10,000 days'];
+  ticks.forEach((d,i)=>{
+    const x = xPos(d);
+    const t = ns('line');
+    t.setAttribute('x1',x); t.setAttribute('y1',95); t.setAttribute('x2',x); t.setAttribute('y2',235);
+    t.setAttribute('stroke',grid); t.setAttribute('stroke-width',1); t.setAttribute('stroke-dasharray','3,3');
+    svg.appendChild(t);
+    const lbl = ns('text');
+    lbl.setAttribute('x', i===ticks.length-1 ? x-4 : x);
+    lbl.setAttribute('y',250);
+    lbl.setAttribute('text-anchor', i===0 ? 'start' : (i===ticks.length-1 ? 'end' : 'middle'));
+    lbl.setAttribute('font-size','10.5'); lbl.setAttribute('fill',muted);
+    lbl.textContent = tickLabels[i];
+    svg.appendChild(lbl);
+  });
+
+  const axTitle = ns('text');
+  axTitle.setAttribute('x',(X0+X1)/2); axTitle.setAttribute('y',270);
+  axTitle.setAttribute('text-anchor','middle'); axTitle.setAttribute('font-size','11'); axTitle.setAttribute('fill',muted);
+  axTitle.textContent = 'time to break the key (log scale, days)';
+  svg.appendChild(axTitle);
+
+  // classical arrow (fixed, off-chart)
+  const cLine = ns('line');
+  cLine.setAttribute('x1',X1-2); cLine.setAttribute('y1',ROW_C); cLine.setAttribute('x2',X1+18); cLine.setAttribute('y2',ROW_C);
+  cLine.setAttribute('stroke',classical); cLine.setAttribute('stroke-width',8);
+  svg.appendChild(cLine);
+  const cArrow = ns('polygon');
+  cArrow.setAttribute('points', `${X1+18},${ROW_C-8} ${X1+34},${ROW_C} ${X1+18},${ROW_C+8}`);
+  cArrow.setAttribute('fill',classical);
+  svg.appendChild(cArrow);
+  const cBarStart = ns('rect');
+  cBarStart.setAttribute('x',xPos(1)); cBarStart.setAttribute('y',ROW_C-6); cBarStart.setAttribute('width', X1-xPos(1)); cBarStart.setAttribute('height',12);
+  cBarStart.setAttribute('fill',classical); cBarStart.setAttribute('opacity',0.35);
+  svg.appendChild(cBarStart);
+  const cLabel1 = ns('text');
+  cLabel1.setAttribute('x',X0); cLabel1.setAttribute('y',ROW_C-14);
+  cLabel1.setAttribute('font-size','11.5'); cLabel1.setAttribute('fill',classical); cLabel1.setAttribute('font-weight','600');
+  cLabel1.textContent = 'classical brute force (off this chart)';
+  svg.appendChild(cLabel1);
+  const cLabel2 = ns('text');
+  cLabel2.setAttribute('x',X0); cLabel2.setAttribute('y',ROW_C+22);
+  cLabel2.setAttribute('font-size','10.5'); cLabel2.setAttribute('fill',muted);
+  cLabel2.textContent = `≈ ${CLASSICAL_DAYS.toExponential(1)} days — longer than the age of the universe (13.8 Gyr)`;
+  svg.appendChild(cLabel2);
+
+  // quantum bar (dynamic, built as group with id)
+  const qLabel = ns('text');
+  qLabel.setAttribute('id','qLabelTitle');
+  qLabel.setAttribute('x',X0); qLabel.setAttribute('y',ROW_Q-14);
+  qLabel.setAttribute('font-size','11.5'); qLabel.setAttribute('fill',fg); qLabel.setAttribute('font-weight','600');
+  svg.appendChild(qLabel);
+
+  const qBar = ns('rect');
+  qBar.setAttribute('id','qBar');
+  qBar.setAttribute('y',ROW_Q-8); qBar.setAttribute('height',16); qBar.setAttribute('rx',4);
+  const quantumColor = getComputedStyle(document.documentElement).getPropertyValue('--quantum').trim();
+  qBar.setAttribute('fill',quantumColor);
+  svg.appendChild(qBar);
+
+  const qValLabel = ns('text');
+  qValLabel.setAttribute('id','qValLabel');
+  qValLabel.setAttribute('y',ROW_Q+22);
+  qValLabel.setAttribute('font-size','10.5'); qValLabel.setAttribute('fill',muted);
+  svg.appendChild(qValLabel);
+}
+
+// ---- animation state ----
+let animLo = ECC_DAYS, animHi = ECC_DAYS;
+let targetLo = ECC_DAYS, targetHi = ECC_DAYS;
+let animStart = 0, animDur = 500;
+let animating = false;
+
+function drawDynamic(days_lo, days_hi, key){
+  const d = dataFor(key);
+  document.getElementById('lockLabel').textContent = d.name;
+  const qBar = document.getElementById('qBar');
+  const x1 = xPos(Math.max(days_lo, AXIS_MIN_DAYS));
+  const x2 = xPos(Math.max(days_hi, AXIS_MIN_DAYS));
+  const w = Math.max(x2 - x1, 4);
+  qBar.setAttribute('x', x1);
+  qBar.setAttribute('width', w);
+  document.getElementById('qLabelTitle').textContent = `quantum attack — ${d.name}`;
+  const valLabel = document.getElementById('qValLabel');
+  valLabel.setAttribute('x', x1);
+  valLabel.textContent = (days_lo === days_hi)
+    ? `~${Math.round(days_lo)} days, ${d.qubitStr} physical qubits`
+    : `${Math.round(days_lo)}–${Math.round(days_hi)} days, ${d.qubitStr} physical qubits`;
+}
+
+function updateReadouts(key){
+  const d = dataFor(key);
+  const r = reductionFactor(key);
+  readoutsEl.innerHTML = '';
+  const rows = [
+    ['Physical qubits needed', d.qubitStr],
+    ['Time to break key', `${d.dayStr} days`],
+    ['Classical brute force (fixed)', `~5.0×10¹² days`],
+    ['Fewer qubits than earlier estimates', `${Math.round(r.lo)}×–${Math.round(r.hi)}×`]
+  ];
+  rows.forEach(([label,val])=>{
+    const li = document.createElement('li');
+    const l = document.createElement('span'); l.className='label'; l.textContent = label;
+    const v = document.createElement('span'); v.className='val'; v.textContent = val;
+    li.appendChild(l); li.appendChild(v);
+    readoutsEl.appendChild(li);
+  });
+}
+
+function step(ts){
+  if(!animStart) animStart = ts;
+  const t = Math.min(1, (ts - animStart) / animDur);
+  const ease = t*(2-t);
+  const lo = animLo + (targetLo - animLo) * ease;
+  const hi = animHi + (targetHi - animHi) * ease;
+  drawDynamic(lo, hi, sel.value);
+  if(t < 1){
+    requestAnimationFrame(step);
+  } else {
+    animLo = targetLo; animHi = targetHi;
+    animating = false;
+  }
+}
+
+function setKey(key){
+  const d = dataFor(key);
+  targetLo = d.dLo; targetHi = d.dHi;
+  updateReadouts(key);
+  if(reduceMotion){
+    animLo = targetLo; animHi = targetHi;
+    drawDynamic(animLo, animHi, key);
+    return;
+  }
+  animStart = 0; animating = true;
+  requestAnimationFrame(step);
+}
+
+buildStatic();
+setKey(sel.value);
+sel.addEventListener('change', ()=> setKey(sel.value));
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;what-this-means-today&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Ten thousand reliable, reconfigurable qubits — not millions — stand between today's hardware and a 10-day break of ECC-256"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Shor's algorithm is possible with as few as 10,000 reconfigurable atomic qubits</em> — Madelyn Cain, Qian Xu, Robbie King, Lewis R. B. Picard, Harry Levine, Manuel Endres, John Preskill, Hsin-Yuan Huang, Dolev Bluvstein. Explainer generated 2026-07-17.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

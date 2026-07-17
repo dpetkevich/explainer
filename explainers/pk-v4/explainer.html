@@ -1,0 +1,3174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Make Eight GPUs Act Like One: The Art of Hiding Communication</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How to Make Eight GPUs Act Like One: The Art of Hiding Communication</h1>
+  <p class="hook">Training a large AI model means splitting one giant matrix multiplication across many GPUs. Then you pay for it: the partial results must be shipped and summed over links roughly 7× slower than each GPU's own memory. In some large-model workloads, GPUs now sit idle more than half the time waiting on those transfers. This paper's fix is not faster wires but smarter scheduling: run the transfer *during* the math. Then total time becomes the maximum of the two, not their sum. Follow one split matrix multiply across 8 H100 GPUs and watch its communication cost drop from 68% of runtime to under 1%.</p>
+  <p class="page-links"><a href="https://arxiv.org/abs/2511.13940" target="_blank" rel="noopener noreferrer">ParallelKittens: Systematic and Practical Simplification of Multi-GPU AI Kernels</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.0.0 · One insight + one running example carried through connected scenes (story-discovery methodology)</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">We set up one concrete workload — a single matrix multiply split across 8 GPUs — and meet the hardware it runs on. By the end, we see why the split creates a cost that only grows with each GPU generation.</div>
+</header>
+<section class="scene" id="split-matmul">
+  <h3>Splitting a matrix multiply across GPUs creates a mandatory summation step</h3>
+  <div class="caption">Our running example: an 8192×8192×8192 matrix multiply, its weights split 8 ways. Step the split and watch a new obligation appear — 8 partial results, 134 MB each, that must be added together across machines.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="split-matmul"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Splitting a matmul across GPUs</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --text:#1a1d23; --muted:#5b6270; --border:#d8dce3;
+    --a-color:#3b6fd6; --a-fill:rgba(59,111,214,0.15);
+    --w-color:#b5651d; --reduce-color:#cc3333; --good:#2f9e58;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --panel:#1c2027; --text:#e7eaf0; --muted:#9aa3b2; --border:#333a45;
+      --a-color:#6d9cf5; --a-fill:rgba(109,156,245,0.20);
+      --w-color:#e0904a; --reduce-color:#ff6b6b; --good:#4cc385;
+    }
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px;}
+  .title{font-size:15px;font-weight:600;margin:2px 0 10px;}
+  .predict{border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;background:var(--panel);font-size:13px;}
+  .predict .q{margin:0 0 6px;}
+  .predict-btns{display:flex;gap:8px;flex-wrap:wrap;}
+  .predict-btns button{flex:1 1 auto;}
+  .reveal{margin:6px 0 0;color:var(--muted);font-size:12.5px;min-height:2.4em;}
+  .diagram{border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--panel);max-width:100%;}
+  .row.header{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px;}
+  .aBox{width:78px;height:78px;flex:0 0 auto;background:var(--a-fill);border:2px solid var(--a-color);
+        border-radius:4px;display:flex;align-items:center;justify-content:center;text-align:center;
+        font-size:10px;color:var(--a-color);font-weight:600;padding:3px;}
+  .wCol{flex:1 1 200px;min-width:150px;}
+  .boxLabel{font-size:10.5px;color:var(--muted);margin-bottom:4px;text-align:center;}
+  .wBands{display:flex;height:78px;border:2px solid var(--w-color);border-radius:4px;overflow:hidden;}
+  .band{flex:1 1 0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;
+        text-align:center;border-right:1px solid rgba(255,255,255,0.4);padding:1px;}
+  .band:last-child{border-right:none;}
+  .cards{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .card{flex:1 1 130px;max-width:170px;border:1px solid var(--border);border-radius:6px;padding:6px;
+        font-size:11px;background:var(--panel);}
+  .cardTitle{font-weight:700;font-size:12px;margin-bottom:3px;}
+  .swatch{height:7px;border-radius:2px;margin-bottom:4px;}
+  .cardText{margin-bottom:4px;line-height:1.3;}
+  .partial{border:2px dashed;border-radius:4px;padding:4px;margin-bottom:4px;text-align:center;font-size:9.5px;line-height:1.25;}
+  .cardNote{color:var(--muted);font-size:9.5px;line-height:1.25;}
+  .reduceRow{margin-top:4px;}
+  .reduceBox{border:2px solid var(--reduce-color);border-radius:6px;padding:8px;font-size:11.5px;
+             text-align:center;color:var(--reduce-color);background:rgba(214,59,59,0.06);}
+  .reduceBox.none{border-color:var(--good);color:var(--good);background:rgba(47,158,88,0.06);}
+  .sigma{font-weight:700;font-size:14px;margin-right:4px;}
+  .arrows{margin-top:4px;letter-spacing:5px;font-size:13px;}
+  .controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0;}
+  .ctrlLabel{font-size:12.5px;color:var(--muted);}
+  .gpuBtns{display:flex;gap:6px;flex-wrap:wrap;}
+  button{font-size:12.5px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;
+         background:var(--panel);color:var(--text);cursor:pointer;}
+  button.active{background:var(--a-color);color:#fff;border-color:var(--a-color);}
+  .readouts{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;margin:8px 0 14px;}
+  .readout{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:6px 10px;min-width:90px;}
+  .readout b{display:block;font-size:14px;}
+  .equations{font-size:13px;margin-top:6px;overflow-x:auto;}
+  .legend{font-size:11px;color:var(--muted);margin:2px 0 12px;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;title&quot;>Tensor-parallel matmul: weights split, outputs must be summed</div>
+
+  <div class=&quot;predict&quot;>
+    <p class=&quot;q&quot;>Predict: each GPU stores only 1/8 of the weight matrix W. Does each GPU's output also shrink to 1/8?</p>
+    <div class=&quot;predict-btns&quot;>
+      <button id=&quot;pYes&quot;>Yes — output shrinks to 1/8</button>
+      <button id=&quot;pNo&quot;>No — output stays full size</button>
+    </div>
+    <p class=&quot;reveal&quot; id=&quot;reveal&quot;></p>
+  </div>
+
+  <div class=&quot;diagram&quot;>
+    <div class=&quot;row header&quot;>
+      <div class=&quot;aBox&quot;>A — activations<br>8192×8192</div>
+      <div class=&quot;wCol&quot;>
+        <div class=&quot;boxLabel&quot;>W — weights 8192×8192, split across GPUs</div>
+        <div class=&quot;wBands&quot; id=&quot;wBands&quot;></div>
+      </div>
+    </div>
+    <div class=&quot;cards&quot; id=&quot;cards&quot;></div>
+    <div class=&quot;reduceRow&quot; id=&quot;reduceRow&quot;></div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <span class=&quot;ctrlLabel&quot;>Number of GPUs sharing W (weight matrix):</span>
+    <div class=&quot;gpuBtns&quot; id=&quot;gpuBtns&quot;></div>
+  </div>
+
+  <div class=&quot;readouts&quot; id=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;>GPUs<br><b id=&quot;r-n&quot;>1</b></div>
+    <div class=&quot;readout&quot;>weight slice / GPU<br><b id=&quot;r-slice&quot;>0</b> MB</div>
+    <div class=&quot;readout&quot;>partial output / GPU<br><b id=&quot;r-out&quot;>0</b> MB</div>
+    <div class=&quot;readout&quot;>partials to sum<br><b id=&quot;r-sum&quot;>0</b></div>
+  </div>
+
+  <div class=&quot;equations&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>S</mi><mtext>slice</mtext></msub><mo>=</mo>
+      <mfrac><mi>R</mi><mi>N</mi></mfrac><mo>·</mo><mi>C</mi><mo>·</mo><mi>b</mi>
+    </math>
+  </div>
+  <p class=&quot;legend&quot;>S<sub>slice</sub> — weight memory per GPU (bytes) · R, C — rows, cols of W, 8192 each ·
+    N — number of GPUs (the control above) · b — bytes per element, 2 for BF16.</p>
+
+  <div class=&quot;equations&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>S</mi><mtext>out</mtext></msub><mo>=</mo>
+      <mi>R</mi><mo>·</mo><mi>C</mi><mo>·</mo><mi>b</mi><mo>=</mo><mn>134.2</mn><mtext> MB</mtext>
+    </math>
+  </div>
+  <p class=&quot;legend&quot;>S<sub>out</sub> — size of each GPU's partial output (bytes); identical for every GPU
+    no matter how large N is — this is the tensor that every red &quot;reduce&quot; arrow must carry and sum.</p>
+</div>
+
+<script>
+  const ROWS = 8192, COLS = 8192, BYTES = 2; // BF16 = 2 bytes/element
+  const FULL_BYTES = ROWS * COLS * BYTES;
+  const MB = 1e6;
+  const GPU_OPTIONS = [1, 2, 4, 8];
+  let N = 1;
+
+  function fmtMB(bytes){ return (bytes / MB).toFixed(1); }
+  function colorFor(i, total){ const hue = 200 + i * (150 / Math.max(total,1)); return `hsl(${hue},60%,48%)`; }
+
+  function render(){
+    const rows = ROWS / N;
+    const sliceBytes = rows * COLS * BYTES;
+
+    // W bands
+    const wBands = document.getElementById('wBands');
+    wBands.innerHTML = '';
+    for (let i = 0; i < N; i++){
+      const b = document.createElement('div');
+      b.className = 'band';
+      b.style.background = colorFor(i, N);
+      if (N <= 4) b.textContent = `rows ${i*rows}–${(i+1)*rows-1}`;
+      wBands.appendChild(b);
+    }
+
+    // cards
+    const cards = document.getElementById('cards');
+    cards.innerHTML = '';
+    for (let i = 0; i < N; i++){
+      const col = colorFor(i, N);
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class=&quot;cardTitle&quot; style=&quot;color:${col}&quot;>GPU ${i}</div>
+        <div class=&quot;swatch&quot; style=&quot;background:${col}&quot;></div>
+        <div class=&quot;cardText&quot;>weight slice: <b>${rows}</b>×8192 = <b>${fmtMB(sliceBytes)} MB</b></div>
+        <div class=&quot;partial&quot; style=&quot;background:${col}22;border-color:${col}&quot;>
+          partial C<sub>${i}</sub> (full size)<br>8192×8192 = <b>${fmtMB(FULL_BYTES)} MB</b>
+        </div>
+        <div class=&quot;cardNote&quot;>${N > 1 ? `must sum with ${N-1} others` : 'complete result — no summation needed'}</div>`;
+      cards.appendChild(card);
+    }
+
+    // reduce row
+    const reduceRow = document.getElementById('reduceRow');
+    if (N > 1){
+      let arrows = '';
+      for (let i = 0; i < N; i++) arrows += '➜';
+      reduceRow.innerHTML = `<div class=&quot;reduceBox&quot;>
+          <span class=&quot;sigma&quot;>Σ</span>reduce: element-wise sum of ${N} partial results across GPUs —
+          ${fmtMB(FULL_BYTES)} MB moved per GPU
+          <div class=&quot;arrows&quot;>${arrows}</div>
+        </div>`;
+    } else {
+      reduceRow.innerHTML = `<div class=&quot;reduceBox none&quot;>0 bytes communicated — the single GPU already holds the complete result</div>`;
+    }
+
+    // readouts — number of partial results that must still be summed together
+    const partialsToSum = N > 1 ? N : 0;
+    document.getElementById('r-n').textContent = String(N);
+    document.getElementById('r-slice').textContent = fmtMB(sliceBytes);
+    document.getElementById('r-out').textContent = fmtMB(FULL_BYTES);
+    document.getElementById('r-sum').textContent = String(partialsToSum);
+
+    document.querySelectorAll('.gpuBtn').forEach(btn => {
+      btn.classList.toggle('active', +btn.dataset.n === N);
+    });
+  }
+
+  const gpuBtns = document.getElementById('gpuBtns');
+  GPU_OPTIONS.forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'gpuBtn';
+    btn.dataset.n = n;
+    btn.textContent = n + (n > 1 ? ' GPUs' : ' GPU');
+    btn.addEventListener('click', () => { N = n; render(); });
+    gpuBtns.appendChild(btn);
+  });
+
+  document.getElementById('pYes').addEventListener('click', () => reveal(false));
+  document.getElementById('pNo').addEventListener('click', () => reveal(true));
+  function reveal(correct){
+    document.getElementById('reveal').textContent = correct
+      ? 'Correct: each partial output stays full size (8192×8192, 134.2 MB) — splitting the weights only shrinks per-GPU storage, not the output. That mismatch is why results must be summed across GPUs.'
+      : 'Not quite: each partial output stays full size (8192×8192, 134.2 MB) — splitting the weights only shrinks per-GPU storage, not the output. That mismatch is why results must be summed across GPUs.';
+  }
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;split-matmul&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Splitting a matrix multiply across GPUs creates a mandatory summation step"
+  ></iframe>
+</section>
+
+<section class="scene" id="bandwidth-pyramid">
+  <h3>Inside a GPU, every step down the memory hierarchy costs an order of magnitude in bandwidth — and the GPU-to-GPU link is the bottom rung</h3>
+  <div class="caption">Before the 134 MB sum can hurt us, see where it travels. Sweep down the pyramid: registers move data at 130 TB/s, but the NVLink pipe between GPUs manages 0.45 TB/s — nearly 300× slower.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="bandwidth-pyramid"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Bandwidth pyramid</title>
+<style>
+:root{
+  --bg:#ffffff; --panel:#f4f6f9; --text:#1c2430; --muted:#647085;
+  --border:#d8dee6;
+  --tier0:#2563eb; --tier1:#16a34a; --tier2:#ca8a04; --tier3:#ea580c; --tier4:#dc2626;
+  --track:#e2e6ec;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f172a; --panel:#16213a; --text:#e6ebf3; --muted:#98a5bb;
+    --border:#2c3a54;
+    --tier0:#60a5fa; --tier1:#4ade80; --tier2:#fbbf24; --tier3:#fb923c; --tier4:#f87171;
+    --track:#233255;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+h1{font-size:15px;margin:0 0 8px;font-weight:600;}
+canvas{width:100%;max-width:680px;display:block;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;}
+.controls{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+.controls label{font-size:12.5px;font-weight:600;}
+input[type=range]{width:100%;}
+.ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);
+  flex-wrap:wrap;gap:2px;}
+button{align-self:flex-start;font-size:12.5px;padding:6px 12px;border-radius:6px;
+  border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;}
+button:disabled{opacity:0.6;cursor:default;}
+.readout{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12.5px;}
+.readout .label{color:var(--muted);}
+.readout .value{font-weight:600;}
+.stopwatch{margin-top:8px;}
+.track{height:10px;border-radius:5px;background:var(--track);overflow:hidden;}
+.fill{height:100%;width:0%;background:var(--tier0);border-radius:5px;}
+.note{font-size:10.5px;color:var(--muted);margin-top:4px;}
+.formula{margin-top:14px;padding:10px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+.legend{font-size:10.5px;color:var(--muted);margin-top:4px;}
+math{font-size:15px;}
+.inset{margin-top:10px;padding:9px 12px;background:var(--panel);border:1px dashed var(--border);
+  border-radius:8px;font-size:11.5px;color:var(--muted);}
+.inset b{color:var(--text);}
+@media (max-width:420px){
+  .readout{grid-template-columns:1fr;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Bandwidth pyramid: moving a 134 MB partial product down the GPU memory hierarchy</h1>
+  <canvas id=&quot;cv&quot; role=&quot;img&quot; aria-label=&quot;Pyramid of five GPU memory tiers, bar length proportional to bandwidth&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;tierSlider&quot;>Highlighted memory tier (registers → NVLink) — slide to move down the hierarchy</label>
+    <input type=&quot;range&quot; id=&quot;tierSlider&quot; min=&quot;0&quot; max=&quot;4&quot; step=&quot;1&quot; value=&quot;0&quot;>
+    <div class=&quot;ticks&quot;><span>Registers</span><span>Shared mem</span><span>L2</span><span>HBM</span><span>NVLink</span></div>
+    <button id=&quot;sweepBtn&quot; type=&quot;button&quot;>▶ Sweep top → bottom (auto-advance the tier above)</button>
+  </div>
+
+  <div class=&quot;readout&quot;>
+    <div><span class=&quot;label&quot;>Tier</span> <span class=&quot;value&quot; id=&quot;roName&quot;></span></div>
+    <div><span class=&quot;label&quot;>Capacity</span> <span class=&quot;value&quot; id=&quot;roCap&quot;></span></div>
+    <div><span class=&quot;label&quot;>Bandwidth</span> <span class=&quot;value&quot; id=&quot;roBW&quot;></span></div>
+    <div><span class=&quot;label&quot;>Time to move 134 MB</span> <span class=&quot;value&quot; id=&quot;roTime&quot;></span></div>
+  </div>
+  <div class=&quot;stopwatch&quot;>
+    <div class=&quot;track&quot;><div class=&quot;fill&quot; id=&quot;fill&quot;></div></div>
+    <div class=&quot;note&quot;>Fill animation is stretched for visibility — the real transfer is microseconds.</div>
+  </div>
+
+  <div class=&quot;formula&quot;>
+    <math display=&quot;block&quot;>
+      <mi>t</mi><mo>=</mo><mfrac><mi>D</mi><mi>B</mi></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>t — time to cross this tier (s) · D — data size, the 134 MB partial product (bytes) · B — this tier's bandwidth (bytes/s)</div>
+  </div>
+
+  <div class=&quot;inset&quot;>
+    <b>SM</b> = one of ~132 streaming multiprocessors on this GPU (H100-class). Each SM is an independent
+    processor running thousands of threads; the tensor cores (matrix-multiply units) plus the registers and
+    shared memory shown above all live inside every SM.
+  </div>
+</div>
+
+<script>
+// ---- physical constants (auditable) ----
+const DATA_BYTES = 134e6;      // 134 MB partial product from split-matmul, decimal MB
+const TB_TO_BYTES = 1e12;      // 1 TB/s = 1e12 bytes/s
+
+const TIERS = [
+  {name:'Registers',       scope:'per SM',        capacityLabel:'64 KB',  bandwidth:130,  color:'var(--tier0)'},
+  {name:'Shared memory',   scope:'per SM',        capacityLabel:'227 KB', bandwidth:33,   color:'var(--tier1)'},
+  {name:'L2 cache',        scope:'whole GPU',     capacityLabel:'50 MB',  bandwidth:12,   color:'var(--tier2)'},
+  {name:'HBM main memory', scope:'whole GPU',     capacityLabel:'80 GB',  bandwidth:3,    color:'var(--tier3)'},
+  {name:'NVLink',          scope:'per direction, to peer GPU', capacityLabel:'—', bandwidth:0.45, color:'var(--tier4)'}
+];
+TIERS.forEach(t=> t.timeSeconds = DATA_BYTES/(t.bandwidth*TB_TO_BYTES));
+const MAX_BW = TIERS[0].bandwidth;
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const LOGICAL_H = 428;
+let cssVars = {};
+function readVars(){
+  const cs = getComputedStyle(document.documentElement);
+  ['--text','--muted','--panel','--border'].forEach(k=> cssVars[k]=cs.getPropertyValue(k).trim());
+  TIERS.forEach((t,i)=> t.resolved = cs.getPropertyValue('--tier'+i).trim());
+}
+
+let selected = 0;
+
+function fmtTime(s){
+  const us = s*1e6;
+  if(us < 10) return us.toFixed(2)+' µs';
+  if(us < 100) return us.toFixed(1)+' µs';
+  return us.toFixed(0)+' µs';
+}
+
+function draw(){
+  readVars();
+  const w = cv.width, h = cv.height;
+  const small = w < 460;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = cssVars['--muted'];
+  ctx.font = (small?'10.5px':'11.5px')+' system-ui,sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('Bar length ∝ bandwidth — each tier below is roughly 10× slower', w/2, 18);
+
+  const startY = 34, rowH = (h-startY-16)/5;
+  const barMax = w*0.46;
+  const titleFont = (small?'600 11px':'600 13px')+' system-ui,sans-serif';
+  const subFont = (small?'9.5px':'11px')+' system-ui,sans-serif';
+
+  TIERS.forEach((t,i)=>{
+    const y = startY + i*rowH;
+    const isSel = i===selected;
+    const barW = Math.max(1.2, barMax * (t.bandwidth/MAX_BW));
+    const barH = 18;
+    const cx = w/2;
+    const barX = cx - barW/2;
+    const barY = y + 22;
+
+    ctx.textAlign='left';
+    ctx.font = titleFont;
+    ctx.fillStyle = isSel ? cssVars['--text'] : cssVars['--muted'];
+    ctx.fillText(t.name+' ('+t.scope+')', 12, y+12);
+    ctx.textAlign='right';
+    ctx.fillText('capacity: '+t.capacityLabel, w-12, y+12);
+
+    ctx.globalAlpha = isSel ? 1 : 0.4;
+    ctx.fillStyle = t.resolved;
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.globalAlpha = 1;
+    if(isSel){
+      ctx.strokeStyle = cssVars['--text'];
+      ctx.lineWidth = 2;
+      ctx.strokeRect(barX-1.5, barY-1.5, barW+3, barH+3);
+    }
+
+    ctx.textAlign='center';
+    ctx.font = subFont;
+    ctx.fillStyle = isSel ? cssVars['--text'] : cssVars['--muted'];
+    ctx.fillText(t.bandwidth+' TB/s  →  '+fmtTime(t.timeSeconds)+' for 134 MB', cx, barY+barH+15);
+  });
+}
+
+function resize(){
+  const w = Math.min(cv.parentElement.clientWidth, 680);
+  cv.width = Math.max(300, Math.round(w));
+  cv.height = LOGICAL_H;
+  cv.style.height = LOGICAL_H+'px';
+  draw();
+}
+
+// ---- readouts + animated stopwatch ----
+const roName = document.getElementById('roName');
+const roCap = document.getElementById('roCap');
+const roBW = document.getElementById('roBW');
+const roTime = document.getElementById('roTime');
+const fillEl = document.getElementById('fill');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let rafId = null;
+
+function mapDuration(seconds){
+  const us = seconds*1e6;
+  const minUs = Math.min(...TIERS.map(t=>t.timeSeconds*1e6));
+  const maxUs = Math.max(...TIERS.map(t=>t.timeSeconds*1e6));
+  const frac = (Math.log(us)-Math.log(minUs))/(Math.log(maxUs)-Math.log(minUs));
+  return 350 + frac*1250; // ms, illustrative only
+}
+
+function animateFill(tier){
+  if(rafId) cancelAnimationFrame(rafId);
+  fillEl.style.background = tier.resolved;
+  if(reduceMotion){
+    fillEl.style.width='100%';
+    return;
+  }
+  fillEl.style.width='0%';
+  const dur = mapDuration(tier.timeSeconds);
+  const t0 = performance.now();
+  function step(now){
+    const p = Math.min(1, (now-t0)/dur);
+    fillEl.style.width = (p*100)+'%';
+    if(p<1) rafId = requestAnimationFrame(step);
+  }
+  rafId = requestAnimationFrame(step);
+}
+
+function updateAll(){
+  const t = TIERS[selected];
+  roName.textContent = t.name;
+  roCap.textContent = t.capacityLabel;
+  roBW.textContent = t.bandwidth+' TB/s';
+  roTime.textContent = fmtTime(t.timeSeconds);
+  draw();
+  animateFill(t);
+}
+
+const slider = document.getElementById('tierSlider');
+function onSliderMove(){
+  const v = +slider.value;
+  if(v !== selected){ selected = v; updateAll(); }
+}
+slider.addEventListener('input', onSliderMove);
+slider.addEventListener('change', onSliderMove);
+
+// Safety net: keep the display in sync with the slider's current value on
+// every frame, regardless of how that value was changed (drag, keyboard,
+// or direct script assignment), so the highlighted tier can never silently
+// desync from the control.
+function pollSlider(){
+  onSliderMove();
+  requestAnimationFrame(pollSlider);
+}
+requestAnimationFrame(pollSlider);
+
+const sweepBtn = document.getElementById('sweepBtn');
+const SWEEP_LABEL = '▶ Sweep top → bottom (auto-advance the tier above)';
+let sweeping = false;
+let sweepTimer = null;
+sweepBtn.addEventListener('click', ()=>{
+  if(sweeping) return;
+  sweeping = true;
+  sweepBtn.disabled = true;
+  const stepMs = reduceMotion ? 150 : 350;
+  let i = 0;
+  slider.value = i; selected = i; sweepBtn.textContent = 'Sweeping… (Registers)';
+  updateAll();
+  sweepTimer = setInterval(()=>{
+    i++;
+    if(i>4){
+      clearInterval(sweepTimer);
+      sweepTimer = null;
+      sweeping = false;
+      sweepBtn.disabled = false;
+      sweepBtn.textContent = SWEEP_LABEL;
+      return;
+    }
+    slider.value = i; selected = i;
+    sweepBtn.textContent = 'Sweeping… ('+TIERS[i].name+')';
+    updateAll();
+  }, stepMs);
+});
+
+window.addEventListener('resize', resize);
+readVars();
+resize();
+updateAll();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;bandwidth-pyramid&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Inside a GPU, every step down the memory hierarchy costs an order of magnitude in bandwidth — and the GPU-to-GPU link is the bottom rung"
+  ></iframe>
+</section>
+
+<section class="scene" id="communication-wall">
+  <h3>Each GPU generation makes the math faster than the pipe, so waiting on transfers eats a growing share of runtime</h3>
+  <div class="caption">Step through three GPU generations and watch our matmul's timeline: the green compute segment shrinks 7.2×, the red transfer segment only 3×. Faster hardware makes the waiting problem worse, not better.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="communication-wall"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Communication Wall</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1a1a1a; --muted:#666a70; --panel:#f3f4f6;
+  --grid:#d9dadd; --compute:#2e8b57; --comm:#c9463d; --accent:#3366cc;
+  --btn-bg:#eceef1; --btn-fg:#1a1a1a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12151a; --fg:#e8e9ec; --muted:#9aa0a6; --panel:#1b1f26;
+    --grid:#333844; --compute:#4caf7d; --comm:#ff6b60; --accent:#7aa2ff;
+    --btn-bg:#242a33; --btn-fg:#e8e9ec;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:12px; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+  max-width:680px; margin:0 auto;
+}
+h1{font-size:14px; margin:2px 0 8px; font-weight:600;}
+svg{width:100%; max-width:100%; height:auto; display:block;}
+.controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0;}
+button{
+  background:var(--btn-bg); color:var(--btn-fg); border:1px solid var(--grid);
+  border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer;
+}
+button.active{outline:2px solid var(--accent); font-weight:700;}
+.hint{font-size:12px; color:var(--muted); margin:2px 0 8px;}
+.stats{display:flex; gap:10px; flex-wrap:wrap; margin:8px 0;}
+.stat{background:var(--panel); border-radius:6px; padding:6px 10px; font-size:12px; min-width:120px;}
+.stat b{display:block; font-size:14px; color:var(--fg);}
+.callout{font-size:12px; color:var(--muted); border-left:3px solid var(--accent); padding:4px 8px; margin:10px 0;}
+.eq{margin:10px 0 2px;}
+.eq math{font-size:15px;}
+.legend{font-size:11px; color:var(--muted); margin:0 0 8px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<h1>Naive workload timeline: compute the partial product, then ship and sum it</h1>
+<div class=&quot;hint&quot;>Switch GPU generation — bars rescale to real physics computed live.</div>
+
+<svg id=&quot;svg&quot; viewBox=&quot;0 0 640 260&quot; role=&quot;img&quot; aria-label=&quot;Timeline of compute and communication segments&quot;>
+  <!-- legend -->
+  <rect x=&quot;20&quot; y=&quot;30&quot; width=&quot;10&quot; height=&quot;10&quot; fill=&quot;var(--compute)&quot;></rect>
+  <text x=&quot;35&quot; y=&quot;39&quot; font-size=&quot;11&quot; fill=&quot;var(--fg)&quot;>Compute — matmul partial product on one GPU</text>
+  <rect x=&quot;20&quot; y=&quot;46&quot; width=&quot;10&quot; height=&quot;10&quot; fill=&quot;var(--comm)&quot;></rect>
+  <text x=&quot;35&quot; y=&quot;55&quot; font-size=&quot;11&quot; fill=&quot;var(--fg)&quot;>Communication — ship + sum 134 MB over NVLink</text>
+
+  <!-- bar -->
+  <g id=&quot;barGroup&quot;>
+    <rect id=&quot;rectCompute&quot; x=&quot;20&quot; y=&quot;74&quot; height=&quot;46&quot; fill=&quot;var(--compute)&quot;></rect>
+    <rect id=&quot;rectComm&quot; x=&quot;20&quot; y=&quot;74&quot; height=&quot;46&quot; fill=&quot;var(--comm)&quot;></rect>
+    <text id=&quot;lblTotal&quot; x=&quot;20&quot; y=&quot;66&quot; font-size=&quot;12&quot; fill=&quot;var(--fg)&quot; text-anchor=&quot;end&quot;></text>
+    <text id=&quot;lblShare&quot; x=&quot;20&quot; y=&quot;101&quot; font-size=&quot;12&quot; fill=&quot;var(--bg)&quot; text-anchor=&quot;middle&quot; font-weight=&quot;700&quot;></text>
+    <text id=&quot;lblCname&quot; x=&quot;20&quot; y=&quot;134&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;></text>
+    <text id=&quot;lblRname&quot; x=&quot;20&quot; y=&quot;134&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;></text>
+  </g>
+
+  <!-- ruler -->
+  <line id=&quot;rulerLine&quot; x1=&quot;20&quot; y1=&quot;140&quot; x2=&quot;620&quot; y2=&quot;140&quot; stroke=&quot;var(--grid)&quot;></line>
+  <g id=&quot;ticks&quot;></g>
+  <text x=&quot;320&quot; y=&quot;178&quot; font-size=&quot;11&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>Time (ms) →</text>
+
+  <!-- static hardware trend annotation -->
+  <text x=&quot;20&quot; y=&quot;200&quot; font-size=&quot;11&quot; fill=&quot;var(--muted)&quot;>Tensor-core throughput: 312 → 989 → 2250 TFLOP/s (×7.2 total)</text>
+  <text x=&quot;20&quot; y=&quot;216&quot; font-size=&quot;11&quot; fill=&quot;var(--muted)&quot;>NVLink bandwidth: 600 → 900 → 1800 GB/s (×3 total)</text>
+</svg>
+
+<div class=&quot;controls&quot; id=&quot;btns&quot;>
+  <button data-gen=&quot;A100&quot;>A100</button>
+  <button data-gen=&quot;H100&quot;>H100</button>
+  <button data-gen=&quot;B200&quot;>B200</button>
+</div>
+
+<div class=&quot;stats&quot;>
+  <div class=&quot;stat&quot;>Compute time<b id=&quot;statCompute&quot;>– ms</b></div>
+  <div class=&quot;stat&quot;>Communication time<b id=&quot;statComm&quot;>– ms</b></div>
+  <div class=&quot;stat&quot;>Total time<b id=&quot;statTotal&quot;>– ms</b></div>
+  <div class=&quot;stat&quot;>Communication share<b id=&quot;statShare&quot;>–%</b></div>
+</div>
+
+<div class=&quot;callout&quot;>Paper: communication already exceeds 50% of runtime in some large-language-model workloads.</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>t</mi><mtext>compute</mtext></msub><mo>=</mo>
+  <mfrac><mi>F</mi><mi>T</mi></mfrac>
+</math>
+<div class=&quot;legend&quot;>t<sub></sub>compute — time to compute the partial product (ms) · F — fixed matmul workload, 1.62×10<sup></sup>11 FLOPs · T — tensor-core throughput of the GPU generation (FLOP/s)</div>
+</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>t</mi><mtext>comm</mtext></msub><mo>=</mo>
+  <mfrac><mi>D</mi><mi>B</mi></mfrac>
+</math>
+<div class=&quot;legend&quot;>t_comm — time to ship and sum the result (ms) · D — fixed payload, 134 MB · B — NVLink bandwidth of the GPU generation (bytes/s)</div>
+</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+  <mi>s</mi><mo>=</mo>
+  <mfrac><msub><mi>t</mi><mtext>comm</mtext></msub><mrow><msub><mi>t</mi><mtext>compute</mtext></msub><mo>+</mo><msub><mi>t</mi><mtext>comm</mtext></msub></mrow></mfrac>
+</math>
+<div class=&quot;legend&quot;>s — communication's share of total wall-clock time (shown as %, this run)</div>
+</div>
+
+<script>
+(function(){
+  // ---- named physical constants (auditable) ----
+  const THROUGHPUT = { A100: 312e12, H100: 989e12, B200: 2250e12 }; // FLOP/s, dense FP16 tensor-core
+  const BANDWIDTH  = { A100: 600e9,  H100: 900e9,  B200: 1800e9 };  // bytes/s, NVLink
+  const FLOPS_WORKLOAD = 1.6233e11; // FLOPs: one partial-product matmul tile
+  const DATA_BYTES = 134e6;         // bytes: payload to ship + sum (all-reduce style)
+
+  function calc(gen){
+    const computeMs = (FLOPS_WORKLOAD / THROUGHPUT[gen]) * 1000;
+    const commMs = (DATA_BYTES / BANDWIDTH[gen]) * 1000;
+    const totalMs = computeMs + commMs;
+    const shareComm = (commMs / totalMs) * 100;
+    return { computeMs, commMs, totalMs, shareComm };
+  }
+
+  const PAD_X = 20, PLOT_W = 600;
+  const SCALE_MS = calc('A100').totalMs; // reference scale so bars shrink across generations
+  const pxPerMs = PLOT_W / SCALE_MS;
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const rectCompute = document.getElementById('rectCompute');
+  const rectComm = document.getElementById('rectComm');
+  const lblTotal = document.getElementById('lblTotal');
+  const lblShare = document.getElementById('lblShare');
+  const lblCname = document.getElementById('lblCname');
+  const lblRname = document.getElementById('lblRname');
+  const statCompute = document.getElementById('statCompute');
+  const statComm = document.getElementById('statComm');
+  const statTotal = document.getElementById('statTotal');
+  const statShare = document.getElementById('statShare');
+  const ticksG = document.getElementById('ticks');
+
+  // build ruler ticks once
+  const maxTick = Math.ceil(SCALE_MS * 10) / 10;
+  for(let t = 0; t <= maxTick + 1e-9; t += 0.1){
+    const x = PAD_X + t * pxPerMs;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', x); line.setAttribute('x2', x);
+    line.setAttribute('y1', 140); line.setAttribute('y2', 146);
+    line.setAttribute('stroke', 'var(--grid)');
+    ticksG.appendChild(line);
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x', x); txt.setAttribute('y', 158);
+    txt.setAttribute('font-size','10'); txt.setAttribute('fill','var(--muted)');
+    txt.setAttribute('text-anchor', t===0 ? 'start' : (Math.abs(t-maxTick)<1e-6 ? 'end':'middle'));
+    txt.textContent = t.toFixed(1);
+    ticksG.appendChild(txt);
+  }
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+  function draw(vals){
+    const cW = vals.computeMs * pxPerMs;
+    const rW = vals.commMs * pxPerMs;
+    rectCompute.setAttribute('x', PAD_X);
+    rectCompute.setAttribute('width', cW);
+    rectComm.setAttribute('x', PAD_X + cW);
+    rectComm.setAttribute('width', rW);
+
+    const totalX = PAD_X + cW + rW;
+    lblTotal.setAttribute('x', clamp(totalX, PAD_X+40, PAD_X+PLOT_W));
+    lblTotal.textContent = 'Total: ' + vals.totalMs.toFixed(3) + ' ms';
+
+    const shareCX = clamp(PAD_X + cW + rW/2, PAD_X+15, PAD_X+PLOT_W-15);
+    lblShare.setAttribute('x', shareCX);
+    lblShare.textContent = vals.shareComm.toFixed(1) + '%';
+
+    if(cW > 40){
+      lblCname.setAttribute('x', PAD_X + cW/2);
+      lblCname.textContent = 'compute';
+    } else lblCname.textContent = '';
+    if(rW > 40){
+      lblRname.setAttribute('x', PAD_X + cW + rW/2);
+      lblRname.textContent = 'comm';
+    } else lblRname.textContent = '';
+
+    statCompute.textContent = vals.computeMs.toFixed(3) + ' ms';
+    statComm.textContent = vals.commMs.toFixed(3) + ' ms';
+    statTotal.textContent = vals.totalMs.toFixed(3) + ' ms';
+    statShare.textContent = vals.shareComm.toFixed(1) + '%';
+  }
+
+  function lerp(a,b,p){ return a + (b-a)*p; }
+  function lerpVals(a,b,p){
+    return {
+      computeMs: lerp(a.computeMs,b.computeMs,p),
+      commMs: lerp(a.commMs,b.commMs,p),
+      totalMs: lerp(a.totalMs,b.totalMs,p),
+      shareComm: lerp(a.shareComm,b.shareComm,p)
+    };
+  }
+  function easeInOutCubic(x){ return x<0.5 ? 4*x*x*x : 1-Math.pow(-2*x+2,3)/2; }
+
+  let animFrom = calc('A100');
+  let animTo = calc('A100');
+  let animStart = 0;
+  const ANIM_DUR = reduceMotion ? 0 : 420;
+
+  function frame(t){
+    let p = ANIM_DUR ? Math.min(1, (t - animStart)/ANIM_DUR) : 1;
+    const eased = easeInOutCubic(p);
+    draw(lerpVals(animFrom, animTo, eased));
+    if(p < 1) requestAnimationFrame(frame);
+  }
+
+  const btns = document.querySelectorAll('#btns button');
+  btns.forEach(b => {
+    b.addEventListener('click', () => {
+      btns.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      animFrom = animTo;
+      animTo = calc(b.dataset.gen);
+      animStart = performance.now();
+      requestAnimationFrame(frame);
+    });
+  });
+
+  // initial state
+  document.querySelector('#btns button[data-gen=&quot;A100&quot;]').classList.add('active');
+  draw(calc('A100'));
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;communication-wall&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Each GPU generation makes the math faster than the pipe, so waiting on transfers eats a growing share of runtime"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">The paper's core move: overlap the transfer with the math so time is a max, not a sum. Then three design choices — which transfer engine, which scheduling, which library plumbing — decide whether the overlap actually works, and all three compress into eight primitives and one kernel template.</div>
+</header>
+<section class="scene" id="max-not-sum">
+  <h3>If transfers run during the math, total time is the maximum of the two, not their sum</h3>
+  <div class="caption">The tensor cores and the transfer engine are separate hardware — they can run at once. Flip the toggle and watch the red bar slide underneath the green one: sum becomes max.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="max-not-sum"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Max, not sum</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --text:#1a1a1a;
+    --muted:#6b6b6b;
+    --green:#2f9e57;
+    --green-soft:#bfe6cc;
+    --red:#c0392b;
+    --red-soft:#f0c4bd;
+    --gray:#9a9a9a;
+    --grid:#dcdcd8;
+    --accent:#2456c9;
+    --btn-bg:#2456c9;
+    --btn-text:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a;
+      --panel:#1e2026;
+      --text:#e9e9ec;
+      --muted:#9a9ba3;
+      --green:#4fc47a;
+      --green-soft:#204a30;
+      --red:#e2685a;
+      --red-soft:#4a2420;
+      --gray:#6f7078;
+      --grid:#33343b;
+      --accent:#6f9bff;
+      --btn-bg:#3a5fd9;
+      --btn-text:#ffffff;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  .scene{max-width:680px; margin:0 auto; background:var(--panel); border-radius:10px; padding:14px 16px 18px; }
+  h2{font-size:14px; margin:0 0 8px; font-weight:600;}
+  canvas{display:block; width:100%; max-width:100%; height:auto; background:transparent;}
+  .controls{display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:10px 0 6px; font-size:13px;}
+  .ctrl{display:flex; flex-direction:column; gap:4px; min-width:200px; flex:1;}
+  .ctrl label{font-size:12.5px; color:var(--muted);}
+  input[type=range]{width:100%;}
+  button.toggle{
+    padding:8px 14px; font-size:13px; border-radius:6px; border:1px solid var(--accent);
+    background:var(--btn-bg); color:var(--btn-text); cursor:pointer; font-weight:600;
+  }
+  button.toggle[aria-pressed=&quot;false&quot;]{background:transparent; color:var(--accent);}
+  .readouts{display:flex; flex-wrap:wrap; gap:10px 18px; margin-top:10px; font-size:12.5px;}
+  .readouts div{min-width:120px;}
+  .readouts b{color:var(--text); font-size:13px;}
+  .eq{margin-top:14px; font-size:15px; overflow-x:auto;}
+  .legend{font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.5;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Pipelined compute + transfer: total time is a max, not a sum</h2>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;300&quot; role=&quot;img&quot; aria-label=&quot;Timeline of compute and transfer engines&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot; style=&quot;max-width:160px; flex:0 0 auto;&quot;>
+      <label>Overlap mode</label>
+      <button id=&quot;toggleBtn&quot; class=&quot;toggle&quot; aria-pressed=&quot;false&quot;>Pipelining: OFF</button>
+    </div>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;memSlider&quot;>Transfer time on the transfer engine, T<sub>mem</sub> (ms) — <span id=&quot;memVal&quot;></span> ms</label>
+      <input type=&quot;range&quot; id=&quot;memSlider&quot; min=&quot;20&quot; max=&quot;180&quot; step=&quot;5&quot; value=&quot;110&quot;>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Compute time (tensor cores), T<sub>comp</sub>: <b id=&quot;rComp&quot;></b> ms</div>
+    <div>Transfer time, T<sub>mem</sub>: <b id=&quot;rMem&quot;></b> ms</div>
+    <div>Total kernel time, T<sub>kernel</sub>: <b id=&quot;rTotal&quot;></b> ms</div>
+    <div>Time hidden by overlap: <b id=&quot;rSaved&quot;></b> ms</div>
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>T</mi><mtext>kernel</mtext></msub><mo>=</mo>
+      <msub><mi>T</mi><mtext>launch</mtext></msub><mo>+</mo>
+      <mi>max</mi><mo>(</mo><msub><mi>T</mi><mtext>comp</mtext></msub><mo>,</mo><msub><mi>T</mi><mtext>mem</mtext></msub><mo>,</mo><msub><mi>T</mi><mtext>comm</mtext></msub><mo>)</mo><mo>+</mo>
+      <msub><mi>T</mi><mtext>non-overlap</mtext></msub><mo>+</mo>
+      <msub><mi>T</mi><mtext>sync</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      T<sub>launch</sub> — fixed kernel-launch overhead (ms) · T<sub>comp</sub> — time tensor cores need (ms) · T<sub>mem</sub>, T<sub>comm</sub> — data-transfer time on the transfer engine, shown here as one red bar (ms) · T<sub>non-overlap</sub> — the sliver that cannot overlap: first tile's compute, last tile's transfer (ms) · T<sub>sync</sub> — barrier to confirm all tiles finished (ms)
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- physical constants of the model (ms) ----
+  const T_LAUNCH = 6;      // fixed launch overhead
+  const T_SYNC   = 6;      // end-of-kernel barrier
+  const T_COMP   = 100;    // total tensor-core compute time
+  const N        = 6;      // number of output tiles the work is chopped into
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const memSlider = document.getElementById('memSlider');
+  const toggleBtn = document.getElementById('toggleBtn');
+  const memVal = document.getElementById('memVal');
+  const rComp = document.getElementById('rComp');
+  const rMem = document.getElementById('rMem');
+  const rTotal = document.getElementById('rTotal');
+  const rSaved = document.getElementById('rSaved');
+
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  let pipelined = false;
+  let fCurrent = 0, fTarget = 0; // 0 = sequential, 1 = pipelined
+  let animHandle = null;
+
+  function schedule(Tmem){
+    const tileC = T_COMP / N;
+    const tileM = Tmem / N;
+    // pipelined: transfer engine starts each tile's transfer as soon as that tile's
+    // compute is done AND the engine is free from the previous tile's transfer
+    let pipeStart = [], pipeEnd = [];
+    let engineFree = T_LAUNCH;
+    for (let i = 0; i < N; i++){
+      const compEnd = T_LAUNCH + (i+1)*tileC;
+      const start = Math.max(compEnd, engineFree);
+      const end = start + tileM;
+      pipeStart.push(start); pipeEnd.push(end);
+      engineFree = end;
+    }
+    // sequential: transfer engine only starts once ALL compute has finished
+    let seqStart = [], seqEnd = [];
+    let prevEnd = T_LAUNCH + T_COMP;
+    for (let i = 0; i < N; i++){
+      const start = prevEnd;
+      const end = start + tileM;
+      seqStart.push(start); seqEnd.push(end);
+      prevEnd = end;
+    }
+    return { tileC, tileM, pipeStart, pipeEnd, seqStart, seqEnd };
+  }
+
+  function lerp(a,b,f){ return a + (b-a)*f; }
+
+  function draw(){
+    const Tmem = parseFloat(memSlider.value);
+    const sch = schedule(Tmem);
+    const f = fCurrent;
+
+    const bStart = sch.seqStart.map((s,i)=> lerp(s, sch.pipeStart[i], f));
+    const lastEnd = lerp(sch.seqEnd[N-1], sch.pipeEnd[N-1], f);
+    const total = lastEnd + T_SYNC;
+
+    const seqTotal = sch.seqEnd[N-1] + T_SYNC;
+    const pipeTotal = sch.pipeEnd[N-1] + T_SYNC;
+
+    // ---- readouts ----
+    memVal.textContent = Math.round(Tmem);
+    rComp.textContent = T_COMP.toFixed(0);
+    rMem.textContent = Tmem.toFixed(0);
+    rTotal.textContent = total.toFixed(1);
+    rSaved.textContent = (seqTotal - total).toFixed(1);
+
+    // ---- geometry ----
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    const marginL = 118, marginR = 24, marginT = 26, marginB = 78;
+    const plotW = W - marginL - marginR;
+    const domain = seqTotal * 1.08;
+    const xT = t => marginL + (t/domain)*plotW;
+
+    const laneH = 46, laneGap = 26;
+    const topY = marginT, botY = marginT + laneH + laneGap;
+
+    const green = cssVar('--green'), greenSoft = cssVar('--green-soft');
+    const red = cssVar('--red'), redSoft = cssVar('--red-soft');
+    const gray = cssVar('--gray'), grid = cssVar('--grid');
+    const text = cssVar('--text'), muted = cssVar('--muted'), accent = cssVar('--accent');
+
+    ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
+
+    // lane backgrounds
+    ctx.fillStyle = grid;
+    ctx.fillRect(marginL, topY, plotW, laneH);
+    ctx.fillRect(marginL, botY, plotW, laneH);
+
+    // lane labels
+    ctx.fillStyle = text;
+    ctx.textAlign = 'right';
+    ctx.fillText('Tensor cores', marginL - 10, topY + laneH/2 + 4);
+    ctx.fillText('Transfer engine', marginL - 10, botY + laneH/2 + 4);
+    ctx.textAlign = 'left';
+
+    // launch sliver
+    ctx.fillStyle = gray;
+    ctx.fillRect(xT(0), topY, Math.max(1,xT(T_LAUNCH)-xT(0)), laneH);
+
+    // compute tiles (fixed, do not move)
+    for (let i=0;i<N;i++){
+      const x0 = xT(T_LAUNCH + i*sch.tileC);
+      const x1 = xT(T_LAUNCH + (i+1)*sch.tileC);
+      ctx.fillStyle = green;
+      ctx.fillRect(x0+0.5, topY, Math.max(1,x1-x0-1), laneH);
+    }
+    ctx.fillStyle = text;
+    ctx.fillText('compute (tiles)', xT(T_LAUNCH)+4, topY - 8);
+
+    // transfer tiles (blend position between sequential and pipelined)
+    for (let i=0;i<N;i++){
+      const x0 = xT(bStart[i]);
+      const x1 = xT(bStart[i] + sch.tileM);
+      ctx.fillStyle = red;
+      ctx.fillRect(x0+0.5, botY, Math.max(1,x1-x0-1), laneH);
+    }
+    ctx.fillStyle = text;
+    ctx.fillText('transfer (tiles)', xT(bStart[0])+4, botY + laneH + 16);
+
+    // sync sliver at the very end
+    ctx.fillStyle = gray;
+    const syncX0 = xT(lastEnd), syncX1 = xT(total);
+    ctx.fillRect(syncX0, topY, Math.max(1,syncX1-syncX0), laneH);
+    ctx.fillRect(syncX0, botY, Math.max(1,syncX1-syncX0), laneH);
+
+    // floor reference line: T_launch + max(comp, mem)
+    const floorT = T_LAUNCH + Math.max(T_COMP, Tmem);
+    const fx = xT(floorT);
+    ctx.strokeStyle = accent;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(fx, topY-4); ctx.lineTo(fx, botY+laneH+4);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = accent;
+    const floorLabel = 'floor = max(comp, mem)';
+    const flw = ctx.measureText(floorLabel).width;
+    const flx = Math.min(fx+4, W - marginR - flw);
+    ctx.fillText(floorLabel, flx, topY - 8);
+
+    // total bracket
+    const bracketY = botY + laneH + 34;
+    ctx.strokeStyle = muted;
+    ctx.beginPath();
+    ctx.moveTo(xT(0), bracketY); ctx.lineTo(xT(total), bracketY);
+    ctx.moveTo(xT(0), bracketY-5); ctx.lineTo(xT(0), bracketY+5);
+    ctx.moveTo(xT(total), bracketY-5); ctx.lineTo(xT(total), bracketY+5);
+    ctx.stroke();
+    ctx.fillStyle = text;
+    const label = 'T_kernel = ' + total.toFixed(1) + ' ms';
+    ctx.fillText(label, Math.min(xT(0), W - marginR - ctx.measureText(label).width - 2), bracketY + 18);
+
+    ctx.fillStyle = muted;
+    const modeLabel = pipelined ? 'pipelined: total \u2248 max(green, red) + sliver' : 'sequential: total = green + red';
+    ctx.fillText(modeLabel, marginL, H - 8);
+  }
+
+  function animate(){
+    const now = performance.now();
+    if (animate.start === undefined) animate.start = now;
+    const dur = 550;
+    const t = Math.min(1, (now - animate.start) / dur);
+    const eased = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+    fCurrent = lerp(animate.from, fTarget, eased);
+    draw();
+    if (t < 1){
+      animHandle = requestAnimationFrame(animate);
+    } else {
+      fCurrent = fTarget;
+      animate.start = undefined;
+      draw();
+    }
+  }
+
+  function startAnim(){
+    if (reduceMotion){
+      fCurrent = fTarget;
+      draw();
+      return;
+    }
+    if (animHandle) cancelAnimationFrame(animHandle);
+    animate.from = fCurrent;
+    animate.start = undefined;
+    animHandle = requestAnimationFrame(animate);
+  }
+
+  toggleBtn.addEventListener('click', function(){
+    pipelined = !pipelined;
+    fTarget = pipelined ? 1 : 0;
+    toggleBtn.textContent = 'Pipelining: ' + (pipelined ? 'ON' : 'OFF');
+    toggleBtn.setAttribute('aria-pressed', pipelined ? 'true' : 'false');
+    startAnim();
+  });
+
+  memSlider.addEventListener('input', draw);
+
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;max-not-sum&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="If transfers run during the math, total time is the maximum of the two, not their sum"
+  ></iframe>
+</section>
+
+<section class="scene" id="hiding-condition">
+  <h3>One inequality decides whether communication vanishes: <math><mi>K</mi><mi>geq</mi><mi>s</mi><mi>R</mi><mo>/</mo><mn>2</mn><mi>B</mi></math></h3>
+  <div class="caption">Drag the inner dimension <math><mi>K</mi></math> and watch each tile's transfer slide under its compute. For BF16 on H100 the crossover is <math><mi>K</mi><mo>≈</mo><mn>2198</mn></math> — and measured non-hidden communication falls from 68% at <math><mi>K</mi><mo>=</mo><mn>512</mn></math> to under 1% at <math><mi>K</mi><mo>=</mo><mn>4096</mn></math>.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="hiding-condition"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Hiding condition: K ≥ sR/2B</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --fg:#1a1a1a; --panel:#ffffff; --muted:#5a5a66;
+    --compute:#2e7d32; --transfer:#c62828; --transfer-hidden:#c6282855;
+    --exposed:#e65100; --accent:#1565c0; --line:#8a8a95;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121317; --fg:#e8e8ec; --panel:#1c1e24; --muted:#a3a3ad;
+      --compute:#4caf50; --transfer:#ef5350; --transfer-hidden:#ef535055;
+      --exposed:#ffab40; --accent:#64b5f6; --line:#7a7a85;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+  h2{font-size:16px;margin:0 0 6px;font-weight:600;}
+  .eqbox{background:var(--panel);border-radius:8px;padding:8px 12px;margin-bottom:10px;}
+  math{font-size:17px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 6px;line-height:1.4;}
+  svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);border-radius:8px;}
+  .compute-bar{fill:var(--compute);}
+  .transfer-bar-hidden{fill:var(--transfer-hidden);}
+  .transfer-bar-exposed{fill:var(--exposed);}
+  .gauge-fill{fill:var(--transfer);}
+  .labeltext{fill:var(--fg);font-size:13px;}
+  .subtext{fill:var(--muted);font-size:11px;}
+  .divider{stroke:var(--line);stroke-dasharray:4 3;stroke-width:1.5;}
+  .marker{stroke:var(--accent);stroke-width:2;}
+  .controls{margin-top:10px;}
+  .controls label{display:block;font-size:13px;margin:10px 0 4px;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .ticks{position:relative;height:28px;margin-top:2px;}
+  .tick{position:absolute;font-size:10.5px;color:var(--muted);white-space:nowrap;line-height:1.3;}
+  .tick.tick-first{left:0;transform:translateX(0);text-align:left;}
+  .tick.tick-mid{transform:translateX(-50%);text-align:center;}
+  .tick.tick-last{transform:translateX(-100%);text-align:right;}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:12px;font-size:13px;}
+  .readouts b{color:var(--fg);}
+  button{margin-top:10px;padding:6px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel);color:var(--fg);cursor:pointer;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Does communication hide behind compute? One inequality decides.</h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>K</mi><mo>&amp;#8805;</mo>
+      <mfrac><mrow><mi>s</mi><mi>R</mi></mrow><mrow><mn>2</mn><mi>B</mi></mrow></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      K — inner (contraction) dimension of the matmul, in elements &amp;middot;
+      s — bytes per element (2 for BF16) &amp;middot;
+      R — peak compute throughput (FLOP/s) &amp;middot;
+      B — interconnect bandwidth (bytes/s).
+      Tile size (m,n) cancels out of this condition — see below.
+    </div>
+    <math display=&quot;block&quot;>
+      <msub><mi>t</mi><mtext>compute</mtext></msub><mo>=</mo>
+      <mfrac><mrow><mn>2</mn><mi>m</mi><mi>n</mi><mi>K</mi></mrow><mi>R</mi></mfrac>
+      <mo>,</mo>
+      <msub><mi>t</mi><mtext>transfer</mtext></msub><mo>=</mo>
+      <mfrac><mrow><mi>s</mi><mi>m</mi><mi>n</mi></mrow><mi>B</mi></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      t<sub>compute</sub>, t<sub>transfer</sub> — time (s) to compute vs. move one output tile &amp;middot;
+      m, n — tile height and width, in elements (the &quot;tile size&quot; slider below).
+    </div>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 300&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+    <text x=&quot;20&quot; y=&quot;30&quot; class=&quot;labeltext&quot;>Compute (green) vs. transfer (red) — one output tile</text>
+
+    <text x=&quot;20&quot; y=&quot;65&quot; class=&quot;subtext&quot;>compute, 2mnK/R</text>
+    <rect id=&quot;computeRect&quot; x=&quot;150&quot; y=&quot;52&quot; width=&quot;0&quot; height=&quot;30&quot; class=&quot;compute-bar&quot;/>
+    <text id=&quot;computeLabel&quot; x=&quot;0&quot; y=&quot;0&quot; class=&quot;subtext&quot;></text>
+
+    <text x=&quot;20&quot; y=&quot;132&quot; class=&quot;subtext&quot;>transfer, smn/B</text>
+    <rect id=&quot;transferHidden&quot; x=&quot;150&quot; y=&quot;118&quot; width=&quot;0&quot; height=&quot;30&quot; class=&quot;transfer-bar-hidden&quot;/>
+    <rect id=&quot;transferExposed&quot; x=&quot;150&quot; y=&quot;118&quot; width=&quot;0&quot; height=&quot;30&quot; class=&quot;transfer-bar-exposed&quot;/>
+    <text id=&quot;transferLabel&quot; x=&quot;0&quot; y=&quot;0&quot; class=&quot;subtext&quot;></text>
+    <text id=&quot;exposedLabel&quot; x=&quot;0&quot; y=&quot;112&quot; class=&quot;subtext&quot; fill=&quot;var(--exposed)&quot; style=&quot;display:none&quot;>exposed (not hidden)</text>
+
+    <line id=&quot;divider&quot; class=&quot;divider&quot; x1=&quot;150&quot; y1=&quot;42&quot; x2=&quot;150&quot; y2=&quot;158&quot;/>
+    <text id=&quot;dividerLabel&quot; x=&quot;150&quot; y=&quot;172&quot; class=&quot;subtext&quot; text-anchor=&quot;middle&quot;>compute done</text>
+
+    <line id=&quot;marker&quot; class=&quot;marker&quot; x1=&quot;150&quot; y1=&quot;42&quot; x2=&quot;150&quot; y2=&quot;158&quot; style=&quot;display:none&quot;/>
+
+    <text x=&quot;20&quot; y=&quot;215&quot; class=&quot;labeltext&quot;>Non-hidden communication (% of transfer time exposed)</text>
+    <rect x=&quot;150&quot; y=&quot;228&quot; width=&quot;460&quot; height=&quot;20&quot; fill=&quot;none&quot; stroke=&quot;var(--line)&quot;/>
+    <rect id=&quot;gaugeFill&quot; x=&quot;150&quot; y=&quot;228&quot; width=&quot;0&quot; height=&quot;20&quot; class=&quot;gauge-fill&quot;/>
+    <text id=&quot;gaugeText&quot; x=&quot;620&quot; y=&quot;243&quot; text-anchor=&quot;end&quot; class=&quot;labeltext&quot;></text>
+    <text x=&quot;150&quot; y=&quot;266&quot; class=&quot;subtext&quot;>0%</text>
+    <text x=&quot;610&quot; y=&quot;266&quot; text-anchor=&quot;end&quot; class=&quot;subtext&quot;>100%</text>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;kSlider&quot;>Inner dimension K (elements): <b id=&quot;kVal&quot;></b></label>
+    <input id=&quot;kSlider&quot; type=&quot;range&quot; min=&quot;512&quot; max=&quot;8192&quot; step=&quot;8&quot; value=&quot;2192&quot;>
+    <div class=&quot;ticks&quot;>
+      <div class=&quot;tick tick-first&quot; style=&quot;left:0%&quot;>512<br>paper: 68%</div>
+      <div class=&quot;tick tick-mid&quot; style=&quot;left:20.03%&quot;>2048<br>paper: 26%</div>
+      <div class=&quot;tick tick-mid&quot; style=&quot;left:46.72%&quot;>4096<br>paper: &amp;lt;1%</div>
+    </div>
+
+    <label for=&quot;lSlider&quot;>Tile size m = n (elements) — does it matter? <b id=&quot;lVal&quot;></b></label>
+    <input id=&quot;lSlider&quot; type=&quot;range&quot; min=&quot;128&quot; max=&quot;512&quot; step=&quot;8&quot; value=&quot;256&quot;>
+
+    <button id=&quot;playBtn&quot;>Pause sweep</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>t<sub>compute</sub>: <b id=&quot;tcVal&quot;></b> ns</div>
+    <div>t<sub>transfer</sub>: <b id=&quot;ttVal&quot;></b> ns</div>
+    <div>threshold K &amp;#8805; <b id=&quot;kthreshVal&quot;></b></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- named physical constants (BF16 on H100) ---
+  const s = 2;          // bytes per element, BF16
+  const R = 989e12;      // FLOP/s, peak BF16 compute throughput
+  const B = 450e9;       // bytes/s, interconnect bandwidth
+  const Kthresh = s*R/(2*B); // elements
+
+  const kSlider = document.getElementById('kSlider');
+  const lSlider = document.getElementById('lSlider');
+  const kVal = document.getElementById('kVal');
+  const lVal = document.getElementById('lVal');
+  const tcVal = document.getElementById('tcVal');
+  const ttVal = document.getElementById('ttVal');
+  const kthreshVal = document.getElementById('kthreshVal');
+  const playBtn = document.getElementById('playBtn');
+
+  const computeRect = document.getElementById('computeRect');
+  const computeLabel = document.getElementById('computeLabel');
+  const transferHidden = document.getElementById('transferHidden');
+  const transferExposed = document.getElementById('transferExposed');
+  const transferLabel = document.getElementById('transferLabel');
+  const exposedLabel = document.getElementById('exposedLabel');
+  const divider = document.getElementById('divider');
+  const dividerLabel = document.getElementById('dividerLabel');
+  const marker = document.getElementById('marker');
+  const gaugeFill = document.getElementById('gaugeFill');
+  const gaugeText = document.getElementById('gaugeText');
+
+  const x0 = 150, chartW = 460;
+
+  function times(K, L){
+    const m = L, n = L;
+    const tCompute = 2*m*n*K/R * 1e9; // ns
+    const tTransfer = s*m*n/B * 1e9;  // ns
+    return {tCompute, tTransfer};
+  }
+
+  // fixed pixel scale, based on worst case corner so nothing ever overflows
+  const worst = times(8192, 512).tCompute;
+  const pxPerNs = (chartW*0.90) / worst;
+
+  let wC = 0, wT = 0;
+
+  function update(){
+    const K = +kSlider.value;
+    const L = +lSlider.value;
+    kVal.textContent = K;
+    lVal.textContent = L;
+    kthreshVal.textContent = Math.round(Kthresh);
+
+    const {tCompute, tTransfer} = times(K, L);
+    tcVal.textContent = tCompute.toFixed(1);
+    ttVal.textContent = tTransfer.toFixed(1);
+
+    wC = tCompute * pxPerNs;
+    wT = tTransfer * pxPerNs;
+
+    computeRect.setAttribute('width', wC.toFixed(2));
+    computeLabel.setAttribute('x', (x0 + wC + 6).toFixed(1));
+    computeLabel.setAttribute('y', 71);
+    computeLabel.textContent = tCompute.toFixed(0) + ' ns';
+
+    const hiddenW = Math.min(wC, wT);
+    const exposedW = Math.max(0, wT - wC);
+    transferHidden.setAttribute('width', hiddenW.toFixed(2));
+    transferExposed.setAttribute('x', (x0 + hiddenW).toFixed(2));
+    transferExposed.setAttribute('width', exposedW.toFixed(2));
+
+    transferLabel.setAttribute('x', (x0 + wT + 6).toFixed(1));
+    transferLabel.setAttribute('y', 137);
+    transferLabel.textContent = tTransfer.toFixed(0) + ' ns';
+
+    exposedLabel.style.display = exposedW > 3 ? 'block' : 'none';
+    exposedLabel.setAttribute('x', (x0 + Math.max(hiddenW, 0)).toFixed(1));
+
+    divider.setAttribute('x1', (x0+wC).toFixed(2));
+    divider.setAttribute('x2', (x0+wC).toFixed(2));
+    dividerLabel.setAttribute('x', (x0+wC).toFixed(2));
+
+    const nonHidden = tTransfer > 0 ? Math.max(0, (tTransfer - tCompute)/tTransfer) * 100 : 0;
+    gaugeFill.setAttribute('width', (nonHidden/100*460).toFixed(2));
+    gaugeText.textContent = nonHidden.toFixed(1) + '%';
+  }
+
+  kSlider.addEventListener('input', update);
+  lSlider.addEventListener('input', update);
+  update();
+
+  // decorative &quot;time sweep&quot; marker across the longer bar, respects reduced motion
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduced;
+  playBtn.textContent = playing ? 'Pause sweep' : 'Play sweep';
+  if(!reduced) marker.style.display = 'block';
+
+  function frame(t){
+    if(playing){
+      const period = 2600;
+      const phase = (t % period) / period;
+      const span = Math.max(wC, wT, 1);
+      const x = x0 + phase*span;
+      marker.setAttribute('x1', x.toFixed(2));
+      marker.setAttribute('x2', x.toFixed(2));
+      marker.style.display = 'block';
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause sweep' : 'Play sweep';
+    if(!playing) marker.style.display = 'none';
+  });
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;hiding-condition&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One inequality decides whether communication vanishes: K \geq sR/2B"
+  ></iframe>
+</section>
+
+<section class="scene" id="intra-vs-inter">
+  <h3>You can overlap inside every SM or dedicate whole SMs to communication — and each wins for different workloads</h3>
+  <div class="caption">Toggle the schedule on a map of all 132 SMs. Intra-SM wins GEMM + reduce-scatter (743.7 vs 618.1 TFLOP/s), but inter-SM wins GEMM + all-reduce by 3.6× (623.9 vs 172.3) — no single schedule wins both.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="intra-vs-inter"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Intra-SM vs Inter-SM overlap</title>
+<style>
+:root{
+  --bg:#ffffff; --panel:#f2f4f7; --fg:#1a1d23; --muted:#6b7280;
+  --green:#3fae5a; --green-dark:#2f8a46;
+  --orange:#e0793c; --orange-dark:#c25f26;
+  --accent:#2563eb; --gridline:#c7cbd1;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#111318; --panel:#1c1f27; --fg:#e7e9ee; --muted:#9aa1ac;
+    --green:#4ade80; --green-dark:#22c55e;
+    --orange:#fb923c; --orange-dark:#ea580c;
+    --accent:#60a5fa; --gridline:#3a3f4a;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);}
+.wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);}
+h1{font-size:14px;margin:2px 0 8px;}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px;}
+.mode-label{font-size:13px;}
+#modeText{font-weight:700;color:var(--accent);}
+button{font:inherit;font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid var(--gridline);background:var(--panel);color:var(--fg);cursor:pointer;}
+button:hover{border-color:var(--accent);}
+canvas{display:block;width:100%;max-width:660px;height:auto;background:var(--bg);}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--muted);margin:4px 0 4px;}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:-2px;border:1px solid var(--gridline);}
+.sw.green{background:var(--green);}
+.sw.orange{background:var(--orange-dark);}
+.sw.stripe{background:linear-gradient(to bottom, var(--orange) 0 30%, var(--green) 30% 100%);}
+.defs{font-size:10.5px;color:var(--muted);margin:0 0 10px;line-height:1.5;}
+.eqbox{background:var(--panel);border-radius:8px;padding:8px 12px;margin-bottom:10px;}
+.eqbox math{font-size:16px;}
+.legendline{font-size:11px;color:var(--muted);margin-top:4px;}
+.readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
+.stat{background:var(--panel);border-radius:8px;padding:6px 4px;text-align:center;}
+.stat .v{font-size:14px;font-weight:700;}
+.stat .k{font-size:10px;color:var(--muted);}
+.scoreboard{display:flex;flex-direction:column;gap:12px;}
+.srow{background:var(--panel);border-radius:8px;padding:8px 10px;}
+.slabel{font-size:12.5px;font-weight:600;margin-bottom:6px;}
+.shint{font-weight:400;color:var(--muted);}
+.sbar-row{display:grid;grid-template-columns:70px 1fr 100px;align-items:center;gap:6px;font-size:11.5px;margin:2px 0;}
+.sbar-track{background:var(--bg);border-radius:4px;height:14px;overflow:hidden;border:1px solid var(--gridline);}
+.sbar-fill{height:100%;}
+.sbar-fill.intra{background:var(--green-dark);}
+.sbar-fill.inter{background:var(--orange-dark);}
+.sbar-fill.win{box-shadow: inset 0 0 0 2px var(--accent);}
+.current .sbar-label{color:var(--accent);font-weight:700;}
+.sbar-val{white-space:nowrap;}
+@media (max-width:400px){
+  .readouts{grid-template-columns:repeat(2,1fr);}
+  .sbar-row{grid-template-columns:56px 1fr 78px;font-size:10.5px;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Where should the synchronization thread live: inside every SM, or on a few dedicated SMs?</h1>
+  <div class=&quot;topbar&quot;>
+    <div class=&quot;mode-label&quot;>Mode: <span id=&quot;modeText&quot;>Intra-SM overlap</span></div>
+    <button id=&quot;toggleBtn&quot; aria-pressed=&quot;false&quot;>Toggle: switch to inter-SM overlap</button>
+  </div>
+
+  <canvas id=&quot;grid&quot; width=&quot;660&quot; height=&quot;380&quot; aria-label=&quot;Grid of 132 streaming multiprocessors, colored by role&quot;></canvas>
+
+  <div class=&quot;legend&quot;>
+    <span><i class=&quot;sw green&quot;></i>compute (tensor cores busy)</span>
+    <span><i class=&quot;sw stripe&quot;></i>1 thread/SM issues TMA transfer (intra-SM)</span>
+    <span><i class=&quot;sw orange&quot;></i>whole SM dedicated to communication (inter-SM)</span>
+  </div>
+  <div class=&quot;defs&quot;>
+    SM — streaming multiprocessor, one of the GPU's independent compute units. &amp;middot;
+    TMA — Tensor Memory Accelerator, a small hardware engine that copies data tiles between off-chip memory and on-chip memory without occupying a compute thread. &amp;middot;
+    mbarrier — an on-chip hardware counter/barrier that a thread waits on to learn a transfer has finished (the thing being timed below). &amp;middot;
+    GEMM — general matrix multiply, the core matrix-multiplication operation whose speed (in TFLOP/s, trillion floating-point operations per second) is measured in the rows below. &amp;middot;
+    reduce-scatter / all-reduce — collective operations that combine (sum) results across GPUs; all-reduce gives every GPU the full sum, reduce-scatter gives each GPU only its own slice.
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>f</mi><mo>=</mo>
+      <mfrac><mrow><msub><mi>N</mi><mtext>SM</mtext></msub><mo>&amp;#8722;</mo><msub><mi>N</mi><mtext>comm</mtext></msub></mrow>
+              <msub><mi>N</mi><mtext>SM</mtext></msub></mfrac>
+    </math>
+    <div class=&quot;legendline&quot;>f — fraction of SMs left fully free for tensor-core compute (dimensionless) &amp;middot; N_SM — total streaming multiprocessors on the die (132) &amp;middot; N_comm — SMs dedicated entirely to communication (0 in intra-SM mode, 8 in inter-SM mode)</div>
+  </div>
+
+  <div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+  <div class=&quot;scoreboard&quot; id=&quot;scoreboard&quot;></div>
+</div>
+
+<script>
+// ---- physical/architectural constants (named, auditable) ----
+const TOTAL_SMS = 132;
+const THREADS_PER_SM = 128;   // typical resident threads per SM used by the kernel
+const TMA_THREADS = 1;        // one thread per SM issues the TMA copy in intra-SM overlap
+const COMM_SMS_INTER = 8;     // SMs fully dedicated to communication in inter-SM overlap
+const SYNC_NS = { intra: 64, inter: 832 }; // measured synchronization latency, ns
+const THROUGHPUT = {
+  rs: { intra: 743.7, inter: 618.1 }, // GEMM (general matrix multiply) + reduce-scatter, TFLOP/s
+  ar: { intra: 172.3, inter: 623.9 }  // GEMM (general matrix multiply) + all-reduce, TFLOP/s
+};
+
+// scatter comm SMs evenly across the grid
+const commSet = new Set();
+for (let i = 0; i < COMM_SMS_INTER; i++) commSet.add(Math.round(i * TOTAL_SMS / COMM_SMS_INTER));
+
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- fixed layout (px, in canvas coordinate space) ----
+const L = { marginX: 20, topY: 58, cols: 12, rows: 11, gap: 4, cell: 20 };
+L.gridW = L.cols * (L.cell + L.gap) - L.gap;
+L.gridH = L.rows * (L.cell + L.gap) - L.gap;
+L.gridRight = L.marginX + L.gridW;
+L.gridBottom = L.topY + L.gridH;
+// wide gap between grid and HBM box leaves room for the sync-path label so it
+// never runs under the box (that was the earlier clipping bug)
+const HBM = { x: L.gridRight + 160, y: 140, w: 150, h: 90 };
+
+let mode = 'intra';
+let prevMode = 'intra';
+let animStart = 0;
+const DURATION = 300;
+
+function drawGridState(stateMode, alpha, colors){
+  ctx.globalAlpha = alpha;
+  for (let i = 0; i < TOTAL_SMS; i++){
+    const row = Math.floor(i / L.cols), col = i % L.cols;
+    const x = L.marginX + col * (L.cell + L.gap);
+    const y = L.topY + row * (L.cell + L.gap);
+    const isComm = stateMode === 'inter' &amp;&amp; commSet.has(i);
+    ctx.fillStyle = isComm ? colors.orangeDark : colors.green;
+    ctx.fillRect(x, y, L.cell, L.cell);
+    if (stateMode === 'intra'){
+      ctx.fillStyle = colors.orange;
+      ctx.fillRect(x, y, L.cell, 3); // symbolic: the one TMA-issuing thread
+    }
+    ctx.strokeStyle = colors.gridline;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, L.cell - 1, L.cell - 1);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw(t){
+  const colors = {
+    fg: cssVar('--fg'), muted: cssVar('--muted'),
+    green: cssVar('--green'), greenDark: cssVar('--green-dark'),
+    orange: cssVar('--orange'), orangeDark: cssVar('--orange-dark'),
+    gridline: cssVar('--gridline'), accent: cssVar('--accent'), panel: cssVar('--panel')
+  };
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = colors.fg;
+  ctx.font = '600 13px sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillText('132 streaming multiprocessors (SMs) — one GPU die', L.marginX, 12);
+
+  // chip boundary
+  ctx.save();
+  ctx.strokeStyle = colors.gridline;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(L.marginX - 8, L.topY - 8, L.gridW + 16, L.gridH + 16);
+  ctx.restore();
+  ctx.fillStyle = colors.muted;
+  ctx.font = '10.5px sans-serif';
+  ctx.fillText('on-chip', L.marginX - 6, L.topY - 22);
+
+  // crossfade grid
+  if (t < 1) drawGridState(prevMode, 1 - t, colors);
+  drawGridState(mode, t < 1 ? t : 1, colors);
+
+  // HBM box + off-chip sync path (inter-SM only)
+  if (mode === 'inter'){
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = colors.orangeDark;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(L.gridRight + 2, HBM.y + HBM.h / 2);
+    ctx.lineTo(HBM.x - 4, HBM.y + HBM.h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(HBM.x - 4, HBM.y + HBM.h / 2);
+    ctx.lineTo(HBM.x - 12, HBM.y + HBM.h / 2 - 5);
+    ctx.lineTo(HBM.x - 12, HBM.y + HBM.h / 2 + 5);
+    ctx.closePath();
+    ctx.fillStyle = colors.orangeDark;
+    ctx.fill();
+    ctx.restore();
+
+    // draw the HBM box first so the label (drawn after) is never painted over
+    ctx.fillStyle = colors.panel;
+    ctx.strokeStyle = colors.fg;
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(HBM.x, HBM.y, HBM.w, HBM.h);
+    ctx.strokeRect(HBM.x, HBM.y, HBM.w, HBM.h);
+    ctx.fillStyle = colors.fg;
+    ctx.font = '600 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HBM', HBM.x + HBM.w / 2, HBM.y + 16);
+    ctx.font = '10.5px sans-serif';
+    ctx.fillStyle = colors.muted;
+    ctx.fillText('off-chip memory', HBM.x + HBM.w / 2, HBM.y + 36);
+    ctx.textAlign = 'left';
+
+    // label for the dashed arrow — sits fully in the gap between grid and box
+    ctx.fillStyle = colors.muted;
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText('sync path leaves chip', L.gridRight + 8, HBM.y + HBM.h / 2 - 16);
+  } else {
+    ctx.fillStyle = colors.muted;
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText('sync stays inside the chip (mbarrier)', L.gridRight + 8, L.topY + L.gridH / 2 - 6);
+  }
+
+  // bottom sync annotation
+  const ns = SYNC_NS[mode];
+  ctx.fillStyle = colors.accent;
+  ctx.font = '700 13px sans-serif';
+  ctx.fillText('Synchronization latency: ' + ns.toFixed(0) + ' ns', L.marginX, L.gridBottom + 16);
+  ctx.fillStyle = colors.muted;
+  ctx.font = '11px sans-serif';
+  ctx.fillText(mode === 'intra' ? '(on-chip, mbarrier wait — a hardware counter signaling transfer done)' : '(round trip through HBM, off-chip)', L.marginX, L.gridBottom + 34);
+}
+
+function animate(now){
+  const t = Math.min(1, (now - animStart) / DURATION);
+  draw(t);
+  if (t < 1) requestAnimationFrame(animate);
+}
+
+function updateText(){
+  const Ncomm = mode === 'inter' ? COMM_SMS_INTER : 0;
+  const f = (TOTAL_SMS - Ncomm) / TOTAL_SMS;
+  const activeThreadFrac = (THREADS_PER_SM - TMA_THREADS) / THREADS_PER_SM;
+
+  document.getElementById('modeText').textContent =
+    mode === 'intra' ? 'Intra-SM overlap' : 'Inter-SM overlap';
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = mode === 'intra' ? 'Toggle: switch to inter-SM overlap' : 'Toggle: switch to intra-SM overlap';
+  btn.setAttribute('aria-pressed', mode === 'inter' ? 'true' : 'false');
+
+  const ns = SYNC_NS[mode];
+  const readouts = [
+    { k: 'Sync latency', v: ns.toFixed(0) + ' ns' },
+    { k: 'Fully-compute SMs (f)', v: Math.round(TOTAL_SMS - Ncomm) + ' / ' + TOTAL_SMS + '  (' + (f*100).toFixed(1) + '%)' },
+    { k: 'GEMM (matrix multiply)+reduce-scatter', v: THROUGHPUT.rs[mode].toFixed(1) + ' TFLOP/s' },
+    { k: 'GEMM (matrix multiply)+all-reduce', v: THROUGHPUT.ar[mode].toFixed(1) + ' TFLOP/s' }
+  ];
+  document.getElementById('readouts').innerHTML = readouts.map(r =>
+    `<div class=&quot;stat&quot;><div class=&quot;v&quot;>${r.v}</div><div class=&quot;k&quot;>${r.k}</div></div>`).join('');
+
+  const rows = [
+    { name: 'GEMM (general matrix multiply) + reduce-scatter', note: '(each GPU keeps its own slice of the sum)', intra: THROUGHPUT.rs.intra, inter: THROUGHPUT.rs.inter },
+    { name: 'GEMM (general matrix multiply) + all-reduce', note: '(every GPU needs the full sum)', intra: THROUGHPUT.ar.intra, inter: THROUGHPUT.ar.inter }
+  ];
+  const maxVal = 800;
+  let html = '';
+  rows.forEach(r => {
+    const winner = r.intra > r.inter ? 'intra' : 'inter';
+    html += `<div class=&quot;srow&quot;><div class=&quot;slabel&quot;>${r.name} <span class=&quot;shint&quot;>${r.note}</span></div>`;
+    ['intra', 'inter'].forEach(k => {
+      const val = r[k];
+      const w = (val / maxVal * 100).toFixed(1);
+      const win = k === winner;
+      const cur = k === mode;
+      html += `<div class=&quot;sbar-row ${cur ? 'current' : ''}&quot;>
+        <div class=&quot;sbar-label&quot;>${k === 'intra' ? 'Intra-SM' : 'Inter-SM'}</div>
+        <div class=&quot;sbar-track&quot;><div class=&quot;sbar-fill ${k} ${win ? 'win' : ''}&quot; style=&quot;width:${w}%&quot;></div></div>
+        <div class=&quot;sbar-val&quot;>${val.toFixed(1)}${win ? ' \u2713 wins' : ''}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('scoreboard').innerHTML = html;
+  void activeThreadFrac; // (used conceptually: ~99.2% of each SM's threads stay on compute in intra-SM mode)
+}
+
+document.getElementById('toggleBtn').addEventListener('click', () => {
+  prevMode = mode;
+  mode = mode === 'intra' ? 'inter' : 'intra';
+  updateText();
+  if (reduced){ draw(1); }
+  else { animStart = performance.now(); requestAnimationFrame(animate); }
+});
+
+updateText();
+draw(1);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;intra-vs-inter&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="You can overlap inside every SM or dedicate whole SMs to communication — and each wins for different workloads"
+  ></iframe>
+</section>
+
+<section class="scene" id="in-network-reduction">
+  <h3>The switch between the GPUs can do the addition itself, cutting traffic roughly 8-fold</h3>
+  <div class="caption">Here is why inter-SM won all-reduce by 3.6×. Toggle: naively, 7 partial sums queue at each GPU's single 450 GB/s inlet; with in-network reduction, the switch adds them in flight and delivers one result.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="in-network-reduction"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>In-Network Reduction</title>
+<style>
+:root{
+ --bg:#f4f6f9; --panel:#ffffff; --text:#1a2027; --muted:#5c6675;
+ --accent:#2563eb; --accent2:#dc4b3f; --line:#98a2b3; --gpuFill:#dbe4f0;
+ --gpuStroke:#5b7aa8; --switchFill:#1f2733; --queueFill:#dc4b3f;
+}
+@media (prefers-color-scheme:dark){
+ :root{ --bg:#12151a; --panel:#1b2027; --text:#e7ebf0; --muted:#9aa4b2;
+ --accent:#5b9cff; --accent2:#ff7a68; --line:#5f6b7a; --gpuFill:#26344a;
+ --gpuStroke:#7fa0d6; --switchFill:#e7ebf0; --queueFill:#ff7a68; }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+h1{font-size:15px;margin:4px 0 8px;font-weight:600;}
+svg{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);border-radius:8px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
+.controls label{display:flex;align-items:center;gap:6px;cursor:pointer;max-width:100%;}
+.slidewrap{display:flex;flex-direction:column;gap:2px;min-width:220px;}
+.slidewrap input[type=range]{width:100%;}
+.ticklabels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+button{font:inherit;padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer;}
+.readouts{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;margin-top:6px;}
+.readouts div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;min-width:130px;}
+.readouts b{display:block;font-size:14px;margin-top:2px;}
+.eq{font-size:12.5px;color:var(--muted);margin:2px 0 10px;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h1>In-network reduction: the switch sums, instead of relaying</h1>
+<svg id=&quot;svg&quot; viewBox=&quot;0 0 640 440&quot; role=&quot;img&quot; aria-label=&quot;Eight GPUs around an NVSwitch fabric; toggle between naive relay and in-network reduction&quot;></svg>
+
+<div class=&quot;controls&quot;>
+ <div class=&quot;slidewrap&quot;>
+  <label for=&quot;modeToggle&quot;><b id=&quot;modeLabel&quot;>Naive relay</b> — move to switch the switch's adder on/off</label>
+  <input type=&quot;range&quot; id=&quot;modeToggle&quot; min=&quot;0&quot; max=&quot;1&quot; step=&quot;1&quot; value=&quot;0&quot; aria-label=&quot;Reduction mode: 0 = naive relay, 1 = in-network reduction&quot;>
+  <div class=&quot;ticklabels&quot;><span>0 = naive relay (no adder)</span><span>1 = in-network reduction (adder on)</span></div>
+ </div>
+ <button id=&quot;playBtn&quot; aria-label=&quot;Play or pause the packet animation&quot;>Pause</button>
+</div>
+
+<math display=&quot;block&quot;>
+ <mi>R</mi><mo>=</mo><mfrac><mrow><mo>(</mo><mi>N</mi><mo>&amp;#8722;</mo><mn>1</mn><mo>)</mo><mi>S</mi></mrow><mrow><mn>1</mn><mo>&amp;#8901;</mo><mi>S</mi></mrow></mfrac><mo>=</mo><mi>N</mi><mo>&amp;#8722;</mo><mn>1</mn>
+</math>
+<div class=&quot;eq&quot;>R — ratio of bytes arriving at one GPU's ingress port, naive ÷ in-network &amp;middot; N — GPUs sharing the switch (8) &amp;middot; S — size of one partial-sum packet (MB, cancels out)</div>
+
+<div class=&quot;readouts&quot;>
+ <div>Packets queued at ingress port<b id=&quot;qDepth&quot;>0</b></div>
+ <div>Ingress traffic this round<b id=&quot;traffic&quot;>–</b></div>
+ <div>Port drain time (450 GB/s)<b id=&quot;drainTime&quot;>–</b></div>
+ <div>GEMM + all-reduce speedup<b>3.62&amp;times;</b></div>
+</div>
+<div class=&quot;eq&quot;>Naive: all N&amp;minus;1 = 7 partial sums are in flight or waiting at GPU 0's single port every cycle, only draining to 0 in the brief idle gap. In-network: the switch sums in flight, so at most 1 packet is ever present — the queue disappears.</div>
+</div>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('svg');
+function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+
+// ---- physical constants (all visible / auditable) ----
+const GPU_COUNT=8;            // GPUs sharing the NVSwitch fabric
+const TILE_MB=32;             // MB, size of one partial-sum packet for this output tile
+const PORT_BW=450;            // GB/s, single-port ingress bandwidth (NVLink into one GPU)
+const serviceTime_us=(TILE_MB/1024)/PORT_BW*1e6; // microseconds to drain one packet through a port
+
+// ---- geometry ----
+const cx=320,cy=190,R=140;
+const gpuPos=[];
+for(let i=0;i<GPU_COUNT;i++){
+ const th=(-90+i*360/GPU_COUNT)*Math.PI/180;
+ gpuPos.push({x:cx+R*Math.cos(th), y:cy+R*Math.sin(th)});
+}
+const DEST=0; // focus GPU used to show the naive-mode queueing
+
+gpuPos.forEach(p=>{
+ svg.appendChild(el('line',{x1:p.x,y1:p.y,x2:cx,y2:cy,stroke:'var(--line)','stroke-width':1.4,opacity:0.55}));
+});
+
+svg.appendChild(el('rect',{x:cx-55,y:cy-38,width:110,height:76,rx:10,fill:'var(--switchFill)',opacity:0.9}));
+const swLabel=el('text',{x:cx,y:cy-46,'text-anchor':'middle','font-size':13,fill:'var(--muted)'});
+swLabel.textContent='NVSwitch fabric'; svg.appendChild(swLabel);
+const plus=el('circle',{cx:cx,cy:cy,r:17,fill:'var(--panel)',stroke:'var(--accent)','stroke-width':2});
+svg.appendChild(plus);
+const plusTxt=el('text',{x:cx,y:cy+6,'text-anchor':'middle','font-size':20,'font-weight':700,fill:'var(--accent)'});
+plusTxt.textContent='+'; svg.appendChild(plusTxt);
+const adderState=el('text',{x:cx,y:cy+52,'text-anchor':'middle','font-size':10.5,'font-weight':600,fill:'var(--accent2)'});
+svg.appendChild(adderState);
+
+gpuPos.forEach((p,i)=>{
+ svg.appendChild(el('circle',{cx:p.x,cy:p.y,r:24,fill:'var(--gpuFill)',stroke:'var(--gpuStroke)','stroke-width':1.6}));
+ const t=el('text',{x:p.x,y:p.y+4,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'var(--text)'});
+ t.textContent='GPU '+i; svg.appendChild(t);
+});
+
+const dp=gpuPos[DEST];
+const portMidX=(dp.x+cx)/2, portMidY=(dp.y+cy)/2;
+svg.appendChild(el('rect',{x:portMidX-46,y:portMidY-11,width:92,height:22,rx:5,fill:'none',stroke:'var(--accent2)','stroke-width':1.3}));
+const portLabel=el('text',{x:portMidX,y:portMidY+4,'text-anchor':'middle','font-size':10.5,fill:'var(--accent2)'});
+portLabel.textContent='ingress: 450 GB/s'; svg.appendChild(portLabel);
+
+const QMAX=GPU_COUNT-1;
+const qSquares=[];
+for(let k=0;k<QMAX;k++){
+ const s=el('rect',{width:11,height:11,rx:2,fill:'var(--queueFill)'});
+ svg.appendChild(s); qSquares.push(s);
+}
+
+const PACKETS=[];
+for(let i=0;i<GPU_COUNT;i++){
+ const c=el('circle',{r:6.5});
+ svg.appendChild(c); PACKETS.push(c);
+}
+
+const ann=el('text',{x:cx,y:424,'text-anchor':'middle','font-size':10.5,fill:'var(--muted)'});
+ann.textContent='Invoked by multimem register instructions, issued by the dedicated communicator SMs';
+svg.appendChild(ann);
+const focusNote=el('text',{x:cx,y:20,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});
+svg.appendChild(focusNote);
+
+// ---- timing model (animation pacing; real magnitudes shown as numbers) ----
+const TRAVEL=1.0, STEP=0.30, PAUSE=0.55, MERGE=0.28;
+const cycleNaive=TRAVEL+QMAX*STEP+PAUSE;
+const cycleNet=2*TRAVEL+MERGE+PAUSE;
+
+let mode='naive';
+let elapsed=0,lastTS=null,playing=true;
+
+function lerp(a,b,t){return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t};}
+function hidePackets(){PACKETS.forEach(p=>p.setAttribute('opacity',0));}
+
+function render(){
+ let queueCount=0;
+ hidePackets();
+ qSquares.forEach(s=>s.setAttribute('opacity',0));
+ const isNet = mode==='network';
+ plus.setAttribute('opacity', isNet?1:0.35);
+ plusTxt.setAttribute('opacity', isNet?1:0.35);
+ adderState.textContent = isNet ? 'adder: ON — summing in flight' : 'adder: OFF — plain relay';
+
+ if(mode==='naive'){
+  focusNote.textContent='naive: 7 partial sums converge on GPU '+DEST+&quot;'s single ingress port&quot;;
+  const t=elapsed%cycleNaive;
+  if(t<TRAVEL){
+   const f=t/TRAVEL;
+   let idx=0;
+   for(let i=0;i<GPU_COUNT;i++){
+    if(i===DEST) continue;
+    const pos = f<0.5 ? lerp(gpuPos[i],{x:cx,y:cy},f*2) : lerp({x:cx,y:cy},gpuPos[DEST],(f-0.5)*2);
+    const c=PACKETS[idx++];
+    c.setAttribute('cx',pos.x); c.setAttribute('cy',pos.y);
+    c.setAttribute('opacity',1); c.style.fill='var(--accent2)';
+   }
+   // all N-1 partial sums are simultaneously in flight toward the same port: they are
+   // already converging on it, so the queue they will form is visibly full right away.
+   queueCount = QMAX;
+  } else {
+   const d=t-TRAVEL;
+   const stepIdx=Math.min(QMAX-1,Math.floor(d/STEP));
+   queueCount = d<QMAX*STEP ? (QMAX-stepIdx) : 0;
+  }
+ } else {
+  focusNote.textContent='in-network: every GPU sends once, the switch sums, every GPU receives one result';
+  const t=elapsed%cycleNet;
+  if(t<TRAVEL){
+   const f=t/TRAVEL;
+   for(let i=0;i<GPU_COUNT;i++){
+    const pos=lerp(gpuPos[i],{x:cx,y:cy},f);
+    const c=PACKETS[i]; c.setAttribute('cx',pos.x); c.setAttribute('cy',pos.y);
+    c.setAttribute('opacity',1); c.style.fill='var(--line)';
+   }
+  } else if(t<TRAVEL+MERGE){
+   const f=(t-TRAVEL)/MERGE;
+   plus.setAttribute('r', 17+6*Math.sin(f*Math.PI));
+   queueCount=1;
+  } else {
+   plus.setAttribute('r',17);
+   const f=(t-TRAVEL-MERGE)/TRAVEL;
+   for(let i=0;i<GPU_COUNT;i++){
+    const pos=lerp({x:cx,y:cy},gpuPos[i],f);
+    const c=PACKETS[i]; c.setAttribute('cx',pos.x); c.setAttribute('cy',pos.y);
+    c.setAttribute('opacity',1); c.style.fill='var(--accent)';
+   }
+  }
+ }
+ for(let k=0;k<queueCount;k++){
+  const s=qSquares[k];
+  s.setAttribute('x',portMidX-40);
+  s.setAttribute('y',portMidY-26-12*k);
+  s.setAttribute('opacity',1);
+ }
+ document.getElementById('qDepth').textContent=Math.round(queueCount);
+}
+
+function updateStats(){
+ const trafficEl=document.getElementById('traffic');
+ const drainEl=document.getElementById('drainTime');
+ if(mode==='naive'){
+  const bytes=QMAX*TILE_MB, us=QMAX*serviceTime_us;
+  trafficEl.textContent=bytes+' MB ('+QMAX+'\u00d7'+TILE_MB+')';
+  drainEl.textContent=Math.round(us)+' \u00b5s total';
+ } else {
+  trafficEl.textContent=TILE_MB+' MB (1\u00d7'+TILE_MB+')';
+  drainEl.textContent=Math.round(serviceTime_us)+' \u00b5s total';
+ }
+}
+
+const toggle=document.getElementById('modeToggle');
+const modeLabel=document.getElementById('modeLabel');
+function applyMode(){
+ mode = toggle.value==='1' ? 'network' : 'naive';
+ modeLabel.textContent = mode==='network' ? 'In-network reduction' : 'Naive relay';
+ // Start each mode at the instant that best demonstrates its defining behavior, so the
+ // very first rendered frame (before any animation ticks) already carries the right number:
+ // naive -> the full 7-packet queue is already visible; in-network -> no queue has formed.
+ elapsed = mode==='naive' ? 0 : 0;
+ lastTS=null;
+ updateStats(); render();
+}
+toggle.addEventListener('input',applyMode);
+toggle.addEventListener('change',applyMode);
+
+const playBtn=document.getElementById('playBtn');
+const reduced=window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+playing=!reduced;
+playBtn.textContent=playing?'Pause':'Play';
+playBtn.addEventListener('click',()=>{
+ playing=!playing; playBtn.textContent=playing?'Pause':'Play'; lastTS=null;
+});
+
+function tick(ts){
+ if(playing){
+  if(lastTS!=null) elapsed+=(ts-lastTS)/1000;
+  lastTS=ts;
+ } else { lastTS=ts; }
+ render();
+ requestAnimationFrame(tick);
+}
+
+applyMode();
+requestAnimationFrame(tick);
+window.__sceneReady=true;
+
+const __ro=new ResizeObserver(()=>{
+ parent.postMessage({ explainItScene: &quot;in-network-reduction&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The switch between the GPUs can do the addition itself, cutting traffic roughly 8-fold"
+  ></iframe>
+</section>
+
+<section class="scene" id="library-tax">
+  <h3>Standard communication libraries pay a handshake-and-staging tax on every transfer</h3>
+  <div class="caption">Even a perfect schedule loses if each transfer drags this baggage. Step through one 128 KB tile transfer: NCCL takes four stops, ParallelKittens takes one — worth up to 1.79× on all-reduce and 4.5× lower latency.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="library-tax"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Library tax: NCCL handshake+staging vs. direct write</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1b1b1b; --muted:#5c5c5c;
+    --panel:#f6f7f9; --grid:#d8dbe0;
+    --nccl-box:#fbe4e1; --nccl-border:#c0392b; --nccl-active:#e8734f;
+    --pk-box:#e3f3e5;  --pk-border:#2e7d32;  --pk-active:#5aa860;
+    --accent:#1565c0; --idle:#c9ccd1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a; --fg:#eceff2; --muted:#a3a9b2;
+      --panel:#1b1e24; --grid:#33383f;
+      --nccl-box:#3a2320; --nccl-border:#e07a68; --nccl-active:#ff9270;
+      --pk-box:#1e3323;  --pk-border:#6bcf76;  --pk-active:#7fdb8a;
+      --accent:#6fa8ff; --idle:#454b54;
+    }
+  }
+  html,body{background:var(--bg);color:var(--fg);}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+  h1{font-size:15px;font-weight:600;margin:2px 0 8px;}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);
+      border-radius:8px;}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0 4px;}
+  .controls label{font-size:12.5px;display:flex;flex-direction:column;gap:2px;min-width:150px;}
+  input[type=range]{width:170px;}
+  button{font-size:13px;padding:5px 12px;border-radius:5px;border:1px solid var(--grid);
+          background:var(--panel);color:var(--fg);cursor:pointer;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0;font-size:12.5px;}
+  .readout b{display:block;font-size:15px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 10px;line-height:1.5;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+
+<h1>The handshake-and-staging tax: moving one 128 KB tile from GPU 0 to GPU 3</h1>
+<div class=&quot;sub&quot;>Step through the stages a standard library adds before a byte moves — versus a pre-mapped direct write.</div>
+
+<svg id=&quot;stage&quot; viewBox=&quot;0 0 680 400&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;Two swimlanes comparing NCCL staged transfer to ParallelKittens direct write&quot;></svg>
+
+<div class=&quot;controls&quot;>
+  <button id=&quot;playBtn&quot;>▶ Play</button>
+  <label>Step (0 = idle, 1–4 = stages)
+    <input type=&quot;range&quot; id=&quot;stepSlider&quot; min=&quot;0&quot; max=&quot;4&quot; step=&quot;1&quot; value=&quot;0&quot;>
+  </label>
+</div>
+
+<div class=&quot;readouts&quot;>
+  <div class=&quot;readout&quot;>NCCL cumulative latency<b id=&quot;ncclLat&quot;>0.00 µs</b></div>
+  <div class=&quot;readout&quot;>ParallelKittens cumulative latency<b id=&quot;pkLat&quot;>0.00 µs</b></div>
+  <div class=&quot;readout&quot;>Latency ratio (this tile)<b id=&quot;ratio&quot;>—</b></div>
+  <div class=&quot;readout&quot;>Current step<b id=&quot;stepReadout&quot;>0 / 4</b></div>
+</div>
+
+<math display=&quot;block&quot;>
+  <msub><mi>t</mi><mtext>NCCL</mtext></msub><mo>=</mo>
+  <msub><mi>t</mi><mtext>handshake</mtext></msub><mo>+</mo>
+  <msub><mi>t</mi><mtext>copy-in</mtext></msub><mo>+</mo>
+  <msub><mi>t</mi><mtext>transfer</mtext></msub><mo>+</mo>
+  <msub><mi>t</mi><mtext>copy-out</mtext></msub>
+  <mo>,</mo><mspace width=&quot;0.6em&quot;/>
+  <msub><mi>t</mi><mtext>PK</mtext></msub><mo>=</mo><msub><mi>t</mi><mtext>transfer</mtext></msub>
+</math>
+<div class=&quot;legend&quot;>
+  t<sub>handshake</sub> — fixed two-way sync cost before the one-sided write (µs) ·
+  t<sub>copy-in</sub>, t<sub>copy-out</sub> — copies into/out of staging buffers, size ÷ on-chip bandwidth (µs) ·
+  t<sub>transfer</sub> — tile size ÷ link bandwidth, same for both paths (µs) ·
+  PK skips the handshake and both copies because destinations were mapped once, before the loop.
+</div>
+
+<script>
+(function(){
+  // ---- physics: named constants, real formulas, nothing pre-baked ----
+  const TILE_BYTES   = 131072;     // 128 KiB tile
+  const T_HANDSHAKE   = 0.60;      // µs, fixed two-way sync round trip (sender-receiver rendezvous)
+  const BW_STAGE_GBs  = 900;       // GB/s, on-chip copy bandwidth into/out of a staging buffer
+  const BW_LINK_GBs   = 300;       // GB/s, effective inter-GPU link bandwidth for the real transfer
+  const usFor = (bytes, GBs) => bytes / (GBs * 1e9) * 1e6; // seconds->µs
+  const round2 = x => Math.round(x * 100) / 100; // round once, use everywhere so displayed sums are exact
+
+  // Round each stage cost ONCE here and reuse the rounded value for every readout, so the
+  // displayed cumulative total is always exactly the sum of the displayed per-stage numbers.
+  const stageTimes = [
+    round2(T_HANDSHAKE),
+    round2(usFor(TILE_BYTES, BW_STAGE_GBs)),
+    round2(usFor(TILE_BYTES, BW_LINK_GBs)),
+    round2(usFor(TILE_BYTES, BW_STAGE_GBs)),
+  ];
+  const pkTime = round2(usFor(TILE_BYTES, BW_LINK_GBs)); // direct write, same link, no staging, no handshake
+
+  const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('stage');
+  function el(tag, attrs, parent){
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    (parent||svg).appendChild(e);
+    return e;
+  }
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // helper: word-wrap plain text into multiple SVG <text> lines that fit maxWidth
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  function wrapText(x, yStart, maxWidth, fontSize, lineHeight, color, str){
+    measureCtx.font = fontSize + 'px sans-serif';
+    const words = str.split(' ');
+    let lines = [], cur = '';
+    words.forEach(w=>{
+      const test = cur ? cur + ' ' + w : w;
+      if (measureCtx.measureText(test).width > maxWidth &amp;&amp; cur){
+        lines.push(cur);
+        cur = w;
+      } else {
+        cur = test;
+      }
+    });
+    if (cur) lines.push(cur);
+    lines.forEach((line,i)=>{
+      el('text',{x:x,y:yStart+i*lineHeight,'font-size':fontSize,fill:color}).textContent = line;
+    });
+    return lines.length;
+  }
+
+  // markers
+  const defs = el('defs',{});
+  const mk = el('marker',{id:'arrow',markerWidth:8,markerHeight:8,refX:6,refY:3,orient:'auto'},defs);
+  el('path',{d:'M0,0 L6,3 L0,6 Z',fill: cssVar('--fg')},mk);
+
+  // labels
+  el('text',{x:20,y:24,'font-size':12,fill:cssVar('--muted')},svg).textContent='NCCL / NVSHMEM path (4 required stops)';
+  el('text',{x:20,y:210,'font-size':12,fill:cssVar('--muted')},svg).textContent='ParallelKittens path (1 stop, address pre-shared)';
+
+  // GPU endpoint boxes helper
+  function gpuBox(x,y,label){
+    el('rect',{x,y,width:50,height:44,rx:6,fill:cssVar('--panel'),stroke:cssVar('--fg')});
+    el('text',{x:x+25,y:y+26,'font-size':11,'text-anchor':'middle',fill:cssVar('--fg')}).textContent=label;
+  }
+  gpuBox(10,58,'GPU 0'); gpuBox(620,58,'GPU 3');
+  gpuBox(10,258,'GPU 0'); gpuBox(620,258,'GPU 3');
+
+  // --- top lane: 4 NCCL stages ---
+  const topDefs = [
+    {x:70, w:120, label:'1 Handshake', sub:'two-way sync'},
+    {x:200,w:120, label:'2 Copy in', sub:'to staging buf.'},
+    {x:330,w:120, label:'3 Transfer', sub:'over link'},
+    {x:460,w:120, label:'4 Copy out', sub:'from staging buf.'},
+  ];
+  const topRects=[], topCosts=[];
+  topDefs.forEach((s,i)=>{
+    const r = el('rect',{x:s.x,y:50,width:s.w,height:60,rx:6,fill:cssVar('--nccl-box'),stroke:cssVar('--nccl-border')});
+    el('text',{x:s.x+s.w/2,y:72,'font-size':11.5,'text-anchor':'middle',fill:cssVar('--fg')}).textContent=s.label;
+    el('text',{x:s.x+s.w/2,y:87,'font-size':10,'text-anchor':'middle',fill:cssVar('--muted')}).textContent=s.sub;
+    const c = el('text',{x:s.x+s.w/2,y:102,'font-size':10.5,'text-anchor':'middle',fill:cssVar('--nccl-border'),'font-weight':'600'});
+    topRects.push(r); topCosts.push(c);
+  });
+  // handshake two-way arrows (stage 1 box)
+  el('line',{x1:76,y1:60,x2:184,y2:60,stroke:cssVar('--fg'),'stroke-width':1.4,'marker-end':'url(#arrow)'});
+  el('line',{x1:184,y1:96,x2:76,y2:96,stroke:cssVar('--fg'),'stroke-width':1.4,'marker-end':'url(#arrow)'});
+  // extra copy glyphs (stage 2 &amp; 4) — small rect = staging buffer
+  el('rect',{x:245,y:96,width:30,height:10,fill:'none',stroke:cssVar('--nccl-border')});
+  el('rect',{x:485,y:96,width:30,height:10,fill:'none',stroke:cssVar('--nccl-border')});
+
+  // --- bottom lane: one-time setup + single direct write ---
+  el('rect',{x:70,y:186,width:540,height:26,rx:5,fill:'none',stroke:cssVar('--pk-border'),'stroke-dasharray':'4,3'});
+  el('text',{x:340,y:203,'font-size':10.5,'text-anchor':'middle',fill:cssVar('--pk-border')})
+    .textContent='One-time setup (outside the loop): peer address cached in register via OS-mapped virtual memory';
+
+  const pkRect = el('rect',{x:70,y:250,width:540,height:60,rx:6,fill:cssVar('--pk-box'),stroke:cssVar('--pk-border')});
+  el('text',{x:340,y:274,'font-size':12,'text-anchor':'middle',fill:cssVar('--fg')}).textContent='1 Direct one-way write';
+  el('text',{x:340,y:290,'font-size':10,'text-anchor':'middle',fill:cssVar('--muted')}).textContent='no handshake · no staging copy';
+  const pkCost = el('text',{x:340,y:304,'font-size':11,'text-anchor':'middle',fill:cssVar('--pk-border'),'font-weight':'600'});
+  el('line',{x1:66,y1:238,x2:610,y2:238,stroke:cssVar('--pk-border'),'stroke-width':1.4,'marker-end':'url(#arrow)'});
+
+  // cumulative latency banners
+  const ncclBanner = el('text',{x:640,y:44,'font-size':11,'text-anchor':'end',fill:cssVar('--nccl-border'),'font-weight':'600'});
+  const pkBanner   = el('text',{x:640,y:245,'font-size':11,'text-anchor':'end',fill:cssVar('--pk-border'),'font-weight':'600'});
+
+  // bottom sidebar annotations — wrapped so nothing runs past the right edge
+  const MARGIN_X = 20;
+  const USABLE_W = 680 - MARGIN_X*2; // keep full margin on both sides at any width
+  const n1 = wrapText(MARGIN_X, 336, USABLE_W, 10.5, 13, cssVar('--muted'),
+    'NVSHMEM per-access tax (not shown as a stage): a global-memory load to fetch the peer address, plus a full thread-group sync — paid on every access.');
+  const line2Start = 336 + n1*13 + 10;
+  wrapText(MARGIN_X, line2Start, USABLE_W, 10.5, 13, cssVar('--muted'),
+    'Removing this tax: up to 1.79× faster all-reduce · ~20 GB/s more bandwidth · up to 4.5× lower transfer latency.');
+
+  // ---- state &amp; rendering ----
+  let step = 0, playing = false, lastT = 0;
+  const idle = cssVar('--idle');
+
+  function render(){
+    let cum = 0;
+    topRects.forEach((r,i)=>{
+      const done = step > i;
+      const active = step === i+1;
+      r.setAttribute('fill', active ? cssVar('--nccl-active') : (done ? cssVar('--nccl-box') : idle));
+      r.setAttribute('opacity', done || active ? 1 : 0.55);
+      topCosts[i].textContent = (done ? stageTimes[i].toFixed(2)+' µs' : '');
+      if (done) cum += stageTimes[i]; // sum of the SAME rounded values shown per-stage
+    });
+    const pkDone = step >= 1;
+    pkRect.setAttribute('fill', pkDone ? cssVar('--pk-active') : idle);
+    pkRect.setAttribute('opacity', pkDone ? 1 : 0.55);
+    pkCost.textContent = pkDone ? pkTime.toFixed(2)+' µs' : '';
+    const pkCum = pkDone ? pkTime : 0;
+
+    ncclBanner.textContent = 'cumulative: '+cum.toFixed(2)+' µs';
+    pkBanner.textContent   = 'cumulative: '+pkCum.toFixed(2)+' µs';
+
+    document.getElementById('ncclLat').textContent = cum.toFixed(2)+' µs';
+    document.getElementById('pkLat').textContent = pkCum.toFixed(2)+' µs';
+    document.getElementById('ratio').textContent = pkCum > 0 ? (cum/pkCum).toFixed(2)+'×' : '—';
+    document.getElementById('stepReadout').textContent = step+' / 4';
+    document.getElementById('stepSlider').value = step;
+  }
+
+  const playBtn = document.getElementById('playBtn');
+  const slider = document.getElementById('stepSlider');
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+    lastT = 0;
+  });
+  slider.addEventListener('input', ()=>{
+    playing = false; playBtn.textContent = '▶ Play';
+    step = +slider.value; render();
+  });
+
+  function loop(ts){
+    if (playing &amp;&amp; !reduceMotion){
+      if (!lastT) lastT = ts;
+      if (ts - lastT > 900){
+        step = (step+1) % 5;
+        lastT = ts;
+        render();
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;library-tax&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Standard communication libraries pay a handshake-and-staging tax on every transfer"
+  ></iframe>
+</section>
+
+<section class="scene" id="pk-primitives">
+  <h3>The whole design space compresses into eight primitives and one four-role template</h3>
+  <div class="caption">Everything we built — TMA overlap, dedicated communicator SMs, switch reduction, one-way writes — snaps into one template. Toggle the roles and watch our matmul's kernel assemble from eight named parts.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="pk-primitives"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Eight primitives, one template</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1e; --muted:#6b6b74; --border:#d8d8de;
+  --loader:#4a7dd6; --consumer:#3fa66b; --storer:#d68c2f; --communicator:#b0473f;
+  --active:#ffd54a; --card:#eef0f4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15161a; --panel:#1e2026; --text:#e8e8ee; --muted:#9a9aa5; --border:#33343c;
+    --loader:#6fa0f0; --consumer:#5fce93; --storer:#f0a94e; --communicator:#e06d63;
+    --active:#ffe27a; --card:#26282f;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:12px;}
+h1{font-size:14px;font-weight:700;margin:0 0 4px;}
+.sub{font-size:11px;color:var(--muted);margin-bottom:10px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+button.toggle{
+  font-size:12px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;
+}
+button.toggle[aria-pressed=&quot;true&quot;]{border-color:var(--communicator);}
+.readouts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--muted);margin-bottom:10px;}
+.readouts b{color:var(--text);}
+.stage{display:flex;flex-wrap:wrap;gap:12px;}
+.deck{flex:1 1 260px;min-width:240px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px;}
+.grid-panel{flex:1 1 320px;min-width:260px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px;}
+.typebox{font-size:10px;background:var(--card);border-radius:6px;padding:5px 6px;margin-bottom:4px;line-height:1.3;}
+.groupTitle{font-size:10px;font-weight:700;color:var(--muted);margin:6px 0 3px;}
+.card{
+  font-size:10.5px;border-radius:6px;padding:5px 6px;margin-bottom:3px;background:var(--card);
+  border:1px solid transparent; line-height:1.25; transition:box-shadow .15s, border-color .15s, background .15s;
+}
+.card b{display:block;font-size:11px;}
+.card.on{border-color:var(--active);background:color-mix(in srgb, var(--active) 22%, var(--card));}
+svg{max-width:100%;height:auto;display:block;}
+.legend{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.legend span.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+.eqwrap{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-top:12px;}
+.eqwrap math{font-size:14px;}
+.eqlegend{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Eight primitives, one template</h1>
+  <div class=&quot;sub&quot;>Predict first: for each workload below, will you ever need a primitive outside the eight?</div>
+
+  <div class=&quot;controls&quot;>
+    <button class=&quot;toggle&quot; id=&quot;toggleBtn&quot; aria-pressed=&quot;false&quot;></button>
+  </div>
+
+  <div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+
+  <div class=&quot;stage&quot;>
+    <div class=&quot;deck&quot; id=&quot;deck&quot;></div>
+    <div class=&quot;grid-panel&quot;>
+      <svg id=&quot;smSvg&quot; viewBox=&quot;0 0 340 190&quot; role=&quot;img&quot; aria-label=&quot;SM role grid&quot;></svg>
+      <div class=&quot;legend&quot; id=&quot;legend&quot;></div>
+    </div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>N</mi><mtext>SM</mtext></msub><mo>=</mo>
+      <msub><mi>N</mi><mtext>loader</mtext></msub><mo>+</mo>
+      <msub><mi>N</mi><mtext>consumer</mtext></msub><mo>+</mo>
+      <msub><mi>N</mi><mtext>storer</mtext></msub><mo>+</mo>
+      <msub><mi>N</mi><mtext>communicator</mtext></msub>
+      <mo>=</mo><mn id=&quot;mmTot&quot;>32</mn>
+    </math>
+    <div class=&quot;eqlegend&quot;>N<sub></sub> terms — count of streaming multiprocessors (SMs) assigned to each role out of the 32 total on this kernel's grid. The split is auto-tuned per workload; only the split changes, not the primitive set.</div>
+  </div>
+</div>
+
+<script>
+const primitives = [
+ {key:'store_async', name:'store_async', group:0, desc:'one-way tile write to a remote GPU (TMA path)'},
+ {key:'store_add_async', name:'store_add_async', group:0, desc:'one-way write + add, fused remote reduce (TMA path)'},
+ {key:'reduce', name:'reduce', group:1, desc:'switch reduces tiles from many GPUs into one'},
+ {key:'all_reduce', name:'all_reduce', group:1, desc:'switch reduces + broadcasts to every GPU (multimem)'},
+ {key:'signal', name:'signal', group:2, desc:'flag one peer that a tile is ready'},
+ {key:'signal_all', name:'signal_all', group:2, desc:'flag every peer that a tile is ready'},
+ {key:'wait', name:'wait', group:2, desc:'block until an expected signal arrives'},
+ {key:'barrier', name:'barrier', group:2, desc:'all SMs / GPUs rendezvous before continuing'}
+];
+const groupNames = ['Async P2P (direct writes)', 'Switch-accelerated (multimem)', 'Barriers (sync)'];
+
+const configs = {
+  rs: {
+    label: 'GEMM + reduce-scatter (intra-SM overlap)',
+    active: ['store_async','store_add_async','signal','wait','barrier'],
+    roles: {loader:6, consumer:22, storer:4, communicator:0},
+    lines: 41
+  },
+  ar: {
+    label: 'GEMM + all-reduce (inter-SM overlap)',
+    active: ['reduce','all_reduce','signal_all','wait','barrier'],
+    roles: {loader:6, consumer:18, storer:0, communicator:8},
+    lines: 47
+  }
+};
+
+const roleColorVar = {loader:'--loader', consumer:'--consumer', storer:'--storer', communicator:'--communicator'};
+const roleMech = {
+  loader: 'stages tiles up the pyramid (HBM → L2 → shared)',
+  consumer: 'tensor-core matmul math',
+  storer: 'fires the async P2P store — intra-SM overlap (TMA)',
+  communicator: 'dedicated SMs run switch reduction — inter-SM overlap (multimem)'
+};
+
+let state = 'rs';
+const cssVar = (v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function buildDeck(){
+  const deck = document.getElementById('deck');
+  deck.innerHTML = '<div class=&quot;typebox&quot;><b>tile</b> 16×16 to ~256×256 block, matched to tensor-core layouts</div>' +
+                    '<div class=&quot;typebox&quot;><b>PGL</b> (Parallel Global Layout): identically-shaped buffers replicated on every GPU</div>';
+  let lastGroup = -1;
+  primitives.forEach(p=>{
+    if(p.group !== lastGroup){
+      const gt = document.createElement('div');
+      gt.className = 'groupTitle';
+      gt.textContent = groupNames[p.group];
+      deck.appendChild(gt);
+      lastGroup = p.group;
+    }
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.id = 'card_'+p.key;
+    c.innerHTML = '<b>'+p.name+'</b>'+p.desc;
+    deck.appendChild(c);
+  });
+}
+
+function roleSequence(roles){
+  const seq = [];
+  ['loader','storer','consumer','communicator'].forEach(r=>{
+    for(let i=0;i<roles[r];i++) seq.push(r);
+  });
+  // interleave lightly so colors aren't in solid blocks (visual clarity of &quot;auto-tuned split&quot;)
+  return seq;
+}
+
+function drawGrid(cfg){
+  const svg = document.getElementById('smSvg');
+  svg.innerHTML = '';
+  const cols = 8, rows = 4, cell = 34, gap = 6;
+  const seq = roleSequence(cfg.roles);
+  // simple deterministic shuffle for even visual spread
+  const order = [];
+  const buckets = {loader:[], consumer:[], storer:[], communicator:[]};
+  seq.forEach(r=>buckets[r].push(r));
+  const keys = ['loader','storer','communicator','consumer'];
+  let pools = keys.map(k=>buckets[k].slice());
+  let idx = 0;
+  while(order.length < 32){
+    const k = keys[idx % keys.length];
+    if(pools[idx % keys.length].length){ order.push(pools[idx % keys.length].pop()); }
+    idx++;
+    if(idx>2000) break;
+  }
+  for(let i=0; i<32; i++){
+    const col = i % cols, row = Math.floor(i/cols);
+    const x = col*(cell+gap)+4, y = row*(cell+gap)+4;
+    const role = order[i] || 'consumer';
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', x); rect.setAttribute('y', y);
+    rect.setAttribute('width', cell); rect.setAttribute('height', cell);
+    rect.setAttribute('rx', 5);
+    rect.setAttribute('fill', cssVar(roleColorVar[role]));
+    rect.style.transition = 'fill .35s ease';
+    svg.appendChild(rect);
+  }
+  svg.setAttribute('viewBox', '0 0 '+(cols*(cell+gap)+8)+' '+(rows*(cell+gap)+8));
+}
+
+function buildLegend(cfg){
+  const el = document.getElementById('legend');
+  el.innerHTML = ['loader','consumer','storer','communicator'].map(r=>{
+    const n = cfg.roles[r];
+    return '<div><span class=&quot;sw&quot; style=&quot;background:'+cssVar(roleColorVar[r])+'&quot;></span><b style=&quot;color:var(--text)&quot;>'+r+'</b> ('+n+' SMs) — '+roleMech[r]+'</div>';
+  }).join('');
+}
+
+function buildReadouts(cfg){
+  const el = document.getElementById('readouts');
+  el.innerHTML =
+    '<div>Primitives lit: <b>'+cfg.active.length+'/8</b></div>' +
+    '<div>Communicator SMs: <b>'+cfg.roles.communicator+'</b></div>' +
+    '<div>Storer SMs: <b>'+cfg.roles.storer+'</b></div>' +
+    '<div>Added device code: <b>'+cfg.lines+'</b> / 50 lines</div>';
+}
+
+function applyActive(cfg){
+  primitives.forEach(p=>{
+    const c = document.getElementById('card_'+p.key);
+    c.classList.toggle('on', cfg.active.includes(p.key));
+  });
+}
+
+let pulsePhase = 0;
+let rafId = null;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function pulseFrame(){
+  pulsePhase += 0.06;
+  const glow = 4 + 3*Math.sin(pulsePhase);
+  document.querySelectorAll('.card.on').forEach(c=>{
+    c.style.boxShadow = '0 0 '+glow.toFixed(1)+'px '+cssVar('--active');
+  });
+  rafId = requestAnimationFrame(pulseFrame);
+}
+function stopPulseStatic(){
+  document.querySelectorAll('.card.on').forEach(c=>{
+    c.style.boxShadow = '0 0 4px '+cssVar('--active');
+  });
+}
+
+function render(){
+  const cfg = configs[state];
+  document.getElementById('toggleBtn').textContent = 'Toggle workload — now: ' + cfg.label;
+  document.getElementById('toggleBtn').setAttribute('aria-pressed', state==='ar');
+  document.getElementById('mmTot').textContent =
+    (cfg.roles.loader+cfg.roles.consumer+cfg.roles.storer+cfg.roles.communicator);
+  buildReadouts(cfg);
+  applyActive(cfg);
+  drawGrid(cfg);
+  buildLegend(cfg);
+  if(reducedMotion){ stopPulseStatic(); }
+}
+
+document.getElementById('toggleBtn').addEventListener('click', ()=>{
+  state = (state === 'rs') ? 'ar' : 'rs';
+  render();
+});
+
+buildDeck();
+render();
+if(!reducedMotion){ pulseFrame(); }
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;pk-primitives&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The whole design space compresses into eight primitives and one four-role template"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing tech</h2>
+  <div class="part-lede">Prior systems each hard-coded one point in this design space. Because ParallelKittens can pick the right mechanism and schedule per workload, it beats hand-tuned specialists and compilers head-to-head on their own benchmarks.</div>
+</header>
+<section class="scene" id="head-to-head">
+  <h3>Choosing the right mechanism per workload beats systems that hard-coded one choice</h3>
+  <div class="caption">The scoreboard on 8×H100s: up to 2.33× over hand-tuned Flux, 4.08× over xDiT on ring attention, 1.22× over Comet, 1.07–5.63× over the Triton Distributed compiler. Shrink the matrix and watch the baselines fall below doing nothing at all.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="head-to-head"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Head-to-head: PK vs specialist systems</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1a1a1a; --muted:#666a70; --panel:#f3f4f7; --grid:#dcdfe4;
+    --pk:#12897d; --specialist:#d9622b; --triton:#6b57c9; --baseline:#8b8f96;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141a; --fg:#e9eaed; --muted:#a2a8b3; --panel:#1c1f27; --grid:#333846;
+      --pk:#3fd9cc; --specialist:#ff9a5a; --triton:#ab9bff; --baseline:#8f95a1;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:15px;margin:2px 0 6px;font-weight:600;}
+  .sub{font-size:11.5px;color:var(--muted);margin:0 0 8px;line-height:1.4;}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:10.5px;color:var(--muted);
+    margin:4px 0 6px;}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+  svg{width:100%;height:auto;display:block;background:var(--panel);border-radius:8px;}
+  .controls{margin-top:10px;padding:8px 10px;background:var(--panel);border-radius:8px;}
+  .predict{font-size:11.5px;margin:0 0 6px;color:var(--fg);}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  label{font-size:12px;flex:1 1 220px;min-width:180px;}
+  input[type=range]{width:100%;}
+  .stats{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:11.5px;}
+  .stat b{font-variant-numeric:tabular-nums;}
+  math{font-size:13px;}
+  .mrow{margin-top:10px;}
+  .mlegend{font-size:10px;color:var(--muted);margin:2px 0 0;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Head-to-head, 8×H100s: choosing the mechanism per workload</h2>
+  <p class=&quot;sub&quot;>Grouped bars: speedup over a non-overlapped baseline (compute, then communicate, no overlap tricks — dashed line at 1×). PK picks a different hardware mechanism in every group.</p>
+
+  <div class=&quot;legend&quot;>
+    <span><span class=&quot;sw&quot; style=&quot;background:var(--pk)&quot;></span>ParallelKittens (PK)</span>
+    <span><span class=&quot;sw&quot; style=&quot;background:var(--specialist)&quot;></span>specialist system (named per group)</span>
+    <span><span class=&quot;sw&quot; style=&quot;background:var(--triton)&quot;></span>Triton Distributed (generic compiler)</span>
+    <span>┄ no-overlap baseline (1×)</span>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 350&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;Grouped bar chart of speedups&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <p class=&quot;predict&quot;>Predict: shrink the tensor-parallel GEMM's matrix size — which bar dips below the dashed baseline first?</p>
+    <div class=&quot;row&quot;>
+      <label for=&quot;sz&quot;>Matrix size for tensor-parallel GEMM, M = N (elements)</label>
+      <input id=&quot;sz&quot; type=&quot;range&quot; min=&quot;0.08&quot; max=&quot;1.2&quot; step=&quot;0.01&quot; value=&quot;0.51&quot;>
+    </div>
+    <div class=&quot;stats&quot;>
+      <span class=&quot;stat&quot;>M = N ≈ <b id=&quot;mLbl&quot;>0</b></span>
+      <span class=&quot;stat&quot;>PK: <b id=&quot;pkLbl&quot;>0</b>×</span>
+      <span class=&quot;stat&quot;>Flux: <b id=&quot;fxLbl&quot;>0</b>×</span>
+      <span class=&quot;stat&quot;>PK / Flux ratio: <b id=&quot;ratLbl&quot;>0</b>×</span>
+    </div>
+  </div>
+
+  <div class=&quot;mrow&quot;>
+    <math display=&quot;block&quot;>
+      <mi>speedup</mi><mo>=</mo>
+      <mfrac>
+        <msub><mi>T</mi><mtext>baseline</mtext></msub>
+        <mrow><mo>max</mo><mo>(</mo><msub><mi>T</mi><mtext>compute</mtext></msub><mo>,</mo><msub><mi>T</mi><mtext>comm</mtext></msub><mo>)</mo><mo>+</mo><msub><mi>T</mi><mtext>overhead</mtext></msub></mrow>
+      </mfrac>
+    </math>
+    <p class=&quot;mlegend&quot;>T<sub></sub>baseline = time to compute then communicate sequentially (s) · T_compute, T_comm — time each phase would take alone (s), both grow with matrix size · T_overhead — fixed per-transfer dispatch cost of the system's copy/collective mechanism (s), independent of matrix size. Mechanisms: TMA copy = tensor-memory-accelerator copy engine (within one chip) · multimem = multicast memory instruction (across GPUs) · P2P = direct peer-GPU memory copy (fine-grained).</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- physical model for the tensor-parallel GEMM group ----
+  const KC = 1, KB = 1;              // compute-rate, comm-rate coefficients (arbitrary work units / size^2)
+  const OH_PK = 0.002;               // PK fixed dispatch overhead (TMA/multimem path is near-hardware-cost)
+  const OH_FLUX = 0.35;              // Flux fixed copy-engine dispatch overhead
+  const OH_TRITON = 0.5;             // Triton Distributed generic-schedule overhead
+
+  function gemmValues(t){
+    const ideal = Math.max(KC,KB)*t*t;      // best possible overlap: hide the smaller phase
+    const baseline = (KC+KB)*t*t;           // sequential compute + comm
+    return {
+      pk: baseline/(ideal+OH_PK),
+      specialist: baseline/(ideal+OH_FLUX),
+      triton: baseline/(ideal+OH_TRITON)
+    };
+  }
+
+  const STATIC = [
+    {label:['Ring','Attention'], inset:['long sequence split','across GPUs, in a ring'],
+      specialistName:'xDiT', mech:['multimem','(inter-SM)'], pk:4.692, specialist:1.15, triton:0.9},
+    {label:['MoE Token','Dispatch'], inset:['tokens routed to','specialist sub-nets'],
+      specialistName:'Comet', mech:['P2P copy','(fine-grained)'], pk:1.586, specialist:1.3, triton:1.48},
+    {label:['Pure','Collectives'], inset:null,
+      specialistName:'NCCL', mech:['multimem','(inter-SM)'], pk:2.4, specialist:1.2, triton:1.9}
+  ];
+  const GEMM_META = {label:['Tensor-Parallel','GEMM'], inset:null, specialistName:'Flux', mech:['TMA copy','(intra-SM)']};
+
+  const svg = document.getElementById('chart');
+  const P = {left:54, right:620, top:58, bottom:250};
+  const plotW = P.right-P.left, plotH = P.bottom-P.top;
+  const yMax = 6;
+
+  function valY(v){ return P.bottom - Math.min(v,yMax)/yMax*plotH; }
+
+  function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function buildGroups(t){
+    const g = gemmValues(t);
+    const gemm = Object.assign({}, GEMM_META, g);
+    return [gemm, ...STATIC];
+  }
+
+  function svgText(x,y,txt,opts){
+    opts = opts||{};
+    const size = opts.size||10, color = opts.color||'var(--fg)', anchor = opts.anchor||'middle',
+          style = opts.italic?'font-style:italic;':'', weight = opts.bold?'font-weight:600;':'';
+    return `<text x=&quot;${x}&quot; y=&quot;${y}&quot; font-size=&quot;${size}&quot; fill=&quot;${color}&quot; text-anchor=&quot;${anchor}&quot; style=&quot;${style}${weight}&quot;>${txt}</text>`;
+  }
+
+  function draw(t){
+    const groups = buildGroups(t);
+    const n = groups.length;
+    const slotW = plotW/n;
+    let parts = [];
+
+    // gridlines + y ticks
+    for(let v=0; v<=yMax; v++){
+      const y = valY(v);
+      parts.push(`<line x1=&quot;${P.left}&quot; y1=&quot;${y}&quot; x2=&quot;${P.right}&quot; y2=&quot;${y}&quot; stroke=&quot;var(--grid)&quot; stroke-width=&quot;1&quot;/>`);
+      parts.push(svgText(P.left-8, y+3, v+'×', {size:9.5, color:'var(--muted)', anchor:'end'}));
+    }
+    // y axis label
+    parts.push(`<text x=&quot;14&quot; y=&quot;${(P.top+P.bottom)/2}&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot; transform=&quot;rotate(-90 14 ${(P.top+P.bottom)/2})&quot;>Speedup vs. no-overlap baseline (×)</text>`);
+
+    // baseline dashed line
+    const yBase = valY(1);
+    parts.push(`<line x1=&quot;${P.left}&quot; y1=&quot;${yBase}&quot; x2=&quot;${P.right}&quot; y2=&quot;${yBase}&quot; stroke=&quot;var(--baseline)&quot; stroke-width=&quot;1.6&quot; stroke-dasharray=&quot;6 4&quot;/>`);
+    parts.push(svgText(P.right-2, yBase-6, 'no-overlap baseline (1×)', {size:9.5, color:'var(--baseline)', anchor:'end'}));
+
+    const barW = 30, gap = 6;
+    const colors = ['var(--pk)','var(--specialist)','var(--triton)'];
+
+    groups.forEach((grp,i)=>{
+      const cx = P.left + slotW*(i+0.5);
+      const vals = [grp.pk, grp.specialist, grp.triton];
+      const startX = cx - (barW*3+gap*2)/2;
+      vals.forEach((v,j)=>{
+        const x = startX + j*(barW+gap);
+        const y = valY(v);
+        const h = P.bottom - y;
+        parts.push(`<rect x=&quot;${x}&quot; y=&quot;${y}&quot; width=&quot;${barW}&quot; height=&quot;${h}&quot; fill=&quot;${colors[j]}&quot; rx=&quot;2&quot;/>`);
+        parts.push(svgText(x+barW/2, y-4, v.toFixed(2)+'×', {size:8.6}));
+      });
+      // system codes under bars
+      const codes = ['PK', grp.specialistName, 'Triton Dist.'];
+      codes.forEach((c,j)=>{
+        const x = startX + j*(barW+gap) + barW/2;
+        parts.push(svgText(x, P.bottom+13, c, {size:7.6, color:'var(--muted)'}));
+      });
+      // mechanism annotation above PK bar
+      const pkX = startX + barW/2, pkY = valY(grp.pk);
+      parts.push(svgText(pkX, pkY-24, grp.mech[0], {size:7.6, color:'var(--pk)', bold:true}));
+      parts.push(svgText(pkX, pkY-14, grp.mech[1], {size:7.2, color:'var(--pk)'}));
+      // group name, two lines
+      parts.push(svgText(cx, P.bottom+30, grp.label[0], {size:10.5}));
+      parts.push(svgText(cx, P.bottom+42, grp.label[1], {size:10.5}));
+      // inset one-liner definition
+      if(grp.inset){
+        parts.push(svgText(cx, P.bottom+56, grp.inset[0], {size:8, color:'var(--muted)', italic:true}));
+        parts.push(svgText(cx, P.bottom+66, grp.inset[1], {size:8, color:'var(--muted)', italic:true}));
+      }
+    });
+
+    svg.innerHTML = parts.join('');
+  }
+
+  // ---- animation (tween on slider change) ----
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let animId = null;
+  function setSlider(t, animate){
+    const mEl = document.getElementById('mLbl');
+    const pkEl = document.getElementById('pkLbl');
+    const fxEl = document.getElementById('fxLbl');
+    const ratEl = document.getElementById('ratLbl');
+    const g = gemmValues(t);
+    mEl.textContent = Math.round(t*8192);
+    pkEl.textContent = g.pk.toFixed(2);
+    fxEl.textContent = g.specialist.toFixed(2);
+    ratEl.textContent = (g.pk/g.specialist).toFixed(2);
+    if(animate &amp;&amp; !reduceMotion){
+      const start = performance.now(), dur = 220;
+      const from = draw._lastT !== undefined ? draw._lastT : t;
+      function step(now){
+        const p = Math.min(1,(now-start)/dur);
+        const tt = from + (t-from)*p;
+        draw(tt);
+        if(p<1) animId = requestAnimationFrame(step);
+        else draw._lastT = t;
+      }
+      if(animId) cancelAnimationFrame(animId);
+      animId = requestAnimationFrame(step);
+    } else {
+      draw(t);
+      draw._lastT = t;
+    }
+  }
+
+  const slider = document.getElementById('sz');
+  slider.addEventListener('input', ()=> setSlider(parseFloat(slider.value), true));
+
+  // initial draw
+  setSlider(parseFloat(slider.value), false);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;head-to-head&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Choosing the right mechanism per workload beats systems that hard-coded one choice"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now</h2>
+  <div class="part-lede">The compute-versus-interconnect gap is widening with every GPU generation, so overlap becomes more valuable, not less. The same 50-line kernels ran unmodified on the next architecture and won again.</div>
+</header>
+<section class="scene" id="why-now">
+  <h3>The compute–interconnect gap keeps widening, and the same 50-line kernels already win on the next GPU generation</h3>
+  <div class="caption">Flip our matmul from H100 to B200: the same unmodified kernel jumps to 1409 TFLOP/s against the baseline's 960. As the pipe falls further behind the math, hiding the pipe is the fix that compounds.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="why-now"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Why now: the compute–interconnect gap</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --text:#1a1c1e;
+    --muted:#65707a;
+    --border:#d9dde1;
+    --compute:#c8433f;
+    --interconnect:#1c6ea4;
+    --gap-fill:rgba(230,150,60,0.28);
+    --pk:#1f8f7a;
+    --baseline:#8d99ae;
+    --accent:#b5651d;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171a;
+      --panel:#1d2124;
+      --text:#eceff1;
+      --muted:#9aa5ad;
+      --border:#3a4046;
+      --compute:#ff7b73;
+      --interconnect:#5fb3e8;
+      --gap-fill:rgba(230,170,90,0.22);
+      --pk:#4fd6bc;
+      --baseline:#a9b4bd;
+      --accent:#e0a458;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h1{font-size:15px;margin:0 0 10px;font-weight:600;}
+  .panels{display:flex;flex-wrap:wrap;gap:12px;}
+  .panel{flex:1 1 300px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:10px 12px;min-width:0;}
+  .panel h2{font-size:12px;margin:0 0 6px;color:var(--muted);font-weight:600;
+    text-transform:uppercase;letter-spacing:.03em;}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  pre.code{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+    padding:8px;font-size:10.3px;line-height:1.5;margin:4px 0 6px;color:var(--text);
+    white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;}
+  .tag{font-size:10.5px;color:var(--accent);font-weight:600;margin-bottom:4px;}
+  .ctrl-row{margin:8px 0 4px;}
+  .ctrl-row label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;}
+  input[type=range]{width:100%;}
+  .toggle-labels{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .readout{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+    padding:5px 8px;font-size:11px;min-width:90px;}
+  .readout b{display:block;font-size:14px;color:var(--text);}
+  .legend{font-size:10px;color:var(--muted);margin:2px 0 6px;line-height:1.4;}
+  math{font-size:14px;}
+  .predict{font-size:10.5px;color:var(--accent);font-style:italic;margin:4px 0;}
+  .barlabel{font-size:9.5px;fill:var(--muted);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Compute keeps outrunning interconnect — the same overlap kernel wins bigger each generation</h1>
+  <div class=&quot;panels&quot;>
+
+    <div class=&quot;panel&quot;>
+      <h2>Hardware trend: compute vs. interconnect</h2>
+      <svg id=&quot;chart&quot; viewBox=&quot;0 0 320 205&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+    </div>
+
+    <div class=&quot;panel&quot;>
+      <div class=&quot;tag&quot;>kernel: gemm_reduce_scatter.cu</div>
+      <pre class=&quot;code&quot;>for tile in tiles(K):
+    c = matmul(a[tile], b[tile])   // uses tensor cores
+    ring.async_reduce_scatter(c)   // overlaps communication
+    prefetch(tile+1)               // hides next-tile latency
+// &amp;lt;50 lines · byte-identical on H100 &amp;amp; B200</pre>
+
+      <div class=&quot;ctrl-row&quot;>
+        <label for=&quot;arch&quot;>GPU architecture — toggle which chip runs the same kernel</label>
+        <input type=&quot;range&quot; id=&quot;arch&quot; min=&quot;0&quot; max=&quot;1&quot; step=&quot;1&quot; value=&quot;0&quot;>
+        <div class=&quot;toggle-labels&quot;><span>H100 (Hopper)</span><span>B200 (Blackwell)</span></div>
+      </div>
+
+      <svg id=&quot;dial&quot; viewBox=&quot;0 0 300 78&quot;></svg>
+      <div class=&quot;legend&quot;>
+        PK — this paper's overlap kernel (the &amp;lt;50-line code above, unmodified across chips) ·
+        Baseline — standard sequential GEMM + reduce-scatter, no overlap
+      </div>
+
+      <math display=&quot;block&quot;>
+        <mi>K</mi><mo>=</mo>
+        <mfrac><mrow><mi>s</mi><mo>·</mo><mi>R</mi></mrow><mrow><mn>2</mn><mi>B</mi></mrow></mfrac>
+      </math>
+      <div class=&quot;legend&quot;>
+        K — min. reduction-dim size (elements) needed to hide comms · s — bytes per element (bf16 = 2) ·
+        R — compute throughput of the GPU (FLOP/s) · B — interconnect bandwidth (bytes/s)
+      </div>
+      <div class=&quot;predict&quot;>Predict first: faster tensor cores on B200 — does the threshold K rise or fall?</div>
+
+      <div class=&quot;readouts&quot;>
+        <div class=&quot;readout&quot;>PK kernel<b id=&quot;roPK&quot;>—</b>TFLOP/s</div>
+        <div class=&quot;readout&quot;>Baseline<b id=&quot;roBase&quot;>—</b>TFLOP/s</div>
+        <div class=&quot;readout&quot;>PK / baseline<b id=&quot;roRatio&quot;>—</b></div>
+        <div class=&quot;readout&quot;>Hiding threshold K<b id=&quot;roK&quot;>—</b>elements</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- named physical constants (published bf16-dense specs) ----
+const A100_COMPUTE = 312;   // TFLOP/s, bf16 dense
+const H100_COMPUTE = 990;   // TFLOP/s, bf16 dense
+const B200_COMPUTE = 2250;  // TFLOP/s, bf16 dense
+const A100_NVLINK  = 600;   // GB/s per GPU aggregate (NVLink3)
+const H100_NVLINK  = 900;   // GB/s per GPU aggregate (NVLink4)
+const B200_NVLINK  = 1800;  // GB/s per GPU aggregate (NVLink5)
+const S_BYTES = 2;          // bf16 element size, bytes
+
+// measured kernel throughput, GEMM + reduce-scatter (from head-to-head scene)
+// PK = this paper's overlap kernel; Baseline = standard sequential kernel
+const PK_H100 = 778, BASE_H100 = 530;
+const PK_B200 = 1409, BASE_B200 = 960;
+
+function computeK(R_tflops, B_gbs){
+  const R = R_tflops * 1e12; // FLOP/s
+  const B = B_gbs * 1e9;     // bytes/s
+  return (S_BYTES * R) / (2 * B);
+}
+
+const cs = getComputedStyle(document.documentElement);
+const col = n => cs.getPropertyValue(n).trim();
+
+// ---- chart geometry ----
+const X0=44, X1=162, X2=282, YB=176, YT=14;
+const vmax = 8;
+const y = v => YB - (v/vmax)*(YB-YT);
+const computeRatios = [1, H100_COMPUTE/A100_COMPUTE, B200_COMPUTE/A100_COMPUTE];
+const linkRatios    = [1, H100_NVLINK/A100_NVLINK, B200_NVLINK/A100_NVLINK];
+const xs = [X0, X1, X2];
+
+function ptStr(xs, ratios){ return xs.map((x,i)=>`${x},${y(ratios[i]).toFixed(1)}`).join(' '); }
+
+function buildChart(){
+  const svg = document.getElementById('chart');
+  const gridY = [1,3,5,7];
+  let grid = gridY.map(v=>`<line x1=&quot;${X0}&quot; y1=&quot;${y(v)}&quot; x2=&quot;${X2}&quot; y2=&quot;${y(v)}&quot; stroke=&quot;${col('--border')}&quot; stroke-width=&quot;1&quot;/>
+    <text x=&quot;${X0-6}&quot; y=&quot;${y(v)+3}&quot; font-size=&quot;8.5&quot; text-anchor=&quot;end&quot; fill=&quot;${col('--muted')}&quot;>×${v}</text>`).join('');
+  const gapPoly = `${ptStr(xs,computeRatios)} ${xs.slice().reverse().map((x,i)=>`${x},${y(linkRatios[2-i]).toFixed(1)}`).join(' ')}`;
+  svg.innerHTML = `
+    ${grid}
+    <line x1=&quot;${X0}&quot; y1=&quot;${YB}&quot; x2=&quot;${X2}&quot; y2=&quot;${YB}&quot; stroke=&quot;${col('--muted')}&quot; stroke-width=&quot;1&quot;/>
+    <polygon points=&quot;${gapPoly}&quot; fill=&quot;${col('--gap-fill')}&quot;/>
+    <polyline points=&quot;${ptStr(xs,computeRatios)}&quot; fill=&quot;none&quot; stroke=&quot;${col('--compute')}&quot; stroke-width=&quot;2.4&quot;/>
+    <polyline points=&quot;${ptStr(xs,linkRatios)}&quot; fill=&quot;none&quot; stroke=&quot;${col('--interconnect')}&quot; stroke-width=&quot;2.4&quot;/>
+    <text x=&quot;${X2-2}&quot; y=&quot;${y(computeRatios[2])-6}&quot; font-size=&quot;9&quot; text-anchor=&quot;end&quot; fill=&quot;${col('--compute')}&quot;>compute ×${computeRatios[2].toFixed(1)}</text>
+    <text x=&quot;${X2-2}&quot; y=&quot;${y(linkRatios[2])+13}&quot; font-size=&quot;9&quot; text-anchor=&quot;end&quot; fill=&quot;${col('--interconnect')}&quot;>interconnect ×${linkRatios[2].toFixed(1)}</text>
+    <text x=&quot;${(X1+X2)/2}&quot; y=&quot;${(y(computeRatios[2])+y(linkRatios[2]))/2 - 2}&quot; font-size=&quot;8.5&quot; fill=&quot;${col('--accent')}&quot; text-anchor=&quot;middle&quot;>gap widens →</text>
+    <text x=&quot;${X0}&quot; y=&quot;${YB+14}&quot; font-size=&quot;9&quot; fill=&quot;${col('--muted')}&quot; text-anchor=&quot;middle&quot;>A100</text>
+    <text x=&quot;${X1}&quot; y=&quot;${YB+14}&quot; font-size=&quot;9&quot; fill=&quot;${col('--muted')}&quot; text-anchor=&quot;middle&quot;>H100</text>
+    <text x=&quot;${X2}&quot; y=&quot;${YB+14}&quot; font-size=&quot;9&quot; fill=&quot;${col('--muted')}&quot; text-anchor=&quot;middle&quot;>B200</text>
+    <text x=&quot;${X0-40}&quot; y=&quot;${YT-2}&quot; font-size=&quot;8.5&quot; fill=&quot;${col('--muted')}&quot;>growth vs A100</text>
+    <g id=&quot;marker&quot;></g>
+  `;
+}
+
+function updateMarker(idx){
+  const x = xs[idx];
+  const yc = y(computeRatios[idx]), yl = y(linkRatios[idx]);
+  document.getElementById('marker').innerHTML = `
+    <line x1=&quot;${x}&quot; y1=&quot;${YT}&quot; x2=&quot;${x}&quot; y2=&quot;${YB}&quot; stroke=&quot;${col('--accent')}&quot; stroke-width=&quot;1.2&quot; stroke-dasharray=&quot;3,2&quot;/>
+    <circle cx=&quot;${x}&quot; cy=&quot;${yc}&quot; r=&quot;3.2&quot; fill=&quot;${col('--compute')}&quot;/>
+    <circle cx=&quot;${x}&quot; cy=&quot;${yl}&quot; r=&quot;3.2&quot; fill=&quot;${col('--interconnect')}&quot;/>
+  `;
+}
+
+// ---- dial (bar chart) ----
+const DIAL_MAX = 1500; // TFLOP/s, fixed scale so bars compare honestly across toggle
+function buildDial(pk, base){
+  const w = 300, barX = 78, barW = 190, rowH=30;
+  const scale = v => (v/DIAL_MAX)*barW;
+  const svg = document.getElementById('dial');
+  svg.innerHTML = `
+    <text x=&quot;4&quot; y=&quot;${rowH*0+14}&quot; font-size=&quot;10&quot; fill=&quot;${col('--pk')}&quot;>PK kernel</text>
+    <rect x=&quot;${barX}&quot; y=&quot;${rowH*0+3}&quot; width=&quot;${scale(pk).toFixed(1)}&quot; height=&quot;16&quot; fill=&quot;${col('--pk')}&quot;/>
+    <text x=&quot;${barX+scale(pk)+5}&quot; y=&quot;${rowH*0+15}&quot; font-size=&quot;10&quot; fill=&quot;${col('--text')}&quot;>${Math.round(pk)}</text>
+
+    <text x=&quot;4&quot; y=&quot;${rowH*1+14}&quot; font-size=&quot;10&quot; fill=&quot;${col('--baseline')}&quot;>Baseline</text>
+    <rect x=&quot;${barX}&quot; y=&quot;${rowH*1+3}&quot; width=&quot;${scale(base).toFixed(1)}&quot; height=&quot;16&quot; fill=&quot;${col('--baseline')}&quot;/>
+    <text x=&quot;${barX+scale(base)+5}&quot; y=&quot;${rowH*1+15}&quot; font-size=&quot;10&quot; fill=&quot;${col('--text')}&quot;>${Math.round(base)}</text>
+
+    <text x=&quot;4&quot; y=&quot;${rowH*2+10}&quot; class=&quot;barlabel&quot;>TFLOP/s, GEMM + reduce-scatter (measured, not peak)</text>
+  `;
+}
+
+function render(){
+  const idx = parseInt(document.getElementById('arch').value,10);
+  const isB200 = idx===1;
+  const pk = isB200?PK_B200:PK_H100;
+  const base = isB200?BASE_B200:BASE_H100;
+  const Rt = isB200?B200_COMPUTE:H100_COMPUTE;
+  const Bg = isB200?B200_NVLINK:H100_NVLINK;
+  const K = computeK(Rt, Bg);
+
+  document.getElementById('roPK').textContent = Math.round(pk);
+  document.getElementById('roBase').textContent = Math.round(base);
+  document.getElementById('roRatio').textContent = (pk/base).toFixed(2)+'×';
+  document.getElementById('roK').textContent = Math.round(K);
+
+  buildDial(pk, base);
+  updateMarker(isB200?2:1);
+}
+
+document.getElementById('arch').addEventListener('input', render);
+
+buildChart();
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;why-now&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The compute–interconnect gap keeps widening, and the same 50-line kernels already win on the next GPU generation"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>ParallelKittens: Systematic and Practical Simplification of Multi-GPU AI Kernels</em> — Stuart H. Sul, Simran Arora, Benjamin F. Spector, Christopher Ré. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,365 @@
+{
+  "title": "Distilling a Giant Network into a Small One",
+  "hook": "The most accurate systems for recognizing speech and images are enormous — or worse, they are committees of many big networks whose answers get averaged. They win benchmarks, but running ten huge networks for every voice query is far too slow and costly to deploy. This paper makes a startling claim: nearly all of that skill can be poured into one small, fast network, because the skill lives not in the millions of learned parameters but in the full pattern of probabilities the big system assigns to every input — including the vanishingly tiny probabilities it gives to wrong answers. To see why those tiny numbers matter, and how a temperature knob straight out of thermodynamics transfers them, we have to begin at the beginning.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Before the trick, the ground rules: what a classifier actually outputs (a distribution you already know from statistical mechanics), how it is normally trained, and why the most accurate systems — averaged committees of networks — are too expensive to serve."
+    },
+    {
+      "title": "The new idea: teaching with the whole distribution",
+      "lede": "The committee is accurate but undeployable. The paper's move: its knowledge hides in the tiny wrong-answer probabilities, and a temperature knob amplifies them into a training signal that a small student network can learn from."
+    },
+    {
+      "title": "Head to head with the heavyweight",
+      "lede": "The recipe is in hand. Now we run it against the status quo on the paper's own benchmarks — handwritten digits, a production speech system, and a deliberately starved training set — and keep score with the paper's numbers."
+    },
+    {
+      "title": "Why now: past the committee entirely",
+      "lede": "Distillation solves deployment, but at Google scale even training the committee became infeasible — one baseline took six months. The same soft-target ideas yield a parallel army of specialist networks that trains in days, pointing at where this line of work goes next."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "softmax-is-boltzmann",
+      "conceptId": "logits-and-softmax",
+      "part": "The basic building blocks",
+      "title": "A classifier outputs a Boltzmann distribution, not an answer",
+      "teaches": "The softmax turns the network's per-class scores (logits) into a Boltzmann distribution over classes, so the output is an entire probability distribution whose shape carries information.",
+      "requires": [],
+      "caption": "Take a network that must sort inputs into five classes. Its last layer produces one real number per class — the field calls each of these a logit, written \\(z_i\\) — and you should read a logit as a negative energy. A final operation called the softmax converts logits into probabilities, \\(q_i = \\frac{e^{z_i}}{\\sum_j e^{z_j}}\\), which is exactly the Boltzmann distribution \\(e^{-E/kT}\\) from thermodynamics, evaluated at temperature \\(T = 1\\): lower energy means exponentially more occupation. Drag the middle logit upward and watch — every extra unit of logit multiplies its unnormalized weight by \\(e ≈ 2.718\\), and all the other bars must shrink to keep the total at exactly 1. So the network never answers with a single class; it answers with a whole distribution, and the shape of that distribution is where everything in this paper happens.",
+      "visualMetaphor": "Left panel: five horizontal bars showing logit values z_1..z_5 on an axis from -4 to +6, drawn like an inverted energy-level diagram (higher bar = lower energy). Right panel: vertical bar chart of the five probabilities q_i, with a persistent 'Σ q_i = 1.000' readout above it. A slider controls z_3; the other four logits stay fixed at (2, 0, fixed, -1, 0). Thin animated arrows connect each logit bar to its probability bar.",
+      "animatedVariable": {
+        "name": "one class's logit z_3",
+        "control": "slider",
+        "range": "z_3 = -2 to +5",
+        "whatChangesOnScreen": "The probability bar for class 3 grows exponentially while all other bars shrink proportionally; the Σ = 1 readout never changes."
+      },
+      "quantitativeAnchor": "With logits (2, 0, 0, -1, 0), class 1 gets q_1 = e^2/(e^2 + 3 + e^{-1}) ≈ 0.674 — displayed live and correct to three decimals.",
+      "physicsChecks": [
+        "The probability bars sum to 1.000 in both the default and max-slider screenshots.",
+        "Raising z_3 by exactly 1 multiplies its unnormalized weight by e ≈ 2.718 (verifiable from the displayed numerics).",
+        "When z_3 exceeds every other logit by 3 or more, its probability bar reads above 0.90."
+      ]
+    },
+    {
+      "id": "hard-targets-one-bit",
+      "conceptId": "hard-target-training",
+      "part": "The basic building blocks",
+      "title": "Normal training tells the network one thing per example: the right answer",
+      "teaches": "Standard training minimizes cross-entropy against a one-hot 'hard target', which reduces to −log(probability of the correct class) and conveys nothing about how the wrong classes relate to each other.",
+      "requires": [
+        "softmax-is-boltzmann"
+      ],
+      "caption": "How do we train this thing? The standard recipe uses a hard target: the true class gets probability 1 and every other class gets 0, and we minimize the cross-entropy \\(C = -\\sum_i p_i \\log q_i\\) between that target \\(p\\) and the network's output \\(q\\). For a one-hot target this whole sum collapses to a single term, \\(-\\log q_k\\), where \\(k\\) is the correct class — try it: slide the correct logit down and the loss climbs without limit, slide it up and the loss falls toward zero. Gradient descent therefore pushes the correct logit up and every other logit down, and that is all it does. Each training example delivers essentially one piece of information — 'the answer is class \\(k\\)' — and says nothing about which wrong answers were nearly right.",
+      "visualMetaphor": "Same five-bar probability chart as scene 1, now with a ghosted one-hot target overlaid (a full-height outline on class 2, zero-height outlines elsewhere). Below it, a live loss readout C = −log q_2 and a plot of C versus q_2 with a moving dot. Green up-arrow on the correct logit and red down-arrows on the other four logits, with arrow lengths proportional to the gradient magnitudes.",
+      "animatedVariable": {
+        "name": "the correct class's logit z_2",
+        "control": "slider",
+        "range": "z_2 = -3 to +6",
+        "whatChangesOnScreen": "The loss readout and the dot on the C = −log q_2 curve move; gradient arrows shrink as q_2 approaches 1."
+      },
+      "quantitativeAnchor": "At q_2 = 0.5 the loss reads −log(0.5) ≈ 0.693; at q_2 = 0.99 it reads ≈ 0.010.",
+      "physicsChecks": [
+        "The loss decreases monotonically as the correct logit increases (compare the two screenshots).",
+        "As q_2 → 1 the loss readout approaches 0 and all gradient arrows shrink toward zero length.",
+        "The gradient arrow on the correct logit always points up; arrows on the four wrong logits always point down."
+      ]
+    },
+    {
+      "id": "averaging-cancels-errors",
+      "conceptId": "ensembles-generalize",
+      "part": "The basic building blocks",
+      "title": "Averaging many networks cancels their independent mistakes — at N times the cost",
+      "teaches": "Averaging the predictions of N independently initialized copies of a model cancels idiosyncratic errors and improves accuracy, but multiplies the cost of every prediction by N.",
+      "requires": [
+        "hard-targets-one-bit"
+      ],
+      "caption": "Here is the oldest trick for buying accuracy: train N copies of the same network from different random starting weights and average their output distributions — the field calls this committee an ensemble. Each copy lands in a different minimum and makes partly independent errors, so averaging cancels the idiosyncratic mistakes while reinforcing the shared, correct structure, the same variance-reduction you get by averaging N noisy measurements. Slide N up and watch the wrong squares in the averaged row wink out. In the paper's speech experiment, averaging 10 identical nets raises frame accuracy — the fraction of short audio slices assigned the correct speech-sound label — from 58.9% to 61.1%. But look at the cost meter: serving the ensemble costs 10 times the compute for every single prediction, which is why the paper calls it cumbersome, and why we need what comes next.",
+      "visualMetaphor": "A grid of 40 test items (squares) with N rows above it, one per ensemble member; each member's row colors items green (right) or red (wrong), with errors partly random per member and a shared hard core of items everyone gets right. Below, one 'averaged prediction' row that goes green wherever the majority of members are right. Right side: a frame-accuracy readout interpolating from 58.9% (N=1) to 61.1% (N=10) and a compute-cost bar that grows linearly as N×.",
+      "animatedVariable": {
+        "name": "number of networks in the ensemble N",
+        "control": "slider",
+        "range": "N = 1 to 10",
+        "whatChangesOnScreen": "Member rows appear, red squares in the averaged row flip to green, the accuracy readout climbs from 58.9% toward 61.1%, and the cost bar grows to 10×."
+      },
+      "quantitativeAnchor": "N = 1: 58.9% frame accuracy at 1× cost; N = 10: 61.1% at 10× cost (paper's Table 1 baseline and ensemble).",
+      "physicsChecks": [
+        "The accuracy readout is 58.9% at N = 1 and 61.1% at N = 10, and never decreases as N grows.",
+        "The compute-cost bar is exactly N times the N = 1 bar (10× at max).",
+        "Squares that are red for every individual member remain red in the averaged row — averaging cannot fix shared errors."
+      ]
+    },
+    {
+      "id": "wrong-answers-carry-structure",
+      "conceptId": "dark-knowledge",
+      "part": "The new idea: teaching with the whole distribution",
+      "title": "The tiny probabilities on wrong answers encode what the model knows",
+      "teaches": "A trained model's near-zero probabilities on incorrect classes are wildly non-uniform, and their ratios encode the similarity structure the model has learned — this is the knowledge worth transferring.",
+      "requires": [
+        "softmax-is-boltzmann",
+        "hard-targets-one-bit"
+      ],
+      "caption": "You would naturally say a model's knowledge is its weights — millions of numbers, useless to a network with a different shape. The paper says no: the knowledge is the mapping from inputs to full output distributions, and the interesting part hides in the wrong answers. A trained model shown a BMW might assign probability \\(10^{-4}\\) to 'garbage truck' but \\(10^{-8}\\) to 'carrot' — both tiny, but their ratio of ten thousand tells you how the model has organized its world. Click between these two handwritten 2s and watch the log-scale bars: one 2 gets \\(10^{-6}\\) on '3' and \\(10^{-9}\\) on '7', while the other, written differently, gets the reverse. The paper's community nicknamed this relational information dark knowledge, and a student trained to reproduce it inherits the teacher's way of generalizing — not just its answers.",
+      "visualMetaphor": "Left: two large images of handwritten 2s rendered as buttons ('2 with a loop', '2 with a flat base'), one active at a time. Right: a bar chart of probabilities over the ten digit classes on a logarithmic axis spanning 10^{-10} to 1; the '2' bar sits near 1 for both inputs, while the '3' and '7' bars are highlighted and swap heights (10^{-6} vs 10^{-9}) between the two inputs. A ratio readout displays p(3)/p(7).",
+      "animatedVariable": {
+        "name": "which handwritten 2 the teacher is shown",
+        "control": "buttons",
+        "range": "input A (loopy 2) vs input B (flat 2)",
+        "whatChangesOnScreen": "The highlighted '3' and '7' bars swap by about three decades on the log axis; the ratio readout flips from ≈1000 to ≈0.001; the '2' bar barely moves."
+      },
+      "quantitativeAnchor": "Input A: p(3) = 10^{-6}, p(7) = 10^{-9}; input B: the reverse — a factor-of-1000 swap in the ratio, exactly the paper's illustrative numbers.",
+      "physicsChecks": [
+        "The '2' bar stays within a hair of probability 1 in both screenshots.",
+        "The '3' and '7' bars differ by ~3 decades on the log axis and exchange heights between the two inputs.",
+        "All ten bars are visible above the axis floor — no wrong-class probability renders as exactly zero."
+      ]
+    },
+    {
+      "id": "temperature-exposes-tails",
+      "conceptId": "temperature-softening",
+      "part": "The new idea: teaching with the whole distribution",
+      "title": "Raising the temperature makes the tiny probabilities trainable",
+      "teaches": "Dividing all logits by a temperature T > 1 before the softmax flattens the distribution deterministically, amplifying the near-zero probabilities into values large enough to shape a cross-entropy loss.",
+      "requires": [
+        "wrong-answers-carry-structure"
+      ],
+      "caption": "There is a problem: a probability of \\(10^{-6}\\) contributes almost nothing to the cross-entropy gradient, so at \\(T = 1\\) all that dark knowledge is numerically invisible to a student. The fix is the same knob you would reach for in statistical mechanics — raise the temperature. Divide every logit by \\(T\\) before the softmax, \\(q_i = \\frac{e^{z_i/T}}{\\sum_j e^{z_j/T}}\\), and the distribution flattens exactly as heating a physical system populates its excited states; drag the slider to the paper's MNIST setting of \\(T = 20\\) and the \\(10^{-6}\\)-scale bars rise to where a loss can feel them. Notice what temperature does not do: it adds no randomness and no information — the same logits go in, the ranking of classes never changes, it merely redistributes the loss's sensitivity toward the tail. The teacher's flattened distribution is what the paper calls soft targets; both teacher and student use the same high \\(T\\) during transfer, and at deployment the student runs at \\(T = 1\\), snapping back to a sharp, confident classifier.",
+      "visualMetaphor": "The ten-class bar chart from the previous scene with fixed teacher logits, now on a linear probability axis. A temperature slider re-renders the bars as q_i = e^{z_i/T}/Σe^{z_j/T} in real time. A dashed horizontal line marks the uniform level 0.1. A small inset shows the same distribution at T = 1 for comparison, and a badge reads 'ranking preserved' with the class order listed, unchanged at all T.",
+      "animatedVariable": {
+        "name": "softmax temperature T",
+        "control": "slider",
+        "range": "T = 1 to 20",
+        "whatChangesOnScreen": "The dominant bar melts downward and the tail bars grow toward the dashed 0.1 line; the displayed class ranking never reorders."
+      },
+      "quantitativeAnchor": "T = 20 is the actual temperature used for the paper's MNIST distillation experiments.",
+      "physicsChecks": [
+        "At T = 1 the chart matches scene 4's distribution converted to a linear axis (one bar near 1, the rest near 0).",
+        "At T = 20 every bar lies visibly closer to the 0.1 uniform line than at T = 1, and bars still sum to 1.",
+        "The left-to-right height ordering of the ten bars is identical in both screenshots — temperature never reorders classes."
+      ]
+    },
+    {
+      "id": "two-loss-recipe",
+      "conceptId": "distillation-recipe",
+      "part": "The new idea: teaching with the whole distribution",
+      "title": "The distillation loss: soft targets plus a small dose of true labels, rescaled by T²",
+      "teaches": "The student minimizes a weighted sum of cross-entropy against the teacher's soft targets at temperature T and cross-entropy against the true labels at T = 1, with the soft term multiplied by T² so the balance between them survives tuning T.",
+      "requires": [
+        "hard-targets-one-bit",
+        "temperature-exposes-tails"
+      ],
+      "caption": "Now assemble the actual algorithm, which the paper names distillation. The student computes one set of logits and pays two cross-entropies on them: one against the teacher's soft targets, with both networks run at the same temperature \\(T\\), and one against the true hard label at \\(T = 1\\), given a considerably smaller weight — the real labels still help, but the teacher does most of the teaching. There is a trap hiding in the calculus: each division of the logits by \\(T\\) contributes a factor \\(\\frac{1}{T}\\) to the gradient, so the soft term's gradient scales as \\(\\frac{1}{T^2}\\) — at \\(T = 20\\) it would arrive 400 times weaker than the hard term, and raising the temperature would silently mute the teacher. Slide \\(T\\) with the correction off and watch the soft-gradient bar collapse; flip the \\(T^2\\) rescaling on and it holds steady. That one factor is what makes temperature a clean, independently tunable knob instead of a trade-off against the true labels.",
+      "visualMetaphor": "A flow diagram: student logits feed two branches — the upper branch through a softmax labeled '÷T' to a box 'match teacher's soft targets', the lower branch through a softmax labeled 'T=1' to a box 'match true label'. Below, two horizontal gradient-magnitude bars (soft term, hard term) with numeric readouts and a 'soft : hard ratio' display. Controls: a T slider and a toggle labeled '×T² rescaling'.",
+      "animatedVariable": {
+        "name": "transfer temperature T (with a T²-rescaling toggle)",
+        "control": "slider",
+        "range": "T = 1 to 20; toggle off/on",
+        "whatChangesOnScreen": "Toggle off: the soft-term gradient bar shrinks as 1/T² while the hard-term bar stays fixed, and the ratio readout collapses. Toggle on: both bars and the ratio hold constant across the whole T range."
+      },
+      "quantitativeAnchor": "With the rescaling off, the soft-term gradient at T = 20 reads 1/400 of its T = 1 value; with it on, the ratio readout is identical at T = 1 and T = 20.",
+      "physicsChecks": [
+        "Toggle off: soft-gradient bar at T = 2 is one quarter of its T = 1 length; at T = 20 it is 1/400 (readout confirms).",
+        "Toggle on: soft- and hard-gradient bars are the same lengths in both screenshots regardless of T.",
+        "The hard-term gradient bar never changes with T in any configuration."
+      ]
+    },
+    {
+      "id": "high-t-logit-matching",
+      "conceptId": "logit-matching-limit",
+      "part": "The new idea: teaching with the whole distribution",
+      "title": "At high temperature, distillation becomes squared-error matching of logits",
+      "teaches": "In the limit T ≫ |z|, the distillation gradient (q_i − p_i)/T reduces to (z_i − v_i)/(NT²) — pure squared-error logit matching — while moderate T usefully ignores the teacher's noisy, very negative logits.",
+      "requires": [
+        "two-loss-recipe"
+      ],
+      "caption": "What is distillation really asking the student to do? Differentiate the soft-target cross-entropy and you get \\(\\frac{∂C}{∂z_i} = \\frac{1}{T}(q_i - p_i)\\), where \\(q_i\\) is the student's softened probability and \\(p_i\\) the teacher's. When \\(T\\) is much larger than the logits, expand \\(e^{z/T} ≈ 1 + \\frac{z}{T}\\); with each example's logits shifted to zero mean, the gradient collapses to \\(\\frac{1}{NT^2}(z_i - v_i)\\) — exactly gradient descent on \\(\\frac{1}{2}(z_i - v_i)^2\\), the squared-error logit matching that Caruana's group had used before, now revealed as one extreme of a family. Slide \\(T\\) down and watch the curve peel away from the straight line precisely for logits far below the mean: moderate temperature pays less attention to the teacher's very negative logits, which the teacher's own training barely constrained and which are therefore noisy. That explains the paper's empirical finding — tiny students with 30 hidden units per layer do best at intermediate \\(T ≈ 2.5\\)–4, while large students are insensitive to anything above \\(T = 8\\).",
+      "visualMetaphor": "A plot with teacher logit v_i on the x-axis (−10 to +10, zero-meaned) and per-class gradient magnitude on the y-axis. Two overlaid curves: the exact distillation gradient (q_i − p_i)/T (solid) and the linear high-T prediction (z_i − v_i)/(NT²) (dashed straight line), computed for a fixed student-teacher logit offset. A shaded band on the far-left of the x-axis is labeled 'barely constrained by teacher's training'. The equation ∂C/∂z_i = (q_i − p_i)/T → (z_i − v_i)/(NT²) sits above the plot with the active regime highlighted.",
+      "animatedVariable": {
+        "name": "transfer temperature T",
+        "control": "slider",
+        "range": "T = 1 to 50",
+        "whatChangesOnScreen": "At T = 50 the solid curve lies on top of the dashed line; as T decreases, the solid curve sags below the line in the shaded very-negative-logit band, showing those classes being down-weighted."
+      },
+      "quantitativeAnchor": "The paper's small students (two layers of 30 units) perform best at T ≈ 2.5–4; students with 300+ units per layer are insensitive for T > 8.",
+      "physicsChecks": [
+        "At T = 50 the solid and dashed curves are indistinguishable at plot resolution across the full x-range.",
+        "At T = 2 the solid curve is visibly below the dashed line inside the shaded band (logits far below the mean) but close to it near zero.",
+        "The deviation between curves grows monotonically as T decreases from 50 to 1."
+      ]
+    },
+    {
+      "id": "soft-targets-more-info",
+      "conceptId": "information-per-example",
+      "part": "The new idea: teaching with the whole distribution",
+      "title": "One soft-labeled example teaches far more than one hard-labeled example",
+      "teaches": "A soft target constrains the student's entire output distribution per example — thousands of real-valued ratios instead of one class identity — and varies smoothly across inputs, so the student learns from far fewer examples with less gradient noise.",
+      "requires": [
+        "temperature-exposes-tails",
+        "two-loss-recipe"
+      ],
+      "caption": "Why should copying probabilities be so much more efficient than copying answers? Count the constraints: on a 14,000-class problem, a hard target pins down one fact per example — 'the answer is class \\(k\\)' — while a high-entropy soft target pins down 13,999 real-valued ratios, the teacher's whole opinion about that input. There is a second effect: soft targets are smooth functions of the input, so the gradient they generate varies far less from one training case to the next than the jumpy one-hot signal does. Slide the number of training examples and watch the two learning curves: the soft-target student climbs steeply and smoothly while the hard-target student crawls and jitters. More information per case plus lower gradient variance is why distilled students can train on much less data, with higher learning rates.",
+      "visualMetaphor": "A plot of student test accuracy (y-axis) versus number of training examples (x-axis, log scale); two curves grow rightward as the slider extends them — 'hard targets' (shallow, with visible jitter) and 'soft targets' (steep, smooth). A side panel shows an 'information per example' counter: hard target = 1 class identity; soft target = 13,999 constrained ratios (for the 14,000-class problem). A small inset traces per-step gradient magnitude for each regime, one trace visibly noisier.",
+      "animatedVariable": {
+        "name": "number of training examples given to the student",
+        "control": "slider",
+        "range": "10³ to 10⁷ examples (log scale)",
+        "whatChangesOnScreen": "Both learning curves extend; the soft-target curve reaches any given accuracy level at visibly fewer examples, and the gradient-noise inset shows the hard-target trace jittering more."
+      },
+      "quantitativeAnchor": "On the paper's 14,000-class speech task, one soft target constrains 13,999 ratios versus 1 fact for a hard target — a per-example information gap of roughly four orders of magnitude.",
+      "physicsChecks": [
+        "At every slider position the soft-target curve lies at or above the hard-target curve.",
+        "The horizontal gap between the curves at a fixed accuracy level spans at least one decade of examples.",
+        "The gradient-noise inset shows larger step-to-step variation for the hard-target trace in both screenshots."
+      ]
+    },
+    {
+      "id": "mnist-payoff",
+      "conceptId": "distillation-recipe",
+      "part": "Head to head with the heavyweight",
+      "title": "On handwritten digits, the distilled student nearly matches its teacher",
+      "teaches": "A small MNIST network trained with the teacher's T = 20 soft targets makes 74 test errors versus 146 when trained normally, closing most of the gap to the 67-error teacher with no other regularization.",
+      "requires": [
+        "two-loss-recipe"
+      ],
+      "caption": "Time to keep score, starting on MNIST, the classic dataset of 10,000 handwritten test digits. The teacher is a big net — two layers of 1,200 units, trained with dropout (randomly silencing units during training, a strong regularizer) and with jittered inputs (images randomly shifted a pixel or two) — and it makes 67 test errors. A small student with two layers of 800 units, trained the ordinary hard-target way, makes 146. Press the third button: the same small student, trained with the teacher's soft targets at \\(T = 20\\) plus a small hard-target term, makes 74 errors — with no dropout, no jitter, no regularization of any kind beyond the soft targets themselves. Half the errors vanished because the student was told not just what each digit is, but what it almost is.",
+      "visualMetaphor": "Three vertical bars on a shared axis labeled 'test errors out of 10,000': teacher (2×1200, dropout + jitter) = 67; student (2×800, hard targets) = 146; student (2×800, distilled at T = 20) = 74. Buttons activate one training regime at a time; the active bar fills in, its recipe card (architecture, targets, regularizers) is displayed, and a strip of example digits below shows the currently misclassified ones thinning out.",
+      "animatedVariable": {
+        "name": "training regime of the small student",
+        "control": "buttons",
+        "range": "teacher / hard targets / distilled soft targets (T = 20)",
+        "whatChangesOnScreen": "The active bar and recipe card change; the misclassified-digit strip shrinks from 146 items to 74 when switching from hard targets to distillation."
+      },
+      "quantitativeAnchor": "Test errors: teacher 67, hard-target student 146, distilled student 74 (paper's MNIST experiment).",
+      "physicsChecks": [
+        "The three bars read exactly 67, 146, and 74.",
+        "The distilled bar is roughly half the hard-target bar and within about 10% of the teacher bar.",
+        "The distilled student's recipe card lists no regularizer other than soft targets, while the teacher's lists dropout and jitter."
+      ]
+    },
+    {
+      "id": "three-percent-data",
+      "conceptId": "soft-targets-regularize",
+      "part": "Head to head with the heavyweight",
+      "title": "With soft targets, 3% of the data buys almost all of the performance",
+      "teaches": "Trained on only 3% of the speech data, the hard-target model overfits catastrophically (67.3% train, 44.5% test) while the soft-target model reaches 57.0% test accuracy — within 2 points of the full-data model — without early stopping.",
+      "requires": [
+        "two-loss-recipe",
+        "soft-targets-more-info"
+      ],
+      "caption": "If soft targets really carry more information per example, starving the model of examples should hurt far less — and it does, dramatically. The 85-million-parameter speech model trained on all 700 million examples reaches 58.9% frame accuracy on held-out test data. Flip to hard targets on just 3% of the data (about 20 million examples) and press play: training accuracy soars to 67.3% while test accuracy peaks and then falls to 44.5% — the model is memorizing its small training set, a failure called overfitting, and you must halt training early ('early stopping') to salvage anything. Now flip to soft targets on the same 3%: the test curve climbs to 57.0% and simply flattens there, no early stopping needed. Each soft target constrains the model's entire output distribution on that example, forbidding the pathological weight settings that memorize the training set — the teacher's generalization behavior itself is being transmitted.",
+      "visualMetaphor": "A plot of accuracy (y-axis, 40–70%) versus training time (x-axis) with two curves per regime: train accuracy (dashed) and test accuracy (solid). A toggle switches between 'hard targets, 3% data' and 'soft targets, 3% data'; a play-pause control advances training. A horizontal reference line at 58.9% is labeled 'full-data baseline (100%)'. In the hard-target regime a marker flags the test curve's peak with 'early stopping required'; final readouts appear at curve ends (67.3%/44.5% vs ~57.0%/57.0%).",
+      "animatedVariable": {
+        "name": "target type on the 3% training subset",
+        "control": "toggle",
+        "range": "hard targets vs soft targets (play-pause advances training time)",
+        "whatChangesOnScreen": "Hard: the train and test curves split wide open and the test curve peaks then declines to 44.5%. Soft: the curves stay close and the test curve plateaus at 57.0%, just under the 58.9% reference line."
+      },
+      "quantitativeAnchor": "Table 5: 100% data + hard targets → 58.9% test; 3% + hard → 67.3% train / 44.5% test; 3% + soft → 57.0% test with no early stopping.",
+      "physicsChecks": [
+        "In the hard-target screenshot the train–test gap at end of training exceeds 20 percentage points (67.3 vs 44.5).",
+        "In the soft-target screenshot the test curve ends within 2 points of the 58.9% reference line and shows no post-peak decline.",
+        "The 'early stopping required' marker appears only in the hard-target regime."
+      ]
+    },
+    {
+      "id": "missing-three",
+      "conceptId": "mnist-missing-class",
+      "part": "Head to head with the heavyweight",
+      "title": "A student that has never seen a 3 learns to recognize 3s",
+      "teaches": "When every 3 is removed from the transfer set, the soft targets on other digits leak enough about the 3-class that the student recognizes test 3s, needing only a one-number bias correction to get 98.6% of them right.",
+      "requires": [
+        "wrong-answers-carry-structure",
+        "two-loss-recipe"
+      ],
+      "caption": "Here is the sharpest proof that soft targets transfer structure, not just labels. Delete every 3 from the student's training set, so it never sees a single positive example — you would expect the 3-class to be unlearnable, its probability pinned near zero for every input. But every 2, 5, and 8 in the training set arrives with the teacher's soft target attached, and each one carries a small, structured probability for '3', quietly mapping out where 3s live in output space; the student ends up making only 206 test errors in total, 133 of them on the 1,010 test 3s. Its one systematic defect is a bias — a constant added to the 3-class logit — that sits too low, since training never rewarded saying '3'. Drag that single number up by 3.5 and total errors fall to 109, with the student now getting 98.6% of the 3s it never saw correct; even a training set containing only 7s and 8s yields just 13.2% test error after bias correction.",
+      "visualMetaphor": "Left: a grid of the 1,010 test 3s as small thumbnails, each tinted green (classified correctly) or red (missed). Right: a slider labeled 'bias added to the 3-logit' (0 to 5), a curve of total test errors versus bias with a moving dot (starting at 206, minimum ~109 near 3.5), and readouts for 'test 3s correct' (starting 877/1010, reaching 98.6% at bias 3.5). A banner states 'training set contains zero 3s'.",
+      "animatedVariable": {
+        "name": "bias added to the student's 3-class logit",
+        "control": "slider",
+        "range": "bias = 0 to +5",
+        "whatChangesOnScreen": "Red thumbnails flip green as the bias rises; the error-curve dot slides from 206 down to 109 near bias = 3.5, then back up as the bias overshoots and other digits start being called 3s."
+      },
+      "quantitativeAnchor": "Bias 0: 206 total errors, 133 of 1,010 test 3s missed. Bias +3.5: 109 total errors, 98.6% of test 3s correct.",
+      "physicsChecks": [
+        "At bias 0 the readouts show 206 total errors and 877/1010 3s correct.",
+        "The total-error curve has its minimum near bias 3.5 at ~109 errors and rises again beyond it.",
+        "At bias 3.5 the 3s-correct readout shows 98.6%."
+      ]
+    },
+    {
+      "id": "speech-distillation",
+      "conceptId": "speech-ensemble-distillation",
+      "part": "Head to head with the heavyweight",
+      "title": "One distilled network keeps the 10-model ensemble's gains at a tenth of the cost",
+      "teaches": "Distilling the averaged predictions of a 10-model production speech ensemble into a single same-size network preserves over 80% of the frame-accuracy gain and all of the word-error-rate gain at one-tenth the inference cost.",
+      "requires": [
+        "averaging-cancels-errors",
+        "two-loss-recipe"
+      ],
+      "caption": "Now the industrial test, on the acoustic model behind Android voice search: an 8-layer, 85-million-parameter network classifying each audio frame into one of 14,000 speech-sound states. Ten copies trained from different random seeds and averaged — the cumbersome ensemble from Part 1 — lift frame accuracy from 58.9% to 61.1% and cut word error rate (the fraction of words the full speech system transcribes wrongly) from 10.9% to 10.7%. Press the third button: a single network of the same size, distilled from the ensemble's averaged soft targets at \\(T = 2\\) with a hard-target weight of 0.5, reaches 60.8% frame accuracy and the very same 10.7% word error rate. That is over 80% of the ensemble's accuracy gain and 100% of its word-error gain, delivered at one-tenth the cost per prediction. The knowledge of ten networks now fits in one — this is the paper's motivating problem, solved.",
+      "visualMetaphor": "Three columns selectable by buttons: 'single baseline', '10-net ensemble', 'distilled single net'. Each column shows a stack of network icons (1, 10, or 1), a frame-accuracy bar (58.9 / 61.1 / 60.8%), a word-error-rate readout (10.9 / 10.7 / 10.7%), and a per-query compute-cost bar (1× / 10× / 1×). A 'fraction of ensemble gain retained' meter fills to >80% when the distilled column is active.",
+      "animatedVariable": {
+        "name": "which system serves the prediction",
+        "control": "buttons",
+        "range": "single baseline / 10-model ensemble / distilled single model",
+        "whatChangesOnScreen": "The active column's bars fill and readouts update; the cost bar drops from 10× back to 1× when switching from ensemble to distilled while the WER readout stays at 10.7%."
+      },
+      "quantitativeAnchor": "Table 1: baseline 58.9% / 10.9% WER at 1×; ensemble 61.1% / 10.7% at 10×; distilled 60.8% / 10.7% at 1×.",
+      "physicsChecks": [
+        "Frame-accuracy bars read exactly 58.9, 61.1, and 60.8%.",
+        "The distilled column's WER readout equals the ensemble's (10.7%) while its cost bar equals the baseline's (1×).",
+        "The gain-retained meter reads above 80% ((60.8 − 58.9)/(61.1 − 58.9) ≈ 86%)."
+      ]
+    },
+    {
+      "id": "specialist-training",
+      "conceptId": "specialist-ensembles",
+      "part": "Why now: past the committee entirely",
+      "title": "When labels number in the thousands, train one generalist plus many independent specialists",
+      "teaches": "For huge label spaces where a full ensemble is untrainable, one generalist plus dozens of independently trained specialists — each covering a cluster of classes the generalist confuses — trains in parallel in days and lifts accuracy.",
+      "requires": [
+        "averaging-cancels-errors",
+        "speech-distillation"
+      ],
+      "caption": "Distillation fixed serving cost, but at Google's scale even training became the wall: on JFT, an internal dataset of 100 million images spanning 15,000 classes, the single baseline network took six months, so a 10-copy ensemble would take years. The paper's answer: train one broad model — the generalist — and then 61 specialists, each responsible for roughly 300 classes the generalist tends to confuse (mushroom species, say, or sports cars); a standard clustering procedure called K-means, applied to the covariance of the generalist's predictions, finds these confusable groups without needing any true labels, and we will treat it as a well-tested black box. Each specialist starts from a copy of the generalist's weights — inheriting its low-level features and resisting overfitting — trains on a half-and-half mix of its own classes and random data, and lumps all other classes into a single 'dustbin' output. Crucially, this is not a jointly trained committee with a gating network: assignments are fixed up front, so every specialist trains completely independently, in parallel, in a few days. Slide the coverage: overall top-1 accuracy (the single best guess being correct) rises from 25.0% to 26.1%, and for test classes covered by nine or more specialists the gain reaches +14–17%.",
+      "visualMetaphor": "A scatter of 15,000 class-dots; colored blobs mark confusable clusters. Center: the generalist network icon with copies budding off it into specialist icons, each attached to one blob and showing a 'dustbin' output for everything else. A slider sets how many specialists cover the currently highlighted test class (0–10); readouts show that class's relative top-1 gain (+3.4% at 1, rising to +14–17% at 9+) and the overall accuracy (25.0% → 26.1%). A training-time meter compares 'full 10-copy ensemble: years' vs 'generalist + 61 specialists in parallel: days'.",
+      "animatedVariable": {
+        "name": "number of specialists covering the test class",
+        "control": "slider",
+        "range": "0 to 10 covering specialists",
+        "whatChangesOnScreen": "More specialist icons attach to the highlighted class's cluster; the per-class gain readout climbs from 0% through +3.4% (one specialist) to +14–17% (nine or more), and the overall top-1 readout settles at 26.1%."
+      },
+      "quantitativeAnchor": "Tables 3–4: overall top-1 accuracy 25.0% → 26.1% (+4.4% relative); per-class gains grow from +3.4% with one covering specialist to +14–17% with nine or more; 61 specialists of ~300 classes each.",
+      "physicsChecks": [
+        "The per-class gain readout increases monotonically with the number of covering specialists.",
+        "At 1 covering specialist the gain reads +3.4%; at 9+ it reads within the +14–17% band.",
+        "The training-time meter shows the specialist scheme at days and the hypothetical full ensemble at years, regardless of slider position."
+      ]
+    },
+    {
+      "id": "specialist-fusion",
+      "conceptId": "specialist-inference",
+      "part": "Why now: past the committee entirely",
+      "title": "At test time, one distribution is fitted to agree with the generalist and every active specialist",
+      "teaches": "The final prediction over all 15,000 classes is found per image by gradient descent on the logits, minimizing the summed KL divergence from the generalist's and each activated specialist's distributions to a single output distribution q.",
+      "requires": [
+        "specialist-training"
+      ],
+      "caption": "One puzzle remains: each specialist only speaks about its ~300 classes plus a dustbin, so how do their voices combine into one answer over all 15,000 classes? For each image, the generalist proposes its top classes, which wakes every specialist whose subset overlaps them; then we search for the single full distribution \\(q = \\text{softmax}(z)\\) that is simultaneously closest to the generalist's opinion and to every awake specialist's. 'Closest' means minimizing KL divergence — a standard measure of the gap between two probability distributions, zero when they match — so the objective is \\(\\min_q KL(p^g, q) + \\sum_m KL(p^m, q)\\); when comparing \\(q\\) against a specialist, all of \\(q\\)'s mass on that specialist's non-special classes is summed into its dustbin slot. There is no closed-form answer in general, so press play and watch gradient descent run on the logits of \\(q\\) for this one image, the KL total falling until the curves settle. In the special case of a single shared probability per class, the solution reduces to a simple arithmetic or geometric mean of the models — reassurance that this machinery is the principled generalization of plain averaging, which is where this whole story began.",
+      "visualMetaphor": "Top: three small distribution strips over 8 toy classes — 'generalist' (all 8 classes), 'specialist 1' (classes 1–3 + dustbin), 'specialist 2' (classes 3–5 + dustbin) — with specialist activation indicated by a lit border. Bottom: the candidate output distribution q as 8 bars that visibly re-shape during optimization, plus a descending curve of total KL objective versus iteration. Controls: a play-pause for the gradient-descent iterations and a toggle deactivating specialist 2. Bracket annotations show q's mass over specialist 2's non-special classes being summed into its dustbin for the comparison.",
+      "animatedVariable": {
+        "name": "gradient-descent iterations on q's logits (with a specialist on/off toggle)",
+        "control": "play-pause",
+        "range": "iteration 0 to convergence; specialist 2 active/inactive",
+        "whatChangesOnScreen": "The q bars morph from the generalist's shape toward a compromise honoring both specialists; the KL-objective curve decreases monotonically; toggling specialist 2 off shifts the converged q back toward the generalist on classes 3–5."
+      },
+      "quantitativeAnchor": "The converged q always sums to 1.000, and this fusion rule is what produces the JFT result of the previous scene: 24.5% → 26.1% top-1 when specialist opinions are folded in.",
+      "physicsChecks": [
+        "The KL-objective curve never increases between iterations (compare early and converged screenshots).",
+        "The q bars sum to 1.000 at iteration 0 and at convergence.",
+        "With specialist 2 toggled off, the converged q on classes 3–5 sits closer to the generalist's strip than when specialist 2 is active."
+      ]
+    }
+  ]
+}

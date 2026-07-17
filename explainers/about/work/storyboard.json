@@ -1,0 +1,342 @@
+{
+  "title": "How a Protein Model Learned to Predict and Design Biology",
+  "hook": "A useful medicine often begins with a molecule that can grip one chosen target and ignore the rest. Finding that molecule has usually meant making and testing enormous collections in a laboratory. Biohub reports a system that moves much of that first search into a computer, then checks the winners in the physical world. To understand what changed, we have to begin with the tiny chains that do most of life's molecular work.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "First we need the causal chain from a protein's building blocks to its shape, then from shape to binding. That makes the old laboratory search bottleneck concrete."
+    },
+    {
+      "title": "How the new protein machine works",
+      "lede": "Once sequence, shape, and binding are linked, we can see how a machine learns those links from examples and uses them to predict and design."
+    },
+    {
+      "title": "Why it beats the old search",
+      "lede": "The mechanism is only useful if it survives real measurements. Now we compare its structure predictions, speed, designed binders, and physical geometry with laboratory evidence."
+    },
+    {
+      "title": "Why this is possible now",
+      "lede": "Fast prediction and learned biological coordinates can now be applied across billions of sequences. The result is not just a faster answer to one question, but a map for finding new questions."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "sequence-sets-shape",
+      "conceptId": "what-a-protein-is",
+      "part": "The basic building blocks",
+      "title": "A protein's sequence sets the shape it can fold into",
+      "teaches": "Changing one amino acid in a protein's sequence can change the three-dimensional shape the chain adopts.",
+      "requires": [],
+      "caption": "To understand protein design, begin with the object being designed. A protein is a chain assembled from 20 kinds of chemical building block called amino acids; the ordered list is its sequence. Attractions and repulsions among those building blocks pull the chain into a three-dimensional fold. Change the selected amino acid and watch the chain settle into a new contact pattern, which is why sequence is the first cause in this story.",
+      "visualMetaphor": "A split panel shows an eight-position toy protein sequence on the left and its folded chain on the right. Each position is a labeled bead; the selected fourth bead has a 20-option amino-acid picker grouped by chemical character. The fold is a fixed, reproducible two-dimensional projection with contact lines between beads that end up near one another. Changing the selected amino acid animates the chain from the old projection to a precomputed new projection and updates only the contacts affected by that choice; a legend explicitly labels this as a toy fold, not an atomically accurate simulation.",
+      "animatedVariable": {
+        "name": "amino-acid identity at one sequence position",
+        "control": "buttons",
+        "range": "20 amino-acid choices for position 4 of an eight-amino-acid toy chain",
+        "whatChangesOnScreen": "the selected bead's label and chemical category change, then the chain relaxes into the corresponding fold and its contact lines update"
+      },
+      "quantitativeAnchor": "Proteins use 20 kinds of amino acid.",
+      "physicsChecks": [
+        "Exactly 20 amino-acid choices are available and one is visibly selected.",
+        "At least two choices produce visibly different fold outlines and contact patterns.",
+        "The bead order stays fixed when identity changes; only the chosen bead and the resulting fold change."
+      ]
+    },
+    {
+      "id": "shape-controls-binding",
+      "conceptId": "what-a-protein-is",
+      "part": "The basic building blocks",
+      "title": "Matching surfaces make a protein bind its target",
+      "teaches": "A protein binds a target when complementary surfaces fit closely enough to form many stabilizing contacts.",
+      "requires": [
+        "sequence-sets-shape"
+      ],
+      "caption": "A fold matters because shape decides what the protein can touch. Suppose one protein presents a pocket and another molecule, the target, presents a matching ridge. Where their surfaces approach closely, many weak chemical contacts can add up to a firm grip; a protein chosen for that grip is called a binder. Move the match from poor to close and watch scattered contacts become a stable interface.",
+      "visualMetaphor": "A fixed yellow target surface sits on the right while a green binder surface approaches from the left. The match slider continuously morphs the binder's contact edge from a mismatched arc to the target's complementary contour without changing its overall area. Short contact marks appear only where the gap is below a fixed threshold; a contact counter, a bound/unbound state, and a plain-language grip meter update together. At high mismatch the binder springs apart, while at high match it seats against the target without overlapping it.",
+      "animatedVariable": {
+        "name": "surface complementarity between binder and target",
+        "control": "slider",
+        "range": "0% shape match to 100% shape match",
+        "whatChangesOnScreen": "the interface gap shrinks, the number of valid contacts rises, and the binder changes from separated to stably seated"
+      },
+      "physicsChecks": [
+        "Contact count rises monotonically as shape match increases.",
+        "At 0% match the surfaces do not overlap and the state reads unbound.",
+        "At 100% match the contours are complementary, multiple contacts are visible, and the state reads bound."
+      ]
+    },
+    {
+      "id": "rare-hits-make-screening-slow",
+      "conceptId": "the-binder-design-problem",
+      "part": "The basic building blocks",
+      "title": "Rare binders force laboratories to test enormous libraries",
+      "teaches": "The rarer a working binder is, the more physical candidates a laboratory must screen before finding one.",
+      "requires": [
+        "shape-controls-binding"
+      ],
+      "caption": "Now we can name the old bottleneck: the right shape is rare. A classical screen makes a physical library, meaning a large collection of candidate molecules, then tests them against the target. Set how often a hit occurs and watch the expected number of tests swell from thousands to millions. At the hard end, the first hits can take weeks or months, while development beyond that first hit typically takes years.",
+      "visualMetaphor": "A target sits above a conveyor of candidate wells. A rarity slider controls the stated toy hit frequency, and the display computes the expected candidates per hit as the reciprocal of that frequency. Rather than drawing millions of wells, the conveyor groups them into labeled batches while counters show expected candidates tested and elapsed search scale. A single green hit appears at the end of each completed expected batch so every state visibly reaches the same outcome through a different amount of screening.",
+      "animatedVariable": {
+        "name": "frequency of a working binder in the physical library",
+        "control": "slider",
+        "range": "one hit per 1,000 candidates to one hit per 1,000,000 candidates",
+        "whatChangesOnScreen": "the number of candidate batches and expected tests before one hit rise as hits become rarer, while the time label moves from days toward weeks or months"
+      },
+      "quantitativeAnchor": "Classical approaches screen hundreds of thousands or millions of candidates; initial hits can take weeks to months and broader antibody development takes years.",
+      "physicsChecks": [
+        "Expected candidates per hit equals the reciprocal of the displayed toy hit frequency at every slider stop.",
+        "Moving from one hit per 1,000 to one per 1,000,000 increases the expected screen by exactly 1,000-fold.",
+        "A hit is visible in both easy and hard states; rarity changes the work needed, not the definition of success."
+      ]
+    },
+    {
+      "id": "context-predicts-hidden-amino-acids",
+      "conceptId": "language-model-of-proteins",
+      "part": "How the new protein machine works",
+      "title": "Neighboring amino acids help the machine fill a sequence gap",
+      "teaches": "A protein language model learns by using neighboring amino acids to predict one hidden amino acid.",
+      "requires": [
+        "sequence-sets-shape"
+      ],
+      "caption": "The machine needs a way to learn from sequences without a teacher labeling every fold. During training, the learning process, one amino acid is hidden and the machine must guess it from the neighbors. This fill-in-the-blank system is called a protein language model because it treats amino-acid sequences much as a text model treats sentences. Reveal more surrounding positions and watch a flat choice among 20 possibilities sharpen around the amino acid that fits this context.",
+      "visualMetaphor": "A 13-amino-acid toy sequence is centered on one masked position shown as a question mark. A context slider reveals matching numbers of neighbors outward from the mask, from none to six on each side. Beneath it, a 20-bar probability chart starts uniform at 5% per amino acid and follows a fixed toy probability table as context is revealed; the true amino acid is outlined but not disclosed until the reader presses the final reveal state. A compact note says the probabilities are illustrative while the 20-way prediction task is real.",
+      "animatedVariable": {
+        "name": "amount of sequence context visible around the hidden amino acid",
+        "control": "slider",
+        "range": "0 to 6 neighboring positions visible on each side",
+        "whatChangesOnScreen": "more sequence letters appear and the 20-way probability distribution concentrates on the context-compatible amino acid"
+      },
+      "quantitativeAnchor": "Each hidden position is predicted from 20 possible amino acids.",
+      "physicsChecks": [
+        "With no context, all 20 bars read 5% and sum to 100%.",
+        "Each slider step reveals the same number of positions on the left and right until the sequence boundary is reached.",
+        "At maximum context the true amino acid has the tallest probability bar."
+      ]
+    },
+    {
+      "id": "training-scale-enriches-representations",
+      "conceptId": "scaling-law",
+      "part": "How the new protein machine works",
+      "title": "More training produces a richer internal picture of biology",
+      "teaches": "Increasing training scale makes the model's internal protein description more biologically informative in a predictable way.",
+      "requires": [
+        "context-predicts-hidden-amino-acids",
+        "shape-controls-binding"
+      ],
+      "caption": "Good guesses are useful only if they teach the machine something deeper. As training grows, the numbers the model builds for each amino acid capture shape and function more accurately; that numerical summary is called a representation. The measured improvement follows a smooth trend called a scaling law, so more computing effort has a predictable payoff. Slide from millions of training sequences toward ESMC's roughly 2.8 billion and watch independent biology probes climb along the same trend.",
+      "visualMetaphor": "A log-scale horizontal axis runs from millions of training sequences to 2.8 billion, with a smooth rising scaling-law curve labeled representation quality on the vertical axis. The slider moves one marker along the curve. Three small probe gauges labeled fold, binding site, and broad function all fill from the same marker through fixed monotonic mappings, making clear that these are tests of the representation rather than extra training labels. The endpoint is labeled ESMC and 2.8 billion sequences; no invented absolute accuracy values are shown.",
+      "animatedVariable": {
+        "name": "training scale measured by sequences processed",
+        "control": "slider",
+        "range": "millions of protein sequences to approximately 2.8 billion sequences",
+        "whatChangesOnScreen": "the marker advances along a smooth scaling curve and all three biological probe gauges rise"
+      },
+      "quantitativeAnchor": "ESMC was trained on approximately 2.8 billion protein sequences.",
+      "physicsChecks": [
+        "Representation quality and all three probe gauges rise monotonically with training scale.",
+        "The scaling curve is smooth rather than stepped or random.",
+        "The maximum state is explicitly labeled approximately 2.8 billion sequences."
+      ]
+    },
+    {
+      "id": "loops-refine-structure",
+      "conceptId": "looped-transformer-recurrence",
+      "part": "How the new protein machine works",
+      "title": "Repeated passes refine one structural prediction",
+      "teaches": "Repeating the same structure-refinement machinery improves a predicted fold without increasing model size.",
+      "requires": [
+        "training-scale-enriches-representations"
+      ],
+      "caption": "A learned representation still has to become a three-dimensional structure. ESMFold2 sends an evolving shape guess through the same machinery several times, a method called looped refinement. Each pass can correct conflicts left by the previous pass, so a hard protein can receive more computing effort without adding a larger set of machinery. Increase the loop count and watch one rough fold settle while the model-size indicator stays fixed.",
+      "visualMetaphor": "A single rectangular refinement module receives a protein representation and outputs a folded ribbon. One arrow loops from output back to input, with a numbered pass token traveling around it. The fold begins with visibly crossed segments and unsatisfied contact guides; each additional pass moves it toward a fixed final structure, removes conflicts, and raises a qualitative confidence meter. A separate model-size bar is locked to one constant width at every loop count.",
+      "animatedVariable": {
+        "name": "number of refinement loops at prediction time",
+        "control": "slider",
+        "range": "1 to 8 passes through the same refinement module",
+        "whatChangesOnScreen": "the pass token repeats, structural conflicts disappear, and prediction confidence rises while the module and model-size bar remain unchanged"
+      },
+      "physicsChecks": [
+        "The loop counter equals the selected number of passes.",
+        "Structural conflict count never increases as loops are added.",
+        "The refinement module drawing and model-size bar have identical dimensions at 1 and 8 loops."
+      ]
+    },
+    {
+      "id": "search-ranks-binder-candidates",
+      "conceptId": "design-by-searching-representation-space",
+      "part": "How the new protein machine works",
+      "title": "A larger virtual search gives the model more chances to find a binder",
+      "teaches": "Searching more computer-generated sequences raises the best model-scored binder available for testing.",
+      "requires": [
+        "shape-controls-binding",
+        "training-scale-enriches-representations",
+        "loops-refine-structure"
+      ],
+      "caption": "Prediction answers what shape a sequence will make; design asks which sequence to try. ESMFold2 turns design into a search by generating candidate sequences, predicting how each sits on the target, then ranking them with a confidence score, the model's estimate that the pose is stable and well formed. Increase the candidate pool and the fixed toy search reveals more ranked options, so its best available score can rise but never fall. In the reported runs, generation took roughly two days and ranking took less than a day, with no special retraining for these targets.",
+      "visualMetaphor": "A fixed target appears at left beside a seeded stream of candidate sequence cards. A candidate-count slider reveals progressively larger prefixes of the same 50,000-candidate toy pool, preventing random reversals between screenshots. Each revealed card flows through a compact predicted-pose thumbnail into a vertical ranking lane ordered by a plainly labeled confidence score from 0 to 100. The best-so-far card is enlarged beside the target, and a two-stage timeline below remains labeled generation about 2 days and ranking under 1 day.",
+      "animatedVariable": {
+        "name": "number of virtual binder candidates searched",
+        "control": "slider",
+        "range": "100 to 50,000 generated candidates from one fixed seeded pool",
+        "whatChangesOnScreen": "more candidates enter the ranking, the shortlist grows, and the best-so-far confidence score steps upward or stays level"
+      },
+      "quantitativeAnchor": "Tens of thousands or more candidates were generated in roughly two days, then scored and ranked in less than a day.",
+      "physicsChecks": [
+        "The number of ranked candidates matches the selected pool size, using aggregation when individual cards would not fit.",
+        "The best-so-far confidence score is monotonic because larger states contain every candidate from smaller states.",
+        "The generation and ranking timeline labels read about 2 days and under 1 day at every state."
+      ]
+    },
+    {
+      "id": "alignment-raises-complex-accuracy",
+      "conceptId": "structure-prediction-benchmarks",
+      "part": "Why it beats the old search",
+      "title": "Related sequences raise correct complex predictions from 71% to 77%",
+      "teaches": "Supplying related sequences raises ESMFold2's success rate on protein complexes.",
+      "requires": [
+        "context-predicts-hidden-amino-acids",
+        "loops-refine-structure"
+      ],
+      "caption": "The first test is whether the predicted shapes are right often enough to trust. ESMFold2 can start from one sequence because the training stage already captured evolutionary patterns. Give it an optional stack of related sequences, called a multiple sequence alignment, and correct general complex predictions on Foldbench rise from 71% to 77%. The same benchmark suite includes the harder antibody-target task, where the model predicts 55% correctly; antibodies are proteins whose flexible gripping loops make the exact pose difficult.",
+      "visualMetaphor": "A two-state toggle feeds either one query sequence or that sequence plus a visibly aligned stack of relatives into the same unchanged ESMFold2 box. The output is a 100-cell Foldbench grid for general protein-protein complexes, with the correct portion filled to 71 cells or 77 cells and a large percentage label. A separate fixed inset labeled harder antibody-target benchmark shows 55 of 100 cells and does not respond to the toggle, preventing the reader from mistaking 55% for an alignment effect. A footer states that these are reported Foldbench rates, not a toy calculation.",
+      "animatedVariable": {
+        "name": "related-sequence evidence supplied to structure prediction",
+        "control": "toggle",
+        "range": "single sequence only or single sequence plus a multiple sequence alignment",
+        "whatChangesOnScreen": "the related-sequence stack appears and the general-complex success grid increases from 71% to 77%"
+      },
+      "quantitativeAnchor": "Foldbench: 71% of general complexes correct from sequence alone, 77% with alignment data, and 55% of antibody-antigen complexes correct.",
+      "physicsChecks": [
+        "The general-complex grid contains exactly 71 filled cells without alignment and 77 with alignment.",
+        "The ESMFold2 module is visually identical in both states; only its supplied evidence changes.",
+        "The antibody-target inset remains fixed at 55% and is clearly separated from the alignment comparison."
+      ]
+    },
+    {
+      "id": "long-proteins-remain-fast",
+      "conceptId": "structure-prediction-benchmarks",
+      "part": "Why it beats the old search",
+      "title": "A 1024-amino-acid structure can be predicted in 9.4 seconds",
+      "teaches": "ESMFold2-Fast keeps structure prediction practical even as protein length increases.",
+      "requires": [
+        "loops-refine-structure"
+      ],
+      "caption": "Accuracy alone would not replace a slow search, so the next constraint is time. Protein length means the number of amino acids in its chain, and longer chains give a predictor more work. Stretch the sequence from 128 to 1024 amino acids and watch the work indicator grow while the measured endpoint remains within a few seconds. ESMFold2-Fast predicts the 1024-amino-acid case in 9.4 seconds, fast enough to make large virtual searches plausible.",
+      "visualMetaphor": "A length slider expands a bracketed protein sequence using grouped blocks rather than thousands of individual letters. Beneath it, a relative-work bar grows monotonically with length and a stopwatch sits beside a measured benchmark marker at 1024 amino acids. Only the source-backed endpoint displays an absolute runtime: 9.4 seconds; intermediate slider positions show relative work without invented times. A small comparison strip keeps one laboratory calendar page visible to preserve the scale contrast without assigning it a fabricated exact duration.",
+      "animatedVariable": {
+        "name": "protein sequence length",
+        "control": "slider",
+        "range": "128 to 1024 amino acids",
+        "whatChangesOnScreen": "the sequence bracket and relative-work bar grow, reaching the measured 9.4-second benchmark marker at length 1024"
+      },
+      "quantitativeAnchor": "ESMFold2-Fast predicts a 1024-amino-acid protein structure in 9.4 seconds.",
+      "physicsChecks": [
+        "The displayed sequence length always equals the slider value.",
+        "Relative work never decreases as sequence length increases.",
+        "At exactly 1024 amino acids the runtime badge reads 9.4 seconds; no unsupported absolute times appear at other lengths."
+      ]
+    },
+    {
+      "id": "compute-raises-lab-success",
+      "conceptId": "compute-scaling-improves-lab-success",
+      "part": "Why it beats the old search",
+      "title": "More virtual search produces more binders that work in the lab",
+      "teaches": "More inference compute raises the fraction of top-ranked designs that bind in the laboratory.",
+      "requires": [
+        "search-ranks-binder-candidates"
+      ],
+      "caption": "A confidence score is only a promise until molecules are made and tested. The team searched at two computing scales, then screened the top 84 designs for every target, design format, and scale across five disease-relevant targets. Raise the search compute and minibinder success climbs from 54% to 70%. The harder single-chain antibody fragments, called scFvs, climb from 12% to 21%. Because the same testing rule is used at both scales, the rising lab bars show that extra virtual search buys real experimental success.",
+      "visualMetaphor": "A two-position compute control sits above two paired success bars, one labeled minibinders, meaning small newly designed binding proteins, and one labeled scFvs, meaning compact single-chain antibody fragments. At lower compute the bars read 54% and 12%; at higher compute they animate to 70% and 21%. A fixed protocol rail lists five target tabs by name: EGFR, PDGFR-beta, PD-L1, CTLA-4, and CD45, followed by the statement top 84 screened per target, format, and compute scale. The target tabs are labels only, not controls, because the reported bars are averages across targets.",
+      "animatedVariable": {
+        "name": "inference compute used to search candidate designs",
+        "control": "buttons",
+        "range": "lower compute or higher compute",
+        "whatChangesOnScreen": "both laboratory success bars rise, from 54% to 70% for minibinders and from 12% to 21% for scFvs"
+      },
+      "quantitativeAnchor": "Across five targets, the top 84 designs per target, format, and scale were screened; minibinders improved from 54% to 70% and scFvs from 12% to 21%.",
+      "physicsChecks": [
+        "Lower-compute bars read exactly 54% for minibinders and 12% for scFvs.",
+        "Higher-compute bars read exactly 70% for minibinders and 21% for scFvs.",
+        "All five target names and the top-84-per-target-format-scale protocol are visible in both states.",
+        "Bar heights are proportional to their labeled percentages on a shared 0% to 100% axis."
+      ]
+    },
+    {
+      "id": "pd-l1-binder-is-tight",
+      "conceptId": "lab-validation-affinity-and-novelty",
+      "part": "Why it beats the old search",
+      "title": "What 4.3 nanomolar means: how tightly a binder grips",
+      "teaches": "Binding strength is quoted as a dissociation constant, and the reported 4.3-nanomolar value means half the target sites are occupied at a tiny concentration \u2014 a tight grip.",
+      "requires": [
+        "shape-controls-binding",
+        "compute-raises-lab-success"
+      ],
+      "caption": "How do we say, in a number, how firmly one molecule holds onto another? We quote a dissociation constant, written \\(K_D\\): the concentration at which half of the target sites are occupied. The smaller that concentration, the tighter the grip. Biohub reports \\(K_D = 4.3\\) nanomolar \u2014 billionths of a mole per liter \u2014 for its binder against PD-L1, a protein on cells that normally tells the immune system to stand down. Slide the binder's concentration and watch the share of occupied targets climb; at 4.3 nanomolar it crosses one half. Needing only so slight a concentration to fill half the sites is exactly what 'tight' means.",
+      "visualMetaphor": "An educational binding-affinity chart. A logarithmic concentration slider drives a field of 100 target icons (labeled 'PD-L1 target sites'); the occupied share follows one displayed equilibrium curve \\(f = C/(C + K_D)\\) with \\(K_D\\) fixed at the reported 4.3 nM. Icons switch between occupied and free to match the rounded percentage. A vertical marker at 4.3 nM meets the curve at 50%. A small side note states in plain words what PD-L1 is and that 4.3 nM is a reported measurement, not something the reader is computing or creating.",
+      "animatedVariable": {
+        "name": "binder concentration",
+        "control": "slider",
+        "range": "0.1 nM to 100 nM on a logarithmic scale",
+        "whatChangesOnScreen": "the marker moves along the equilibrium curve and the share of occupied PD-L1 target sites rises"
+      },
+      "quantitativeAnchor": "The reported PD-L1 binder has a dissociation constant \\(K_D\\) of 4.3 nM (half-occupancy at 4.3 nM).",
+      "physicsChecks": [
+        "At 4.3 nM the occupied share reads 50% and the marker sits on the reported \\(K_D\\) line.",
+        "Occupancy rises monotonically with concentration, from about 2% at 0.1 nM to about 96% at 100 nM.",
+        "The displayed curve and the occupied-icon count agree within one percentage point at every slider value."
+      ]
+    },
+    {
+      "id": "microscopy-confirms-egfr-pose",
+      "conceptId": "cryo-em-ground-truth",
+      "part": "Why it beats the old search",
+      "title": "The observed EGFR binder pose is within 1.204 Angstroms of the prediction",
+      "teaches": "A 1.204-Angstrom RMSD shows that the designed EGFR binder adopted almost the same pose predicted by the model.",
+      "requires": [
+        "shape-controls-binding",
+        "compute-raises-lab-success"
+      ],
+      "caption": "A binder can grip strongly for an unexpected reason, so the final test asks whether its physical pose matches the prediction. The team used cryo-electron microscopy, which reconstructs a three-dimensional structure by averaging many electron-beam images of rapidly frozen molecules. Pose error is summarized by root-mean-square deviation, or RMSD: the typical distance between corresponding atoms after the two structures are aligned. Set the error to the measured 1.204 Angstroms and the predicted and observed EGFR minibinders nearly coincide, about an atom-width apart. Increase the counterfactual error and watch the overlay and target contacts visibly fail.",
+      "visualMetaphor": "A yellow EGFR target is fixed beneath two copies of its minibinder: the model prediction in green and the microscopy reconstruction as a gray mesh. A pose-error slider moves and rotates the gray copy along a deterministic path while a large RMSD readout and contact-retention counter update. The measured 1.204-Angstrom position is a labeled snap point and the default state; higher values are explicitly marked counterfactual. A small inset shows the averaging of many frozen particle views into the gray reconstruction without adding another control.",
+      "animatedVariable": {
+        "name": "RMSD between predicted and observed binder poses",
+        "control": "slider",
+        "range": "1.204 Angstroms measured to 8 Angstroms counterfactual error",
+        "whatChangesOnScreen": "the gray observed pose separates from the green prediction and loses predicted target contacts as RMSD increases"
+      },
+      "quantitativeAnchor": "The predicted and cryo-EM-observed EGFR minibinder structures differ by 1.204 Angstroms RMSD.",
+      "physicsChecks": [
+        "The default and minimum slider state read exactly 1.204 Angstroms RMSD and are labeled measured.",
+        "Visual separation between gray and green structures increases monotonically with RMSD.",
+        "Predicted target-contact retention never increases as pose error rises.",
+        "The 8-Angstrom state is labeled counterfactual rather than experimental."
+      ]
+    },
+    {
+      "id": "atlas-connects-distant-proteins",
+      "conceptId": "esm-atlas-map",
+      "part": "Why this is possible now",
+      "title": "Learned biology connects proteins that sequence spelling misses",
+      "teaches": "Using the model's biological representation as map coordinates brings functionally related proteins together despite low sequence similarity.",
+      "requires": [
+        "training-scale-enriches-representations",
+        "long-proteins-remain-fast"
+      ],
+      "caption": "Once billions of sequences can be represented and many structures can be predicted quickly, the next need is navigation. ESM Atlas places proteins by the model's learned biological representation rather than only by shared sequence letters. Shift the coordinate rule from raw sequence similarity toward learned biology and watch distant Fanzor and TnpB proteins join the same functional neighborhood despite low sequence similarity. The full Atlas contains 6.8 billion sequences and 1.1 billion predicted structures. That scale turns the vast unstudied collection into a place where a known neighborhood can point toward an unknown protein worth testing next.",
+      "visualMetaphor": "A sampled two-dimensional map contains several thousand points, with a clear scale badge stating that the sample stands for the full Atlas. A coordinate-weight slider interpolates deterministically between a raw-sequence layout and a learned-representation layout. Fanzor points and TnpB points start far apart in the raw-sequence state, then travel along visible trails into one labeled RNA-guided DNA-cutting neighborhood as learned biology receives more weight; unrelated control clusters remain separate. Fixed counters above the map read 6.8 billion sequences and 1.1 billion predicted structures.",
+      "animatedVariable": {
+        "name": "weight given to learned biological representation when positioning proteins",
+        "control": "slider",
+        "range": "0% learned biology with raw sequence similarity only to 100% learned biological coordinates",
+        "whatChangesOnScreen": "the map rearranges and the distance between Fanzor and TnpB clusters shrinks while unrelated groups remain apart"
+      },
+      "quantitativeAnchor": "ESM Atlas maps 6.8 billion sequences and 1.1 billion predicted structures.",
+      "physicsChecks": [
+        "The scale counters remain fixed at 6.8 billion sequences and 1.1 billion predicted structures for every coordinate setting.",
+        "Fanzor-to-TnpB cluster distance decreases monotonically as learned-biology weight increases.",
+        "At 100% learned biology, Fanzor and TnpB occupy the same labeled functional neighborhood without merging into one point.",
+        "The map is labeled as a representative sample so the scene never implies that billions of individual points are rendered."
+      ]
+    }
+  ]
+}

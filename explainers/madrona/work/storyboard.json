@@ -1,0 +1,334 @@
+{
+  "title": "How to Simulate a Million Reinforcement-Learning Environments on One GPU",
+  "hook": "A reinforcement learning agent that discovers a genuinely new strategy — like building a fort out of movable boxes — needed on the order of 100 billion tries before that behavior showed up. If each try takes even a millisecond of simulated physics, that's years of wall-clock time no matter how good your learning algorithm is. This explainer builds up, from the ground rules of GPU hardware, the design that turns those hundred billion tries into a day and a half on a single consumer graphics card. To understand it honestly, we start with why simulators are slow, why GPUs are fussy about how they're used, and only then turn to the paper's actual machine.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Before judging any speedup we need the ground rules: how many tries reinforcement learning actually needs, how a GPU is willing to be used, and what it costs just to talk to one. These four facts explain why almost every existing simulator leaves nearly all of a GPU's power on the table."
+    },
+    {
+      "title": "The new technology",
+      "lede": "Given those constraints, the paper borrows a pattern from video-game engines — entity-component-system — and reshapes it entirely around the GPU's need for coherent memory and coherent instructions. Each scene below adds one piece of that machine."
+    },
+    {
+      "title": "Why it beats existing simulators",
+      "lede": "With the machine built, we can put it head-to-head against both a naive GPU port and a strong CPU baseline, using the paper's own measured numbers."
+    },
+    {
+      "title": "Why it matters now",
+      "lede": "The architecture's payoff isn't a fluke of one hand-tuned task — it generalizes across simple and complex environments alike, which is exactly the property reinforcement learning research needs as tasks keep getting more complex."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "rl-needs-billions-of-steps",
+      "conceptId": "rl-needs-billions-of-steps",
+      "part": "The basic building blocks",
+      "title": "Training complex behavior takes on the order of 100 billion tries",
+      "teaches": "Modern reinforcement learning needs roughly \\(10^{11}\\) environment steps before complex behavior emerges, so wall-clock training time is set by simulator speed, not by the learning algorithm.",
+      "requires": [],
+      "caption": "Complex behavior can take \\(1.15×10^{11}\\) environment steps to emerge. Drag the simulator's speed and watch training time collapse from decades down to about a day.",
+      "visualMetaphor": "A log-scale x-axis from \\(10^6\\) to \\(10^{11}\\) environment steps with labeled milestone dots (\"random flailing\" ~\\(10^7\\), \"basic tool use\" ~\\(10^9\\), \"coordinated fort-building\" ~\\(10^{11}\\)). Below it, a slider sets simulator throughput (steps/sec) and a live readout computes wall-clock time = steps needed ÷ speed, shown in days.",
+      "animatedVariable": {
+        "name": "simulator throughput (steps/sec)",
+        "control": "slider",
+        "range": "10^3 to 10^6 steps/sec",
+        "whatChangesOnScreen": "the wall-clock-time-to-reach-1.15×10^11-steps readout shrinks from multiple years down to about 1.3 days as the slider moves right"
+      },
+      "quantitativeAnchor": "115 billion (1.15×10^11) steps needed for emergent tool use in hide-and-seek",
+      "physicsChecks": [
+        "at 10^3 steps/sec the readout shows multi-year training time (>3 years)",
+        "at 10^6 steps/sec the readout is close to 1.3 days",
+        "the milestone dots stay fixed on the step axis regardless of slider position — only the time readout changes"
+      ]
+    },
+    {
+      "id": "gpu-simt-and-warp-divergence",
+      "conceptId": "gpu-simt-and-warp-divergence",
+      "part": "The basic building blocks",
+      "title": "A GPU is fast only when neighboring threads do the same thing",
+      "teaches": "GPU threads run in lockstep groups of 32 (a warp); the moment threads in a warp need different instructions or scattered memory addresses, the hardware serializes them and throughput collapses.",
+      "requires": [],
+      "caption": "Threads in a warp — a group of 32 that share one instruction stream — run in lockstep. Let even one thread diverge and the hardware splits the warp into two slower passes.",
+      "visualMetaphor": "A row of 32 small thread icons. A slider sets the fraction taking an alternate branch of a two-branch code snippet shown above. At 0% all 32 icons flash green together and a progress bar fills in one pass. At any value above 0%, icons split into two colors and the progress bar visibly takes two sequential passes, with idle (greyed) icons shown waiting during the pass they're not part of. A linked memory-bandwidth gauge below drops proportionally when the divergence slider also represents scattered memory addresses.",
+      "animatedVariable": {
+        "name": "fraction of threads diverging from the group's instruction/address",
+        "control": "slider",
+        "range": "0% to 100%",
+        "whatChangesOnScreen": "completion time jumps from one pass to two the instant divergence leaves 0%, and the memory-bandwidth gauge drops as the scattered-address fraction rises"
+      },
+      "quantitativeAnchor": "warp size = 32 threads sharing one instruction stream",
+      "physicsChecks": [
+        "at 0% divergence, single pass, all 32 icons green, baseline time T",
+        "at any value above 0%, two passes are shown and total time is roughly 2T regardless of exact split",
+        "the bandwidth gauge is monotonically decreasing as the scatter fraction increases"
+      ]
+    },
+    {
+      "id": "kernel-launch-overhead-and-cpu-sync",
+      "conceptId": "kernel-launch-overhead-and-cpu-sync",
+      "part": "The basic building blocks",
+      "title": "Every GPU launch carries a fixed tax, however small the job",
+      "teaches": "Launching a kernel — a chunk of code sent to the GPU — and syncing the CPU with it costs a fixed microsecond-scale overhead, so many small kernels can spend more time on overhead than on actual work.",
+      "requires": [],
+      "caption": "Every kernel launch costs the CPU a fixed microsecond-scale tax to launch and to wait for. Slide the step count up and watch that tax swallow the actual work.",
+      "visualMetaphor": "Two stacked horizontal timelines. Top: '1 big kernel' — one block of useful-compute width. Bottom: 'N small kernels' — a slider sets N from 1 to 200; for each launch, a fixed-width red 'overhead' sliver is inserted before a small compute segment. Below, a live readout shows % of total time spent on overhead.",
+      "animatedVariable": {
+        "name": "number of separate kernel launches per simulation step",
+        "control": "slider",
+        "range": "1 to 200",
+        "whatChangesOnScreen": "cumulative red overhead grows linearly and the overhead-percentage readout climbs from near 0% toward the majority of total step time"
+      },
+      "quantitativeAnchor": "~200 operations per HideSeek simulation step; overhead is roughly microseconds per launch",
+      "physicsChecks": [
+        "at 1 launch, overhead is a negligible fraction of the bar",
+        "at 200 launches with small per-op compute, overhead exceeds half the total bar length",
+        "the total bar length never shrinks as the slider moves right"
+      ]
+    },
+    {
+      "id": "batch-vs-scaleout-simulation",
+      "conceptId": "batch-vs-scaleout-simulation",
+      "part": "The basic building blocks",
+      "title": "Running many copies is not the same as running them together",
+      "teaches": "Scale-out simulation (N independent simulator copies on N cores) gives the hardware no shared structure to exploit; batch simulation (one engine aware of all N environments at once) turns identical per-environment work into single coherent parallel operations.",
+      "requires": [
+        "gpu-simt-and-warp-divergence"
+      ],
+      "caption": "Running N separate simulator copies gives the GPU nothing to coalesce; running all N inside one engine that knows about all of them turns identical operations into one coherent operation. Flip the switch and watch the access pattern turn from scattered red to coherent green.",
+      "visualMetaphor": "Split-screen toggle. Left: 'scale-out' — N separate boxes, each its own private memory blob and its own independent control flow. Right: 'batch' — one big box containing all N environments' data laid out as one shared table, with a single operation sweeping across the row. Each side reuses the coherence indicator from the divergence scene (red = scattered, green = coalesced).",
+      "animatedVariable": {
+        "name": "simulation strategy",
+        "control": "toggle",
+        "range": "scale-out (N independent copies) ↔ batch (one shared engine)",
+        "whatChangesOnScreen": "the coherence indicator flips from red/scattered to green/coalesced, and a throughput-multiplier readout jumps upward in batch mode"
+      },
+      "quantitativeAnchor": "N up to 32,768 environments simulated simultaneously in the paper's batch design",
+      "physicsChecks": [
+        "scale-out always shows red/incoherent regardless of N",
+        "batch always shows green/coherent regardless of N",
+        "the throughput readout is higher in batch mode than scale-out mode at every N tested"
+      ]
+    },
+    {
+      "id": "ecs-core-abstractions",
+      "conceptId": "ecs-core-abstractions",
+      "part": "The new technology",
+      "title": "Data and behavior are stored separately, and a query connects them",
+      "teaches": "In entity-component-system design, entities are bundles of components (data), and a system is one plain function that a query automatically runs on every entity possessing the right components — no manual dispatch code.",
+      "requires": [],
+      "caption": "An entity — like one agent or one obstacle — is just a bundle of components (position, velocity, team). A system is one plain function that a query runs on every entity with the right components. Change the query and watch which rows light up.",
+      "visualMetaphor": "A table diagram (Fig.1-style): rows are entities (Agent1, Agent2, Obstacle1...), columns are components (Position, Velocity, Team, Action); entities sharing the same columns are grouped into colored blocks labeled 'Archetype: Agent' and 'Archetype: Obstacle'. A separate box shows system pseudocode: TimeIntegrate(pos, vel): vel += force·dt; pos += vel·dt. Buttons let the reader pick a query signature, and matching rows highlight.",
+      "animatedVariable": {
+        "name": "component signature requested by the query",
+        "control": "buttons",
+        "range": "query = (Position, Velocity) vs query = (Position, Velocity, Team)",
+        "whatChangesOnScreen": "the set of highlighted rows changes to exactly the entities possessing all requested components"
+      },
+      "quantitativeAnchor": "n/a — structural concept (Fig. 1)",
+      "physicsChecks": [
+        "query (Position, Velocity) highlights both Agent and Obstacle rows if both have those components",
+        "query (Position, Velocity, Team) highlights only Agent rows, since Obstacles lack Team",
+        "the system pseudocode box never changes when the query changes"
+      ]
+    },
+    {
+      "id": "system-computation-graph",
+      "conceptId": "system-computation-graph",
+      "part": "The new technology",
+      "title": "One simulation step is a dependency graph of systems, not a flat list",
+      "teaches": "A simulation step is a directed acyclic graph whose nodes are systems and whose edges encode required ordering (e.g. collision detection must run before collision resolution).",
+      "requires": [
+        "ecs-core-abstractions"
+      ],
+      "caption": "One simulation step is a graph — nodes are systems, arrows are dependencies that must be respected. Try running collision resolution before collision detection and watch it get blocked.",
+      "visualMetaphor": "A node-and-arrow diagram: ProcessAction → FindOverlaps → NarrowPhase → PosSolve → AgentVisibility → Rewards. Buttons let the reader pick a proposed execution order (a valid one respecting arrows, or an invalid one that swaps two dependent nodes); invalid attempts flash the violated arrow red, valid ones animate nodes lighting up in topological order, with independent nodes shown lighting up in the same time-slot.",
+      "animatedVariable": {
+        "name": "attempted execution order of graph nodes",
+        "control": "buttons",
+        "range": "a few preset orderings: valid topological order vs an order that swaps a dependent pair",
+        "whatChangesOnScreen": "invalid orderings trigger a red blocked-arrow highlight; valid orderings animate nodes executing in dependency order, with independent nodes shown running in the same slot"
+      },
+      "quantitativeAnchor": "the real HideSeek computation graph has ~200 nodes; this diagram shows 6 for teaching",
+      "physicsChecks": [
+        "reordering NarrowPhase before FindOverlaps always triggers the red invalid state",
+        "nodes with no path between them can be shown executing in the same time slot",
+        "an on-screen label states the real graph has ~200 nodes versus the 6 shown"
+      ]
+    },
+    {
+      "id": "centralized-table-per-archetype",
+      "conceptId": "centralized-table-per-archetype",
+      "part": "The new technology",
+      "title": "One shared table for all environments beats one table per environment",
+      "teaches": "Storing every environment's copy of an archetype in one contiguous table tagged by environment ID — instead of a separate table per environment — gives GPU threads adjacent memory addresses to read.",
+      "requires": [
+        "ecs-core-abstractions",
+        "gpu-simt-and-warp-divergence"
+      ],
+      "caption": "Give every environment its own memory block and neighboring GPU threads read scattered addresses. Merge everyone's obstacles into one table tagged by environment ID and neighbors become adjacent. Flip the layout and watch the environment-count ceiling jump from about 8,000 to over 32,000.",
+      "visualMetaphor": "Two memory-layout diagrams toggled between. 'Per-environment': N small colored blocks, each partly empty (white slack space), with a GPU thread-row shown jumping between far-apart addresses (red scattered lines). 'Centralized': one long contiguous row holding all environments' obstacle rows back to back, each tagged with a small EnvID number; threads read consecutive addresses (green straight lines), and slack space is pooled once rather than duplicated.",
+      "animatedVariable": {
+        "name": "table layout: per-environment vs centralized",
+        "control": "toggle",
+        "range": "per-environment ↔ centralized (with EnvID tag)",
+        "whatChangesOnScreen": "access lines switch from scattered/red to contiguous/green, wasted slack shrinks, and the 'max concurrent environments' readout jumps from ~8,000 to 32,000+"
+      },
+      "quantitativeAnchor": "naive per-environment layout caps at ~8K concurrent environments vs 32K+ for the centralized layout",
+      "physicsChecks": [
+        "per-environment layout always shows scattered/red access",
+        "centralized layout always shows contiguous/green access",
+        "the max-environments readout is strictly higher in centralized mode (32K+) than per-environment mode (~8K)"
+      ]
+    },
+    {
+      "id": "envid-dynamic-entities",
+      "conceptId": "envid-dynamic-entities",
+      "part": "The new technology",
+      "title": "Deleting an entity is a tag flip; reclaiming its memory is a sort",
+      "teaches": "Deleting an entity just overwrites its EnvID with a sentinel value (-1), a lock-free operation; a periodic parallel sort pushes all dead rows to the table's end so the table can be truncated.",
+      "requires": [
+        "centralized-table-per-archetype"
+      ],
+      "caption": "Deleting an entity just overwrites its environment tag with \\(-1\\) — no locks, no shifting. Periodically a parallel sort shoves every \\(-1\\) row to the end so the table can be truncated. Click delete, then run the sort, and watch the table shrink.",
+      "visualMetaphor": "A row of table cells each labeled with an EnvID number (0,0,1,2,1,...). A 'delete entity' button turns a clicked cell's EnvID to -1 (greyed out) instantly, with no other cell moving. A 'run compaction sort' button animates a sort: -1 cells slide to the end, live cells re-group by EnvID (contiguous per environment again), then the trailing dead block is truncated and the table visibly shrinks.",
+      "animatedVariable": {
+        "name": "number of deletions performed before compaction",
+        "control": "slider",
+        "range": "0 to 20 deletions",
+        "whatChangesOnScreen": "greyed-out (-1) cells accumulate scattered through the table; pressing compaction sorts them to the end and truncates, with a readout of memory reclaimed"
+      },
+      "quantitativeAnchor": "compaction sort runs nearly every simulation step",
+      "physicsChecks": [
+        "clicking delete never moves any other cell",
+        "after compaction, all -1 cells are contiguous at the table's tail",
+        "after truncation, the table shrinks by exactly the number of deletions since the last compaction"
+      ]
+    },
+    {
+      "id": "megakernel-design",
+      "conceptId": "megakernel-design",
+      "part": "The new technology",
+      "title": "The whole simulation step runs as one self-scheduling kernel",
+      "teaches": "Madrona compiles the entire ~200-node system graph into a single persistent CUDA kernel, where warps atomically pull the next ready graph node from a shared pointer instead of the CPU launching each node separately.",
+      "requires": [
+        "system-computation-graph",
+        "kernel-launch-overhead-and-cpu-sync"
+      ],
+      "caption": "Instead of ~200 separate kernel launches with a CPU round-trip between each, the whole graph is compiled into one kernel: warps just grab the next ready node from a shared pointer. Step through the graph and watch the launch-overhead slivers from before disappear.",
+      "visualMetaphor": "The 6-node DAG from the computation-graph scene, now enclosed in one rounded box labeled 'ONE megakernel, launched once per step'. Several warp icons sit at a task pointer; a 'next node' button advances the pointer and all warps instantly jump to the new node with no gap between them, shown beside a faded ghost of the earlier multi-kernel timeline (with its red overhead slivers) for comparison.",
+      "animatedVariable": {
+        "name": "step through consecutive task-graph nodes",
+        "control": "buttons",
+        "range": "node 1 through 6 (toy graph, labeled as standing in for ~200 in the real kernel)",
+        "whatChangesOnScreen": "warps reassign to each new node with zero overhead gap, while the faded reference multi-kernel timeline visibly runs longer for the same graph"
+      },
+      "quantitativeAnchor": "an entire simulation step (~200 systems) executes as 1 kernel launch instead of ~200",
+      "physicsChecks": [
+        "no red overhead sliver appears between any two nodes in the megakernel timeline",
+        "the faded multi-kernel reference timeline is visibly longer overall than the megakernel timeline",
+        "warp icons only ever move to the immediate next unblocked node in the graph"
+      ]
+    },
+    {
+      "id": "pgo-register-allocation",
+      "conceptId": "pgo-register-allocation",
+      "part": "The new technology",
+      "title": "Splitting the megakernel's register budget per system raises GPU utilization",
+      "teaches": "Because expensive systems need many registers and cheap systems benefit from few (to keep more warps resident), profiling each system and giving it its own register budget raises measured compute and memory utilization beyond a single shared budget.",
+      "requires": [
+        "megakernel-design"
+      ],
+      "caption": "One shared register budget for every system either starves cheap systems of parallelism or starves expensive systems of registers. Slide the budget for the selected system and watch resident-warp count trade off against speed — the paper's split raises compute use from 22% to 33%.",
+      "visualMetaphor": "A chart: x-axis = registers per thread (64 to 255). Two curves: 'resident warps (occupancy)', which falls as registers rise, and 'selected system's speed', which rises then plateaus. Buttons let the reader pick which system to view (e.g. expensive NarrowPhase collision vs cheap broad-phase); a slider sets that system's register budget, and an overall compute-utilization readout updates live toward the paper's 22%→33% figures.",
+      "animatedVariable": {
+        "name": "register budget assigned to the selected system",
+        "control": "slider",
+        "range": "64 to 255 registers/thread",
+        "whatChangesOnScreen": "the occupancy curve shrinks as registers increase, and the overall compute-utilization readout moves toward 33% only at the system-specific sweet spot"
+      },
+      "quantitativeAnchor": "1.4M→1.9M steps/sec (35% gain); compute utilization 22%→33%, memory bandwidth 46%→69%",
+      "physicsChecks": [
+        "increasing registers for one system always monotonically decreases its occupancy curve",
+        "the compute-utilization readout peaks near 33% only at the reported optimal split, not at either extreme (all-64 or all-255)",
+        "switching the selected system shifts where its speed-vs-register curve peaks (expensive systems peak at higher register counts)"
+      ]
+    },
+    {
+      "id": "naive-gpu-mapping-fails",
+      "conceptId": "naive-gpu-mapping-fails",
+      "part": "Why it beats existing simulators",
+      "title": "One environment per GPU thread wastes almost the whole GPU",
+      "teaches": "Mapping one whole environment to a single GPU thread (instead of Madrona's shared-table, megakernel design) leaves only 1.9% of compute and memory bandwidth utilized, making it slower than even a well-optimized CPU implementation.",
+      "requires": [
+        "gpu-simt-and-warp-divergence",
+        "centralized-table-per-archetype",
+        "megakernel-design"
+      ],
+      "caption": "Put one whole environment on one GPU thread and you get exactly the failure from earlier scenes: only 1.9% of compute and memory bandwidth used, and a design 3× slower than a good CPU implementation. Toggle between throughput and utilization — Madrona wins both.",
+      "visualMetaphor": "A bar chart with three bars: 'ECS-GPU (naive, 1 env/thread)', 'ECS-CPU (32-thread)', 'Madrona (batched GPU)'. Buttons switch the y-axis between 'throughput (steps/sec, log scale)' and 'GPU utilization (%)'; in utilization view ECS-GPU sits at 1.9%, Madrona at 33% compute / 69% memory.",
+      "animatedVariable": {
+        "name": "displayed metric",
+        "control": "buttons",
+        "range": "throughput (steps/sec) ↔ GPU utilization (%)",
+        "whatChangesOnScreen": "bar heights and axis labels swap between the two metrics while the ranking (Madrona tallest) stays fixed"
+      },
+      "quantitativeAnchor": "ECS-GPU at 1.9% compute/1.9% memory utilization; Madrona ~42× faster than ECS-GPU and ~3× faster than ECS-CPU",
+      "physicsChecks": [
+        "in throughput view, Madrona > ECS-CPU > ECS-GPU",
+        "in utilization view, ECS-GPU sits at ~1.9%, far below Madrona's 33%/69%",
+        "the Madrona/ECS-GPU throughput ratio shown is roughly 42×"
+      ]
+    },
+    {
+      "id": "quantitative-payoff",
+      "conceptId": "quantitative-payoff",
+      "part": "Why it beats existing simulators",
+      "title": "1.9 million steps per second turns 40 days of training into 1.5",
+      "teaches": "Madrona's batched GPU design reaches 1.9 million environment steps/sec on one RTX 4090, collapsing the wall-clock time to reach 115 billion training steps from tens of days on CPU (or far more on the original reference simulator) to about 1.5 days.",
+      "requires": [
+        "naive-gpu-mapping-fails",
+        "rl-needs-billions-of-steps"
+      ],
+      "caption": "Put it all together: 1.9 million steps per second on one RTX 4090. Pick a simulator and watch the same \\(1.15×10^{11}\\)-step training run take anywhere from months down to about a day and a half.",
+      "visualMetaphor": "Reuses the training-time readout from the first scene, now with three fixed points on a throughput axis: 'Python/MuJoCo reference (~7K steps/sec)', 'ECS-CPU 32-thread (~170K steps/sec)', 'Madrona batched GPU (1.9M steps/sec)'. Buttons select a simulator and the training-time-to-115-billion-steps readout (in days) recalculates live, alongside a separate bar showing 'time to first emergent behavior' under 4 hours for Madrona.",
+      "animatedVariable": {
+        "name": "selected simulator",
+        "control": "buttons",
+        "range": "Python/MuJoCo reference, ECS-CPU (32-thread), Madrona (batched GPU)",
+        "whatChangesOnScreen": "the training-time readout jumps between roughly 400 days (reference), ~40 days (CPU), and ~1.5 days (Madrona)"
+      },
+      "quantitativeAnchor": "1.9M steps/sec on one RTX 4090 (32K environments); ~1.5 days full training, <4 hours to early emergent behavior; ~11× vs CPU baseline, ~270× vs the Python/MuJoCo reference",
+      "physicsChecks": [
+        "selecting Madrona shows a training-time readout of roughly 1.5 days",
+        "selecting ECS-CPU shows a training-time readout of roughly 40 days",
+        "the ordering Madrona < ECS-CPU < Python/MuJoCo reference holds for every selection"
+      ]
+    },
+    {
+      "id": "two-level-parallelism",
+      "conceptId": "two-level-parallelism",
+      "part": "Why it matters now",
+      "title": "Entities inside one environment give the GPU work even at modest scale",
+      "teaches": "Because a single environment already contains many entities to parallelize across, Madrona keeps near-peak throughput at far fewer simultaneous environments for entity-rich tasks than for entity-sparse ones, which is what lets the architecture generalize to future, more complex environments.",
+      "requires": [
+        "batch-vs-scaleout-simulation",
+        "megakernel-design"
+      ],
+      "caption": "A single environment already has dozens of entities to spread across threads, so Madrona doesn't need millions of environments to stay busy. Pick a task and watch how few environments it takes to hit 75% of peak throughput — 8,000 for a busy multi-agent task versus half a million for a nearly empty one.",
+      "visualMetaphor": "A chart: x-axis = number of environments simulated in parallel (log scale, 10^2 to 10^6), y-axis = % of peak throughput achieved. Two curves plotted: 'HideSeek (many entities per environment)' and 'Cartpole (1-2 entities per environment)'. Buttons pick which task's curve to highlight, with a vertical marker showing where each curve crosses 75% of peak.",
+      "animatedVariable": {
+        "name": "task selected (entities per environment)",
+        "control": "buttons",
+        "range": "Cartpole (low entity count) ↔ HideSeek (high entity count)",
+        "whatChangesOnScreen": "the 75%-of-peak crossing marker shifts far left (fewer environments needed) for HideSeek versus far right for Cartpole"
+      },
+      "quantitativeAnchor": "HideSeek retains >75% of peak throughput down to 8,000 environments; Cartpole needs 500,000+ environments to saturate",
+      "physicsChecks": [
+        "the HideSeek curve crosses the 75%-of-peak line at roughly x=8,000",
+        "the Cartpole curve crosses the 75%-of-peak line at roughly x=500,000, over 60× further right",
+        "at very small environment counts (e.g. 100), the HideSeek curve sits above the Cartpole curve"
+      ]
+    }
+  ]
+}

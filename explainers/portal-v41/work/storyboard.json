@@ -1,0 +1,370 @@
+{
+  "title": "One Engine, Both Knobs: How Sunlight-Heated Ammonia Breaks the Speed-vs-Efficiency Trap",
+  "hook": "For fifty years, every satellite has faced the same forced choice. Engines with real thrust drain their tanks after a few hundred meters per second of maneuvering. Efficient electric thrusters sip propellant, but a big orbit change takes over a year of continuous firing. This explainer follows one satellite through one maneuver: a 5,000 m/s climb from low Earth orbit to geostationary orbit. The trap is not a law of physics. A thermal rocket's exhaust velocity depends only on gas temperature and molecular weight. It does not care where the heat came from. Feed cheap ammonia through a heat exchanger cooked to 3,000 K by concentrated sunlight, and the maneuver that costs an electric thruster 527 days takes 9 hours.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Meet the running example — a 500 kg satellite that must buy a 5,000 m/s orbit change — and the three pieces of freshman mechanics that price it: momentum exchange, the rocket equation, and the power budget. Together they explain why every existing engine sits in one of two bad corners."
+    },
+    {
+      "title": "The new technology",
+      "lede": "The trap in Part 1 came from letting the propellant supply its own energy. Solar-thermal propulsion cuts that link: sunlight provides the heat, so the propellant can be chosen purely for its physics — and \\(v_e ∝ \\sqrt{T/M}\\) does the rest."
+    },
+    {
+      "title": "Why it beats existing tech",
+      "lede": "With the mechanism in hand, run the GEO sprint head-to-head. Solar thermal is the only architecture that finishes in hours, stays cheapest across the whole Δv range, and can wait in orbit for months without its propellant boiling away."
+    },
+    {
+      "title": "Why now",
+      "lede": "The physics was validated in ground tests decades ago, so the real question is what changed. Three subsystem breakthroughs made the hardware buildable, a filing boom is making maneuvering routine, and the same heat exchanger is the core of the next engine after this one."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "geo-sprint-price-tag",
+      "conceptId": "delta-v-currency",
+      "part": "The basic building blocks",
+      "title": "Every orbital maneuver has a fixed price in velocity change, set by geometry alone",
+      "teaches": "Delta-v (Δv) — the total change in velocity a maneuver requires — is fixed by the orbits involved, not by the engine or the time taken, and a spacecraft's total Δv capacity is its lifetime maneuver budget.",
+      "requires": [],
+      "caption": "In orbit there is no friction, so moving between orbits costs a definite velocity change — written \\(Δv\\) — no matter which engine you use. Our running example, the GEO sprint, carries a fixed bill of 5,000 m/s.",
+      "visualMetaphor": "Earth at center with two circular orbits drawn to scale-ish: LEO (low Earth orbit, ~500 km up) and GEO (geostationary orbit, ~35,786 km up). A 500 kg satellite icon sits in LEO. Buttons select a maneuver — collision dodge (~1 m/s), constellation repositioning (~100 m/s), LEO-to-GEO transfer (5,000 m/s) — and each stamps a price tag on the transfer arc. Predict-before-reveal: a prompt asks 'if you take a month instead of a day, does the price drop?' Pressing 'reveal' shows the same price tag regardless of a fast-burn or slow-spiral animation of the transfer.",
+      "animatedVariable": {
+        "name": "Selected maneuver",
+        "control": "buttons",
+        "range": "collision dodge (1 m/s) → repositioning (100 m/s) → LEO-to-GEO (5,000 m/s)",
+        "whatChangesOnScreen": "The highlighted transfer arc and its Δv price tag; the fast-vs-slow animation shows the price tag unchanged."
+      },
+      "quantitativeAnchor": "LEO-to-GEO transfer: ~5,000 m/s of Δv, regardless of engine or transfer time.",
+      "physicsChecks": [
+        "The Δv price tag for LEO-to-GEO reads 5,000 m/s in both the fast-burn and slow-spiral animations.",
+        "Larger orbit changes always show larger Δv prices (1 < 100 < 5,000 m/s).",
+        "No price tag depends on any engine parameter — no engine is selectable in this scene."
+      ]
+    },
+    {
+      "id": "thrust-power-equation",
+      "conceptId": "thrust-momentum-exchange",
+      "part": "The basic building blocks",
+      "title": "Thrust is momentum thrown overboard: F = ṁ·vₑ, but power grows as vₑ²",
+      "teaches": "Thrust equals mass flow rate times exhaust velocity, while the power to produce it scales with exhaust velocity squared — so at fixed power, thrust and exhaust velocity fight each other.",
+      "requires": [
+        "geo-sprint-price-tag"
+      ],
+      "caption": "To spend that 5,000 m/s bill, the satellite throws mass backward: thrust is \\(F = \\dot{m}·v_e\\), where \\(\\dot{m}\\) is kilograms of propellant expelled per second and \\(v_e\\) is the exhaust velocity in m/s. At a fixed power budget \\(F = 2P/v_e\\), so thrust and exhaust velocity trade directly.",
+      "visualMetaphor": "Equation scene. Center: the two equations \\(F = \\dot{m}v_e\\) and \\(P = \\tfrac{1}{2}\\dot{m}v_e^2\\), each symbol labeled with name, unit, and meaning (\\(\\dot{m}\\): mass flow, kg/s; \\(v_e\\): exhaust velocity, m/s; F: thrust, newtons; P: power, watts). Below, a rocket cross-section ejecting particle streams. A toggle at fixed P = 10 kW switches between 'throw a lot, slowly' (thick slow particle stream, big F readout, small vₑ) and 'throw a little, very fast' (thin fast stream, tiny F readout, large vₑ). Both states display identical P.",
+      "animatedVariable": {
+        "name": "Exhaust strategy at fixed power",
+        "control": "toggle",
+        "range": "high ṁ / low vₑ ↔ low ṁ / high vₑ (P held at 10 kW)",
+        "whatChangesOnScreen": "Particle stream thickness and speed, and the F and vₑ readouts, move in opposite directions while the P readout stays fixed."
+      },
+      "quantitativeAnchor": "At fixed P, doubling vₑ halves F, since F = 2P/vₑ.",
+      "physicsChecks": [
+        "The P readout is identical in both toggle states.",
+        "When vₑ doubles between states, the F readout halves.",
+        "Every symbol in both equations has a visible label with a unit."
+      ]
+    },
+    {
+      "id": "rocket-equation",
+      "conceptId": "rocket-equation",
+      "part": "The basic building blocks",
+      "title": "Δv grows only as the logarithm of propellant mass: the Tsiolkovsky rocket equation",
+      "teaches": "Because a rocket must accelerate its own unburned propellant, achievable Δv is ΔV = vₑ·ln(m_wet/m_dry) — logarithmic in propellant, so only exhaust velocity escapes the exponential.",
+      "requires": [
+        "thrust-power-equation"
+      ],
+      "caption": "Thrust says how hard the engine pushes; this equation says how much total \\(Δv\\) the tanks can buy: because the rocket hauls its own unburned propellant, \\(Δv = v_e\\ln(m_{wet}/m_{dry})\\), where \\(m_{wet}\\) is the fully fueled mass and \\(m_{dry}\\) the empty-tank mass. Adding tanks pays off only logarithmically; raising \\(v_e\\) pays off linearly.",
+      "visualMetaphor": "Equation scene. Center: \\(ΔV = v_e \\ln(m_{wet}/m_{dry})\\) with every symbol labeled: m_wet (total mass with full tanks, kg), m_dry (mass with empty tanks, kg), vₑ (exhaust velocity, m/s). Beside it, \\(v_e = I_{sp}·g_0\\) introduces specific impulse — \\(I_{sp}\\), the industry efficiency rating in seconds; multiply by \\(g_0 = 9.81\\) m/s² to get exhaust velocity. A diagram shows the 500 kg satellite as a stacked bar: a fixed dry-mass block plus stacked propellant blocks. The animated control is a SLIDER for the number of propellant blocks (0 to 8); as it increases the stacked bar grows and a running Δv total is plotted, tracing a concave diminishing-returns curve. The control is a single slider — never a click-to-add button, no reset-dependent or per-click accumulation. At the slider maximum the bar shows all 8 blocks and the complete concave curve is drawn in that one state.",
+      "animatedVariable": {
+        "name": "Propellant loaded onto the 500 kg dry mass (0 to 8 blocks of 125 kg)",
+        "control": "slider",
+        "range": "0 to 8 propellant blocks (0 to 1000 kg)",
+        "whatChangesOnScreen": "Dragging the slider stacks more propellant onto the fixed dry mass; the Δv running total traces a concave curve whose per-block increment visibly shrinks, and at the maximum all 8 blocks and the full curve are shown at once."
+      },
+      "quantitativeAnchor": "vₑ = Isp·g₀: an Isp of 300 s means vₑ ≈ 2,940 m/s.",
+      "physicsChecks": [
+        "At the slider maximum (8 blocks) the full concave Δv running-total curve is visible in a single state — no click-to-add and no reset-dependent accumulation, so the QA end-state screenshot shows the complete curve.",
+        "Each successive propellant block adds less Δv than the previous one (the running total is concave).",
+        "With zero propellant blocks the Δv readout is exactly 0.",
+        "Doubling m_wet/m_dry adds a constant Δv increment of vₑ·ln 2."
+      ]
+    },
+    {
+      "id": "biprop-wall",
+      "conceptId": "rocket-equation",
+      "part": "The basic building blocks",
+      "title": "On storable chemical propellant, the 500 kg satellite hits a wall near 700 m/s",
+      "teaches": "At chemical exhaust velocities, required propellant grows exponentially with Δv, capping a realistic 500 kg satellite at roughly 700 m/s — a fraction of the 5,000 m/s GEO sprint — and only raising vₑ moves the wall.",
+      "requires": [
+        "rocket-equation",
+        "geo-sprint-price-tag"
+      ],
+      "caption": "Now apply the rocket equation to our satellite's 5,000 m/s bill. Before you drag the slider, guess how much of the wet mass must be propellant at chemical \\(v_e ≈ 2.9\\) km/s. Then watch the curve — and watch what happens when \\(v_e\\) rises instead.",
+      "visualMetaphor": "Interactive chart. X-axis: target Δv, 0 to 5,000 m/s. Y-axis: required propellant as a fraction of wet mass, 0 to 100%, computed from the rocket equation for the 500 kg dry satellite. A vertical slider sets vₑ from 1.8 km/s (storable bipropellant, Isp ≈ 180 s) up to 8 km/s (Isp ≈ 800 s). A dashed horizontal line at ~30% marks a realistic tank fraction for a small satellite; where the curve crosses it is marked 'practical Δv ceiling.' At vₑ = 2.0 km/s the ceiling sits near 700 m/s. A flag at 5,000 m/s shows the exponential blow-up: at vₑ = 2.9 km/s the satellite must be 82% propellant. Dragging vₑ up visibly flattens the curve and slides the ceiling right.",
+      "animatedVariable": {
+        "name": "Exhaust velocity vₑ",
+        "control": "slider",
+        "range": "1.8 km/s (Isp 180 s) → 8 km/s (Isp 800 s)",
+        "whatChangesOnScreen": "The exponential propellant-fraction curve flattens and the 'practical Δv ceiling' marker slides right as vₑ increases."
+      },
+      "quantitativeAnchor": "At vₑ ≈ 2.9 km/s (Isp ≈ 300 s), reaching 5,000 m/s requires a mass ratio of e^(5000/2900) ≈ 5.6 — 82% of the wet mass is propellant; at realistic tank fractions the storable-biprop budget is ~700 m/s.",
+      "physicsChecks": [
+        "The propellant-fraction curve is monotonically increasing and concave-up in Δv (exponential character visible).",
+        "Increasing vₑ strictly lowers the curve at every Δv and moves the ceiling marker right.",
+        "At Δv = 0 the required propellant fraction is 0% for all vₑ.",
+        "At default vₑ ≈ 2.0 km/s, the ceiling marker sits near 700 m/s, far short of the 5,000 m/s flag."
+      ]
+    },
+    {
+      "id": "thrust-isp-binary",
+      "conceptId": "isp-thrust-tradeoff",
+      "part": "The basic building blocks",
+      "title": "Fifty years of engines occupy two opposite corners: high thrust or high Isp, never both",
+      "teaches": "Chemical engines have thrust but chemistry-capped Isp; electric thrusters have Isp but power-capped millinewton thrust, so the GEO sprint takes them 527 days — the middle of the plane has been empty for 50 years.",
+      "requires": [
+        "biprop-wall",
+        "thrust-power-equation"
+      ],
+      "caption": "The rocket equation says raise \\(v_e\\); the power equation says raising \\(v_e\\) at fixed power kills thrust. Isp — specific impulse — is just exhaust velocity restated in seconds (\\(v_e\\) divided by \\(g\\)). Before you press each engine's button, predict: can it finish the 5,000 m/s GEO sprint at all, and if so, how long does it take?",
+      "visualMetaphor": "Scatter chart of the (Isp, thrust) plane. X-axis: Isp, 100 to 2,000 s. Y-axis: thrust, log scale from 1 mN to 1 kN. Two occupied corners: 'storable chemical' cluster (Isp 180–330 s, tens to hundreds of newtons) and 'Hall-effect electric' cluster (Isp ~1,500 s, millinewtons) — Hall thrusters use solar-panel electricity to accelerate xenon ions, so their thrust is capped by onboard power. The middle of the plane is shaded and labeled 'empty for 50 years.' Buttons select an engine; a verdict panel runs the GEO sprint: chemical shows 'cannot reach — tank wall at ~700 m/s' (linking back to the previous scene); electric shows '>12,600 hours of continuous firing — 527 days.' A faint iso-power curve F ∝ 1/vₑ shows why the corners are forced.",
+      "animatedVariable": {
+        "name": "Engine selection",
+        "control": "buttons",
+        "range": "storable chemical ↔ Hall-effect electric",
+        "whatChangesOnScreen": "The selected cluster highlights and the verdict panel updates with GEO-sprint reachability and duration."
+      },
+      "quantitativeAnchor": "Hall-effect electric: Isp ~1,500 s but millinewton thrust — a 100 m/s maneuver takes ~220 hours, and the 5,000 m/s GEO sprint takes >12,600 hours (527 days).",
+      "physicsChecks": [
+        "Chemical cluster sits high-thrust/low-Isp; electric cluster sits low-thrust/high-Isp; the gap between them is visibly empty.",
+        "The chemical verdict shows failure at ~700 m/s, consistent with the previous scene's ceiling.",
+        "The electric verdict shows 527 days for 5,000 m/s and ~220 hours for 100 m/s — time scales roughly linearly with Δv at constant thrust.",
+        "The iso-power curve slopes downward: higher Isp corresponds to lower thrust along it."
+      ]
+    },
+    {
+      "id": "temperature-mass-equation",
+      "conceptId": "exhaust-velocity-thermodynamics",
+      "part": "The new technology",
+      "title": "For a thermal rocket, exhaust velocity depends only on T/M: hot gas, light molecules",
+      "teaches": "In any thermal rocket, vₑ ∝ √(T/M) — gas temperature divided by molecular mass — which means the energy source and the working fluid are separately choosable.",
+      "requires": [
+        "thrust-isp-binary"
+      ],
+      "caption": "Here is the loophole in the 50-year binary. A thermal rocket is any engine that heats a gas and expands it through a nozzle. For every one of them, \\(v_e ∝ \\sqrt{T/M}\\): only the gas temperature \\(T\\) and its molecular mass \\(M\\) matter, not where the heat came from.",
+      "visualMetaphor": "Equation scene. Center: \\(v_e ∝ \\sqrt{T/M}\\), symbols labeled: T (gas temperature, kelvin — a measure of molecular kinetic energy), M (molecular mass, g/mol), vₑ (exhaust velocity, m/s). Below, molecules drawn as balls in a heated chamber escaping through a nozzle: heavy balls (CO₂, 44 g/mol) crawl; light balls (H₂, 2 g/mol) streak. A callout box notes the trap combustion sets for itself: burning fuel means your exhaust IS the combustion product — H₂O at 18 g/mol, CO₂ at 44 — at whatever temperature the reaction chemistry allows, so both knobs are locked. A single toggle switches the heat source icon between 'combustion' (knobs locked, propellant = exhaust product) and 'external heat' (both knobs unlocked and highlighted).",
+      "animatedVariable": {
+        "name": "Heat source",
+        "control": "toggle",
+        "range": "combustion (T and M locked) ↔ external heat (T and M free)",
+        "whatChangesOnScreen": "In combustion mode the T and M dials are grayed out and chained to the reaction; in external-heat mode both dials unlock and glow."
+      },
+      "quantitativeAnchor": "Combustion exhaust products: H₂O at 18 g/mol, CO₂ at 44 g/mol; hydrogen working fluid: 2 g/mol.",
+      "physicsChecks": [
+        "Lighter molecules render with visibly higher escape speeds at the same temperature.",
+        "In combustion mode, the T and M controls are visibly disabled; in external-heat mode both are enabled.",
+        "The equation labels give units for T (K) and M (g/mol)."
+      ]
+    },
+    {
+      "id": "propellant-picker",
+      "conceptId": "exhaust-velocity-thermodynamics",
+      "part": "The new technology",
+      "title": "Pick a light working fluid, push the temperature, and Isp doubles past chemical's ceiling",
+      "teaches": "Choosing ammonia or hydrogen as the working fluid and heating to 3,000 K yields Isp of 350–450 s (ammonia) or ~800 s (hydrogen) — beating storable chemical's 330 s ceiling while remaining a high-thrust thermal engine.",
+      "requires": [
+        "temperature-mass-equation"
+      ],
+      "caption": "With both knobs unlocked, turn them. Predict first: which wins more Isp — halving \\(M\\) or doubling \\(T\\)? Then drag the temperature slider and switch fluids to check against \\(v_e ∝ \\sqrt{T/M}\\).",
+      "visualMetaphor": "Interactive chart driven by the previous scene's equation. Buttons select the working fluid: CO₂ (44 g/mol), H₂O (18), ammonia NH₃ (17, decomposing when hot into N₂ + H₂ fragments averaging ~8.5 g/mol), H₂ (2). A slider sets chamber temperature from 1,000 K to 3,000 K. A large Isp gauge (seconds) responds, with a red reference line at 330 s labeled 'storable chemical ceiling.' Because vₑ ∝ √(T/M), √-shaped response is visible as the slider moves. At 3,000 K: ammonia lands at ~400 s (350–450 s band shown); hydrogen at ~800 s. A footnote: hydrogen wins on physics but is cryogenic — a constraint the story returns to in Part 3.",
+      "animatedVariable": {
+        "name": "Chamber temperature (with working-fluid buttons)",
+        "control": "slider",
+        "range": "1,000 K → 3,000 K, across four working fluids",
+        "whatChangesOnScreen": "The Isp gauge climbs with the square root of temperature and jumps between fluid curves; ammonia and hydrogen cross the 330 s chemical ceiling."
+      },
+      "quantitativeAnchor": "At ~3,000 K: ammonia gives Isp ≈ 350–450 s; hydrogen gives Isp ≈ 800 s — versus the 180–330 s storable-chemical ceiling.",
+      "physicsChecks": [
+        "Isp increases with temperature for every fluid, with visibly diminishing (square-root) slope.",
+        "At any fixed temperature, lighter fluids always show higher Isp: H₂ > decomposed NH₃ > H₂O > CO₂.",
+        "Quadrupling T/M doubles Isp on the gauge (√ scaling verifiable from two screenshots).",
+        "CO₂ and H₂O never cross the 330 s line within the slider range; ammonia and hydrogen do."
+      ]
+    },
+    {
+      "id": "solar-thermal-architecture",
+      "conceptId": "solar-thermal-architecture",
+      "part": "The new technology",
+      "title": "Mirrors, a heat exchanger, and a nozzle: sunlight heats the propellant directly",
+      "teaches": "Solar-thermal propulsion concentrates sunlight onto a 3D-printed heat exchanger that heats ammonia to ~3,000 K, delivering ~100–200 N of thrust at 350–450 s Isp with a 5–6 km/s total Δv budget — no photovoltaic-to-electric conversion chain.",
+      "requires": [
+        "propellant-picker"
+      ],
+      "caption": "Deployable mirrors focus sunlight onto a heat exchanger. Ammonia flows through at ~3,000 K and the hot gas expands out a nozzle at 100–200 N. This is not solar-electric — toggle the comparison and count the conversion steps each design requires.",
+      "visualMetaphor": "Manipulable labeled diagram. Left to right: deployable mirror petals → focused sunlight cone → 3D-printed refractory heat exchanger (cutaway showing internal channels, labeled ~3,000 K) → ammonia tank (labeled 'liquid at modest pressure, ~$1/kg') → nozzle with exhaust plume (labeled 100–200 N, Isp 350–450 s). A stats strip shows: total Δv budget 5–6 km/s, hundreds of restarts. A toggle overlays the solar-electric chain for contrast: photovoltaic panel → power electronics → ion accelerator → millinewton plume, with each conversion stage marked as a loss/limit; the solar-thermal path shows one step: sunlight → heat → thrust.",
+      "animatedVariable": {
+        "name": "Architecture comparison overlay",
+        "control": "toggle",
+        "range": "solar-thermal path ↔ solar-electric path",
+        "whatChangesOnScreen": "The energy-flow diagram swaps: one direct sunlight-to-heat step with a 100–200 N plume, versus a three-stage electric chain ending in a millinewton plume."
+      },
+      "quantitativeAnchor": "Ammonia heated to ~3,000 K: 100–200 N thrust, Isp 350–450 s, total Δv budget 5–6 km/s, propellant at ~$1/kg.",
+      "physicsChecks": [
+        "Every component in the solar-thermal path is labeled, and the path has exactly one energy conversion (sunlight → heat).",
+        "The electric overlay shows a plume roughly five orders of magnitude weaker (mN vs 100–200 N) despite higher Isp.",
+        "The 5–6 km/s Δv budget shown is consistent with the biprop-wall scene: roughly 7–8× the ~700 m/s chemical budget.",
+        "The heat exchanger temperature label (~3,000 K) matches the slider maximum from the propellant-picker scene."
+      ]
+    },
+    {
+      "id": "maneuver-time",
+      "conceptId": "maneuver-time-asymmetry",
+      "part": "Why it beats existing tech",
+      "title": "The GEO sprint: 9 hours for solar thermal, 527 days for electric, unreachable for chemical",
+      "teaches": "Maneuver time is Δv divided by acceleration, so solar thermal's 100–200 N keeps every maneuver in minutes-to-hours while electric's millinewtons stretch the same Δv into months.",
+      "requires": [
+        "solar-thermal-architecture",
+        "thrust-isp-binary"
+      ],
+      "caption": "Now race all three engines through maneuvers of growing size. Drag the Δv slider toward the 5,000 m/s GEO sprint and watch the electric curve leave the chart while solar thermal stays in single-digit hours.",
+      "visualMetaphor": "Interactive chart. X-axis: maneuver Δv from 100 to 5,000 m/s (slider-driven cursor). Y-axis: maneuver time, log scale from minutes to years. Three curves: storable chemical (fast, but the curve terminates with a wall icon at ~700 m/s, echoing the biprop-wall scene), Hall-effect electric (223 hours at 100 m/s; ~2,280 hours = 95 days at 1,000 m/s; >12,600 hours = 527 days at 5,000 m/s), solar thermal at 100–200 N including 50% coasting overhead for multi-arc burns (~10 minutes at 100 m/s; ~1.4 hours at 1,000 m/s; ~9 hours at 5,000 m/s). At the cursor position, a readout panel states each engine's time or 'cannot reach.' A shaded band labeled 'operationally responsive: hours, not months' covers the bottom of the chart; only the solar-thermal curve stays inside it.",
+      "animatedVariable": {
+        "name": "Maneuver Δv",
+        "control": "slider",
+        "range": "100 → 5,000 m/s",
+        "whatChangesOnScreen": "The cursor sweeps right; the three time readouts diverge, the chemical curve hits its 700 m/s wall, and the electric readout climbs into months while solar thermal stays in hours."
+      },
+      "quantitativeAnchor": "At 5,000 m/s: solar thermal ~9 hours; electric >12,600 hours (527 days); chemical cannot reach. At 100 m/s: ~10 minutes vs 223 hours.",
+      "physicsChecks": [
+        "All time curves increase monotonically with Δv, roughly linearly on constant-thrust segments.",
+        "The chemical curve visibly terminates at ~700 m/s, matching the earlier tank-wall scene.",
+        "The electric-to-solar-thermal time ratio at 5,000 m/s is ~1,400× (12,600 h vs 9 h), consistent with the thrust ratio of newtons vs millinewtons.",
+        "Only the solar-thermal curve remains inside the 'hours' band across the full slider range."
+      ]
+    },
+    {
+      "id": "cost-per-maneuver",
+      "conceptId": "cost-per-maneuver",
+      "part": "Why it beats existing tech",
+      "title": "Cheap propellant, a big reusable Δv budget, and free sunlight make solar thermal cheapest at every Δv",
+      "teaches": "Maneuver cost decomposes into propellant, hardware amortization, and energy — and solar thermal wins all three, from $222k vs $1.46M at 100 m/s to $9.1M vs $10.9M at 5,000 m/s.",
+      "requires": [
+        "maneuver-time"
+      ],
+      "caption": "The stacked bars split each engine's cost into propellant, hardware amortization, and energy. Solar thermal's ammonia costs $1/kg; the electric thruster's xenon costs $2,500/kg. That gap keeps solar thermal's bar shortest across the whole range.",
+      "visualMetaphor": "Interactive stacked-bar chart, using the paper's model at 500 kg dry mass and a standardized $10M hardware cost. Buttons step through maneuver sizes: 100 m/s, 1,000 m/s, 5,000 m/s. For each, three bars (storable chemical, electric Hall, solar thermal) stack three labeled components: propellant cost (rocket-equation mass × price × launch cost), hardware amortization (fraction of lifetime Δv consumed × $10M — solar thermal's 5–6 km/s budget with 50+ restarts spreads this thin; chemical concentrates it into a few burns; electric thrusters degrade with throughput), and energy (sunlight is free; chemical burns its energy supply with its propellant). At 100 m/s: solar thermal ~$222k vs biprop $1.46M. At 5,000 m/s: solar thermal ~$9.1M vs electric $10.9M, with the chemical bar replaced by a 'cannot reach' marker.",
+      "animatedVariable": {
+        "name": "Maneuver size",
+        "control": "buttons",
+        "range": "100 m/s → 1,000 m/s → 5,000 m/s",
+        "whatChangesOnScreen": "The three stacked bars regrow; the chemical bar disappears into a 'cannot reach' marker at 5,000 m/s, and solar thermal's bar stays shortest at every step."
+      },
+      "quantitativeAnchor": "At 100 m/s: ~$222k (solar thermal) vs $1.46M (storable biprop). At 5,000 m/s: ~$9.1M vs $10.9M (electric); chemical cannot reach. Ammonia $1/kg vs xenon $2,500/kg.",
+      "physicsChecks": [
+        "All bars grow with maneuver size; solar thermal's bar is the shortest at every button state.",
+        "The chemical bar is present at 100 m/s and replaced by 'cannot reach' at 5,000 m/s, consistent with the ~700 m/s wall.",
+        "Solar thermal's propellant component stays nearly flat relative to electric's, reflecting the 2,500× propellant price gap.",
+        "The energy component is zero for solar thermal (free sunlight) at every state."
+      ]
+    },
+    {
+      "id": "storability",
+      "conceptId": "storability-constraint",
+      "part": "Why it beats existing tech",
+      "title": "Ammonia waits in orbit for months; cryogenic propellants boil away before the call comes",
+      "teaches": "Responsive maneuvering requires a propellant that survives long on-orbit loiter — ammonia stores indefinitely as a liquid at modest pressure, while cryogenic methalox boils off and forces a ≥24-hour launch-and-fuel delay.",
+      "requires": [
+        "cost-per-maneuver"
+      ],
+      "caption": "Methalox — methane burned with liquid oxygen — has the thrust and Isp to beat the 700 m/s wall, but both propellants are cryogenic and boil off in orbit. Drag the loiter timeline and watch which tank is still full when the maneuver order arrives.",
+      "visualMetaphor": "Manipulable timeline diagram. Two spacecraft side by side, each with a tank fill gauge: a methalox vehicle and a solar-thermal ammonia vehicle (labeled 'liquid at modest pressure — stores indefinitely'). A slider sweeps loiter time from launch day to 6 months. The methalox gauge drains steadily (boil-off, labeled); the ammonia gauge stays full. At the slider position, a 'maneuver order arrives' event fires: the ammonia vehicle's response readout shows 'burn begins in minutes'; the methalox vehicle's shows 'fresh launch-and-fuel window required — ≥24-hour delay before the burn even starts,' with a note that pre-staging fueled cryogenic vehicles would need orbital logistics infrastructure that does not exist at scale. A footnote closes the hydrogen thread from Part 2: if zero-boil-off cryogenic storage is ever solved, the same solar-thermal architecture on hydrogen pushes Δv beyond 10,000 m/s.",
+      "animatedVariable": {
+        "name": "On-orbit loiter time before the maneuver order",
+        "control": "slider",
+        "range": "0 days → 6 months",
+        "whatChangesOnScreen": "The methalox tank gauge drains with loiter time while the ammonia gauge stays full; the response-time readouts update at the order event."
+      },
+      "quantitativeAnchor": "Methalox response floor: ≥24 hours (fresh launch-and-fuel window); ammonia solar thermal: response in minutes after months of loiter.",
+      "physicsChecks": [
+        "The ammonia gauge never decreases with loiter time; the methalox gauge monotonically drains.",
+        "The methalox response readout never drops below 24 hours at any slider position.",
+        "The ammonia vehicle's response readout is independent of loiter duration.",
+        "The hydrogen footnote is conditional (zero-boil-off), not presented as current capability."
+      ]
+    },
+    {
+      "id": "why-now",
+      "conceptId": "enabling-technologies",
+      "part": "Why now",
+      "title": "Three subsystems that were unbuildable in 1980 now exist off the shelf",
+      "teaches": "The physics was validated decades ago (a 1979 Rockwell study; >800 s Isp in ground tests); what changed is 3D-printed monolithic heat exchangers, refractory alloys good to ~3,000 K, and membrane mirrors at >1,000 W/kg.",
+      "requires": [
+        "solar-thermal-architecture"
+      ],
+      "caption": "Ground tests exceeded 800 s Isp decades ago. What killed the idea in 1980 was three missing subsystems — step through what replaced each. The materials panel is worth checking with the equation you already have: since \\(v_e ∝ \\sqrt{T}\\), raising the limit from 1,800 K to 3,000 K raises \\(v_e\\) by \\(\\sqrt{3000/1800} ≈ 1.29\\).",
+      "visualMetaphor": "Three-panel then/now diagram with step buttons. Panel 1, heat exchanger: 1980 side shows hundreds of machined parts brazed together (exploded view); now side shows a single monolithic 3D-printed refractory-alloy part with computationally optimized internal channels, inherited from rocket-engine additive manufacturing. Panel 2, materials: a temperature bar from 1,800 K (1980 structural limit, marked 'failure') to ~3,000 K (modern refractory alloys), with a live vₑ multiplier readout ×1.29 computed from √T. Panel 3, mirrors: a mass-per-power comparison — conventional solar arrays ~100 W/kg vs modern membrane reflectors >1,000 W/kg — shown as two collector areas hanging off the same satellite mass budget, the membrane one 10× larger.",
+      "animatedVariable": {
+        "name": "Subsystem panel",
+        "control": "buttons",
+        "range": "heat exchanger → materials → mirrors",
+        "whatChangesOnScreen": "Each button reveals one then/now panel; the materials panel animates the temperature bar and the √T-derived vₑ multiplier."
+      },
+      "quantitativeAnchor": "Membrane reflectors: >1,000 W/kg vs ~100 W/kg for conventional solar arrays; materials limit raised from ~1,800 K to ~3,000 K, a √(3000/1800) ≈ 1.29× gain in vₑ.",
+      "physicsChecks": [
+        "The vₑ multiplier readout equals √(T/1800) at every temperature-bar position and reads ≈1.29 at 3,000 K.",
+        "The mirror panel shows an order-of-magnitude (10×) power-per-mass gap, not a marginal one.",
+        "The 'now' heat exchanger renders as one part; the 1980 version renders as many joined parts."
+      ]
+    },
+    {
+      "id": "demand-inflection",
+      "conceptId": "demand-inflection",
+      "part": "Why now",
+      "title": "Filings for 1.2 million satellites turn maneuvering from a rare event into infrastructure",
+      "teaches": "Today's ~15,000 satellites were built for a static park-and-drift paradigm; filed constellations exceeding 1.2 million satellites make collision avoidance, repositioning, and de-orbit routine — demand that station-keeping thrusters cannot serve.",
+      "requires": [
+        "maneuver-time"
+      ],
+      "caption": "Cheap fast Δv only matters if satellites actually need to move — so look at the pipeline, which is regulatory filings, not deployed hardware. Even a fraction of 1.2 million filed satellites means routine collision-avoidance burns, repositioning, and end-of-life de-orbit.",
+      "visualMetaphor": "Bar chart on a log scale with a toggle between 'today' and 'filed.' Today: ~15,000 active satellites, annotated 'designed static: park in a slot, correct drift with millinewton thrusters for 15 years.' Filed: stacked bars totaling >1.2 million — broadband ~95,000 (Starlink's 42,000 authorization, Amazon Leo's 7,727, ~38,000 across three Chinese constellations) plus over a million orbital data-center satellites (SpaceX's one-million-satellite filing at 500–2,000 km altitude, Starcloud's 88,000, Blue Origin's 51,600). A prominent caveat badge on the 'filed' bar reads 'regulatory intent, not hardware.' A side annotation lists what becomes routine at that density: collision avoidance, repositioning, servicing, de-orbit.",
+      "animatedVariable": {
+        "name": "Today vs filed",
+        "control": "toggle",
+        "range": "~15,000 active ↔ >1.2 million filed",
+        "whatChangesOnScreen": "The chart jumps roughly two orders of magnitude on the log axis and the stacked filing components appear with their labels."
+      },
+      "quantitativeAnchor": "~15,000 active satellites today; >1.2 million filed, including SpaceX's one-million-satellite orbital data-center filing at 500–2,000 km.",
+      "physicsChecks": [
+        "The log axis makes the ~80× jump legible without truncating the 'today' bar to invisibility.",
+        "The filed stack's components sum to more than 1.2 million, with broadband (~95,000) visibly dwarfed by data-center filings.",
+        "The 'regulatory intent, not hardware' caveat is visible in the filed state, not hidden in a tooltip."
+      ]
+    },
+    {
+      "id": "nuclear-bridge",
+      "conceptId": "bridge-to-nuclear",
+      "part": "Why now",
+      "title": "Swap the mirror for a reactor and the same hardware becomes a nuclear-thermal rocket",
+      "teaches": "Downstream of the heat source, solar-thermal and nuclear-thermal rockets are the same machine — so flight-proving the 3,000 K heat exchanger now yields ~90% of nuclear-thermal performance at ~10% of the cost, and the core of the next engine when regulation permits it.",
+      "requires": [
+        "solar-thermal-architecture",
+        "why-now"
+      ],
+      "caption": "One last consequence of \\(v_e ∝ \\sqrt{T/M}\\): the equation never asked where the heat comes from. Toggle the heat source: the heat exchanger, propellant handling, and nozzle carry over unchanged to a nuclear-thermal engine. What remains is a 2030s regulatory question, not a physics one.",
+      "visualMetaphor": "Manipulable diagram reusing the architecture drawing from Part 2. A toggle swaps only the leftmost block: concentrated-sunlight mirrors ↔ compact fission reactor (defined in one line: a controlled nuclear heat source, no combustion). Everything downstream — refractory heat exchanger, propellant feed, nozzle — is outlined in a shared 'unchanged hardware' box that persists across the toggle. A comparison strip states the paper's positioning: solar thermal today delivers ~90% of nuclear-thermal performance at ~10% of the cost, with none of a nuclear program's licensing burden; the nuclear variant waits on regulation, likely the 2030s.",
+      "animatedVariable": {
+        "name": "Heat source",
+        "control": "toggle",
+        "range": "solar concentrator ↔ fission reactor",
+        "whatChangesOnScreen": "Only the heat-source block swaps; the heat exchanger, propellant path, and nozzle stay highlighted as identical shared hardware."
+      },
+      "quantitativeAnchor": "Solar thermal today: ~90% of nuclear-thermal performance at ~10% of the cost; nuclear variant gated on regulation, likely 2030s.",
+      "physicsChecks": [
+        "Across the toggle, every component except the heat-source block is pixel-identical and stays inside the 'unchanged hardware' outline.",
+        "The 90%/10% performance-and-cost strip is visible in both toggle states.",
+        "The reactor state carries a regulatory-timeline label (2030s), not a claim of current availability."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a Protein Model Learned to Predict and Design Biology</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How a Protein Model Learned to Predict and Design Biology</h1>
+  <p class="hook">A useful medicine often begins with a molecule that can grip one chosen target and ignore the rest. Finding that molecule has usually meant making and testing enormous collections in a laboratory. Biohub reports a system that moves much of that first search into a computer, then checks the winners in the physical world. To understand what changed, we have to begin with the tiny chains that do most of life's molecular work.</p>
+  <p class="page-links"><a href="https://biohub.ai/esm/protein/about" target="_blank" rel="noopener noreferrer">Protein World Model: The Next Generation of Evolutionary Scale Models (ESM)</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v1.0.0 · Feynman-first; 3-5 sentence captions</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">First we need the causal chain from a protein's building blocks to its shape, then from shape to binding. That makes the old laboratory search bottleneck concrete.</div>
+</header>
+<section class="scene" id="sequence-sets-shape">
+  <h3>A protein's sequence sets the shape it can fold into</h3>
+  <div class="caption">To understand protein design, begin with the object being designed. A protein is a chain assembled from 20 kinds of chemical building block called amino acids; the ordered list is its sequence. Attractions and repulsions among those building blocks pull the chain into a three-dimensional fold. Change the selected amino acid and watch the chain settle into a new contact pattern, which is why sequence is the first cause in this story.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="sequence-sets-shape"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>A protein's sequence sets the shape it can fold into</title>
+<style>
+:root{
+  --bg:#faf9f6; --panel:#ffffff; --text:#1f2430; --muted:#6a7180;
+  --border:#d9d4c9; --line:#3a3f4b; --bead:#eef2f5; --bead-stroke:#4a5568;
+  --accent:#b6432f; --accent2:#2c7a72; --contact:#c98a3a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14171c; --panel:#1b1f26; --text:#e9e6df; --muted:#9aa1ac;
+    --border:#333844; --line:#d6dae2; --bead:#242a33; --bead-stroke:#c7ccd6;
+    --accent:#ff6f5c; --accent2:#5fd0c6; --contact:#e0a458;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;overflow-x:hidden}
+.wrap{max-width:680px;margin:0 auto;padding:14px 14px 18px}
+h1{font-size:15px;margin:0 0 4px}
+.sub{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.seq-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.bead{width:32px;height:32px;border-radius:50%;background:var(--bead);border:2px solid var(--bead-stroke);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;position:relative}
+.bead .pnum{position:absolute;top:-15px;font-size:9px;color:var(--muted);font-weight:400}
+.bead.pos4{border-color:var(--accent);color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.cat-label{font-size:11px;color:var(--muted);margin:6px 0 3px}
+.cat-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:2px}
+button.aa{border:1px solid var(--border);background:var(--bead);color:var(--text);border-radius:6px;
+  padding:4px 8px;font-size:12.5px;cursor:pointer;font-weight:600}
+button.aa:hover{border-color:var(--accent2)}
+button.aa.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.stage{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+canvas{max-width:100%;width:300px;height:180px;background:var(--panel);border:1px solid var(--border);border-radius:8px}
+.readouts{flex:1;min-width:200px;font-size:12.5px}
+.readout{margin-bottom:7px}
+.readout b{display:block;color:var(--muted);font-weight:500;font-size:11px}
+.readout span{font-size:13.5px}
+.note{font-size:11px;color:var(--muted);font-style:italic;margin-top:6px}
+math{font-size:15px}
+.legend{font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px}
+.diagram-legend{font-size:11px;color:var(--muted);line-height:1.7;margin-top:2px}
+.diagram-legend .swatch{display:inline-block;width:22px;height:0;border-top:2px solid var(--line);
+  vertical-align:middle;margin-right:5px}
+.diagram-legend .swatch.dash{border-top-style:dashed;border-color:var(--contact)}
+.diagram-legend .swatch.dash4{border-top-style:dashed;border-color:var(--accent)}
+.diagram-legend .row{margin-bottom:2px}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>A protein's sequence sets the shape it can fold into</h1>
+  <p class=&quot;sub&quot;>Every protein chain is built from 20 kinds of amino acid. Pick a different one for position 4 (highlighted below) and watch the chain settle into a new shape.</p>
+
+  <div class=&quot;seq-row&quot; id=&quot;seqRow&quot;></div>
+
+  <div class=&quot;panel&quot; id=&quot;picker&quot;>
+    <div class=&quot;cat-label&quot;>One of 20 kinds — choose position 4's amino acid</div>
+  </div>
+
+  <div class=&quot;panel stage&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;300&quot; height=&quot;180&quot;></canvas>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;><b>Position 4 amino acid</b><span id=&quot;roAA&quot;>–</span></div>
+      <div class=&quot;readout&quot;><b>Resulting fold shape</b><span id=&quot;roFold&quot;>–</span></div>
+      <div class=&quot;readout&quot;><b>Contacts formed (dashed lines in diagram)</b><span id=&quot;roContacts&quot;>–</span></div>
+      <div class=&quot;readout&quot;><b>Total fold energy (toy units, more negative = more stable)</b><span id=&quot;roEnergy&quot;>–</span></div>
+    </div>
+  </div>
+  <div class=&quot;diagram-legend&quot;>
+    <div class=&quot;row&quot;><span class=&quot;swatch&quot;></span>solid gray line — the backbone: the fixed chemical bond connecting each bead to its neighbor in sequence order</div>
+    <div class=&quot;row&quot;><span class=&quot;swatch dash&quot;></span>dashed line — a contact: two beads that are <em>not</em> neighbors in the sequence but end up close together once folded (this is what &quot;Contacts formed&quot; counts)</div>
+    <div class=&quot;row&quot;><span class=&quot;swatch dash4&quot;></span>dashed orange line — a contact that involves position 4, the bead you can change</div>
+  </div>
+  <p class=&quot;note&quot;>Toy fold model — illustrates real hydrophobic-collapse physics but is not an atomic-resolution simulation.</p>
+
+  <div class=&quot;panel&quot;>
+    <math display=&quot;block&quot;>
+      <mi>ε</mi><mo>=</mo><mo>&amp;#8722;</mo>
+      <mfrac><mrow><msub><mi>h</mi><mi>i</mi></msub><mo>&amp;#183;</mo><msub><mi>h</mi><mi>j</mi></msub></mrow><mn>20</mn></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>ε — energy of one contact between two beads that end up near each other (toy units) &amp;middot;
+    h<sub></sub>i, h<sub></sub>j — hydrophobicity of the amino acids at the two contacting positions, from &amp;minus;4.5 to +4.5 (Kyte&amp;ndash;Doolittle scale: how oil-like vs water-loving a building block is) &amp;middot;
+    20 — a fixed scaling constant &amp;middot; this formula applies only when both amino acids are hydrophobic (h&amp;gt;0); otherwise a fixed penalty of +0.4 is added instead, representing the cost of hiding a water-loving building block away from water.</div>
+  </div>
+</div>
+
+<script>
+// --- real reference data: Kyte-Doolittle hydrophobicity scale ---
+const KD = {A:1.8,R:-4.5,N:-3.5,D:-3.5,C:2.5,Q:-3.5,E:-3.5,G:-0.4,H:-3.2,I:4.5,
+            L:3.8,K:-3.9,M:1.9,F:2.8,P:-1.6,S:-0.8,T:-0.7,W:-0.9,Y:-1.3,V:4.2};
+const NAMES = {A:'Alanine',R:'Arginine',N:'Asparagine',D:'Aspartate',C:'Cysteine',Q:'Glutamine',
+  E:'Glutamate',G:'Glycine',H:'Histidine',I:'Isoleucine',L:'Leucine',K:'Lysine',M:'Methionine',
+  F:'Phenylalanine',P:'Proline',S:'Serine',T:'Threonine',W:'Tryptophan',Y:'Tyrosine',V:'Valine'};
+const CATS = {nonpolar:['G','A','V','L','I','P','F','M','W'], polar:['S','T','C','Y','N','Q'],
+              positive:['K','R','H'], negative:['D','E']};
+const CAT_LABEL = {nonpolar:'hydrophobic (avoids water)', polar:'polar, uncharged (water-loving)',
+                    positive:'positively charged', negative:'negatively charged'};
+
+// candidate toy fold shapes (fixed 2D projections, grid units)
+const SHAPES = [
+  {label:'U-turn after position 4', coords:[[0,0],[1,0],[2,0],[3,0],[3,1],[2,1],[1,1],[0,1]]},
+  {label:'U-turn after position 5', coords:[[0,0],[1,0],[1,1],[1,2],[1,3],[0,3],[0,2],[0,1]]},
+  {label:'stretched out, no turn', coords:[[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]]}
+];
+const CONTACT_THRESHOLD = 1.05; // grid units
+const PENALTY = 0.4;            // toy energy units
+const SCALE = 20;                // toy scaling constant
+
+let sequence = ['L','S','I','L','K','V','M','F']; // position 4 = index 3
+
+function computeContacts(coords){
+  const c=[];
+  for(let i=0;i<coords.length;i++)
+    for(let j=i+2;j<coords.length;j++){
+      const dx=coords[i][0]-coords[j][0], dy=coords[i][1]-coords[j][1];
+      if(Math.sqrt(dx*dx+dy*dy)<=CONTACT_THRESHOLD) c.push([i,j]);
+    }
+  return c;
+}
+function contactEnergy(a,b){
+  const ha=KD[a], hb=KD[b];
+  return (ha>0 &amp;&amp; hb>0) ? -(ha*hb)/SCALE : PENALTY;
+}
+function evalShape(shape, seq){
+  const contacts = computeContacts(shape.coords);
+  let e=0; contacts.forEach(([i,j])=> e+=contactEnergy(seq[i],seq[j]));
+  return {shape, contacts, energy:e};
+}
+function bestShapeFor(seq){
+  let best=null;
+  SHAPES.forEach(s=>{ const r=evalShape(s,seq); if(!best||r.energy<best.energy-1e-9) best=r; });
+  return best;
+}
+
+// --- canvas drawing ---
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const css = getComputedStyle(document.documentElement);
+const col = n=>css.getPropertyValue(n).trim();
+const gridW=7, gridH=3, PAD=22;
+function project(pt){
+  const scale=Math.min((cv.width-2*PAD)/gridW, (cv.height-2*PAD)/gridH);
+  const offX=(cv.width-gridW*scale)/2, offY=(cv.height-gridH*scale)/2;
+  return [offX+pt[0]*scale, offY+pt[1]*scale];
+}
+function draw(progress, oldC, newC, contacts){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const t = progress<1 ? (progress<0.5?2*progress*progress:-1+(4-2*progress)*progress) : 1;
+  const pts = oldC.map((p,i)=>project([p[0]+(newC[i][0]-p[0])*t, p[1]+(newC[i][1]-p[1])*t]));
+  ctx.lineWidth=2; ctx.strokeStyle=col('--line');
+  ctx.beginPath(); pts.forEach((p,i)=> i===0?ctx.moveTo(p[0],p[1]):ctx.lineTo(p[0],p[1])); ctx.stroke();
+  ctx.setLineDash([5,4]); ctx.lineWidth=2;
+  contacts.forEach(([i,j])=>{
+    ctx.globalAlpha=t;
+    ctx.strokeStyle = (i===3||j===3)? col('--accent') : col('--contact');
+    ctx.beginPath(); ctx.moveTo(pts[i][0],pts[i][1]); ctx.lineTo(pts[j][0],pts[j][1]); ctx.stroke();
+  });
+  ctx.setLineDash([]); ctx.globalAlpha=1;
+  pts.forEach((p,i)=>{
+    ctx.beginPath(); ctx.arc(p[0],p[1], i===3?11:9, 0, Math.PI*2);
+    ctx.fillStyle = i===3? col('--accent') : col('--bead');
+    ctx.fill(); ctx.strokeStyle=col('--bead-stroke'); ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle = i===3? '#fff' : col('--text');
+    ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(sequence[i], p[0], p[1]);
+  });
+}
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let oldCoords, curBest;
+function animateTo(best){
+  const newCoords = best.shape.coords;
+  const duration = reduced ? 1 : 650;
+  const start = performance.now();
+  function step(ts){
+    const progress = Math.min(1, (ts-start)/duration);
+    draw(progress, oldCoords, newCoords, best.contacts);
+    if(progress<1) requestAnimationFrame(step);
+    else oldCoords = newCoords.map(p=>p.slice());
+  }
+  requestAnimationFrame(step);
+}
+function updateReadouts(code, best){
+  let cat=''; for(const k in CATS) if(CATS[k].includes(code)) cat=k;
+  document.getElementById('roAA').textContent = `${NAMES[code]} (${code}) — ${CAT_LABEL[cat]}`;
+  document.getElementById('roFold').textContent = best.shape.label;
+  const n4 = best.contacts.filter(c=>c.includes(3)).length;
+  document.getElementById('roContacts').textContent = `${best.contacts.length} total (${n4} involve position 4)`;
+  document.getElementById('roEnergy').textContent = best.energy.toFixed(2);
+}
+function select(code){
+  sequence[3]=code;
+  document.querySelectorAll('button.aa').forEach(b=> b.classList.toggle('active', b.dataset.code===code));
+  document.getElementById('bead4').textContent = code;
+  const best = bestShapeFor(sequence);
+  updateReadouts(code, best);
+  animateTo(best);
+}
+
+// build sequence row
+const seqRow=document.getElementById('seqRow');
+sequence.forEach((code,i)=>{
+  const d=document.createElement('div');
+  d.className='bead'+(i===3?' pos4':'');
+  d.innerHTML=`<span class=&quot;pnum&quot;>${i+1}</span>`+code;
+  if(i===3) d.id='bead4';
+  seqRow.appendChild(d);
+});
+
+// build amino acid picker grouped by chemical category
+const picker=document.getElementById('picker');
+for(const cat in CATS){
+  const lab=document.createElement('div'); lab.className='cat-label';
+  lab.textContent=CAT_LABEL[cat].charAt(0).toUpperCase()+CAT_LABEL[cat].slice(1);
+  picker.appendChild(lab);
+  const row=document.createElement('div'); row.className='cat-row';
+  CATS[cat].forEach(code=>{
+    const b=document.createElement('button');
+    b.className='aa'; b.textContent=code; b.dataset.code=code;
+    b.title=`${NAMES[code]} — hydrophobicity ${KD[code].toFixed(1)}`;
+    b.addEventListener('click',()=>select(code));
+    row.appendChild(b);
+  });
+  picker.appendChild(row);
+}
+
+// initial state (no animation)
+curBest = bestShapeFor(sequence);
+oldCoords = curBest.shape.coords.map(p=>p.slice());
+document.querySelector(`button.aa[data-code=&quot;${sequence[3]}&quot;]`).classList.add('active');
+updateReadouts(sequence[3], curBest);
+draw(1, oldCoords, curBest.shape.coords, curBest.contacts);
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;sequence-sets-shape&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A protein's sequence sets the shape it can fold into"
+  ></iframe>
+</section>
+
+<section class="scene" id="shape-controls-binding">
+  <h3>Matching surfaces make a protein bind its target</h3>
+  <div class="caption">A fold matters because shape decides what the protein can touch. Suppose one protein presents a pocket and another molecule, the target, presents a matching ridge. Where their surfaces approach closely, many weak chemical contacts can add up to a firm grip; a protein chosen for that grip is called a binder. Move the match from poor to close and watch scattered contacts become a stable interface.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="shape-controls-binding"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Shape match and binding</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#ffffff; --text:#1d1d1d; --muted:#5a5a5a;
+    --target:#e0b400; --target-line:#8a6d00;
+    --binder:#3f9142; --binder-line:#245a27;
+    --contact:#d1495b; --muted-track:#ddd;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1c1e; --panel:#242527; --text:#eaeaea; --muted:#a9a9a9;
+      --target:#c99a00; --target-line:#f2d377;
+      --binder:#3f9142; --binder-line:#8fe396;
+      --contact:#ff6b7a; --muted-track:#3a3b3d;
+    }
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;box-sizing:border-box;}
+  svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);
+    border-radius:8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0;}
+  .controls label{font-size:13.5px;flex:1 1 280px;}
+  .controls input[type=range]{width:100%;margin-top:4px;}
+  button{font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid var(--muted);
+    background:var(--panel);color:var(--text);cursor:pointer;flex:0 0 auto;}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13.5px;margin-top:8px;}
+  .readouts div{background:var(--panel);border-radius:6px;padding:6px 10px;flex:1 1 140px;}
+  .readouts b{display:block;font-size:15px;margin-top:2px;}
+  .eq{font-size:14px;overflow-x:auto;margin:14px 0 2px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:0 0 12px;line-height:1.4;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <svg id=&quot;scene&quot; viewBox=&quot;0 0 680 320&quot; role=&quot;img&quot;
+       aria-label=&quot;Binder and target surfaces approaching as shape match changes&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;match&quot;>Shape match between binder and target — <span id=&quot;matchVal&quot;>30</span>%
+      (0% = poor fit, 100% = perfect fit)
+      <input id=&quot;match&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;100&quot; step=&quot;1&quot; value=&quot;30&quot;>
+    </label>
+    <button id=&quot;resetBtn&quot;>Reset to poor fit (0%)</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Contacts formed<b id=&quot;rContacts&quot;>0 / 10</b></div>
+    <div>Binding state<b id=&quot;rState&quot;>Unbound</b></div>
+    <div>Grip (plain language)<b id=&quot;rGrip&quot;>No grip</b></div>
+    <div>Average interface gap<b id=&quot;rGap&quot;>0.00 nm</b></div>
+  </div>
+
+  <div class=&quot;eq&quot;>
+  <math display=&quot;block&quot;>
+    <mi>gap</mi><mo>(</mo><mi>y</mi><mo>)</mo><mo>=</mo>
+    <msub><mi>g</mi><mn>0</mn></msub><mo>+</mo>
+    <msup><mrow><mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>m</mi><mo>)</mo></mrow><mn>2</mn></msup>
+    <mo>&amp;#183;</mo><mi>E</mi><mo>(</mo><mi>y</mi><mo>)</mo>
+  </math>
+  </div>
+  <p class=&quot;legend&quot;>y — position along the interface, top to bottom (arbitrary units) ·
+  g&amp;#8320; — closest-approach distance when the shapes are perfectly complementary (0.35 nm) ·
+  m — shape-match fraction set by the slider (0 to 1) ·
+  E(y) — extra separation caused by local shape mismatch (nm), shrinking toward 0 only as match reaches 100%.</p>
+
+  <div class=&quot;eq&quot;>
+  <math display=&quot;block&quot;>
+    <mi>contact</mi><mtext>&amp;#160;forms&amp;#160;when&amp;#160;</mtext>
+    <mi>gap</mi><mo>&amp;#8804;</mo><msub><mi>g</mi><mtext>c</mtext></msub>
+  </math>
+  </div>
+  <p class=&quot;legend&quot;>gap — distance between the two surfaces at one point along the interface (nm) ·
+  g_c — contact threshold, the distance within which weak chemical attractions can act (here 0.40 nm).</p>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('scene');
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const cs = getComputedStyle(document.documentElement);
+  const col = n => cs.getPropertyValue(n).trim();
+
+  // ---- named physical constants (auditable) ----
+  const PX_PER_NM = 24;    // pixels per nanometer, for on-screen scale
+  const G0_NM = 0.35;      // closest-approach distance at perfect complementary fit (nm)
+  const GC_NM = 0.40;      // contact threshold distance (nm)
+  const E_BASE_NM = 0.5;   // baseline mismatch excess at 0% match (nm)
+  const E_AMP_NM = 1.0;    // hump amplitude of mismatch excess (nm)
+  const N_SAMPLES = 10;    // discrete contact points checked along the interface
+  const BOUND_MIN = 4;     // contacts needed to call the interface &quot;bound&quot;
+
+  const Y0=40, Y1=260, CY=(Y0+Y1)/2, H=Y1-Y0;
+  const TX0=430, AW_PX=16, N_CYCLES=2;
+  const FREQ_T = 2*Math.PI*N_CYCLES/H;
+
+  function Tx(y){ return TX0 + AW_PX*Math.sin(FREQ_T*(y-CY)); }
+  function E_nm(y){ const t=(y-Y0)/H; return E_BASE_NM + E_AMP_NM*Math.sin(Math.PI*t); }
+  function gap_nm(y,m){ return G0_NM + Math.pow(1-m,2)*E_nm(y); }
+  function Bx(y,m){ return Tx(y) - gap_nm(y,m)*PX_PER_NM; }
+
+  function el(tag,attrs){
+    const e=document.createElementNS(svgNS,tag);
+    for(const k in attrs) e.setAttribute(k,attrs[k]);
+    return e;
+  }
+  function txt(x,y,s,size,color,anchor){
+    const t=el('text',{x:x,y:y,'font-size':size||13,fill:color||col('--text'),
+      'text-anchor':anchor||'start'});
+    t.textContent=s; return t;
+  }
+
+  const targetPath = el('path',{fill:col('--target'),stroke:col('--target-line'),'stroke-width':2});
+  const binderPath = el('path',{fill:col('--binder'),stroke:col('--binder-line'),'stroke-width':2});
+  const contactsG = el('g',{});
+  svg.appendChild(targetPath); svg.appendChild(binderPath); svg.appendChild(contactsG);
+
+  svg.appendChild(txt(630,30,'Target (fixed)',13,col('--target-line'),'end'));
+  svg.appendChild(txt(50,30,'Binder',13,col('--binder-line'),'start'));
+  const scaleY=300;
+  svg.appendChild(el('line',{x1:40,y1:scaleY,x2:40+PX_PER_NM,y2:scaleY,
+    stroke:col('--muted'),'stroke-width':2}));
+  svg.appendChild(txt(40,scaleY+14,'1 nm scale',11,col('--muted')));
+
+  function buildCurve(fn,m,nPts){
+    let pts=[];
+    for(let i=0;i<=nPts;i++){ const y=Y0+(Y1-Y0)*i/nPts; pts.push([fn(y,m),y]); }
+    return pts;
+  }
+  function pathFromEdge(edgePts, otherX){
+    let d = 'M '+edgePts[0][0].toFixed(1)+' '+edgePts[0][1].toFixed(1)+' ';
+    for(let i=1;i<edgePts.length;i++)
+      d += 'L '+edgePts[i][0].toFixed(1)+' '+edgePts[i][1].toFixed(1)+' ';
+    const last=edgePts[edgePts.length-1];
+    d += 'L '+otherX+' '+last[1].toFixed(1)+' L '+otherX+' '+edgePts[0][1].toFixed(1)+' Z';
+    return d;
+  }
+
+  function draw(mPercent){
+    const m = mPercent/100;
+    const tEdge = buildCurve(Tx,m,48);
+    const bEdge = buildCurve(Bx,m,48);
+    targetPath.setAttribute('d', pathFromEdge(tEdge,640));
+    binderPath.setAttribute('d', pathFromEdge(bEdge,40));
+
+    while(contactsG.firstChild) contactsG.removeChild(contactsG.firstChild);
+    let count=0, gapSum=0;
+    for(let i=0;i<N_SAMPLES;i++){
+      const y = Y0 + (Y1-Y0)*(i+0.5)/N_SAMPLES;
+      const g = gap_nm(y,m);
+      gapSum += g;
+      const tx = Tx(y), bx = Bx(y,m);
+      if(g<=GC_NM){
+        count++;
+        contactsG.appendChild(el('line',{x1:bx.toFixed(1),y1:y.toFixed(1),
+          x2:tx.toFixed(1),y2:y.toFixed(1),stroke:col('--contact'),'stroke-width':2}));
+        contactsG.appendChild(el('circle',{cx:((tx+bx)/2).toFixed(1),cy:y.toFixed(1),
+          r:4,fill:col('--contact')}));
+      }
+    }
+    const avgGap = gapSum/N_SAMPLES;
+    const bound = count>=BOUND_MIN;
+    document.getElementById('rContacts').textContent = count+' / '+N_SAMPLES;
+    document.getElementById('rState').textContent = bound? 'Bound' : 'Unbound';
+    document.getElementById('rGap').textContent = avgGap.toFixed(2)+' nm';
+    let grip;
+    if(count===0) grip='No grip';
+    else if(count<BOUND_MIN) grip='Weak, fleeting contact';
+    else if(count<N_SAMPLES) grip='Firm grip';
+    else grip='Very firm, fully seated';
+    document.getElementById('rGrip').textContent = grip;
+    document.getElementById('matchVal').textContent = Math.round(mPercent);
+  }
+
+  let current = 30;
+  const slider = document.getElementById('match');
+  slider.addEventListener('input',()=>{ current=parseFloat(slider.value); draw(current); });
+  document.getElementById('resetBtn').addEventListener('click',()=>{
+    slider.value=0; current=0; draw(current);
+  });
+
+  draw(current);
+  function frame(){ draw(current); requestAnimationFrame(frame); }
+  requestAnimationFrame(frame);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;shape-controls-binding&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Matching surfaces make a protein bind its target"
+  ></iframe>
+</section>
+
+<section class="scene" id="rare-hits-make-screening-slow">
+  <h3>Rare binders force laboratories to test enormous libraries</h3>
+  <div class="caption">Now we can name the old bottleneck: the right shape is rare. A classical screen makes a physical library, meaning a large collection of candidate molecules, then tests them against the target. Set how often a hit occurs and watch the expected number of tests swell from thousands to millions. At the hard end, the first hits can take weeks or months, while development beyond that first hit typically takes years.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="rare-hits-make-screening-slow"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Rare hits make screening slow</title>
+<style>
+  :root{
+    --bg:#f7f9fc;
+    --panel:#ffffff;
+    --text:#1b2430;
+    --muted:#5b6472;
+    --accent:#2563eb;
+    --track:#dbe2ea;
+    --hit:#16a34a;
+    --block-fill:#60a5fa;
+    --border:#c9d3de;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1419;
+      --panel:#161d27;
+      --text:#e6edf5;
+      --muted:#9aa7b5;
+      --accent:#60a5fa;
+      --track:#2a3542;
+      --hit:#4ade80;
+      --block-fill:#3b6ea8;
+      --border:#2d3846;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:14px;}
+  h2.scenehead{font-size:15px;margin:0 0 8px;color:var(--muted);font-weight:600;}
+  svg{width:100%;max-width:640px;height:auto;display:block;margin:0 auto;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-top:10px;}
+  .ctrl{flex:1 1 260px;min-width:220px;}
+  .ctrl label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  input[type=range]{width:100%;}
+  button{background:var(--accent);color:#fff;border:none;border-radius:8px;
+    padding:8px 14px;font-size:13px;cursor:pointer;}
+  button:active{transform:translateY(1px);}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+  .ro{background:var(--bg);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;flex:1 1 130px;min-width:130px;}
+  .ro .k{font-size:11px;color:var(--muted);}
+  .ro .v{font-size:16px;font-weight:700;}
+  math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:4px 0 0;line-height:1.4;}
+  .eqwrap{margin-top:14px;border-top:1px solid var(--border);padding-top:10px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <h2 class=&quot;scenehead&quot;>Screening for a working binder</h2>
+    <svg id=&quot;scene&quot; viewBox=&quot;0 0 640 220&quot; role=&quot;img&quot; aria-label=&quot;Diagram of a target and a conveyor of candidate batches&quot;></svg>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>hit frequency</div><div class=&quot;v&quot; id=&quot;roFreq&quot;>1 in 1,000</div></div>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>expected candidates tested per hit</div><div class=&quot;v&quot; id=&quot;roExp&quot;>1,000</div></div>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>estimated search time</div><div class=&quot;v&quot; id=&quot;roTime&quot;>under a day</div></div>
+      <div class=&quot;ro&quot;><div class=&quot;k&quot;>tested so far (this run)</div><div class=&quot;v&quot; id=&quot;roCount&quot;>0</div></div>
+    </div>
+
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;rarity&quot;>How rare is a working binder among candidates? (1 in N) — drag to change the toy hit frequency</label>
+        <input type=&quot;range&quot; id=&quot;rarity&quot; min=&quot;3&quot; max=&quot;6&quot; step=&quot;0.02&quot; value=&quot;3&quot;>
+      </div>
+      <div class=&quot;ctrl&quot; style=&quot;flex:0 0 auto;min-width:auto;&quot;>
+        <label>&amp;nbsp;</label>
+        <button id=&quot;playBtn&quot;>Pause animation</button>
+      </div>
+    </div>
+
+    <div class=&quot;eqwrap&quot;>
+      <math display=&quot;block&quot;>
+        <mi>E</mi><mo>[</mo><msub><mi>N</mi><mtext>hit</mtext></msub><mo>]</mo>
+        <mo>=</mo>
+        <mfrac><mn>1</mn><mi>f</mi></mfrac>
+      </math>
+      <p class=&quot;legend&quot;>
+        E[N<sub style=&quot;font-size:80%&quot;>hit</sub>] — expected number of candidates a lab must test before the first hit (count) ·
+        f — chance that one random candidate happens to be a working binder (here, &quot;1 in N&quot;)
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('scene');
+  const slider = document.getElementById('rarity');
+  const playBtn = document.getElementById('playBtn');
+  const roFreq = document.getElementById('roFreq');
+  const roExp = document.getElementById('roExp');
+  const roTime = document.getElementById('roTime');
+  const roCount = document.getElementById('roCount');
+
+  // ---- named constants (toy model, auditable) ----
+  const CANDIDATES_PER_DAY = 5000; // assumed throughput of a high-throughput screen (candidates/day)
+  const N_BLOCKS = 10;             // conveyor is grouped into this many batches for display
+  const FILL_DURATION = 4200;      // ms for one full sweep across all batches
+  const HOLD_DURATION = 1300;      // ms the green hit is held before the run repeats
+
+  const reducedMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reducedMotion;
+  let progress = 1; // 0..1 fraction of batches filled this run; start showing the hit
+  let cycleStart = null, holdUntil = null;
+
+  function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+
+  function formatTime(days){
+    if (days < 1) return &quot;under a day&quot;;
+    if (days < 7) return fmt(days) + &quot; days&quot;;
+    if (days < 30) return (days/7).toFixed(1) + &quot; weeks&quot;;
+    if (days < 365) return (days/30).toFixed(1) + &quot; months&quot;;
+    return (days/365).toFixed(1) + &quot; years&quot;;
+  }
+
+  // Puts the scene into a state where the green &quot;hit&quot; marker is immediately
+  // visible (full batch complete), then — if playing — lets the animation
+  // hold there briefly before starting a fresh fill from zero. This
+  // guarantees a hit is on screen right after load and right after any
+  // slider change, in both the easy and hard rarity settings.
+  function showHitNow(){
+    progress = 1;
+    if (playing){
+      holdUntil = performance.now() + HOLD_DURATION;
+      cycleStart = null;
+    } else {
+      holdUntil = null;
+      cycleStart = null;
+    }
+  }
+
+  // ---- state derived from slider (the animated variable) ----
+  let N = 1000;      // expected candidates per hit == 1/f
+  let blockValue = N / N_BLOCKS;
+
+  function updateStatics(){
+    const E = parseFloat(slider.value);          // exponent, 3..6
+    N = Math.pow(10, E);                          // expected candidates per hit
+    const f = 1 / N;                              // hit frequency
+    blockValue = N / N_BLOCKS;
+    roFreq.textContent = &quot;1 in &quot; + fmt(N);
+    roExp.textContent = fmt(N);
+    roTime.textContent = formatTime(N / CANDIDATES_PER_DAY);
+  }
+
+  // ---- build static SVG pieces once ----
+  const trackX0 = 33, trackY = 138, trackW = 574, trackH = 40, gap = 6;
+  const blockW = (trackW - gap*(N_BLOCKS-1)) / N_BLOCKS;
+  const bgRects = [], fgRects = [];
+
+  function el(tag, attrs){
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function buildStatic(){
+    svg.innerHTML = &quot;&quot;;
+    const textColor = css('--text'), muted = css('--muted');
+
+    // target icon
+    const tgt = el('circle',{cx:320, cy:28, r:15, fill:'none', stroke: css('--accent'), 'stroke-width':3});
+    svg.appendChild(tgt);
+    [[-11,0,11,0],[0,-11,0,11]].forEach(c=>{
+      svg.appendChild(el('line',{x1:320+c[0],y1:28+c[1],x2:320+c[2],y2:28+c[3],
+        stroke: css('--accent'), 'stroke-width':2}));
+    });
+    const tgtLabel = el('text',{x:320,y:52,'text-anchor':'middle','font-size':12,fill:muted});
+    tgtLabel.textContent = &quot;target&quot;;
+    svg.appendChild(tgtLabel);
+
+    // arrow down (kept short and high, well clear of the counter text below)
+    svg.appendChild(el('line',{x1:320,y1:60,x2:320,y2:80,stroke:muted,'stroke-width':2}));
+    svg.appendChild(el('polygon',{points:&quot;313,76 327,76 320,86&quot;, fill:muted}));
+
+    // counter readout, given a clear vertical gap below the arrow tip so it
+    // never collides with the arrow graphic even as the numbers grow wide
+    const countLabel = el('text',{id:'countLabel', x:320, y:110, 'text-anchor':'middle','font-size':12,fill:textColor,'font-weight':600});
+    svg.appendChild(countLabel);
+
+    const label2 = el('text',{x:320,y:128,'text-anchor':'middle','font-size':11.5,fill:muted});
+    label2.textContent = &quot;candidate batches on the conveyor&quot;;
+    svg.appendChild(label2);
+
+    // blocks
+    for (let i=0;i<N_BLOCKS;i++){
+      const x = trackX0 + i*(blockW+gap);
+      const bg = el('rect',{x:x,y:trackY,width:blockW,height:trackH,rx:4,fill:css('--track')});
+      const fg = el('rect',{x:x,y:trackY,width:0,height:trackH,rx:4,fill:css('--block-fill')});
+      svg.appendChild(bg); svg.appendChild(fg);
+      bgRects.push(bg); fgRects.push(fg);
+    }
+
+    const label3 = el('text',{id:'blockLabel', x:320,y:198,'text-anchor':'middle','font-size':11.5,fill:muted});
+    svg.appendChild(label3);
+
+    // hit marker (hidden until the batch is complete) — label is right-anchored
+    // and kept inboard of the panel's right edge so it can never be clipped
+    const hit = el('circle',{id:'hitDot', cx: trackX0+trackW-14, cy: trackY-18, r:11,
+      fill: css('--hit'), opacity:0});
+    svg.appendChild(hit);
+    const check = el('path',{id:'hitCheck', d:'M '+(trackX0+trackW-19)+' '+(trackY-18)+
+      ' l 4 5 l 8 -10', stroke:'#ffffff','stroke-width':2, fill:'none',
+      'stroke-linecap':'round','stroke-linejoin':'round', opacity:0});
+    svg.appendChild(check);
+    const hitLabel = el('text',{id:'hitLabel', x: trackX0+trackW+6, y: trackY-32,
+      'text-anchor':'end','font-size':12, fill: css('--hit'), 'font-weight':700, opacity:0});
+    hitLabel.textContent = &quot;hit! (batch complete)&quot;;
+    svg.appendChild(hitLabel);
+  }
+
+  function render(){
+    const blockLabel = document.getElementById('blockLabel');
+    blockLabel.textContent = &quot;each block \u2248 &quot; + fmt(blockValue) + &quot; candidates&quot;;
+
+    const filledCount = progress * N_BLOCKS;
+    for (let i=0;i<N_BLOCKS;i++){
+      const frac = Math.max(0, Math.min(1, filledCount - i));
+      fgRects[i].setAttribute('width', (blockW*frac).toFixed(2));
+    }
+
+    const tested = Math.min(N, progress * N);
+    roCount.textContent = fmt(tested);
+    document.getElementById('countLabel').textContent =
+      &quot;tested this run: &quot; + fmt(tested) + &quot; of &quot; + fmt(N);
+
+    const showHit = progress >= 1;
+    document.getElementById('hitDot').setAttribute('opacity', showHit ? 1 : 0);
+    document.getElementById('hitCheck').setAttribute('opacity', showHit ? 1 : 0);
+    document.getElementById('hitLabel').setAttribute('opacity', showHit ? 1 : 0);
+  }
+
+  function tick(t){
+    if (playing){
+      if (holdUntil !== null){
+        progress = 1;
+        if (t >= holdUntil){
+          holdUntil = null;
+          cycleStart = t;
+          progress = 0;
+        }
+      } else {
+        if (cycleStart === null) cycleStart = t;
+        progress = Math.min(1, (t - cycleStart) / FILL_DURATION);
+        if (progress >= 1) holdUntil = t + HOLD_DURATION;
+      }
+    }
+    render();
+    requestAnimationFrame(tick);
+  }
+
+  slider.addEventListener('input', function(){
+    updateStatics();
+    showHitNow();
+    render();
+  });
+
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    playBtn.textContent = playing ? &quot;Pause animation&quot; : &quot;Play animation&quot;;
+    if (playing){
+      showHitNow();
+    } else {
+      holdUntil = null; cycleStart = null; progress = 1;
+    }
+    render();
+  });
+
+  // init
+  updateStatics();
+  buildStatic();
+  showHitNow();
+  render();
+  playBtn.textContent = playing ? &quot;Pause animation&quot; : &quot;Play animation&quot;;
+  window.__sceneReady = true;
+  requestAnimationFrame(tick);
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;rare-hits-make-screening-slow&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Rare binders force laboratories to test enormous libraries"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>How the new protein machine works</h2>
+  <div class="part-lede">Once sequence, shape, and binding are linked, we can see how a machine learns those links from examples and uses them to predict and design.</div>
+</header>
+<section class="scene" id="context-predicts-hidden-amino-acids">
+  <h3>Neighboring amino acids help the machine fill a sequence gap</h3>
+  <div class="caption">The machine needs a way to learn from sequences without a teacher labeling every fold. During training, the learning process, one amino acid is hidden and the machine must guess it from the neighbors. This fill-in-the-blank system is called a protein language model because it treats amino-acid sequences much as a text model treats sentences. Reveal more surrounding positions and watch a flat choice among 20 possibilities sharpen around the amino acid that fits this context.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="context-predicts-hidden-amino-acids"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Context predicts a hidden amino acid</title>
+<style>
+:root{
+  --bg:#faf8f4; --panel:#ffffff; --text:#26241f; --muted:#6b6558;
+  --bar:#9fb8c8; --bar-edge:#5e7d90; --accent:#d97a3c; --true-outline:#3c6e51;
+  --grid:#e2ddd2; --track:#e6e1d5;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1b1a17; --panel:#242320; --text:#ecे7de; --text:#ece7de; --muted:#a49c8c;
+    --bar:#4a7186; --bar-edge:#8fb6c9; --accent:#e8925a; --true-outline:#6fbf8f;
+    --grid:#3a382f; --track:#3a382f;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+.panel{background:var(--panel);border-radius:10px;padding:14px 14px 10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+h1{font-size:15px;margin:0 0 8px;font-weight:600;}
+.seqrow{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:8px 0 14px;}
+.aa{width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  border-radius:6px;background:var(--track);font-weight:700;font-size:15px;color:var(--muted);
+  border:1px solid var(--grid);transition:background .3s,color .3s;}
+.aa.shown{background:var(--bar);color:var(--text);border-color:var(--bar-edge);}
+.aa.mask{background:var(--accent);color:#fff;border-color:var(--accent);}
+.aa.mask.revealed{background:var(--true-outline);}
+canvas{width:100%;max-width:100%;display:block;}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin:10px 0 6px;}
+.ctrl{flex:1 1 220px;}
+.ctrl label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+input[type=range]{width:100%;}
+button{padding:7px 12px;border-radius:6px;border:1px solid var(--bar-edge);
+  background:var(--bar);color:var(--text);font-size:13px;cursor:pointer;}
+button:active{transform:translateY(1px);}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 4px;font-size:12.5px;}
+.ro{background:var(--track);border-radius:6px;padding:6px 10px;min-width:120px;}
+.ro b{display:block;font-size:14.5px;}
+.note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+math{font-size:15px;}
+.eqlegend{font-size:11.5px;color:var(--muted);margin:2px 0 10px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <h1>Filling in a hidden amino acid using its neighbors</h1>
+    <div class=&quot;seqrow&quot; id=&quot;seqrow&quot;></div>
+
+    <canvas id=&quot;chart&quot; height=&quot;220&quot;></canvas>
+
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;radius&quot;>Context radius — number of neighboring positions revealed on each side (0 to 6)</label>
+        <input type=&quot;range&quot; id=&quot;radius&quot; min=&quot;0&quot; max=&quot;6&quot; step=&quot;1&quot; value=&quot;0&quot;>
+      </div>
+      <div class=&quot;ctrl&quot; style=&quot;flex:0 0 auto;&quot;>
+        <label>&amp;nbsp;</label>
+        <button id=&quot;revealBtn&quot;>Reveal the hidden amino acid</button>
+      </div>
+    </div>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;ro&quot;>Neighbors shown / side<b id=&quot;roR&quot;>0</b></div>
+      <div class=&quot;ro&quot;>Positions visible now<b id=&quot;roVis&quot;>0 / 12</b></div>
+      <div class=&quot;ro&quot;>Model's probability on the true amino acid<b id=&quot;roP&quot;>5%</b></div>
+      <div class=&quot;ro&quot;>Hidden identity<b id=&quot;roID&quot;>?</b></div>
+    </div>
+
+    <math display=&quot;block&quot;>
+      <msub><mi>p</mi><mi>i</mi></msub><mo>=</mo>
+      <mfrac>
+        <mrow><mi>exp</mi><mo>(</mo><mi>β</mi><mo>·</mo><msub><mi>a</mi><mi>i</mi></msub><mo>)</mo></mrow>
+        <mrow><munder><mo>∑</mo><mi>j</mi></munder><mi>exp</mi><mo>(</mo><mi>β</mi><mo>·</mo><msub><mi>a</mi><mi>j</mi></msub><mo>)</mo></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;eqlegend&quot;>p<sub>i</sub> — probability given to amino acid i (%) · β — sharpness set by how much context is revealed (0 to 5) · a<sub>i</sub>, a<sub>j</sub> — fixed toy affinity score for amino acid i or j · ∑<sub>j</sub> — sum over all 20 possible amino acids</div>
+    <div class=&quot;note&quot;>Note: the probability numbers follow a fixed illustrative table; the 20-way fill-in-the-blank prediction task itself is real.</div>
+  </div>
+</div>
+
+<script>
+const AAS = ['A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'];
+const AFF = [0.40,0.10,0.05,0.05,0.15,0.10,0.05,0.35,0.10,0.75,1.00,0.10,0.65,0.55,0.05,0.20,0.20,0.15,0.15,0.70];
+const TRUE_IDX = AAS.indexOf('L');
+const BETA_MAX = 5; // sets sharpness at full context
+const SEQ = ['G','V','A','I','L','V','L','V','L','I','A','V','G'];
+const CENTER = 6;
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let radius = 0, revealed = false;
+let curProbs = softmax(0), targetProbs = curProbs.slice();
+let animT = 1;
+
+function softmax(beta){
+  const ex = AFF.map(a=>Math.exp(beta*a));
+  const s = ex.reduce((a,b)=>a+b,0);
+  return ex.map(v=>v/s);
+}
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// ---- sequence strip ----
+const seqrow = document.getElementById('seqrow');
+const boxes = SEQ.map((letter,i)=>{
+  const d = document.createElement('div');
+  d.className = 'aa' + (i===CENTER?' mask':'');
+  seqrow.appendChild(d);
+  return d;
+});
+function drawSeq(){
+  for(let i=0;i<SEQ.length;i++){
+    const off = Math.abs(i-CENTER);
+    const b = boxes[i];
+    if(i===CENTER){
+      b.className = 'aa mask' + (revealed?' revealed':'');
+      b.textContent = revealed ? SEQ[CENTER] : '?';
+    } else if(off<=radius){
+      b.className = 'aa shown';
+      b.textContent = SEQ[i];
+    } else {
+      b.className = 'aa';
+      b.textContent = '·';
+    }
+  }
+}
+
+// ---- chart ----
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+function fitCanvas(){
+  const w = canvas.clientWidth || 640;
+  canvas.width = Math.max(320, Math.round(w));
+  canvas.height = 220;
+}
+
+function drawChart(){
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const marginL=34, marginR=10, marginT=16, marginB=34;
+  const plotW = W-marginL-marginR, plotH = H-marginT-marginB;
+  const bg = cssVar('--panel'), grid = cssVar('--grid'), text = cssVar('--text'),
+        muted = cssVar('--muted'), bar = cssVar('--bar'), barEdge = cssVar('--bar-edge'),
+        accent = cssVar('--accent'), trueLine = cssVar('--true-outline');
+
+  ctx.strokeStyle = grid; ctx.lineWidth=1; ctx.fillStyle = muted; ctx.font='10px sans-serif';
+  for(let g=0;g<=100;g+=25){
+    const y = marginT + plotH*(1-g/100);
+    ctx.beginPath(); ctx.moveTo(marginL,y); ctx.lineTo(marginL+plotW,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(g+'%', marginL-6, y+3);
+  }
+  ctx.save();
+  ctx.translate(10, marginT+plotH/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillStyle=muted; ctx.font='11px sans-serif';
+  ctx.fillText('probability assigned', 0, 0);
+  ctx.restore();
+
+  const n = AAS.length, bw = plotW/n;
+  for(let i=0;i<n;i++){
+    const p = curProbs[i];
+    const h = plotH*p;
+    const x = marginL + i*bw + bw*0.15;
+    const w = bw*0.7;
+    const y = marginT+plotH-h;
+    const isTrue = i===TRUE_IDX;
+    ctx.fillStyle = (revealed &amp;&amp; isTrue) ? accent : bar;
+    ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle = barEdge; ctx.lineWidth=1; ctx.strokeRect(x,y,w,h);
+    if(isTrue){
+      ctx.save();
+      ctx.setLineDash([3,2]);
+      ctx.strokeStyle = trueLine; ctx.lineWidth=1.5;
+      ctx.strokeRect(x-1.5,y-1.5,w+3,h+3);
+      ctx.restore();
+    }
+    ctx.fillStyle = text; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(AAS[i], x+w/2, marginT+plotH+14);
+  }
+  ctx.fillStyle=muted; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('20 possible amino acids', marginL+plotW/2, H-4);
+}
+
+function updateReadouts(){
+  document.getElementById('roR').textContent = radius;
+  document.getElementById('roVis').textContent = (radius*2)+' / 12';
+  document.getElementById('roP').textContent = Math.round(curProbs[TRUE_IDX]*100)+'%';
+  document.getElementById('roID').textContent = revealed ? SEQ[CENTER] : '?';
+}
+
+function animate(){
+  if(animT>=1){ return; }
+  animT = Math.min(1, animT + (reduced?1:0.08));
+  for(let i=0;i<curProbs.length;i++){
+    curProbs[i] = curProbs[i] + (targetProbs[i]-curProbs[i])*animT===1?targetProbs[i]:curProbs[i];
+  }
+  // simple lerp toward target
+  for(let i=0;i<curProbs.length;i++){
+    curProbs[i] += (targetProbs[i]-curProbs[i])*0.25;
+  }
+  drawChart();
+  updateReadouts();
+  requestAnimationFrame(animate);
+}
+
+function setContext(r){
+  radius = r;
+  const beta = (r/6)*BETA_MAX;
+  targetProbs = softmax(beta);
+  if(reduced){
+    curProbs = targetProbs.slice();
+    drawChart(); updateReadouts();
+  } else {
+    animT = 0;
+    requestAnimationFrame(animate);
+  }
+  drawSeq();
+}
+
+document.getElementById('radius').addEventListener('input', e=>{
+  setContext(parseInt(e.target.value,10));
+});
+document.getElementById('revealBtn').addEventListener('click', ()=>{
+  revealed = !revealed;
+  drawSeq(); drawChart(); updateReadouts();
+});
+
+window.addEventListener('resize', ()=>{ fitCanvas(); drawChart(); });
+
+fitCanvas();
+setContext(0);
+drawChart();
+updateReadouts();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;context-predicts-hidden-amino-acids&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Neighboring amino acids help the machine fill a sequence gap"
+  ></iframe>
+</section>
+
+<section class="scene" id="training-scale-enriches-representations">
+  <h3>More training produces a richer internal picture of biology</h3>
+  <div class="caption">Good guesses are useful only if they teach the machine something deeper. As training grows, the numbers the model builds for each amino acid capture shape and function more accurately; that numerical summary is called a representation. The measured improvement follows a smooth trend called a scaling law, so more computing effort has a predictable payoff. Slide from millions of training sequences toward ESMC's roughly 2.8 billion and watch independent biology probes climb along the same trend.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="training-scale-enriches-representations"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Training scale enriches representations</title>
+<style>
+:root{
+  --bg:#f7f7f5;
+  --panel:#ffffff;
+  --ink:#1d2430;
+  --muted:#5b6472;
+  --curve:#2b6cb0;
+  --marker:#d9534f;
+  --fold:#3f8f5f;
+  --bind:#a6763f;
+  --func:#7a5ea8;
+  --grid:#dde2e8;
+  --track:#e5e8ec;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14181f;
+    --panel:#1c2230;
+    --ink:#e8ecf2;
+    --muted:#9aa4b2;
+    --curve:#6fa8dc;
+    --marker:#ff7a70;
+    --fold:#6fd196;
+    --bind:#e0a768;
+    --func:#b79ce0;
+    --grid:#2c333f;
+    --track:#2a303c;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:12px; background:var(--bg); color:var(--ink);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+.scene{
+  max-width:680px; margin:0 auto; background:var(--panel);
+  border-radius:10px; padding:14px 16px 18px; box-shadow:0 1px 4px rgba(0,0,0,0.15);
+}
+h2{font-size:15px; margin:0 0 8px; font-weight:600;}
+canvas{width:100%; max-width:100%; height:auto; display:block; background:transparent;}
+.controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:8px;}
+label{font-size:13px; color:var(--muted); display:block; margin-bottom:2px;}
+input[type=range]{width:100%;}
+.slidewrap{flex:1 1 260px;}
+button{
+  padding:6px 12px; font-size:13px; border-radius:6px; border:1px solid var(--grid);
+  background:var(--track); color:var(--ink); cursor:pointer;
+}
+button:active{transform:translateY(1px);}
+.readouts{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;}
+.readout{
+  flex:1 1 130px; background:var(--track); border-radius:8px; padding:8px 10px;
+}
+.readout .k{font-size:11px; color:var(--muted);}
+.readout .v{font-size:16px; font-weight:600;}
+.bar{height:8px; border-radius:4px; background:var(--grid); margin-top:4px; overflow:hidden;}
+.bar > i{display:block; height:100%; border-radius:4px;}
+.eq{font-size:14px; margin-top:12px;}
+.legend{font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.4;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>More training, richer protein representations</h2>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;300&quot; role=&quot;img&quot; aria-label=&quot;Scaling curve of representation quality versus training sequences&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;slidewrap&quot;>
+      <label for=&quot;scaleSlider&quot;>Training scale — sequences the model has processed (slide from millions toward 2.8 billion)</label>
+      <input type=&quot;range&quot; id=&quot;scaleSlider&quot; min=&quot;6&quot; max=&quot;9.4471&quot; step=&quot;0.001&quot; value=&quot;6&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>▶ Play: sweep from millions to 2.8B</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>Sequences processed</div><div class=&quot;v&quot; id=&quot;nOut&quot;>1 M</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>Fold-shape probe</div><div class=&quot;v&quot; id=&quot;foldOut&quot;>0%</div><div class=&quot;bar&quot;><i id=&quot;foldBar&quot; style=&quot;background:var(--fold);width:0%&quot;></i></div></div>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>Binding-site probe</div><div class=&quot;v&quot; id=&quot;bindOut&quot;>0%</div><div class=&quot;bar&quot;><i id=&quot;bindBar&quot; style=&quot;background:var(--bind);width:0%&quot;></i></div></div>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>Broad-function probe</div><div class=&quot;v&quot; id=&quot;funcOut&quot;>0%</div><div class=&quot;bar&quot;><i id=&quot;funcBar&quot; style=&quot;background:var(--func);width:0%&quot;></i></div></div>
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>Q</mi><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo>
+      <mn>1</mn><mo>−</mo>
+      <msup><mrow><mo>(</mo><mfrac><msub><mi>N</mi><mn>0</mn></msub><mi>N</mi></mfrac><mo>)</mo></mrow><mi>p</mi></msup>
+    </math>
+    <div class=&quot;legend&quot;>N — sequences processed during training · N₀ — small fixed reference scale (constant) · p — scaling-law exponent (constant) · Q — representation quality score, 0 to 1</div>
+    <math display=&quot;block&quot;>
+      <mtext>probe score</mtext><mo>=</mo><msup><mi>Q</mi><mi>k</mi></msup>
+    </math>
+    <div class=&quot;legend&quot;>Q — representation quality from above · k — fixed exponent unique to each probe (fold, binding site, broad function); probes read out the same quality number in three different ways, they add no new training</div>
+  </div>
+</div>
+
+<script>
+const N_MIN = 1e6;
+const N_MAX = 2.8e9;
+const N_REF = 1e5;      // N0, reference constant in the scaling law
+const P_EXP = 0.15;     // p, scaling-law exponent
+const K_FOLD = 0.7;
+const K_BIND = 1.3;
+const K_FUNC = 1.0;
+
+function quality(N){
+  return 1 - Math.pow(N_REF / N, P_EXP);
+}
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const slider = document.getElementById('scaleSlider');
+const playBtn = document.getElementById('playBtn');
+const nOut = document.getElementById('nOut');
+const foldOut = document.getElementById('foldOut');
+const bindOut = document.getElementById('bindOut');
+const funcOut = document.getElementById('funcOut');
+const foldBar = document.getElementById('foldBar');
+const bindBar = document.getElementById('bindBar');
+const funcBar = document.getElementById('funcBar');
+
+const logMin = Math.log10(N_MIN);
+const logMax = Math.log10(N_MAX);
+
+const pad = {l:56, r:20, t:18, b:40};
+
+function fmtN(N){
+  if(N >= 1e9) return (N/1e9).toFixed(2) + &quot; B&quot;;
+  if(N >= 1e6) return Math.round(N/1e6) + &quot; M&quot;;
+  return Math.round(N).toString();
+}
+
+function xFor(logN){
+  const w = cv.width - pad.l - pad.r;
+  return pad.l + (logN - logMin)/(logMax - logMin) * w;
+}
+function yFor(q){
+  const h = cv.height - pad.t - pad.b;
+  return pad.t + (1 - q) * h;
+}
+
+function draw(logN){
+  const ink = cssVar('--ink'), muted = cssVar('--muted'), grid = cssVar('--grid');
+  const curveColor = cssVar('--curve'), markerColor = cssVar('--marker');
+  ctx.clearRect(0,0,cv.width,cv.height);
+
+  // axes
+  ctx.strokeStyle = grid; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, cv.height-pad.b); ctx.lineTo(cv.width-pad.r, cv.height-pad.b);
+  ctx.stroke();
+
+  // y ticks 0,50,100%
+  ctx.fillStyle = muted; ctx.font = &quot;11px system-ui&quot;; ctx.textAlign = &quot;right&quot;; ctx.textBaseline=&quot;middle&quot;;
+  [0,0.5,1].forEach(q=>{
+    const y = yFor(q);
+    ctx.strokeStyle = grid;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(cv.width-pad.r,y); ctx.stroke();
+    ctx.fillText(Math.round(q*100)+&quot;%&quot;, pad.l-6, y);
+  });
+
+  // x ticks
+  const ticks = [1e6,1e7,1e8,1e9,2.8e9];
+  const labels = [&quot;1M&quot;,&quot;10M&quot;,&quot;100M&quot;,&quot;1B&quot;,&quot;2.8B&quot;];
+  ctx.textAlign = &quot;center&quot;; ctx.textBaseline = &quot;top&quot;;
+  ticks.forEach((N,i)=>{
+    const x = xFor(Math.log10(N));
+    ctx.strokeStyle = grid;
+    ctx.beginPath(); ctx.moveTo(x, cv.height-pad.b); ctx.lineTo(x, cv.height-pad.b+4); ctx.stroke();
+    ctx.fillText(labels[i], x, cv.height-pad.b+6);
+  });
+
+  // axis labels
+  ctx.fillStyle = ink; ctx.font = &quot;12px system-ui&quot;;
+  ctx.textAlign = &quot;center&quot;;
+  ctx.fillText(&quot;training sequences processed (log scale)&quot;, (pad.l+cv.width-pad.r)/2, cv.height-12);
+  ctx.save();
+  ctx.translate(14, (pad.t+cv.height-pad.b)/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText(&quot;representation quality (probe score)&quot;, 0, 0);
+  ctx.restore();
+
+  // curve
+  ctx.strokeStyle = curveColor; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  const steps = 120;
+  for(let i=0;i<=steps;i++){
+    const lg = logMin + (logMax-logMin)*i/steps;
+    const N = Math.pow(10, lg);
+    const q = quality(N);
+    const x = xFor(lg), y = yFor(q);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // endpoint label
+  const endX = xFor(logMax), endY = yFor(quality(N_MAX));
+  ctx.fillStyle = muted; ctx.font = &quot;11px system-ui&quot;; ctx.textAlign = &quot;right&quot;; ctx.textBaseline = &quot;bottom&quot;;
+  ctx.fillText(&quot;ESMC · ~2.8B sequences&quot;, cv.width-pad.r-2, endY-8);
+
+  // marker
+  const N = Math.pow(10, logN);
+  const q = quality(N);
+  const mx = xFor(logN), my = yFor(q);
+  ctx.fillStyle = markerColor;
+  ctx.beginPath(); ctx.arc(mx,my,5.5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = cssVar('--panel'); ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function update(logN, redraw=true){
+  const N = Math.pow(10, logN);
+  const q = quality(N);
+  const fold = Math.pow(q, K_FOLD);
+  const bind = Math.pow(q, K_BIND);
+  const func = Math.pow(q, K_FUNC);
+
+  nOut.textContent = fmtN(N);
+  foldOut.textContent = Math.round(fold*100)+&quot;%&quot;;
+  bindOut.textContent = Math.round(bind*100)+&quot;%&quot;;
+  funcOut.textContent = Math.round(func*100)+&quot;%&quot;;
+  foldBar.style.width = (fold*100).toFixed(1)+&quot;%&quot;;
+  bindBar.style.width = (bind*100).toFixed(1)+&quot;%&quot;;
+  funcBar.style.width = (func*100).toFixed(1)+&quot;%&quot;;
+
+  if(redraw) draw(logN);
+}
+
+slider.addEventListener('input', ()=>{
+  update(parseFloat(slider.value));
+});
+
+// play/sweep animation
+// Kept short so the full sweep (including the maximum, 2.8B, state) reliably
+// completes and is reflected on screen shortly after the button is pressed.
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = false;
+let playStart = null;
+const PLAY_DURATION = 900; // ms — quick, smooth sweep guaranteed to reach the max state
+
+function stepPlay(ts){
+  if(!playing) return;
+  if(playStart === null) playStart = ts;
+  const t = Math.min(1, (ts - playStart)/PLAY_DURATION);
+  const logN = logMin + (logMax - logMin) * t;
+  slider.value = logN;
+  update(logN);
+  if(t < 1){
+    requestAnimationFrame(stepPlay);
+  } else {
+    // Ensure we land exactly on the labeled maximum (2.8B sequences).
+    slider.value = logMax;
+    update(logMax);
+    playing = false;
+    playBtn.textContent = &quot;▶ Play: sweep from millions to 2.8B&quot;;
+  }
+}
+
+playBtn.addEventListener('click', ()=>{
+  if(playing){
+    playing = false;
+    playBtn.textContent = &quot;▶ Play: sweep from millions to 2.8B&quot;;
+    return;
+  }
+  playing = true;
+  playStart = null;
+  playBtn.textContent = &quot;⏸ Pause sweep&quot;;
+  requestAnimationFrame(stepPlay);
+});
+
+// initial state
+if(reduceMotion){
+  slider.value = logMin;
+  update(logMin);
+} else {
+  slider.value = logMin;
+  update(logMin);
+}
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;training-scale-enriches-representations&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="More training produces a richer internal picture of biology"
+  ></iframe>
+</section>
+
+<section class="scene" id="loops-refine-structure">
+  <h3>Repeated passes refine one structural prediction</h3>
+  <div class="caption">A learned representation still has to become a three-dimensional structure. ESMFold2 sends an evolving shape guess through the same machinery several times, a method called looped refinement. Each pass can correct conflicts left by the previous pass, so a hard protein can receive more computing effort without adding a larger set of machinery. Increase the loop count and watch one rough fold settle while the model-size indicator stays fixed.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="loops-refine-structure"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Repeated passes refine one structural prediction</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --panel-alt:#e8eaee; --text:#1b1f24; --muted:#5b6470;
+    --accent:#2563eb; --accent2:#059669; --conflict:#dc2626; --module:#cbd5e1; --ribbon:#2563eb;
+    --track:#d7dbe1; --border:#c3c9d2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1115; --panel:#181b21; --panel-alt:#20242c; --text:#e6e9ee; --muted:#9aa4b2;
+      --accent:#60a5fa; --accent2:#34d399; --conflict:#f87171; --module:#3a4150; --ribbon:#60a5fa;
+      --track:#2b303a; --border:#3a4150;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  svg{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--border);border-radius:10px;}
+  .flowLine{stroke:var(--muted);stroke-width:2;fill:none;}
+  .arrowFill{fill:var(--muted);}
+  .mod-box{fill:var(--module);stroke:var(--text);stroke-width:1.4;}
+  .ribbon{stroke:var(--ribbon);stroke-width:4;fill:none;stroke-linecap:round;}
+  .conflict-mark{stroke:var(--conflict);stroke-width:3;stroke-linecap:round;}
+  .bar-track{fill:var(--track);}
+  .bar-fill{fill:var(--accent2);}
+  .bar-fill-fixed{fill:var(--accent);}
+  text{fill:var(--text);font-size:11px;}
+  .lbl{fill:var(--muted);font-size:11px;}
+  .token{fill:var(--accent);stroke:var(--panel);stroke-width:1.5;}
+  .token-txt{fill:var(--panel);font-size:10px;font-weight:700;text-anchor:middle;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:12px;}
+  .ctrl{display:flex;flex-direction:column;gap:4px;flex:1 1 220px;}
+  .ctrl label{font-size:12.5px;color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--panel-alt);color:var(--text);font-size:13px;cursor:pointer;}
+  button:hover{background:var(--track);}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .stat{flex:1 1 140px;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+  .stat .v{font-size:17px;font-weight:700;}
+  .stat .k{font-size:11px;color:var(--muted);}
+  .eq{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-top:12px;overflow-x:auto;}
+  .legend{font-size:11px;color:var(--muted);margin:4px 0 0;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <svg id=&quot;scene&quot; viewBox=&quot;0 0 640 410&quot; role=&quot;img&quot; aria-label=&quot;Diagram of a refinement module looping structural predictions&quot;>
+    <defs>
+      <marker id=&quot;arrow&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;8&quot; refY=&quot;5&quot; markerWidth=&quot;7&quot; markerHeight=&quot;7&quot; orient=&quot;auto-start-reverse&quot;>
+        <path d=&quot;M0,0 L10,5 L0,10 Z&quot; class=&quot;arrowFill&quot;/>
+      </marker>
+    </defs>
+
+    <!-- input arrow -->
+    <text x=&quot;14&quot; y=&quot;26&quot; class=&quot;lbl&quot;>protein representation in</text>
+    <line class=&quot;flowLine&quot; x1=&quot;14&quot; y1=&quot;90&quot; x2=&quot;66&quot; y2=&quot;90&quot; marker-end=&quot;url(#arrow)&quot;/>
+
+    <!-- module box -->
+    <rect class=&quot;mod-box&quot; x=&quot;70&quot; y=&quot;40&quot; width=&quot;150&quot; height=&quot;100&quot; rx=&quot;8&quot;/>
+    <text x=&quot;145&quot; y=&quot;82&quot; text-anchor=&quot;middle&quot; font-weight=&quot;600&quot;>Refinement module</text>
+    <text x=&quot;145&quot; y=&quot;100&quot; text-anchor=&quot;middle&quot; class=&quot;lbl&quot;>(same fixed weights</text>
+    <text x=&quot;145&quot; y=&quot;115&quot; text-anchor=&quot;middle&quot; class=&quot;lbl&quot;>every pass)</text>
+
+    <!-- output arrow -->
+    <line class=&quot;flowLine&quot; x1=&quot;220&quot; y1=&quot;90&quot; x2=&quot;266&quot; y2=&quot;90&quot; marker-end=&quot;url(#arrow)&quot;/>
+    <text x=&quot;270&quot; y=&quot;26&quot; class=&quot;lbl&quot;>predicted fold (ribbon)</text>
+
+    <!-- ribbon -->
+    <path id=&quot;ribbon&quot; class=&quot;ribbon&quot; d=&quot;&quot;/>
+    <g id=&quot;markers&quot;></g>
+
+    <!-- loop path -->
+    <path id=&quot;loopPath&quot; class=&quot;flowLine&quot; d=&quot;M 600,145 C 600,292 90,292 90,145&quot; marker-end=&quot;url(#arrow)&quot;/>
+    <text x=&quot;320&quot; y=&quot;308&quot; text-anchor=&quot;middle&quot; class=&quot;lbl&quot;>pass token — one full trip through the module</text>
+    <g id=&quot;tokenGroup&quot;></g>
+
+    <!-- confidence bar -->
+    <text x=&quot;70&quot; y=&quot;332&quot; class=&quot;lbl&quot;>prediction confidence (qualitative fold quality)</text>
+    <rect class=&quot;bar-track&quot; x=&quot;70&quot; y=&quot;340&quot; width=&quot;500&quot; height=&quot;18&quot; rx=&quot;4&quot;/>
+    <rect id=&quot;confFill&quot; class=&quot;bar-fill&quot; x=&quot;70&quot; y=&quot;340&quot; height=&quot;18&quot; rx=&quot;4&quot; width=&quot;0&quot;/>
+
+    <!-- model size bar (fixed) -->
+    <text x=&quot;70&quot; y=&quot;372&quot; class=&quot;lbl&quot;>model size (number of learned weights) — fixed, does not grow</text>
+    <rect class=&quot;bar-track&quot; x=&quot;70&quot; y=&quot;380&quot; width=&quot;500&quot; height=&quot;18&quot; rx=&quot;4&quot;/>
+    <rect class=&quot;bar-fill-fixed&quot; x=&quot;70&quot; y=&quot;380&quot; height=&quot;18&quot; rx=&quot;4&quot; width=&quot;150&quot;/>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;loopSlider&quot;>Number of refinement loops at prediction time (passes): <b id=&quot;loopVal&quot;>1</b></label>
+      <input type=&quot;range&quot; id=&quot;loopSlider&quot; min=&quot;1&quot; max=&quot;8&quot; step=&quot;1&quot; value=&quot;1&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>Pause animation</button>
+  </div>
+
+  <div class=&quot;stats&quot;>
+    <div class=&quot;stat&quot;><div class=&quot;v&quot; id=&quot;rLoop&quot;>1</div><div class=&quot;k&quot;>loop counter (passes run)</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;v&quot; id=&quot;rConf&quot;>6</div><div class=&quot;k&quot;>structural conflicts remaining</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;v&quot; id=&quot;rQ&quot;>45%</div><div class=&quot;k&quot;>prediction confidence</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;v&quot;>1× (fixed)</div><div class=&quot;k&quot;>model size, any loop count</div></div>
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>C</mi><mo>(</mo><mi>L</mi><mo>)</mo><mo>=</mo><mi>round</mi><mrow><mo>(</mo><msub><mi>N</mi><mn>0</mn></msub><mo>·</mo><msup><mi>e</mi><mrow><mo>−</mo><mi>k</mi><mo>(</mo><mi>L</mi><mo>−</mo><mn>1</mn><mo>)</mo></mrow></msup><mo>)</mo></mrow>
+    </math>
+    <div class=&quot;legend&quot;>C(L) — structural conflicts left after L passes (count) · N₀ — conflicts before any refinement (=6, count) · k — decay rate per pass (=0.6, unitless) · L — number of loops selected (passes)</div>
+  </div>
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>Q</mi><mo>(</mo><mi>L</mi><mo>)</mo><mo>=</mo><msub><mi>Q</mi><mtext>max</mtext></msub><mo>−</mo><mo>(</mo><msub><mi>Q</mi><mtext>max</mtext></msub><mo>−</mo><msub><mi>Q</mi><mn>0</mn></msub><mo>)</mo><mo>·</mo><msup><mi>e</mi><mrow><mo>−</mo><msub><mi>k</mi><mn>2</mn></msub><mo>(</mo><mi>L</mi><mo>−</mo><mn>1</mn><mo>)</mo></mrow></msup>
+    </math>
+    <div class=&quot;legend&quot;>Q(L) — prediction confidence after L passes (%) · Q_max — confidence ceiling (=97%) · Q₀ — confidence after 1 pass (=45%) · k₂ — confidence rise rate per pass (=0.5, unitless) · L — number of loops selected</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const N0 = 6, DECAY_K = 0.6;
+  const CONF0 = 45, CONF_MAX = 97, CONF_K = 0.5;
+
+  const conflictsAt = L => Math.round(N0 * Math.exp(-DECAY_K*(L-1)));
+  const confidenceAt = L => CONF_MAX - (CONF_MAX - CONF0) * Math.exp(-CONF_K*(L-1));
+
+  const rough   = [[270,90],[360,140],[300,60],[400,140],[330,60],[600,100]];
+  const refined = [[270,90],[330,110],[390,70],[450,110],[510,75],[600,95]];
+  const markerPos = [[345,95],[365,75],[385,110],[405,80],[320,120],[430,100]];
+
+  function lerpPoints(w){
+    return rough.map((p,i)=>{
+      const r = refined[i];
+      return [p[0]+(r[0]-p[0])*w, p[1]+(r[1]-p[1])*w];
+    });
+  }
+  function smoothPath(points){
+    let d = `M ${points[0][0]},${points[0][1]}`;
+    for(let i=0;i<points.length-1;i++){
+      const [x0,y0]=points[i], [x1,y1]=points[i+1];
+      const mx=(x0+x1)/2, my=(y0+y1)/2;
+      d += ` Q ${x0},${y0} ${mx},${my}`;
+    }
+    const last = points[points.length-1];
+    d += ` L ${last[0]},${last[1]}`;
+    return d;
+  }
+
+  const slider = document.getElementById('loopSlider');
+  const loopVal = document.getElementById('loopVal');
+  const rLoop = document.getElementById('rLoop');
+  const rConf = document.getElementById('rConf');
+  const rQ = document.getElementById('rQ');
+  const ribbon = document.getElementById('ribbon');
+  const markersG = document.getElementById('markers');
+  const confFill = document.getElementById('confFill');
+  const loopPath = document.getElementById('loopPath');
+  const tokenGroup = document.getElementById('tokenGroup');
+  const playBtn = document.getElementById('playBtn');
+
+  let L = 1;
+
+  function draw(){
+    const conflicts = conflictsAt(L);
+    const conf = confidenceAt(L);
+    const w = 1 - conflicts / N0;
+
+    loopVal.textContent = L;
+    rLoop.textContent = L;
+    rConf.textContent = conflicts;
+    rQ.textContent = Math.round(conf) + '%';
+
+    ribbon.setAttribute('d', smoothPath(lerpPoints(w)));
+
+    markersG.innerHTML = '';
+    for(let i=0;i<conflicts;i++){
+      const [x,y] = markerPos[i];
+      markersG.innerHTML += `<line class=&quot;conflict-mark&quot; x1=&quot;${x-5}&quot; y1=&quot;${y-5}&quot; x2=&quot;${x+5}&quot; y2=&quot;${y+5}&quot;/>
+                              <line class=&quot;conflict-mark&quot; x1=&quot;${x-5}&quot; y1=&quot;${y+5}&quot; x2=&quot;${x+5}&quot; y2=&quot;${y-5}&quot;/>`;
+    }
+
+    confFill.setAttribute('width', (500 * conf/100).toFixed(1));
+  }
+
+  slider.addEventListener('input', ()=>{
+    L = parseInt(slider.value,10);
+    draw();
+  });
+
+  // animation of the pass token traveling around the loop
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduceMotion;
+  playBtn.textContent = playing ? 'Pause animation' : 'Play animation (moves the pass token)';
+
+  const SPEED = 70; // px per second along the loop path
+  let lastT = null, dist = 0;
+  let pathLen = 0;
+
+  function ensureLen(){
+    pathLen = loopPath.getTotalLength();
+  }
+
+  function tick(t){
+    if(lastT === null) lastT = t;
+    const dt = (t - lastT) / 1000;
+    lastT = t;
+    if(playing){
+      dist = (dist + SPEED*dt) % pathLen;
+      const pt = loopPath.getPointAtLength(dist);
+      const passNum = ((Math.floor((dist/SPEED*SPEED)/pathLen)) % L) + 1; // decorative cycle count
+      const shown = (Math.min(L, Math.max(1, passNum)));
+      tokenGroup.innerHTML = `<circle class=&quot;token&quot; cx=&quot;${pt.x}&quot; cy=&quot;${pt.y}&quot; r=&quot;11&quot;/>
+                               <text class=&quot;token-txt&quot; x=&quot;${pt.x}&quot; y=&quot;${pt.y+3.5}&quot;>${shown}</text>`;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause animation' : 'Play animation (moves the pass token)';
+  });
+
+  window.addEventListener('resize', ensureLen);
+
+  draw();
+  ensureLen();
+  requestAnimationFrame(tick);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;loops-refine-structure&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Repeated passes refine one structural prediction"
+  ></iframe>
+</section>
+
+<section class="scene" id="search-ranks-binder-candidates">
+  <h3>A larger virtual search gives the model more chances to find a binder</h3>
+  <div class="caption">Prediction answers what shape a sequence will make; design asks which sequence to try. ESMFold2 turns design into a search by generating candidate sequences, predicting how each sits on the target, then ranking them with a confidence score, the model's estimate that the pose is stable and well formed. Increase the candidate pool and the fixed toy search reveals more ranked options, so its best available score can rise but never fall. In the reported runs, generation took roughly two days and ranking took less than a day, with no special retraining for these targets.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="search-ranks-binder-candidates"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;>
+<title>Searching a bigger candidate pool</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --ink:#1b1e24; --muted:#5b6270;
+  --line:#d7dae0; --accent:#2f6fed; --accent2:#e0722e; --good:#1f9e6d;
+  --card:#eef1f6; --best:#fff4e6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12151a; --panel:#1b2027; --ink:#e8eaed; --muted:#9aa3b2;
+    --line:#333a45; --accent:#6ea8ff; --accent2:#ffb066; --good:#3ddc97;
+    --card:#232a33; --best:#3a2c1d;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+.eqwrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;overflow-x:auto;}
+math{font-size:16px;color:var(--ink);}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;}
+svg{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--line);border-radius:10px;}
+text{fill:var(--ink);font-family:system-ui,Arial,sans-serif;}
+.lbl{font-size:11px;fill:var(--muted);}
+.small{font-size:10px;}
+.muted{fill:var(--muted);}
+.controls{margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;}
+.ctrl{flex:1 1 260px;min-width:220px;}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
+input[type=range]{width:100%;}
+button{padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;min-width:130px;}
+.stat b{display:block;font-size:15px;margin-top:2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>S</mi><mtext>best</mtext></msub><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo>
+      <munderover><mo movablelimits=&quot;true&quot;>max</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+      <msub><mi>s</mi><mi>i</mi></msub>
+    </math>
+    <div class=&quot;legend&quot;>S<sub>best</sub>(N) — best confidence score found after searching the first N candidates (0 to 100) &amp;middot;
+    N — number of candidates searched, set by the slider below &amp;middot;
+    s<sub>i</sub> — the confidence score the model gives candidate number i (0 to 100).</div>
+  </div>
+
+  <svg id=&quot;svg&quot; viewBox=&quot;0 0 680 470&quot; role=&quot;img&quot; aria-label=&quot;Candidate search diagram&quot;>
+    <g transform=&quot;translate(30,26)&quot;>
+      <text class=&quot;lbl&quot; x=&quot;0&quot; y=&quot;-8&quot;>Target shape (fixed)</text>
+      <polygon points=&quot;10,60 50,10 90,10 110,60 90,100 30,100&quot; fill=&quot;var(--accent)&quot; stroke=&quot;var(--line)&quot;/>
+    </g>
+
+    <g transform=&quot;translate(30,170)&quot;>
+      <text class=&quot;lbl&quot; x=&quot;0&quot; y=&quot;-8&quot;>Best-so-far match</text>
+      <rect width=&quot;150&quot; height=&quot;150&quot; rx=&quot;10&quot; fill=&quot;var(--best)&quot; stroke=&quot;var(--line)&quot;/>
+      <circle id=&quot;bestShape&quot; cx=&quot;75&quot; cy=&quot;58&quot; r=&quot;32&quot; fill=&quot;var(--accent2)&quot;/>
+      <text id=&quot;bestScoreText&quot; x=&quot;75&quot; y=&quot;112&quot; text-anchor=&quot;middle&quot; font-size=&quot;24&quot; font-weight=&quot;700&quot;>--</text>
+      <text class=&quot;small muted&quot; x=&quot;75&quot; y=&quot;130&quot; text-anchor=&quot;middle&quot;>confidence score /100</text>
+    </g>
+    <text id=&quot;bestIdxText&quot; class=&quot;lbl small&quot; x=&quot;30&quot; y=&quot;336&quot;>found at candidate #--</text>
+
+    <!-- Flow column: sits strictly between the best-so-far panel (ends x=180)
+         and the ranking lane (starts x=300), so its text can never be
+         overlapped by ranking-lane cards. -->
+    <g transform=&quot;translate(196,182)&quot;>
+      <text class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;0&quot; font-size=&quot;9&quot;>Generated →</text>
+      <text class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;12&quot; font-size=&quot;9&quot;>scored → ranked</text>
+    </g>
+    <g transform=&quot;translate(232,236)&quot;>
+      <circle id=&quot;dot0&quot; cx=&quot;0&quot; cy=&quot;0&quot; r=&quot;5&quot; fill=&quot;var(--accent)&quot;/>
+      <circle id=&quot;dot1&quot; cx=&quot;0&quot; cy=&quot;0&quot; r=&quot;5&quot; fill=&quot;var(--accent)&quot;/>
+      <circle id=&quot;dot2&quot; cx=&quot;0&quot; cy=&quot;0&quot; r=&quot;5&quot; fill=&quot;var(--accent)&quot;/>
+    </g>
+    <g transform=&quot;translate(196,258)&quot;>
+      <text class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;0&quot; font-size=&quot;8&quot;>Dots: candidates</text>
+      <text class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;11&quot; font-size=&quot;8&quot;>moving into the</text>
+      <text class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;22&quot; font-size=&quot;8&quot;>ranking lane. Brighter</text>
+      <text class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;33&quot; font-size=&quot;8&quot;>= closer to being ranked.</text>
+    </g>
+
+    <g transform=&quot;translate(300,26)&quot;>
+      <text class=&quot;lbl&quot; x=&quot;0&quot; y=&quot;-8&quot;>Ranking lane — ordered by confidence score</text>
+      <g id=&quot;row0&quot; transform=&quot;translate(0,4)&quot;></g>
+      <g id=&quot;row1&quot; transform=&quot;translate(0,42)&quot;></g>
+      <g id=&quot;row2&quot; transform=&quot;translate(0,80)&quot;></g>
+      <g id=&quot;row3&quot; transform=&quot;translate(0,118)&quot;></g>
+      <g id=&quot;row4&quot; transform=&quot;translate(0,156)&quot;></g>
+      <g id=&quot;row5&quot; transform=&quot;translate(0,194)&quot;></g>
+      <text id=&quot;aggText&quot; class=&quot;small muted&quot; x=&quot;0&quot; y=&quot;248&quot;>+0 more candidates ranked (aggregated)</text>
+    </g>
+
+    <g transform=&quot;translate(30,412)&quot;>
+      <text class=&quot;lbl&quot; x=&quot;0&quot; y=&quot;-8&quot;>Two-stage pipeline timeline (fixed, does not change with N)</text>
+      <rect x=&quot;0&quot; y=&quot;0&quot; width=&quot;440&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--card)&quot; stroke=&quot;var(--line)&quot;/>
+      <rect x=&quot;0&quot; y=&quot;0&quot; width=&quot;308&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--accent)&quot;/>
+      <rect x=&quot;308&quot; y=&quot;0&quot; width=&quot;132&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--accent2)&quot;/>
+      <text x=&quot;154&quot; y=&quot;17&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;#fff&quot;>Generation ~2 days</text>
+      <text x=&quot;374&quot; y=&quot;17&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;#fff&quot;>Ranking &amp;lt;1 day</text>
+    </g>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;nSlider&quot;>Number of virtual binder candidates searched (N): <b id=&quot;nVal&quot;>100</b></label>
+      <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;100&quot; max=&quot;50000&quot; step=&quot;100&quot; value=&quot;100&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>Play flow animation</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;stat&quot;>Candidates searched<b id=&quot;r1&quot;>100</b></div>
+    <div class=&quot;stat&quot;>Best score so far (/100)<b id=&quot;r2&quot;>--</b></div>
+    <div class=&quot;stat&quot;>Best found at candidate #<b id=&quot;r3&quot;>--</b></div>
+    <div class=&quot;stat&quot;>Shortlist shown<b id=&quot;r4&quot;>top 6 of 100</b></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  function scoreFor(i){
+    const s = Math.sin(i*12.9898+78.233)*43758.5453123;
+    const r = s - Math.floor(s);
+    return 30 + 70*Math.pow(r,6); // deterministic seeded &quot;toy pool&quot; score, 0-100
+  }
+  function computeTop(N){
+    const top = [];
+    for(let i=0;i<N;i++){
+      const sc = scoreFor(i);
+      if(top.length<6){ top.push({score:sc, idx:i}); top.sort((a,b)=>b.score-a.score); }
+      else if(sc>top[5].score){ top[5]={score:sc, idx:i}; top.sort((a,b)=>b.score-a.score); }
+    }
+    return top;
+  }
+  function hueColor(score){ const h = (score/100)*130; return `hsl(${h.toFixed(0)},70%,45%)`; }
+
+  const nSlider = document.getElementById('nSlider');
+  const nVal = document.getElementById('nVal');
+  const bestShape = document.getElementById('bestShape');
+  const bestScoreText = document.getElementById('bestScoreText');
+  const bestIdxText = document.getElementById('bestIdxText');
+  const aggText = document.getElementById('aggText');
+  const r1 = document.getElementById('r1'), r2=document.getElementById('r2'),
+        r3 = document.getElementById('r3'), r4=document.getElementById('r4');
+
+  function render(){
+    const N = parseInt(nSlider.value,10);
+    nVal.textContent = N.toLocaleString();
+    const top = computeTop(N);
+    for(let k=0;k<6;k++){
+      const row = document.getElementById('row'+k);
+      if(k < top.length){
+        const c = top[k];
+        const score = Math.round(c.score);
+        const barW = Math.max(2, Math.round(score*1.5));
+        const col = hueColor(score);
+        row.innerHTML =
+          '<rect width=&quot;200&quot; height=&quot;34&quot; rx=&quot;6&quot; fill=&quot;var(--card)&quot; stroke=&quot;var(--line)&quot;/>'+
+          '<text x=&quot;8&quot; y=&quot;14&quot; font-size=&quot;11&quot; fill=&quot;var(--ink)&quot;>#'+(k+1)+'  score '+score+'/100</text>'+
+          '<rect x=&quot;8&quot; y=&quot;20&quot; width=&quot;150&quot; height=&quot;8&quot; fill=&quot;var(--line)&quot;/>'+
+          '<rect x=&quot;8&quot; y=&quot;20&quot; width=&quot;'+barW+'&quot; height=&quot;8&quot; fill=&quot;'+col+'&quot;/>'+
+          '<text x=&quot;164&quot; y=&quot;27&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>cand '+(c.idx+1)+'</text>';
+      } else {
+        row.innerHTML = '';
+      }
+    }
+    const best = top[0];
+    const bestScore = best ? Math.round(best.score) : 0;
+    bestShape.setAttribute('fill', best ? hueColor(best.score) : 'var(--accent2)');
+    bestScoreText.textContent = bestScore;
+    bestIdxText.textContent = 'found at candidate #' + (best ? (best.idx+1) : '--');
+    const shown = Math.min(6,N);
+    const more = Math.max(0, N-6);
+    aggText.textContent = '+ ' + more.toLocaleString() + ' more candidates ranked (aggregated)';
+
+    r1.textContent = N.toLocaleString();
+    r2.textContent = bestScore;
+    r3.textContent = best ? (best.idx+1) : '--';
+    r4.textContent = 'top '+shown+' of '+N.toLocaleString();
+  }
+  nSlider.addEventListener('input', render);
+
+  // Decorative flow animation (does not affect data)
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dots = [document.getElementById('dot0'),document.getElementById('dot1'),document.getElementById('dot2')];
+  const playBtn = document.getElementById('playBtn');
+  let playing = !reduce;
+  let t0 = performance.now();
+  function frame(now){
+    if(playing){
+      const t = (now - t0)/1000;
+      dots.forEach((d,k)=>{
+        const phase = (t*0.6 + k/3) % 1;
+        const x = -50 + phase*110;
+        const y = Math.sin(phase*Math.PI*2 + k)*6;
+        d.setAttribute('cx', x.toFixed(1));
+        d.setAttribute('cy', y.toFixed(1));
+        d.setAttribute('opacity', (0.3+0.7*Math.sin(phase*Math.PI)).toFixed(2));
+      });
+    }
+    requestAnimationFrame(frame);
+  }
+  playBtn.textContent = playing ? 'Pause flow animation' : 'Play flow animation';
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause flow animation' : 'Play flow animation';
+    if(playing) t0 = performance.now();
+  });
+  requestAnimationFrame(frame);
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;search-ranks-binder-candidates&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A larger virtual search gives the model more chances to find a binder"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats the old search</h2>
+  <div class="part-lede">The mechanism is only useful if it survives real measurements. Now we compare its structure predictions, speed, designed binders, and physical geometry with laboratory evidence.</div>
+</header>
+<section class="scene" id="alignment-raises-complex-accuracy">
+  <h3>Related sequences raise correct complex predictions from 71% to 77%</h3>
+  <div class="caption">The first test is whether the predicted shapes are right often enough to trust. ESMFold2 can start from one sequence because the training stage already captured evolutionary patterns. Give it an optional stack of related sequences, called a multiple sequence alignment, and correct general complex predictions on Foldbench rise from 71% to 77%. The same benchmark suite includes the harder antibody-target task, where the model predicts 55% correctly; antibodies are proteins whose flexible gripping loops make the exact pose difficult.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="alignment-raises-complex-accuracy"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Related sequences raise complex accuracy</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel-bg:#f4f6f9;
+  --fg:#16202b;
+  --muted:#5b6b7c;
+  --accent:#2563eb;
+  --accent-2:#16a34a;
+  --antibody:#c2650a;
+  --cell-empty:#dde4ec;
+  --border:#c7d0da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1620;
+    --panel-bg:#1b2634;
+    --fg:#e8eef5;
+    --muted:#9fb0c2;
+    --accent:#5b9bff;
+    --accent-2:#4ade80;
+    --antibody:#f0a15c;
+    --cell-empty:#324153;
+    --border:#3c4c5f;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:14px; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}
+.wrap{max-width:680px;margin:0 auto;}
+h2{font-size:15px;margin:0 0 8px;font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px;}
+button.toggle{
+  font-size:13px;padding:8px 14px;border-radius:20px;border:1px solid var(--border);
+  background:var(--panel-bg);color:var(--fg);cursor:pointer;
+}
+button.toggle[aria-pressed=&quot;true&quot;]{background:var(--accent);color:#fff;border-color:var(--accent);}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0;}
+.stat{background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;min-width:120px;}
+.stat b{font-size:16px;display:block;}
+svg{width:100%;height:auto;display:block;max-width:100%;}
+.panel{border:1px solid var(--border);border-radius:10px;background:var(--panel-bg);padding:6px 8px;margin-top:10px;}
+.panel-label{font-size:12px;color:var(--muted);margin:2px 4px 4px;}
+.eqbox{margin-top:10px;font-size:13px;}
+.legend{font-size:11px;color:var(--muted);margin-top:2px;}
+.footer{font-size:11px;color:var(--muted);margin-top:10px;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Does giving the model relatives help it guess protein complex shapes?</h2>
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot; class=&quot;toggle&quot; aria-pressed=&quot;false&quot;>Toggle: single sequence only → add related sequences (a multiple sequence alignment)</button>
+  </div>
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;stat&quot;>General-complex accuracy<b id=&quot;pctGeneral&quot;>71%</b></div>
+    <div class=&quot;stat&quot;>Cells correct / total<b id=&quot;cellsGeneral&quot;>71 / 100</b></div>
+    <div class=&quot;stat&quot;>Antibody-target accuracy (fixed)<b>55%</b></div>
+  </div>
+
+  <svg id=&quot;mainSvg&quot; viewBox=&quot;0 0 680 210&quot; role=&quot;img&quot; aria-label=&quot;diagram&quot;></svg>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;panel-label&quot;>Harder benchmark: antibody–target complexes — fixed at 55 of 100, does not respond to the toggle above</div>
+    <svg id=&quot;antibodySvg&quot; viewBox=&quot;0 0 680 150&quot; role=&quot;img&quot; aria-label=&quot;antibody inset&quot;></svg>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>Accuracy</mi><mo>=</mo>
+      <mfrac><mi>C</mi><mi>N</mi></mfrac><mo>×</mo><mn>100</mn><mi>%</mi>
+    </math>
+    <div class=&quot;legend&quot;>C — number of complexes the model predicted correctly (filled cells) · N — total complexes tested, 100 per grid (one cell each)</div>
+  </div>
+  <div class=&quot;footer&quot;>Values shown are reported Foldbench success rates (71%, 77%, 55%) — not a toy calculation.</div>
+</div>
+
+<script>
+const NS=&quot;http://www.w3.org/2000/svg&quot;;
+function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const reducedMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const mainSvg=document.getElementById('mainSvg');
+const antSvg=document.getElementById('antibodySvg');
+const btn=document.getElementById('toggleBtn');
+const pctGeneralEl=document.getElementById('pctGeneral');
+const cellsGeneralEl=document.getElementById('cellsGeneral');
+
+const state={toggled:false,current:71,target:71};
+
+// ---- static main diagram elements ----
+function buildMain(){
+  mainSvg.innerHTML='';
+  // input box
+  mainSvg.appendChild(el('rect',{x:10,y:15,width:150,height:170,rx:8,fill:'none',stroke:cssVar('--border')}));
+  mainSvg.appendChild(el('text',{x:85,y:32,'text-anchor':'middle',fill:cssVar('--muted'),'font-size':11},)).textContent='Input given to the model';
+  // query row (always present)
+  drawSeqRow(20,45,140,14,'query');
+  // model box
+  mainSvg.appendChild(el('rect',{x:220,y:70,width:150,height:70,rx:8,fill:cssVar('--panel-bg'),stroke:cssVar('--border')}));
+  const t1=el('text',{x:295,y:100,'text-anchor':'middle',fill:cssVar('--fg'),'font-size':13,'font-weight':600});
+  t1.textContent='ESMFold2'; mainSvg.appendChild(t1);
+  const t2=el('text',{x:295,y:118,'text-anchor':'middle',fill:cssVar('--muted'),'font-size':10});
+  t2.textContent='(same model, unchanged)'; mainSvg.appendChild(t2);
+  // arrows
+  arrow(160,105,220,105);
+  arrow(370,105,410,105);
+  // grid label
+  const t3=el('text',{id:'pctText',x:545,y:30,'text-anchor':'middle',fill:cssVar('--accent'),'font-size':18,'font-weight':700});
+  t3.textContent='71%'; mainSvg.appendChild(t3);
+  const t4=el('text',{x:545,y:198,'text-anchor':'middle',fill:cssVar('--muted'),'font-size':10});
+  t4.textContent='General complexes correct (Foldbench)'; mainSvg.appendChild(t4);
+  buildGrid('generalGrid',410,40);
+}
+function arrow(x1,y1,x2,y2){
+  mainSvg.appendChild(el('line',{x1,y1,x2,y2,stroke:cssVar('--muted'),'stroke-width':2}));
+  mainSvg.appendChild(el('polygon',{points:`${x2},${y2-5} ${x2+8},${y2} ${x2},${y2+5}`,fill:cssVar('--muted')}));
+}
+function drawSeqRow(x,y,w,h,cls){
+  const g=el('g',{class:cls});
+  const n=10, cw=w/n;
+  const hues=[0,30,60,90,150,190,230,270,300,330];
+  for(let i=0;i<n;i++){
+    g.appendChild(el('rect',{x:x+i*cw,y,width:cw-1.5,height:h,rx:2,
+      fill:`hsl(${hues[i%hues.length]},55%,55%)`}));
+  }
+  mainSvg.appendChild(g);
+  return g;
+}
+function buildGrid(id,x0,y0,cell=12,gap=1.5){
+  const g=el('g',{id});
+  for(let i=0;i<100;i++){
+    const r=Math.floor(i/10), c=i%10;
+    g.appendChild(el('rect',{x:x0+c*(cell+gap),y:y0+r*(cell+gap),width:cell,height:cell,rx:1.5,
+      fill:cssVar('--cell-empty'),stroke:cssVar('--border'),'stroke-width':0.5}));
+  }
+  mainSvg.appendChild(g);
+}
+function updateGrid(count){
+  const g=document.getElementById('generalGrid');
+  const rects=g.children;
+  for(let i=0;i<rects.length;i++){
+    rects[i].setAttribute('fill', i<count? cssVar('--accent-2') : cssVar('--cell-empty'));
+  }
+}
+function updateMsaRows(show){
+  document.querySelectorAll('#mainSvg g[class^=&quot;rel&quot;]').forEach(n=>n.remove());
+  if(show){
+    for(let r=0;r<4;r++){
+      const row=drawSeqRow(20,64+r*17,140,12,'rel'+r);
+      // dim mismatched-looking cells slightly for a &quot;similar but not identical&quot; feel
+      Array.from(row.children).forEach((c,i)=>{ if((i+r)%5===0) c.setAttribute('opacity',0.45); });
+    }
+    mainSvg.setAttribute('viewBox','0 0 680 210');
+  }
+}
+
+// ---- antibody inset (fixed) ----
+function buildAntibody(){
+  antSvg.innerHTML='';
+  antSvg.appendChild(el('rect',{x:10,y:5,width:660,height:140,rx:8,fill:'none',stroke:'none'}));
+  const t=el('text',{x:545,y:26,'text-anchor':'middle',fill:cssVar('--antibody'),'font-size':16,'font-weight':700});
+  t.textContent='55%'; antSvg.appendChild(t);
+  const g=el('g',{id:'antGrid'});
+  for(let i=0;i<100;i++){
+    const r=Math.floor(i/10), c=i%10;
+    g.appendChild(el('rect',{x:410+c*13.5,y:35+r*13.5,width:12,height:12,rx:1.5,
+      fill: i<55? cssVar('--antibody') : cssVar('--cell-empty'),
+      stroke:cssVar('--border'),'stroke-width':0.5}));
+  }
+  antSvg.appendChild(g);
+  const lbl=el('text',{x:15,y:80,fill:cssVar('--muted'),'font-size':11});
+  lbl.textContent='Flexible antibody loops make'; antSvg.appendChild(lbl);
+  const lbl2=el('text',{x:15,y:95,fill:cssVar('--muted'),'font-size':11});
+  lbl2.textContent='the exact pose harder to predict.'; antSvg.appendChild(lbl2);
+}
+
+function render(){
+  const count=Math.round(state.current);
+  updateGrid(count);
+  document.getElementById('pctText').textContent=count+'%';
+  pctGeneralEl.textContent=count+'%';
+  cellsGeneralEl.textContent=count+' / 100';
+}
+
+btn.addEventListener('click',()=>{
+  state.toggled=!state.toggled;
+  btn.setAttribute('aria-pressed', state.toggled?'true':'false');
+  btn.textContent = state.toggled
+    ? 'Toggle: using single sequence + aligned relatives (click to remove them)'
+    : 'Toggle: single sequence only → add related sequences (a multiple sequence alignment)';
+  updateMsaRows(state.toggled);
+  state.target = state.toggled ? 77 : 71;
+  if(reducedMotion){ state.current=state.target; render(); }
+});
+
+function tick(){
+  if(!reducedMotion &amp;&amp; Math.abs(state.current-state.target)>0.05){
+    state.current += (state.target-state.current)*0.12;
+    render();
+  }
+  requestAnimationFrame(tick);
+}
+
+buildMain();
+buildAntibody();
+updateMsaRows(false);
+render();
+requestAnimationFrame(tick);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;alignment-raises-complex-accuracy&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Related sequences raise correct complex predictions from 71% to 77%"
+  ></iframe>
+</section>
+
+<section class="scene" id="long-proteins-remain-fast">
+  <h3>A 1024-amino-acid structure can be predicted in 9.4 seconds</h3>
+  <div class="caption">Accuracy alone would not replace a slow search, so the next constraint is time. Protein length means the number of amino acids in its chain, and longer chains give a predictor more work. Stretch the sequence from 128 to 1024 amino acids and watch the work indicator grow while the measured endpoint remains within a few seconds. ESMFold2-Fast predicts the 1024-amino-acid case in 9.4 seconds, fast enough to make large virtual searches plausible.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="long-proteins-remain-fast"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Protein length vs. prediction work</title>
+<style>
+  :root{
+    --bg:#f7f8fb; --panel:#ffffff; --text:#1c2430; --muted:#5b6472;
+    --accent:#2f6fed; --accent2:#e2612b; --track:#dfe4ee; --line:#c7cede;
+    --good:#1f9d63;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121620; --panel:#1a2030; --text:#e8ecf4; --muted:#9aa4b6;
+      --accent:#6fa2ff; --accent2:#ff9a5a; --track:#2a3247; --line:#3a4560;
+      --good:#4fd694;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:6px;}
+  label.ctrl{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px;flex:1 1 260px;}
+  input[type=range]{width:100%;}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px 18px;margin:8px 0 4px;font-size:13px;}
+  .readout{background:var(--track);border-radius:8px;padding:6px 10px;}
+  .readout b{color:var(--text);}
+  svg{width:100%;height:auto;max-width:100%;display:block;}
+  .small{font-size:11px;fill:var(--muted);}
+  .lbl{font-size:12px;fill:var(--text);}
+  .lblm{font-size:12px;fill:var(--muted);}
+  math{font-size:16px;}
+  .legend{font-size:12px;color:var(--muted);margin:2px 0 14px;line-height:1.4;}
+  .eqbox{margin-top:10px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;controls&quot;>
+      <label class=&quot;ctrl&quot;>
+        Protein sequence length L — number of amino acids in the chain (128 to 1024)
+        <input id=&quot;lenSlider&quot; type=&quot;range&quot; min=&quot;128&quot; max=&quot;1024&quot; step=&quot;8&quot; value=&quot;128&quot;>
+      </label>
+    </div>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;>Length: <b id=&quot;roLen&quot;>128</b> amino acids</div>
+      <div class=&quot;readout&quot;>Relative work: <b id=&quot;roWork&quot;>1.6%</b> of max</div>
+      <div class=&quot;readout&quot;>Runtime at this length: <b id=&quot;roTime&quot;>not measured</b></div>
+    </div>
+
+    <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 320&quot; role=&quot;img&quot; aria-label=&quot;sequence and work diagram&quot;></svg>
+
+    <div class=&quot;eqbox&quot;>
+      <math display=&quot;block&quot;>
+        <mi>W</mi><mo>=</mo>
+        <msup><mrow><mo>(</mo><mfrac><mi>L</mi><msub><mi>L</mi><mtext>max</mtext></msub></mfrac><mo>)</mo></mrow><mn>2</mn></msup>
+      </math>
+      <div class=&quot;legend&quot;>
+        <b>W</b> — relative work indicator, unitless, set to 1 (100%) at the longest measured length &amp;middot;
+        <b>L</b> — protein length in amino acids, set by the slider &amp;middot;
+        <b>L<sub>max</sub></b> — 1024 amino acids, the longest length in the benchmark, where the measured runtime of 9.4&amp;nbsp;s applies.
+        This curve shows how the compute burden grows; only L = 1024 has an actual measured stopwatch time.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('svg');
+  const slider = document.getElementById('lenSlider');
+  const roLen = document.getElementById('roLen');
+  const roWork = document.getElementById('roWork');
+  const roTime = document.getElementById('roTime');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function css(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  const L_MIN = 128, L_MAX = 1024;
+  const MEASURED_TIME = 9.4; // seconds, ESMFold2-Fast at L=1024 (source-backed anchor)
+  const CHUNK = 128; // amino acids grouped per visual block
+
+  // static layout constants
+  const bracketY = 46, bracketMinW = 140, bracketMaxW = 460, bracketX0 = 40;
+  const barY = 150, barX0 = 40, barMaxW = 460, barH = 26;
+  const stripY = 246;
+
+  let displayWork = null; // for smooth tween
+  let targetWork = 0;
+
+  function relativeWork(L){
+    return Math.pow(L / L_MAX, 2); // quadratic compute-growth model, normalized to 1 at L_MAX
+  }
+
+  // Wraps a string of words into multiple <tspan> lines that fit within maxWidth,
+  // measured using actual rendered text length so nothing clips off the canvas.
+  function wrapText(svgRoot, words, maxWidth, className){
+    const lines = [];
+    let current = '';
+    const temp = el('text', {class: className});
+    svgRoot.appendChild(temp);
+    for(const w of words){
+      const test = current ? current + ' ' + w : w;
+      temp.textContent = test;
+      let len;
+      try { len = temp.getComputedTextLength(); }
+      catch(e){ len = test.length * 6.2; } // fallback estimate if measurement unavailable
+      if(len > maxWidth &amp;&amp; current){
+        lines.push(current);
+        current = w;
+      } else {
+        current = test;
+      }
+    }
+    if(current) lines.push(current);
+    svgRoot.removeChild(temp);
+    return lines;
+  }
+
+  function draw(L, workVal){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    const text = css('--text'), muted = css('--muted'), accent = css('--accent'),
+          accent2 = css('--accent2'), track = css('--track'), line = css('--line'), good = css('--good');
+
+    // ---- Title row for section 1 ----
+    svg.appendChild(el('text', {x:40, y:20, class:'lbl'})).textContent =
+      'Sequence, grouped in blocks of ' + CHUNK + ' amino acids';
+
+    // ---- Bracket + blocks ----
+    const frac = (L - L_MIN) / (L_MAX - L_MIN);
+    const bw = bracketMinW + frac * (bracketMaxW - bracketMinW);
+    const blocks = Math.ceil(L / CHUNK);
+    const gap = 4;
+    const blockW = (bw - gap * (blocks - 1)) / blocks;
+
+    // bracket ticks
+    const bracket = el('path', {
+      d: `M ${bracketX0-8} ${bracketY-16} L ${bracketX0-8} ${bracketY+34} M ${bracketX0-8} ${bracketY-16} L ${bracketX0} ${bracketY-16}
+          M ${bracketX0-8} ${bracketY+34} L ${bracketX0} ${bracketY+34}`,
+      stroke: muted, 'stroke-width':2, fill:'none'
+    });
+    svg.appendChild(bracket);
+    const bracket2 = el('path', {
+      d: `M ${bracketX0+bw+8} ${bracketY-16} L ${bracketX0+bw+8} ${bracketY+34} M ${bracketX0+bw+8} ${bracketY-16} L ${bracketX0+bw} ${bracketY-16}
+          M ${bracketX0+bw+8} ${bracketY+34} L ${bracketX0+bw} ${bracketY+34}`,
+      stroke: muted, 'stroke-width':2, fill:'none'
+    });
+    svg.appendChild(bracket2);
+
+    for(let i=0;i<blocks;i++){
+      const x = bracketX0 + i*(blockW+gap);
+      svg.appendChild(el('rect',{
+        x:x, y:bracketY-16, width:Math.max(blockW,2), height:50,
+        rx:4, fill: i%2===0?accent:accent2, opacity:0.85
+      }));
+    }
+    svg.appendChild(el('text',{x:bracketX0, y:bracketY+52, class:'lblm'})).textContent =
+      blocks + ' block' + (blocks>1?'s':'') + ' \u00d7 ~' + CHUNK + ' amino acids each = ' + L + ' total';
+
+    // ---- Relative work bar ----
+    svg.appendChild(el('text',{x:40, y:barY-14, class:'lbl'})).textContent = 'Relative work (compute effort), normalized to the longest run';
+
+    svg.appendChild(el('rect',{x:barX0, y:barY, width:barMaxW, height:barH, rx:6, fill:track, stroke:line}));
+    const fillW = Math.max(2, workVal * barMaxW);
+    svg.appendChild(el('rect',{x:barX0, y:barY, width:fillW, height:barH, rx:6, fill:accent}));
+    svg.appendChild(el('text',{x:barX0+barMaxW/2, y:barY+barH/2+4, class:'small', 'text-anchor':'middle', fill:'#fff'}))
+      .textContent = (workVal*100).toFixed(1) + '%';
+
+    // measured benchmark marker at L_MAX (right edge of track)
+    const markerX = barX0 + barMaxW;
+    svg.appendChild(el('line',{x1:markerX, y1:barY-8, x2:markerX, y2:barY+barH+34, stroke:muted, 'stroke-dasharray':'4,3'}));
+    // stopwatch icon
+    const swX = markerX - 14, swY = barY + barH + 20;
+    svg.appendChild(el('circle',{cx:swX, cy:swY, r:9, fill:'none', stroke:good, 'stroke-width':2}));
+    svg.appendChild(el('line',{x1:swX, y1:swY, x2:swX+4, y2:swY-5, stroke:good, 'stroke-width':2}));
+    svg.appendChild(el('line',{x1:swX, y1:swY-11, x2:swX, y2:swY-14, stroke:good, 'stroke-width':2}));
+    svg.appendChild(el('text',{x:markerX-2, y:barY+barH+46, class:'small', 'text-anchor':'end', fill:good}))
+      .textContent = 'measured: 1024 aa \u2192 9.4 s';
+
+    // current position marker on bar (where slider currently is)
+    const curX = barX0 + frac*barMaxW;
+    svg.appendChild(el('line',{x1:curX, y1:barY-6, x2:curX, y2:barY+barH+6, stroke:text, 'stroke-width':2}));
+    svg.appendChild(el('text',{x:Math.min(curX, barX0+barMaxW-4), y:barY-10, class:'small', 'text-anchor':'middle', fill:text}))
+      .textContent = 'current: ' + L + ' aa';
+
+    // ---- comparison strip: one calendar page, fixed scale-contrast reference ----
+    svg.appendChild(el('rect',{x:40, y:stripY, width:34, height:34, rx:4, fill:'none', stroke:muted, 'stroke-width':2}));
+    svg.appendChild(el('line',{x1:40, y1:stripY+10, x2:74, y2:stripY+10, stroke:muted, 'stroke-width':2}));
+    svg.appendChild(el('line',{x1:48, y1:stripY-4, x2:48, y2:stripY+4, stroke:muted, 'stroke-width':2}));
+    svg.appendChild(el('line',{x1:66, y1:stripY-4, x2:66, y2:stripY+4, stroke:muted, 'stroke-width':2}));
+
+    const stripTextX = 84;
+    const stripMaxWidth = 640 - stripTextX - 14; // keep clear of right edge with margin
+    const stripWords = 'for scale only: the old search-based method took far longer than seconds (exact duration not fabricated here)'.split(' ');
+    const stripLines = wrapText(svg, stripWords, stripMaxWidth, 'lblm');
+    const stripTextEl = el('text', {x:stripTextX, y:stripY+13, class:'lblm'});
+    stripLines.forEach((ln, i) => {
+      const tspan = el('tspan', {x: stripTextX, dy: i===0 ? 0 : 14});
+      tspan.textContent = ln;
+      stripTextEl.appendChild(tspan);
+    });
+    svg.appendChild(stripTextEl);
+  }
+
+  function update(){
+    const L = parseInt(slider.value, 10);
+    roLen.textContent = L;
+    targetWork = relativeWork(L);
+    roWork.textContent = (targetWork*100).toFixed(1) + '%';
+    roTime.textContent = (L === L_MAX) ? MEASURED_TIME.toFixed(1) + ' s (measured)' : 'not measured';
+    if(reduced){
+      displayWork = targetWork;
+      draw(L, displayWork);
+    }
+  }
+
+  function frame(){
+    const L = parseInt(slider.value, 10);
+    if(displayWork === null) displayWork = targetWork;
+    const diff = targetWork - displayWork;
+    if(Math.abs(diff) > 0.0008){
+      displayWork += diff * 0.18;
+    } else {
+      displayWork = targetWork;
+    }
+    draw(L, displayWork);
+    requestAnimationFrame(frame);
+  }
+
+  slider.addEventListener('input', update);
+  update();
+  if(!reduced){
+    requestAnimationFrame(frame);
+  }
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;long-proteins-remain-fast&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A 1024-amino-acid structure can be predicted in 9.4 seconds"
+  ></iframe>
+</section>
+
+<section class="scene" id="compute-raises-lab-success">
+  <h3>More virtual search produces more binders that work in the lab</h3>
+  <div class="caption">A confidence score is only a promise until molecules are made and tested. The team searched at two computing scales, then screened the top 84 designs for every target, design format, and scale across five disease-relevant targets. Raise the search compute and minibinder success climbs from 54% to 70%. The harder single-chain antibody fragments, called scFvs, climb from 12% to 21%. Because the same testing rule is used at both scales, the rising lab bars show that extra virtual search buys real experimental success.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="compute-raises-lab-success"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Compute raises lab success</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f4f6f9;
+    --text:#1b2430;
+    --muted:#5b6673;
+    --grid:#c7ccd3;
+    --accent:#2b6cb0;
+    --bar-mini:#2b8a6b;
+    --bar-scfv:#a8622a;
+    --bar-mini-light:#8fd3bb;
+    --bar-scfv-light:#e0b184;
+    --btn-bg:#e3e8ee;
+    --btn-active:#2b6cb0;
+    --btn-active-text:#ffffff;
+    --pill-bg:#e9ecf1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12161c;
+      --panel:#1b2129;
+      --text:#e8ecf1;
+      --muted:#98a3b0;
+      --grid:#39424e;
+      --accent:#6fa8dc;
+      --bar-mini:#3fb28a;
+      --bar-scfv:#d68a4c;
+      --bar-mini-light:#1f5c48;
+      --bar-scfv-light:#6b4324;
+      --btn-bg:#252c36;
+      --btn-active:#6fa8dc;
+      --btn-active-text:#0d1117;
+      --pill-bg:#232a34;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  .ctrl-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;}
+  .ctrl-label{font-size:13px;color:var(--muted);}
+  button{
+    font-size:14px;padding:8px 14px;border-radius:8px;border:1px solid var(--grid);
+    background:var(--btn-bg);color:var(--text);cursor:pointer;
+  }
+  button.active{background:var(--btn-active);color:var(--btn-active-text);border-color:var(--btn-active);}
+  svg{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);border-radius:10px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0 4px;font-size:13px;}
+  .readout{background:var(--panel);border-radius:8px;padding:6px 10px;color:var(--text);}
+  .readout b{color:var(--accent);}
+  .terms{margin-top:6px;padding:8px 10px;background:var(--panel);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.5;}
+  .terms b{color:var(--text);}
+  .eqbox{margin-top:12px;padding:8px 10px;background:var(--panel);border-radius:8px;}
+  .legend{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  math{font-size:15px;}
+  .rail{margin-top:14px;padding:10px;background:var(--panel);border-radius:8px;}
+  .rail-title{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .pills{display:flex;flex-wrap:wrap;gap:6px;}
+  .pill{background:var(--pill-bg);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--text);}
+  .protocol{margin-top:8px;font-size:12px;color:var(--muted);}
+  .playbar{display:none;margin-bottom:8px;}
+  .playbar.show{display:flex;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;playbar&quot; id=&quot;playbar&quot;>
+    <button id=&quot;playBtn&quot;>▶ Play animation</button>
+  </div>
+
+  <div class=&quot;ctrl-row&quot;>
+    <span class=&quot;ctrl-label&quot;>Inference compute used to search candidate designs:</span>
+    <button id=&quot;btnLow&quot;>Lower compute</button>
+    <button id=&quot;btnHigh&quot;>Higher compute</button>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+
+  <div class=&quot;terms&quot;>
+    <b>Minibinders</b> — small, newly designed proteins built to grip a target molecule &amp;middot;
+    <b>scFvs</b> (single-chain antibody fragments) — a compact, lab-made piece of an antibody, the body's natural target-gripping protein. Both are &quot;designs&quot; whose real binding is checked afterward in the lab.
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;>Minibinder lab success: <b id=&quot;roMini&quot;>54</b>%</div>
+    <div class=&quot;readout&quot;>scFv lab success: <b id=&quot;roScfv&quot;>12</b>%</div>
+    <div class=&quot;readout&quot;>Compute level: <b id=&quot;roCompute&quot;>lower</b></div>
+    <div class=&quot;readout&quot;>Designs screened per target/format/scale: <b>84</b></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>R</mi><mo>=</mo>
+      <mfrac><mi>k</mi><mi>n</mi></mfrac>
+      <mo>&amp;#215;</mo><mn>100</mn><mi>%</mi>
+    </math>
+    <div class=&quot;legend&quot;>
+      R — lab success rate (%), the share of ranked designs that actually bound their target when made and tested &amp;middot;
+      k — number of top-ranked designs that bound in the lab, averaged across the five targets &amp;middot;
+      n — number of designs screened per target, format, and compute scale (n = 84, fixed)
+    </div>
+  </div>
+
+  <div class=&quot;rail&quot;>
+    <div class=&quot;rail-title&quot;>Same test, five disease-relevant targets (labels only — bars shown are averages across all five):</div>
+    <div class=&quot;pills&quot;>
+      <span class=&quot;pill&quot;>EGFR</span><span class=&quot;pill&quot;>PDGFR-&amp;beta;</span><span class=&quot;pill&quot;>PD-L1</span>
+      <span class=&quot;pill&quot;>CTLA-4</span><span class=&quot;pill&quot;>CD45</span>
+    </div>
+    <div class=&quot;protocol&quot;>Protocol: top 84 designs screened per target, per design format, per compute scale.</div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const screened = 84; // n, designs screened per target/format/scale
+  // per-target success counts (k), identical across the five targets by construction,
+  // chosen so that k/n*100 rounds to the reported averaged percentages.
+  const DATA = {
+    low:  { mini: 45, scfv: 10 },  // 45/84=53.6%→54%, 10/84=11.9%→12%
+    high: { mini: 59, scfv: 18 }   // 59/84=70.2%→70%, 18/84=21.4%→21%
+  };
+
+  function rate(count){ return count/screened*100; }
+
+  const svg = document.getElementById('chart');
+  const roMini = document.getElementById('roMini');
+  const roScfv = document.getElementById('roScfv');
+  const roCompute = document.getElementById('roCompute');
+  const btnLow = document.getElementById('btnLow');
+  const btnHigh = document.getElementById('btnHigh');
+  const playbar = document.getElementById('playbar');
+  const playBtn = document.getElementById('playBtn');
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let compute = 'low';
+  let curMini = rate(DATA.low.mini);
+  let curScfv = rate(DATA.low.scfv);
+  let animT = null; // animation start time
+  let fromMini = curMini, fromScfv = curScfv, toMini = curMini, toScfv = curScfv;
+  let paused = reduceMotion;
+  let pendingCompute = null;
+
+  const W = 640, H = 300;
+  const axisLeft = 60, axisRight = 620, axisTop = 30, axisBottom = 250;
+  const barW = 70;
+  const groupGap = 90;
+  const groups = [
+    {label:'Minibinders', color:'--bar-mini', x: axisLeft + 100},
+    {label:'scFvs', color:'--bar-scfv', x: axisLeft + 100 + groupGap + barW}
+  ];
+
+  function css(varName){
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function yFor(pct){
+    return axisBottom - (pct/100)*(axisBottom-axisTop);
+  }
+
+  function draw(){
+    const textCol = css('--text');
+    const mutedCol = css('--muted');
+    const gridCol = css('--grid');
+    const miniCol = css('--bar-mini');
+    const scfvCol = css('--bar-scfv');
+
+    let svgHTML = '';
+
+    // gridlines + axis labels
+    for(let p=0;p<=100;p+=25){
+      const y = yFor(p);
+      svgHTML += `<line x1=&quot;${axisLeft}&quot; y1=&quot;${y}&quot; x2=&quot;${axisRight}&quot; y2=&quot;${y}&quot; stroke=&quot;${gridCol}&quot; stroke-width=&quot;1&quot;/>`;
+      svgHTML += `<text x=&quot;${axisLeft-10}&quot; y=&quot;${y+4}&quot; font-size=&quot;12&quot; fill=&quot;${mutedCol}&quot; text-anchor=&quot;end&quot;>${p}%</text>`;
+    }
+    svgHTML += `<text x=&quot;${axisLeft-42}&quot; y=&quot;${(axisTop+axisBottom)/2}&quot; font-size=&quot;12&quot; fill=&quot;${mutedCol}&quot; text-anchor=&quot;middle&quot; transform=&quot;rotate(-90 ${axisLeft-42} ${(axisTop+axisBottom)/2})&quot;>Lab success (%)</text>`;
+
+    // bars
+    const vals = [curMini, curScfv];
+    groups.forEach((g,i)=>{
+      const val = vals[i];
+      const y = yFor(val);
+      const h = axisBottom - y;
+      const col = i===0?miniCol:scfvCol;
+      svgHTML += `<rect x=&quot;${g.x}&quot; y=&quot;${y}&quot; width=&quot;${barW}&quot; height=&quot;${h}&quot; fill=&quot;${col}&quot; rx=&quot;4&quot;/>`;
+      svgHTML += `<text x=&quot;${g.x+barW/2}&quot; y=&quot;${y-10}&quot; font-size=&quot;16&quot; font-weight=&quot;600&quot; fill=&quot;${textCol}&quot; text-anchor=&quot;middle&quot;>${Math.round(val)}%</text>`;
+      svgHTML += `<text x=&quot;${g.x+barW/2}&quot; y=&quot;${axisBottom+22}&quot; font-size=&quot;13&quot; fill=&quot;${textCol}&quot; text-anchor=&quot;middle&quot;>${g.label}</text>`;
+    });
+
+    // axis line
+    svgHTML += `<line x1=&quot;${axisLeft}&quot; y1=&quot;${axisBottom}&quot; x2=&quot;${axisRight}&quot; y2=&quot;${axisBottom}&quot; stroke=&quot;${gridCol}&quot; stroke-width=&quot;1.5&quot;/>`;
+
+    // compute state label at top
+    svgHTML += `<text x=&quot;${(axisLeft+axisRight)/2}&quot; y=&quot;18&quot; font-size=&quot;13&quot; fill=&quot;${mutedCol}&quot; text-anchor=&quot;middle&quot;>Compute level: ${compute==='low'?'lower':'higher'}</text>`;
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = svgHTML;
+
+    roMini.textContent = Math.round(curMini);
+    roScfv.textContent = Math.round(curScfv);
+    roCompute.textContent = compute==='low' ? 'lower' : 'higher';
+  }
+
+  function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+  function animate(ts){
+    if(animT===null) animT = ts;
+    const dur = 650;
+    const t = Math.min(1, (ts-animT)/dur);
+    const e = easeOutCubic(t);
+    curMini = fromMini + (toMini-fromMini)*e;
+    curScfv = fromScfv + (toScfv-fromScfv)*e;
+    draw();
+    if(t<1){
+      requestAnimationFrame(animate);
+    } else {
+      curMini = toMini; curScfv = toScfv;
+      draw();
+    }
+  }
+
+  function setCompute(newCompute){
+    if(paused){
+      pendingCompute = newCompute;
+      compute = newCompute;
+      curMini = rate(DATA[newCompute].mini);
+      curScfv = rate(DATA[newCompute].scfv);
+      draw();
+      updateButtons();
+      return;
+    }
+    compute = newCompute;
+    fromMini = curMini; fromScfv = curScfv;
+    toMini = rate(DATA[newCompute].mini);
+    toScfv = rate(DATA[newCompute].scfv);
+    animT = null;
+    updateButtons();
+    requestAnimationFrame(animate);
+  }
+
+  function updateButtons(){
+    btnLow.classList.toggle('active', compute==='low');
+    btnHigh.classList.toggle('active', compute==='high');
+  }
+
+  btnLow.addEventListener('click', ()=>setCompute('low'));
+  btnHigh.addEventListener('click', ()=>setCompute('high'));
+
+  if(reduceMotion){
+    playbar.classList.add('show');
+    playBtn.addEventListener('click', ()=>{
+      paused = false;
+      playbar.classList.remove('show');
+      // trigger a gentle animation from current low state to high, then back visually settles
+      setCompute(compute);
+    });
+  }
+
+  updateButtons();
+  draw();
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;compute-raises-lab-success&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="More virtual search produces more binders that work in the lab"
+  ></iframe>
+</section>
+
+<section class="scene" id="pd-l1-binder-is-tight">
+  <h3>What 4.3 nanomolar means: how tightly a binder grips</h3>
+  <div class="caption">How do we say, in a number, how firmly one molecule holds onto another? We quote a dissociation constant, written <math><msub><mi>K</mi><mi>D</mi></msub></math>: the concentration at which half of the target sites are occupied. The smaller that concentration, the tighter the grip. Biohub reports <math><msub><mi>K</mi><mi>D</mi></msub><mo>=</mo><mn>4.3</mn></math> nanomolar — billionths of a mole per liter — for its binder against PD-L1, a protein on cells that normally tells the immune system to stand down. Slide the binder's concentration and watch the share of occupied targets climb; at 4.3 nanomolar it crosses one half. Needing only so slight a concentration to fill half the sites is exactly what 'tight' means.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="pd-l1-binder-is-tight"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>How tightly does the binder grip?</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --text:#1c2230; --muted:#5a6472;
+    --accent:#1f6feb; --occupied:#e0622b; --free:#c7ccd4; --grid:#d6dae1;
+    --line:#8a94a3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12151b; --panel:#1b2029; --text:#e7ebf2; --muted:#9aa4b2;
+      --accent:#5aa2ff; --occupied:#ff8a5b; --free:#3a4150; --grid:#333b48;
+      --line:#7b8494;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    padding:14px;
+  }
+  .scene{max-width:680px; margin:0 auto;}
+  h2{font-size:15px; margin:0 0 8px; font-weight:600;}
+  .panel{background:var(--panel); border-radius:10px; padding:12px;
+    display:flex; flex-wrap:wrap; gap:14px;}
+  .col{flex:1 1 300px; min-width:220px;}
+  .col h3{font-size:12px; color:var(--muted); margin:0 0 6px; font-weight:600;}
+  canvas{max-width:100%; width:100%; display:block; background:transparent;}
+  #curveCanvas{height:220px;}
+  #iconCanvas{height:220px;}
+  .controls{margin-top:12px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center;}
+  .ctrl{flex:1 1 260px; min-width:220px;}
+  .ctrl label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
+  input[type=range]{width:100%;}
+  button{
+    padding:6px 12px; font-size:13px; border-radius:6px; border:1px solid var(--line);
+    background:var(--panel); color:var(--text); cursor:pointer;
+  }
+  .readouts{display:flex; flex-wrap:wrap; gap:10px 20px; margin-top:10px;}
+  .readout{font-size:13px;}
+  .readout b{font-size:15px;}
+  .eqwrap{margin-top:14px; padding-top:8px; border-top:1px solid var(--grid);}
+  math{font-size:16px;}
+  .legend{font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.4;}
+  .note{font-size:11.5px; color:var(--muted); margin-top:8px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>How tightly does the binder grip PD-L1?</h2>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;col&quot;>
+      <h3>Occupied share vs. concentration (log scale)</h3>
+      <canvas id=&quot;curveCanvas&quot;></canvas>
+    </div>
+    <div class=&quot;col&quot;>
+      <h3>100 PD-L1 target sites</h3>
+      <canvas id=&quot;iconCanvas&quot;></canvas>
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;conc&quot;>Binder concentration C (nanomolar) — slide to change how much binder is present</label>
+      <input type=&quot;range&quot; id=&quot;conc&quot; min=&quot;-1&quot; max=&quot;2&quot; step=&quot;0.01&quot; value=&quot;-1&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>Pause</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;>Concentration: <b id=&quot;rConc&quot;>0.10</b> nM</div>
+    <div class=&quot;readout&quot;>Occupied share: <b id=&quot;rOcc&quot;>2</b>%</div>
+    <div class=&quot;readout&quot;>Occupied sites: <b id=&quot;rCount&quot;>2</b> / 100</div>
+    <div class=&quot;readout&quot;>Reported K<sub>D</sub>: <b>4.3</b> nM</div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>f</mi><mo>=</mo>
+      <mfrac><mi>C</mi><mrow><mi>C</mi><mo>+</mo><msub><mi>K</mi><mtext>D</mtext></msub></mrow></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      f — fraction of target sites occupied (shown as %) &amp;middot;
+      C — binder concentration (nM), set by the slider &amp;middot;
+      K<sub>D</sub> — dissociation constant: the concentration at which half the sites are occupied (nM); the reported value here is 4.3 nM.
+    </div>
+    <div class=&quot;note&quot;>
+      Note: PD-L1 is a protein on cells that tells the immune system to stand down. The 4.3 nM figure is Biohub's reported measurement — this scene only lets you explore its consequence, not recompute it.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const KD = 4.3; // nM, fixed reported dissociation constant
+  const LOG_MIN = -1, LOG_MAX = 2; // 0.1 nM to 100 nM
+
+  const curveCanvas = document.getElementById('curveCanvas');
+  const iconCanvas = document.getElementById('iconCanvas');
+  const cctx = curveCanvas.getContext('2d');
+  const ictx = iconCanvas.getContext('2d');
+  const slider = document.getElementById('conc');
+  const playBtn = document.getElementById('playBtn');
+  const rConc = document.getElementById('rConc');
+  const rOcc = document.getElementById('rOcc');
+  const rCount = document.getElementById('rCount');
+
+  const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let logC = LOG_MIN;
+  let dir = 1;
+  let playing = !reduceMotion;
+  playBtn.textContent = playing ? 'Pause' : 'Play';
+
+  function occupancy(C){ return C/(C+KD); } // fraction 0..1
+
+  function formatConc(c){
+    return c < 10 ? c.toFixed(2) : c.toFixed(1);
+  }
+
+  function resizeCanvas(c){
+    const ratio = window.devicePixelRatio || 1;
+    const rect = c.getBoundingClientRect();
+    c.width = Math.max(1, Math.round(rect.width * ratio));
+    c.height = Math.max(1, Math.round(rect.height * ratio));
+    const ctx = c.getContext('2d');
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  }
+
+  function resizeAll(){
+    resizeCanvas(curveCanvas);
+    resizeCanvas(iconCanvas);
+    draw();
+  }
+
+  function drawCurve(){
+    const ratio = window.devicePixelRatio || 1;
+    const W = curveCanvas.width / ratio, H = curveCanvas.height / ratio;
+    cctx.clearRect(0,0,W,H);
+    const text = cssVar('--text'), muted = cssVar('--muted'), grid = cssVar('--grid');
+    const accent = cssVar('--accent'), line = cssVar('--line');
+
+    // extra right margin so the last x-axis tick label (&quot;100 nM&quot;) never clips
+    const mL = 34, mR = 28, mT = 14, mB = 26;
+    const pw = W - mL - mR, ph = H - mT - mB;
+
+    function xFor(C){ return mL + (Math.log10(C) - LOG_MIN) / (LOG_MAX - LOG_MIN) * pw; }
+    function yFor(fPct){ return mT + (1 - fPct/100) * ph; }
+
+    // grid + y ticks
+    cctx.strokeStyle = grid; cctx.fillStyle = muted;
+    cctx.font = '10px sans-serif'; cctx.lineWidth = 1;
+    cctx.textAlign = 'left';
+    [0,25,50,75,100].forEach(v=>{
+      const y = yFor(v);
+      cctx.beginPath(); cctx.moveTo(mL,y); cctx.lineTo(mL+pw,y); cctx.stroke();
+      cctx.fillText(v+'%', 2, y+3);
+    });
+
+    // x ticks — align edge ticks inward so labels stay within the panel
+    [0.1,1,10,100].forEach(v=>{
+      const x = xFor(v);
+      let align = 'center';
+      if (v === LOG_MIN === undefined) align = 'center';
+      if (v === 0.1) align = 'left';
+      else if (v === 100) align = 'right';
+      cctx.textAlign = align;
+      cctx.fillText(v + ' nM', x, H-6);
+    });
+    cctx.textAlign = 'left';
+
+    // curve
+    cctx.strokeStyle = accent; cctx.lineWidth = 2;
+    cctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const lc = LOG_MIN + (LOG_MAX-LOG_MIN)*i/200;
+      const C = Math.pow(10, lc);
+      const f = occupancy(C)*100;
+      const x = xFor(C), y = yFor(f);
+      if(i===0) cctx.moveTo(x,y); else cctx.lineTo(x,y);
+    }
+    cctx.stroke();
+
+    // KD reference line
+    const kx = xFor(KD), ky = yFor(50);
+    cctx.strokeStyle = line; cctx.setLineDash([4,4]);
+    cctx.beginPath(); cctx.moveTo(kx, mT); cctx.lineTo(kx, mT+ph); cctx.stroke();
+    cctx.beginPath(); cctx.moveTo(mL, ky); cctx.lineTo(mL+pw, ky); cctx.stroke();
+    cctx.setLineDash([]);
+    cctx.fillStyle = muted;
+    cctx.fillText('reported K\u2093 = 4.3 nM', Math.min(kx+4, mL+pw-98), mT+10);
+    cctx.fillText('half occupied (50%)', mL+4, ky-4);
+
+    // current marker
+    const C = Math.pow(10, logC);
+    const f = occupancy(C)*100;
+    const mx = xFor(C), my = yFor(f);
+    cctx.fillStyle = cssVar('--occupied');
+    cctx.beginPath(); cctx.arc(mx,my,5,0,Math.PI*2); cctx.fill();
+    cctx.strokeStyle = cssVar('--occupied'); cctx.setLineDash([3,3]);
+    cctx.beginPath(); cctx.moveTo(mx, my); cctx.lineTo(mx, mT+ph); cctx.stroke();
+    cctx.beginPath(); cctx.moveTo(mL, my); cctx.lineTo(mx, my); cctx.stroke();
+    cctx.setLineDash([]);
+  }
+
+  function drawIcons(){
+    const ratio = window.devicePixelRatio || 1;
+    const W = iconCanvas.width / ratio, H = iconCanvas.height / ratio;
+    ictx.clearRect(0,0,W,H);
+    const occupiedColor = cssVar('--occupied'), freeColor = cssVar('--free');
+    const C = Math.pow(10, logC);
+    const f = occupancy(C)*100;
+    const occCount = Math.round(f);
+
+    const cols = 10, rows = 10;
+    const pad = 10;
+    const gw = W - pad*2, gh = H - pad*2 - 16;
+    const cell = Math.min(gw/cols, gh/rows);
+    const gridW = cell*cols, gridH = cell*rows;
+    const ox = (W-gridW)/2, oy = 16 + (gh-gridH)/2;
+    let idx = 0;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const x = ox + c*cell, y = oy + r*cell;
+        ictx.fillStyle = idx < occCount ? occupiedColor : freeColor;
+        const s = cell*0.72;
+        ictx.fillRect(x + (cell-s)/2, y + (cell-s)/2, s, s);
+        idx++;
+      }
+    }
+    ictx.fillStyle = cssVar('--muted');
+    ictx.font = '10.5px sans-serif';
+    ictx.fillText('orange = occupied, gray = free', ox, oy-4);
+  }
+
+  function updateReadouts(){
+    const C = Math.pow(10, logC);
+    const f = occupancy(C)*100;
+    rConc.textContent = formatConc(C);
+    rOcc.textContent = Math.round(f);
+    rCount.textContent = Math.round(f);
+  }
+
+  function draw(){
+    drawCurve();
+    drawIcons();
+    updateReadouts();
+  }
+
+  slider.addEventListener('input', ()=>{
+    logC = parseFloat(slider.value);
+    playing = false;
+    playBtn.textContent = 'Play';
+    draw();
+  });
+
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    if(playing) lastT = null;
+  });
+
+  let lastT = null;
+  const SPEED = 0.45; // log10-units per second
+  function tick(t){
+    if(playing){
+      if(lastT === null) lastT = t;
+      const dt = (t - lastT)/1000;
+      lastT = t;
+      logC += dir * SPEED * dt;
+      if(logC >= LOG_MAX){ logC = LOG_MAX; dir = -1; }
+      if(logC <= LOG_MIN){ logC = LOG_MIN; dir = 1; }
+      slider.value = logC.toFixed(3);
+      draw();
+    } else {
+      lastT = null;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  slider.value = LOG_MIN;
+  window.addEventListener('resize', resizeAll);
+  resizeAll();
+  requestAnimationFrame(tick);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;pd-l1-binder-is-tight&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="What 4.3 nanomolar means: how tightly a binder grips"
+  ></iframe>
+</section>
+
+<section class="scene" id="microscopy-confirms-egfr-pose">
+  <h3>The observed EGFR binder pose is within 1.204 Angstroms of the prediction</h3>
+  <div class="caption">A binder can grip strongly for an unexpected reason, so the final test asks whether its physical pose matches the prediction. The team used cryo-electron microscopy, which reconstructs a three-dimensional structure by averaging many electron-beam images of rapidly frozen molecules. Pose error is summarized by root-mean-square deviation, or RMSD: the typical distance between corresponding atoms after the two structures are aligned. Set the error to the measured 1.204 Angstroms and the predicted and observed EGFR minibinders nearly coincide, about an atom-width apart. Increase the counterfactual error and watch the overlay and target contacts visibly fail.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="microscopy-confirms-egfr-pose"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Predicted vs. observed EGFR binder pose</title>
+<style>
+  :root{
+    --bg:#f7f5ef; --panel:#ffffff; --text:#1c1c1c; --muted:#6b6b6b;
+    --target:#d9a600; --target-fill:#f4d675;
+    --predicted:#2f8f4e; --observed:#7a7a7a;
+    --accent:#1f6feb; --measured:#2f8f4e; --counter:#b3401f;
+    --line:#d8d3c6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141414; --panel:#1e1e1e; --text:#eee; --muted:#a3a3a3;
+      --target:#e0b73a; --target-fill:#5a481b;
+      --predicted:#4fc472; --observed:#a3a3a3;
+      --accent:#5b9bff; --measured:#4fc472; --counter:#ff8a5c;
+      --line:#3a3a3a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px;}
+  canvas{width:100%;max-width:100%;height:auto;display:block;
+    background:var(--panel);border-radius:8px;border:1px solid var(--line);}
+  .controls{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  .controls label{font-size:13px;color:var(--muted);flex:1 1 260px;}
+  input[type=range]{width:100%;}
+  button{font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;}
+  .r{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;min-width:150px;}
+  .r .v{font-size:20px;font-weight:700;}
+  .r .l{font-size:11px;color:var(--muted);}
+  .measured{color:var(--measured);}
+  .counter{color:var(--counter);}
+  math{font-size:15px;}
+  .eq{margin-top:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:8px 12px;}
+  .legend{font-size:11.5px;color:var(--muted);margin-top:4px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;360&quot; role=&quot;img&quot;
+    aria-label=&quot;Diagram of predicted and observed EGFR minibinder poses relative to target&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;rmsdSlider&quot;>Pose error (RMSD) — drags &amp;amp; rotates the gray observed
+      structure away from the green prediction, along a fixed path</label>
+    <input id=&quot;rmsdSlider&quot; type=&quot;range&quot; min=&quot;1.204&quot; max=&quot;8&quot; step=&quot;0.001&quot; value=&quot;1.204&quot;
+      list=&quot;snaps&quot; aria-label=&quot;RMSD in angstroms&quot;>
+    <datalist id=&quot;snaps&quot;><option value=&quot;1.204&quot;></option></datalist>
+    <button id=&quot;resetBtn&quot;>Reset to measured pose (1.204 Å)</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;r&quot;><div class=&quot;v&quot; id=&quot;rmsdVal&quot;>1.204 Å</div><div class=&quot;l&quot;>RMSD between predicted &amp;amp; observed poses</div></div>
+    <div class=&quot;r&quot;><div class=&quot;v&quot; id=&quot;statusVal&quot;>Measured (cryo-EM)</div><div class=&quot;l&quot;>is this value an experimental reading or a hypothetical?</div></div>
+    <div class=&quot;r&quot;><div class=&quot;v&quot; id=&quot;contactVal&quot;>—</div><div class=&quot;l&quot;>predicted target contacts still made</div></div>
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>RMSD</mi><mo>=</mo><msqrt><mfrac><mn>1</mn><mi>N</mi></mfrac>
+      <munderover><mo>&amp;#8721;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+      <msup><mrow><mo>(</mo><msub><mi>r</mi><mtext>pred,i</mtext></msub><mo>&amp;#8722;</mo>
+      <msub><mi>r</mi><mtext>obs,i</mtext></msub><mo>)</mo></mrow><mn>2</mn></msup></msqrt>
+    </math>
+    <div class=&quot;legend&quot;>N — number of aligned atoms · r<sub>pred,i</sub>, r<sub>obs,i</sub> —
+      position of atom i in the predicted (green) and observed cryo-EM (gray) structures (Å)</div>
+
+    <math display=&quot;block&quot;>
+      <mi>P</mi><mo>(</mo><mi>r</mi><mo>&amp;lt;</mo><msub><mi>r</mi><mi>c</mi></msub><mo>)</mo>
+      <mo>=</mo><mtext>erf</mtext><mfenced><mfrac><msub><mi>r</mi><mi>c</mi></msub>
+      <mrow><mi>&amp;#963;</mi><msqrt><mn>2</mn></msqrt></mrow></mfrac></mfenced>
+      <mo>&amp;#8722;</mo><msqrt><mfrac><mn>2</mn><mi>&amp;#960;</mi></mfrac></msqrt>
+      <mfrac><msub><mi>r</mi><mi>c</mi></msub><mi>&amp;#963;</mi></mfrac>
+      <msup><mi>e</mi><mrow><mo>&amp;#8722;</mo><msup><msub><mi>r</mi><mi>c</mi></msub><mn>2</mn></msup>
+      <mo>/</mo><mn>2</mn><msup><mi>&amp;#963;</mi><mn>2</mn></msup></mrow></msup>
+    </math>
+    <div class=&quot;legend&quot;>r<sub>c</sub> = 2.0 Å — contact cutoff (atoms this close still count as touching) ·
+      &amp;#963; = RMSD/&amp;#8730;3 — typical per-axis atom wobble implied by the RMSD (Å) ·
+      erf — the error function, a standard S-shaped probability curve</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const slider = document.getElementById('rmsdSlider');
+  const resetBtn = document.getElementById('resetBtn');
+  const rmsdVal = document.getElementById('rmsdVal');
+  const statusVal = document.getElementById('statusVal');
+  const contactVal = document.getElementById('contactVal');
+  const cs = getComputedStyle(document.documentElement);
+  const col = n => cs.getPropertyValue(n).trim();
+
+  const MEASURED = 1.204;               // Å, cryo-EM measured pose error
+  const R_C = 2.0;                      // Å, contact distance cutoff
+  const SCALE = 15;                     // px per Å, for the visual separation
+  const ROT = 0.085;                    // rad per Å, deterministic rotation rate
+  const DIR = -2.15;                    // rad, fixed drift direction
+
+  function erf(x){
+    const s = x < 0 ? -1 : 1; x = Math.abs(x);
+    const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    const t = 1/(1+p*x);
+    const y = 1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+    return s*y;
+  }
+  function contactRetention(rmsd){
+    const sigma = rmsd/Math.sqrt(3);
+    const term1 = erf(R_C/(sigma*Math.sqrt(2)));
+    const term2 = Math.sqrt(2/Math.PI)*(R_C/sigma)*Math.exp(-(R_C*R_C)/(2*sigma*sigma));
+    return Math.max(0, Math.min(1, term1-term2));
+  }
+
+  let target = MEASURED, current = MEASURED;
+
+  function drawShape(cx,cy,ang,scale,fill,stroke,dashed){
+    ctx.save();
+    ctx.translate(cx,cy); ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.ellipse(0,0,34*scale,20*scale,0,0,Math.PI*2);
+    ctx.fillStyle=fill; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=stroke;
+    if(dashed) ctx.setLineDash([4,3]);
+    ctx.stroke();
+    if(dashed){
+      ctx.setLineDash([]);
+      for(let i=-3;i<=3;i++){
+        ctx.beginPath();
+        ctx.moveTo(-30, i*6); ctx.lineTo(30, i*6);
+        ctx.strokeStyle=stroke; ctx.globalAlpha=0.35; ctx.lineWidth=1;
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+    ctx.restore();
+  }
+
+  function draw(rmsd){
+    const W=cv.width,H=cv.height;
+    ctx.clearRect(0,0,W,H);
+    const text = col('--text'), muted = col('--muted');
+
+    // target (fixed)
+    const tx=W*0.42, ty=H*0.68;
+    ctx.beginPath(); ctx.ellipse(tx,ty,120,46,0,0,Math.PI*2);
+    ctx.fillStyle=col('--target-fill'); ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=col('--target'); ctx.stroke();
+    ctx.fillStyle=text; ctx.font='12px sans-serif';
+    ctx.fillText('EGFR target (fixed)', tx-60, ty+6);
+
+    // predicted (green), fixed position
+    const gx=W*0.42, gy=H*0.34;
+    drawShape(gx,gy,0,1,'rgba(47,143,78,0.28)',col('--predicted'),false);
+    ctx.fillStyle=col('--predicted'); ctx.font='12px sans-serif';
+    ctx.fillText('Predicted pose (model, green)', gx-96, gy-38);
+
+    // observed (gray), moves with rmsd
+    const extra = rmsd; // Å beyond zero
+    const dx = SCALE*extra*Math.cos(DIR), dy = SCALE*extra*Math.sin(DIR);
+    const rot = ROT*extra;
+    drawShape(gx+dx, gy+dy, rot, 1, 'rgba(120,120,120,0.18)', col('--observed'), true);
+    ctx.fillStyle=col('--observed'); ctx.font='12px sans-serif';
+    ctx.fillText('Observed pose (cryo-EM, gray mesh)', gx+dx-108, gy+dy-38<0?18:gy+dy-38);
+
+    // contact points: 8 anchor points around predicted binder edge
+    const N=8, retention = contactRetention(rmsd), keep = Math.round(retention*N);
+    for(let i=0;i<N;i++){
+      const a = (i/N)*Math.PI*2;
+      const px = gx+30*Math.cos(a), py = gy+16*Math.sin(a)+10;
+      const qx = tx+80*Math.cos(a*0.6), qy = ty-20+22*Math.sin(a*0.6);
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(qx,qy);
+      ctx.strokeStyle=col('--predicted'); ctx.globalAlpha=0.55; ctx.lineWidth=1.4; ctx.stroke();
+      ctx.globalAlpha=1;
+      const ox = gx+dx+30*Math.cos(a+rot), oy = gy+dy+16*Math.sin(a+rot)+10;
+      ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(qx,qy);
+      if(i<keep){ ctx.strokeStyle=col('--accent'); ctx.globalAlpha=0.85; }
+      else { ctx.strokeStyle=col('--counter'); ctx.setLineDash([2,3]); ctx.globalAlpha=0.5; }
+      ctx.lineWidth=1.4; ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+    }
+    ctx.fillStyle=muted; ctx.font='11px sans-serif';
+    ctx.fillText('blue = predicted contact kept · orange dashed = predicted contact lost', 14, H-46);
+
+    // scale bar
+    ctx.strokeStyle=text; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(14,H-20); ctx.lineTo(14+SCALE,H-20); ctx.stroke();
+    ctx.fillStyle=muted; ctx.font='11px sans-serif';
+    ctx.fillText('1 Å (~ one atom-width)', 14+SCALE+6, H-16);
+
+    // inset: cryo-EM averaging illustration
+    const ix=W-150, iy=18;
+    ctx.strokeStyle=col('--line'); ctx.strokeRect(ix,iy,136,74);
+    ctx.fillStyle=muted; ctx.font='10px sans-serif';
+    ctx.fillText('many frozen particle', ix+6, iy+13);
+    ctx.fillText('images, averaged:', ix+6, iy+25);
+    for(let i=0;i<4;i++){
+      ctx.beginPath();
+      ctx.ellipse(ix+18+i*22, iy+42, 8, 8, 0, 0, Math.PI*2);
+      ctx.strokeStyle=col('--observed'); ctx.globalAlpha=0.5+0.1*i; ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+    ctx.beginPath(); ctx.moveTo(ix+100,iy+42); ctx.lineTo(ix+118,iy+42);
+    ctx.strokeStyle=muted; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(ix+128,iy+42,10,7,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(120,120,120,0.25)'; ctx.fill(); ctx.strokeStyle=col('--observed'); ctx.stroke();
+    ctx.fillText('→ this reconstruction', ix+6, iy+66);
+
+    // update readouts
+    rmsdVal.textContent = rmsd.toFixed(3)+' Å';
+    const isMeasured = rmsd <= MEASURED + 1e-6;
+    statusVal.textContent = isMeasured ? 'Measured (cryo-EM)' : 'Counterfactual error';
+    statusVal.className = 'v ' + (isMeasured ? 'measured' : 'counter');
+    contactVal.textContent = (retention*100).toFixed(1)+'%';
+  }
+
+  slider.addEventListener('input', ()=>{ target = parseFloat(slider.value); });
+  resetBtn.addEventListener('click', ()=>{ slider.value = MEASURED; target = MEASURED; });
+
+  const reduced = window.matchMedia &amp;&amp; matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function loop(){
+    const k = reduced ? 1 : 0.15;
+    current += (target-current)*k;
+    if(Math.abs(target-current) < 0.0008) current = target;
+    draw(current);
+    requestAnimationFrame(loop);
+  }
+  loop();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;microscopy-confirms-egfr-pose&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The observed EGFR binder pose is within 1.204 Angstroms of the prediction"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why this is possible now</h2>
+  <div class="part-lede">Fast prediction and learned biological coordinates can now be applied across billions of sequences. The result is not just a faster answer to one question, but a map for finding new questions.</div>
+</header>
+<section class="scene" id="atlas-connects-distant-proteins">
+  <h3>Learned biology connects proteins that sequence spelling misses</h3>
+  <div class="caption">Once billions of sequences can be represented and many structures can be predicted quickly, the next need is navigation. ESM Atlas places proteins by the model's learned biological representation rather than only by shared sequence letters. Shift the coordinate rule from raw sequence similarity toward learned biology and watch distant Fanzor and TnpB proteins join the same functional neighborhood despite low sequence similarity. The full Atlas contains 6.8 billion sequences and 1.1 billion predicted structures. That scale turns the vast unstudied collection into a place where a known neighborhood can point toward an unknown protein worth testing next.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="atlas-connects-distant-proteins"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>ESM Atlas map: sequence spelling vs. learned biology</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#ffffff; --text:#1b1b1f; --muted:#6b6b76;
+    --grid:#e2e2e6; --fanzor:#d1495b; --tnpb:#3a86ff;
+    --controlA:#8d99ae; --controlB:#2a9d8f; --accent:#c77d00; --badge:#eef0ff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a; --panel:#1e2027; --text:#e8e8ec; --muted:#9a9aa5;
+      --grid:#2b2d34; --fanzor:#ff6b81; --tnpb:#5aa9ff;
+      --controlA:#9aa5b1; --controlB:#4ecdc4; --accent:#ffb347; --badge:#2a2d3a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  .counters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;}
+  .counter{background:var(--panel);border:1px solid var(--grid);border-radius:10px;padding:8px 14px;min-width:130px;}
+  .counter .num{font-size:1.4em;font-weight:700;}
+  .counter .lbl{font-size:0.78em;color:var(--muted);}
+  .badge{display:inline-block;background:var(--badge);color:var(--muted);font-size:0.78em;
+    padding:4px 10px;border-radius:8px;margin-bottom:8px;}
+  .mapWrap{position:relative;width:100%;aspect-ratio:16/10;border:1px solid var(--grid);border-radius:10px;
+    background:var(--panel);overflow:hidden;}
+  canvas{width:100%;height:100%;display:block;max-width:100%;}
+  .controls{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .controls label{font-size:0.86em;flex:1 1 100%;}
+  input[type=range]{width:100%;}
+  .readouts{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:0.86em;color:var(--text);}
+  .readouts span.v{font-weight:700;color:var(--accent);}
+  math{font-size:1em;}
+  .legend{font-size:0.74em;color:var(--muted);margin-top:2px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot; id=&quot;scene&quot;>
+
+  <div class=&quot;counters&quot;>
+    <div class=&quot;counter&quot;><div class=&quot;num&quot;>6.8B</div><div class=&quot;lbl&quot;>sequences in ESM Atlas</div></div>
+    <div class=&quot;counter&quot;><div class=&quot;num&quot;>1.1B</div><div class=&quot;lbl&quot;>predicted structures</div></div>
+  </div>
+
+  <div class=&quot;badge&quot;>Map shows a representative sample of ~2,000 points standing in for the full Atlas</div>
+
+  <div class=&quot;mapWrap&quot;><canvas id=&quot;map&quot;></canvas></div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;w&quot;>Weight given to learned biological representation when placing proteins on the map: <span id=&quot;wVal&quot;>0%</span>
+      (0% = raw sequence similarity only &amp;nbsp;→&amp;nbsp; 100% = learned biological coordinates)</label>
+    <input type=&quot;range&quot; id=&quot;w&quot; min=&quot;0&quot; max=&quot;100&quot; value=&quot;0&quot; step=&quot;1&quot;>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Fanzor–TnpB map distance: <span class=&quot;v&quot; id=&quot;dVal&quot;>--</span> units</div>
+  </div>
+
+  <math display=&quot;block&quot;>
+    <mi>x</mi><mo>(</mo><mi>w</mi><mo>)</mo><mo>=</mo><mo>(</mo><mn>1</mn><mo>-</mo><mi>w</mi><mo>)</mo><mo>·</mo>
+    <msub><mi>x</mi><mtext>raw</mtext></msub><mo>+</mo><mi>w</mi><mo>·</mo>
+    <msub><mi>x</mi><mtext>bio</mtext></msub>
+  </math>
+  <div class=&quot;legend&quot;>x(w) — a protein's map position at weight w · w — weight on learned biology, 0 to 1 (the slider) ·
+    x<sub></sub>raw — position from raw sequence similarity alone · x_bio — position from the model's learned biological representation</div>
+
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('map');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('w');
+  const wVal = document.getElementById('wVal');
+  const dVal = document.getElementById('dVal');
+  const cs = getComputedStyle(document.documentElement);
+  const col = name => cs.getPropertyValue(name).trim();
+
+  // deterministic PRNG (mulberry32) so the sample is fixed and auditable
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(1234567);
+  function gauss(){ // sum of uniforms ~ soft gaussian
+    return (rng()+rng()+rng()-1.5)/1.5;
+  }
+
+  // clusters: raw = raw-sequence-similarity coordinates, bio = learned-biology coordinates
+  // map coordinate space is 0-100 x 0-100, arbitrary units
+  // labelDX/labelDY/labelAlign: fixed pixel offsets so labels stay legibly separated
+  // even when cluster centers converge close together (Fanzor &amp; TnpB at high w).
+  const clusters = [
+    {name:'Fanzor',           raw:[15,75], bio:[52,46], color:'--fanzor',  n:500, jitter:9,
+      labelDX:-40, labelDY:-2, labelAlign:'right'},
+    {name:'TnpB',             raw:[85,20], bio:[58,46], color:'--tnpb',    n:500, jitter:9,
+      labelDX:40, labelDY:-2, labelAlign:'left'},
+    {name:'control group A',  raw:[75,80], bio:[88,78], color:'--controlA',n:500, jitter:8},
+    {name:'control group B',  raw:[20,15], bio:[12,18], color:'--controlB',n:500, jitter:8}
+  ];
+  clusters.forEach(c=>{
+    c.pts = [];
+    for(let i=0;i<c.n;i++){
+      c.pts.push([gauss()*c.jitter, gauss()*c.jitter]);
+    }
+  });
+
+  function lerp(a,b,t){ return a+(b-a)*t; }
+
+  let currentW = 0, targetW = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function centerAt(c,w){
+    return [ lerp(c.raw[0], c.bio[0], w), lerp(c.raw[1], c.bio[1], w) ];
+  }
+
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1,Math.round(rect.width*dpr));
+    canvas.height = Math.max(1,Math.round(rect.height*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  function toPx(x,y){
+    const rect = canvas.getBoundingClientRect();
+    const pad = 34;
+    const w = rect.width - 2*pad, h = rect.height - 2*pad;
+    return [ pad + (x/100)*w, pad + (y/100)*h ];
+  }
+
+  function draw(){
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
+    const w = currentW;
+
+    // faint path lines from raw center to bio center for each cluster
+    ctx.save();
+    ctx.setLineDash([4,4]);
+    ctx.lineWidth = 1;
+    clusters.forEach(c=>{
+      const p0 = toPx(c.raw[0], c.raw[1]);
+      const p1 = toPx(c.bio[0], c.bio[1]);
+      ctx.strokeStyle = col(c.color);
+      ctx.globalAlpha = 0.28;
+      ctx.beginPath();
+      ctx.moveTo(p0[0],p0[1]);
+      ctx.lineTo(p1[0],p1[1]);
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    // neighborhood highlight (fades in as w -> 1)
+    const nb = clusters[0].bio, nb2 = clusters[1].bio;
+    const nbCenter = [(nb[0]+nb2[0])/2, (nb[1]+nb2[1])/2];
+    const nbAlpha = Math.max(0, Math.min(1, (w-0.35)/0.45));
+    if(nbAlpha > 0){
+      const p = toPx(nbCenter[0], nbCenter[1]);
+      ctx.save();
+      ctx.globalAlpha = nbAlpha*0.9;
+      ctx.strokeStyle = col('--accent');
+      ctx.setLineDash([3,5]);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(p[0],p[1], 46, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = col('--accent');
+      ctx.font = '600 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('RNA-guided DNA-cutting neighborhood', p[0], Math.max(16, p[1]-64));
+      ctx.restore();
+    }
+
+    // points
+    clusters.forEach(c=>{
+      const center = centerAt(c,w);
+      ctx.fillStyle = col(c.color);
+      ctx.globalAlpha = 0.75;
+      for(let i=0;i<c.pts.length;i++){
+        const jx = c.pts[i][0], jy = c.pts[i][1];
+        const px = toPx(center[0]+jx, center[1]+jy);
+        ctx.beginPath();
+        ctx.arc(px[0], px[1], 1.6, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // cluster label: use a fixed pixel offset (Fanzor left, TnpB right) so the
+      // labels stay separated even when the two clusters converge on the map.
+      const basePt = toPx(center[0], center[1]);
+      let lx, ly, align;
+      if(c.labelDX !== undefined){
+        lx = basePt[0] + c.labelDX;
+        ly = basePt[1] + c.labelDY;
+        align = c.labelAlign || 'center';
+      } else {
+        const lp = toPx(center[0], center[1] - c.jitter - 6);
+        lx = lp[0]; ly = lp[1]; align = 'center';
+      }
+      lx = Math.min(Math.max(lx, 40), rect.width-40);
+      ly = Math.min(Math.max(ly, 14), rect.height-6);
+      ctx.font = '600 12px sans-serif';
+      ctx.textAlign = align;
+      ctx.fillStyle = col(c.color);
+      ctx.fillText(c.name, lx, ly);
+    });
+
+    // distance readout: computed from actual current positions, not a lookup table
+    const fC = centerAt(clusters[0], w), tC = centerAt(clusters[1], w);
+    const dist = Math.hypot(fC[0]-tC[0], fC[1]-tC[1]);
+    dVal.textContent = dist.toFixed(1);
+  }
+
+  function animate(){
+    if(Math.abs(targetW-currentW) > 0.0006){
+      currentW += (targetW - currentW) * 0.18;
+      draw();
+      requestAnimationFrame(animate);
+    } else {
+      currentW = targetW;
+      draw();
+    }
+  }
+
+  slider.addEventListener('input', (e)=>{
+    const pct = +e.target.value;
+    wVal.textContent = Math.round(pct) + '%';
+    targetW = pct/100;
+    if(reduced){ currentW = targetW; draw(); }
+    else { requestAnimationFrame(animate); }
+  });
+
+  const canvasRO = new ResizeObserver(resizeCanvas);
+  canvasRO.observe(canvas);
+  window.addEventListener('resize', resizeCanvas);
+
+  resizeCanvas();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;atlas-connects-distant-proteins&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Learned biology connects proteins that sequence spelling misses"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Protein World Model: The Next Generation of Evolutionary Scale Models (ESM)</em> — Biohub. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

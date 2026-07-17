@@ -1,0 +1,393 @@
+{
+  "title": "Intelligence per Watt: Can Your Laptop Take Over from the Datacenter?",
+  "hook": "Every question you type to an AI today gets shipped across the internet to a warehouse full of specialized chips, answered there, and shipped back — and each answer costs real, measurable joules. A new study asks a physicist's question: how much correct answering do you get per watt, and has the small machine on your desk become efficient enough to keep most of that work at home? The answer turns out to be yes for almost nine of every ten everyday questions, with total energy savings of 60–80% — even though the datacenter chip is still the better machine per query. To see why that isn't a contradiction, we have to begin at the beginning: what a watt is, what a joule buys, and what a computer physically does when a language model writes one word.",
+  "parts": [
+    {
+      "title": "The basic building blocks: what one answer physically costs",
+      "lede": "Before any claims about AI efficiency can mean anything, we need the physics: power versus energy, what generating a word actually forces the silicon to do, and how you measure the joules. This part builds that toolkit and ends at the constraint the whole paper turns on — moving bytes, not doing arithmetic, is what an answer costs."
+    },
+    {
+      "title": "The new tools: buying more correctness per joule",
+      "lede": "Now that you can price an answer in bytes moved and joules spent, we can meet the paper's instruments: a single score that divides correctness by power, and three levers — reading only part of the model per word, storing weights in fewer bits, and pooling many different models — that push that score up."
+    },
+    {
+      "title": "Head to head with the datacenter",
+      "lede": "The levers exist; now the measurements. This part puts a laptop against datacenter silicon with the paper's own numbers: what fraction of a million real queries the laptop can cover, where the big chips still win and by how much, and why the system-level winner is not the per-query winner."
+    },
+    {
+      "title": "Why now: crossing the efficiency threshold",
+      "lede": "The final step is the trend line. The same measured progress reads very differently per watt than per joule, and once you can read both correctly, the paper's historical argument snaps into place: computing migrates to the small machine when it becomes efficient enough — and that threshold is being crossed right now."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "energy-is-power-times-time",
+      "conceptId": "watts-vs-joules-decomposition",
+      "part": "The basic building blocks: what one answer physically costs",
+      "title": "A watt is a rate; a joule is the bill",
+      "teaches": "Energy consumed is power multiplied by time, so the same task can be cheap in watts yet expensive in joules if it runs long.",
+      "requires": [],
+      "caption": "Suppose your laptop draws 40 watts while it thinks about a question for 10 seconds. The watts are a rate — joules flowing per second — and the bill you actually pay is the energy: \\(E = P·τ\\), here 40 W × 10 s = 400 J. Drag the duration out to 60 seconds and the power meter never moves, but the bill swells to 2,400 J. Keep this distinction in your pocket: a device can look frugal on a power meter and still be a glutton for energy if it is slow. Everything in this paper — every comparison between a laptop and a datacenter — comes down to which of these two numbers you are looking at.",
+      "visualMetaphor": "A time axis (0–60 s) with a flat power trace drawn as a rectangle; the rectangle's height is set by a power slider (5–400 W) and its width by the primary duration slider. The shaded area under the trace is labeled 'energy' and a large joule counter shows height × width live.",
+      "animatedVariable": {
+        "name": "inference duration τ",
+        "control": "slider",
+        "range": "τ = 1 to 60 s (second slider: P = 5 to 400 W)",
+        "whatChangesOnScreen": "The rectangle widens, the shaded area grows, and the joule counter rises in exact proportion, while the watt readout stays fixed."
+      },
+      "quantitativeAnchor": "40 W sustained for 10 s = 400 J",
+      "physicsChecks": [
+        "Doubling duration at fixed power exactly doubles the joule counter",
+        "Doubling power at fixed duration exactly doubles the joule counter",
+        "At P = 40 W, τ = 10 s the counter reads 400 J",
+        "The watt readout is unaffected by the duration slider"
+      ]
+    },
+    {
+      "id": "one-token-one-full-pass",
+      "conceptId": "llm-inference-as-physical-process",
+      "part": "The basic building blocks: what one answer physically costs",
+      "title": "Every word an AI writes drags the entire model through memory",
+      "teaches": "Generating each output token requires reading essentially all N model weights from memory, so an answer of a few hundred tokens forces hundreds of full passes over gigabytes.",
+      "requires": [],
+      "caption": "A language model is just a function with \\(N\\) adjustable numbers called weights — an '8B' model has 8×10⁹ of them, stored as 2 bytes each, 16 GB in all. Here is the physical fact everything else rests on: to produce one output word (one 'token', the model's unit of text), the chip must read essentially all \\(N\\) weights out of memory and do about \\(2N\\) multiply-adds with them. Watch the sweep: each token you generate drags the full 16 GB through the silicon, and a 300-token answer drags roughly 4.8 TB. Slide the model down to 1B and each token costs only 2 GB of traffic — the cost per word is simply proportional to \\(N\\). An answer is not an abstraction; it is a definite, countable amount of memory traffic.",
+      "visualMetaphor": "Left: a vertical memory bar representing the model's weights, labeled with its size in GB (set by the model-size slider). Right: a strip of generated tokens. Each new token fires a highlight sweep down the entire memory bar, and a 'bytes moved' odometer increments by N × 2 bytes. A second readout shows the projected total for a 300-token answer.",
+      "animatedVariable": {
+        "name": "model size N (parameters, FP16)",
+        "control": "slider",
+        "range": "N = 1B to 120B parameters",
+        "whatChangesOnScreen": "The memory bar grows or shrinks, the per-token odometer increment changes proportionally, and the 300-token total recomputes (e.g. 8B → 16 GB/token → ≈4.8 TB per answer)."
+      },
+      "quantitativeAnchor": "8B parameters × 2 bytes = 16 GB read per token; a 300-token answer moves ≈ 4.8 TB",
+      "physicsChecks": [
+        "Bytes per token scale linearly with the model-size slider (1B → 2 GB, 8B → 16 GB, 120B → 240 GB)",
+        "The 300-token projection is exactly 300× the per-token figure",
+        "The odometer increments only when a token is generated, once per token, by the full model size"
+      ]
+    },
+    {
+      "id": "bandwidth-sets-the-pace",
+      "conceptId": "llm-inference-as-physical-process",
+      "part": "The basic building blocks: what one answer physically costs",
+      "title": "Memory bandwidth, not arithmetic, sets the speed of an answer",
+      "teaches": "For a single query, token rate is approximately memory bandwidth divided by bytes per token, so the chip's data-moving pipe — not its arithmetic throughput — is the binding constraint.",
+      "requires": [
+        "one-token-one-full-pass"
+      ],
+      "caption": "You might guess an AI chip is limited by how fast it can multiply. It isn't — not for a single query. Since each token needs a full 16 GB pass over an 8B model's weights, the pace is set by the pipe between memory and the arithmetic units: token rate ≈ bandwidth ÷ bytes per token. Widen the pipe from a phone's 60 GB/s to a laptop's 546 GB/s to a datacenter chip's 8 TB/s and watch the words-per-second climb from about 4 to 34 to 500 — while the multiplier units sit mostly dark, waiting for data. This is why an Apple M4 Max is 12–15× slower per query than an H100-class machine despite drawing far less power: it is not short on arithmetic, it is short on bandwidth.",
+      "visualMetaphor": "A pipe connecting a memory block (holding a fixed 8B/16 GB model) to a grid of arithmetic units. A slider sets pipe width (bandwidth); weights stream through as particles. Readouts: tokens/second = bandwidth ÷ 16 GB, and a 'compute utilization' meter showing the arithmetic grid mostly idle (dark cells).",
+      "animatedVariable": {
+        "name": "memory bandwidth",
+        "control": "slider",
+        "range": "60 GB/s (phone) to 8 TB/s (datacenter GPU), log scale",
+        "whatChangesOnScreen": "The pipe widens, particle flow speeds up, tokens/second rises in direct proportion, and the compute-utilization meter stays low throughout."
+      },
+      "quantitativeAnchor": "M4 Max at 546 GB/s vs ≈8 TB/s datacenter GPU → 12–15× slower per query",
+      "physicsChecks": [
+        "Tokens/second doubles whenever bandwidth doubles (straight line on the log-log inset)",
+        "At 546 GB/s the readout shows ≈34 tok/s; at 8 TB/s ≈500 tok/s — a ratio near 15×",
+        "The compute-utilization meter never approaches full even at maximum bandwidth"
+      ]
+    },
+    {
+      "id": "measuring-joules-per-query",
+      "conceptId": "measuring-joules-per-query",
+      "part": "The basic building blocks: what one answer physically costs",
+      "title": "Energy per query is measured by sampling power twenty times a second",
+      "teaches": "The joules behind every number in this paper come from numerically integrating a power trace sampled every 50 ms, with a 10–15% absolute uncertainty from software telemetry.",
+      "requires": [
+        "energy-is-power-times-time"
+      ],
+      "caption": "How do you actually weigh a query in joules? You ask the chip's own power sensor for a reading every 50 ms while the model runs, then add up the rectangles: \\(E = \\int P(t)\\,dt ≈ \\sum_i P_i\\,Δt\\). Press play and watch the trace fill in — power spikes while the model reads the question, settles into a plateau while it writes, and the shaded area accumulates into the final bill. Each query is run 10 times and averaged, because thermal drift and background processes add noise. One honest caveat, and it matters for how literally to take what follows: software power counters carry 10–15% absolute error, so the paper's 2–7× comparisons are rock solid, but any difference under 10% is inside the noise.",
+      "visualMetaphor": "A live power-vs-time trace for one query, built from 50 ms-wide rectangles that shade in as playback advances. A joule counter accumulates the shaded area. A toggle overlays a ±10–15% error band on the final energy figure; a side note shows '10 runs averaged'.",
+      "animatedVariable": {
+        "name": "elapsed inference time",
+        "control": "play-pause",
+        "range": "t = 0 to full query duration (~15 s), with an error-band toggle",
+        "whatChangesOnScreen": "Rectangles fill under the power curve, the joule counter rises monotonically, and toggling the band shows how wide ±10–15% is around the final number."
+      },
+      "quantitativeAnchor": "Sampling interval Δt = 50 ms; telemetry uncertainty ±10–15%; each query averaged over 10 runs",
+      "physicsChecks": [
+        "The joule counter equals the shaded area (sum of rectangle areas) at every pause point",
+        "The counter never decreases during playback",
+        "The error band spans ±10–15% of the final energy value, wide enough to swallow a sub-10% difference"
+      ]
+    },
+    {
+      "id": "ipw-figure-of-merit",
+      "conceptId": "ipw-metric",
+      "part": "The new tools: buying more correctness per joule",
+      "title": "One number scores a model and its chip together: accuracy per watt",
+      "teaches": "Intelligence per watt — mean accuracy over a query distribution divided by mean power draw — is a single figure of merit that a smarter model or a leaner chip can each improve.",
+      "requires": [
+        "energy-is-power-times-time"
+      ],
+      "caption": "Accuracy alone can't tell you whether local AI is viable, because it ignores cost; power alone can't either, because it ignores usefulness. So take the ratio: \\(\\mathrm{IPW}(m,h)=\\frac{\\mathbb{E}_{q}[\\mathrm{acc}(m,q)]}{\\mathbb{E}_{q}[P(m,h,q)]}\\) — average correctness per query divided by average watts drawn while answering, for model \\(m\\) on chip \\(h\\). Accuracy here is binary per query: an exact match on benchmark problems, or a win-or-tie against a frontier reference model for open-ended chat. Push either slider and notice the two ways to win — a smarter model raises the numerator, a leaner chip shrinks the denominator — which is exactly what will let the paper split progress into a model share and a hardware share. A cousin metric, intelligence per joule (IPJ), divides by energy = power × latency instead; hold that thought, because the two will disagree in an instructive way.",
+      "visualMetaphor": "A large gauge labeled IPW fed by two inputs: an accuracy slider (numerator, 0–100%) and a mean-power slider (denominator, 5–500 W). The gauge needle moves as acc/P; a reference marker on the gauge is labeled '2023 local baseline' with a second marker at 5.3× above it labeled '2025'.",
+      "animatedVariable": {
+        "name": "mean power draw during inference",
+        "control": "slider",
+        "range": "P = 5 to 500 W (second slider: mean accuracy 0 to 100%)",
+        "whatChangesOnScreen": "Halving power doubles the gauge reading; doubling accuracy also doubles it — two independent routes to the same figure of merit."
+      },
+      "quantitativeAnchor": "The paper's headline: local IPW improved 5.3× from 2023 to 2025",
+      "physicsChecks": [
+        "Gauge reading doubles when the power slider is halved at fixed accuracy",
+        "Gauge reading doubles when accuracy doubles at fixed power",
+        "The 2025 reference marker sits at exactly 5.3× the 2023 marker"
+      ]
+    },
+    {
+      "id": "moe-active-vs-total",
+      "conceptId": "active-vs-total-parameters-moe",
+      "part": "The new tools: buying more correctness per joule",
+      "title": "A model can store 120 billion weights but read only 20 billion per word",
+      "teaches": "A mixture-of-experts model routes each token through only a few of its expert sub-networks, so per-token energy tracks active parameters while knowledge capacity tracks total parameters.",
+      "requires": [
+        "one-token-one-full-pass"
+      ],
+      "caption": "Remember the iron rule from before: each token costs a full read of the weights it uses. Here is the trick that bends it, called a mixture of experts: partition most of the weights into many 'expert' sub-networks and send each token through only a few of them. In this toy model there are 16 experts; slide the router from touching 2 of them to touching all 16 and watch the per-token memory traffic — and therefore the energy — scale with what's read, while the stored footprint never moves. The paper's best local model, GPT-OSS-120B, stores 120B weights but activates at most 20B per token, so it runs at roughly the cost of a dense 20B model while answering like something far larger. The catch is storage: all 120B weights must fit in memory — 128 GB of unified memory on an M4 Max, at a precision we'll meet in the next scene — which is why 'model size' is genuinely two numbers, not one.",
+      "visualMetaphor": "A memory bar divided into 16 expert blocks plus a small shared core. Each generated token lights up only k expert blocks (k set by the slider) as the read-sweep passes. Two readouts: 'GB read per token' (scales with k) and 'GB stored' (constant). A banner shows the real-world anchor: 120B stored / ≤20B active.",
+      "animatedVariable": {
+        "name": "experts activated per token",
+        "control": "slider",
+        "range": "k = 2 to 16 of 16 experts",
+        "whatChangesOnScreen": "More blocks light per token, the GB-read-per-token and energy-per-token readouts rise proportionally with k, and the GB-stored readout stays fixed."
+      },
+      "quantitativeAnchor": "GPT-OSS-120B: 120B total parameters, ≤20B active per token; all weights must fit in 128 GB of unified memory",
+      "physicsChecks": [
+        "Energy-per-token readout scales linearly with the number of activated experts",
+        "The stored-footprint readout is identical at slider minimum and maximum",
+        "At the real-model anchor (20B active of 120B total) the read-cost is ~6× smaller than a full-read pass"
+      ]
+    },
+    {
+      "id": "quantization-fewer-bits",
+      "conceptId": "quantization-energy-tradeoff",
+      "part": "The new tools: buying more correctness per joule",
+      "title": "Storing each weight in fewer bits cuts energy 3× and accuracy 2.5 points",
+      "teaches": "Halving the bits per weight roughly halves memory traffic, delivering a measured 3–3.5× energy reduction from FP16 to FP4 at about 2.5 accuracy points per precision step.",
+      "requires": [
+        "one-token-one-full-pass"
+      ],
+      "caption": "Since energy tracks bytes moved, there's an obvious lever: store each weight in fewer bits, accepting a little rounding error — this is called quantization. Step from FP16 (16 bits per weight) to FP8 to FP4 and watch the model's footprint halve at each step, per-token traffic halve with it, and total measured energy fall 3–3.5× over the full FP16→FP4 trip — at a price of roughly 2.5 percentage points of accuracy per step. Now the crucial comparison, which you can check on screen: Qwen3-14B squeezed to FP4 scores 49.0% on the SuperGPQA benchmark, still beating Qwen3-4B at pristine FP16, which scores 48.5%. Parameter count buys more accuracy than precision does, so the winning local recipe is: take the largest model that fits, then quantize it hard. FP4 is also what lets a 120B-total model like the one from the last scene squeeze into a 128 GB laptop at all.",
+      "visualMetaphor": "Three buttons (FP16 / FP8 / FP4) control a memory bar that shrinks by half per step, an energy-per-query bar, and an accuracy readout. A fixed comparison panel shows two labeled bars: 'Qwen3-14B @ FP4: 49.0%' vs 'Qwen3-4B @ FP16: 48.5%', with the 14B bar highlighted as the winner.",
+      "animatedVariable": {
+        "name": "bits per weight",
+        "control": "buttons",
+        "range": "FP16 → FP8 → FP4",
+        "whatChangesOnScreen": "Memory footprint halves per step, the energy bar drops (3–3.5× total from FP16 to FP4), and the accuracy readout falls ~2.5 points per step."
+      },
+      "quantitativeAnchor": "FP16→FP4: 3–3.5× lower energy, ~2.5 accuracy points per step; Qwen3-14B FP4 (49.0%) > Qwen3-4B FP16 (48.5%) on SuperGPQA",
+      "physicsChecks": [
+        "The memory bar at FP4 is exactly one quarter of its FP16 size",
+        "The energy bar ratio between FP16 and FP4 states falls in the 3–3.5× range",
+        "Accuracy drops by roughly 2.5 points per button step, never more than ~3",
+        "The comparison panel always shows 14B-FP4 above 4B-FP16 (49.0 vs 48.5)"
+      ]
+    },
+    {
+      "id": "diversity-beats-scale",
+      "conceptId": "ensemble-diversity-effect",
+      "part": "The new tools: buying more correctness per joule",
+      "title": "Twenty different models answer more questions than the single best one",
+      "teaches": "Because differently trained models fail on different queries, routing each query to whichever pooled model can solve it covers far more of the query distribution than any individual model.",
+      "requires": [
+        "ipw-figure-of-merit"
+      ],
+      "caption": "Here is a fact worth sitting with: no single model comes close to the paper's coverage number, but a pool of them does. Different models — different training data, architectures, post-training — fail on different questions, so imagine a selector (the field calls it a router) that sends each question to whichever pooled model is most likely to solve it. Watch the grid: add the best single model and 71 of these 100 query-dots light up; add a second, differently-trained model and dots the first one missed start lighting too; by twenty models the union reaches ≈89%, a gain of 16.3 points over the best individual (GPT-OSS-120B at 71.4%) and 28.8 points over Qwen3-14B. Be careful what this does and does not say: it does not mean any small local model is smarter than GPT-5 — it means twenty complementary specialists, given a good selector, cover more ground than one generalist, and selecting the best of 20 locals even beats selecting the best of 3 frontier cloud models on three of four benchmarks. That is pure best-of-N: more draws per query, more chances to win.",
+      "visualMetaphor": "A 10×10 grid of dots, each dot one query. A slider adds models to the pool one at a time (ordered best-first); each model colors the dots it solves in its own hue, and already-solved dots stay lit. A coverage counter shows the union percentage, with tick labels at 71.4% (pool = 1) and 88.7% (pool = 20).",
+      "animatedVariable": {
+        "name": "number of local models in the pool",
+        "control": "slider",
+        "range": "1 to 20 models",
+        "whatChangesOnScreen": "Newly added models light previously dark dots, the union coverage counter climbs from 71.4% toward 88.7%, and the per-model marginal gain visibly shrinks."
+      },
+      "quantitativeAnchor": "Best single local model: 71.4% (GPT-OSS-120B); best-of-20 local pool: 88.7% (+16.3 pp; +28.8 pp over Qwen3-14B)",
+      "physicsChecks": [
+        "Coverage is monotonically non-decreasing as models are added",
+        "At pool size 1 the counter reads 71.4%; at pool size 20 it reads ≈88.7%",
+        "The marginal coverage gain per added model shrinks toward zero at large pool sizes"
+      ]
+    },
+    {
+      "id": "coverage-88",
+      "conceptId": "local-coverage-88",
+      "part": "Head to head with the datacenter",
+      "title": "Local models can already answer 88.7% of real queries — but not all kinds",
+      "teaches": "Across 1M real single-turn queries, at least one ≤20B-active local model answers 88.7%, with coverage above 93% for chat and writing but only 40–60% for graduate-level technical reasoning.",
+      "requires": [
+        "diversity-beats-scale"
+      ],
+      "caption": "Does that pooling trick survive contact with reality? The paper tested it on one million real queries — 500K actual chat prompts from the WildChat dataset, 500K reasoning problems from NaturalReasoning, plus two hard academic benchmarks — and the pooled local models cover 88.7% overall. But press the buttons and watch the bar swing: chat and creative writing exceed 93–98%, which matters because 77% of real ChatGPT usage is exactly that — practical guidance, information seeking, and writing — while graduate-level architecture, engineering, and physical-science reasoning drops to 40–60%. So the honest statement is two-sided: the bulk of everyday demand is already locally serviceable, and a stubborn technical tail is not. And this coverage did not appear from nowhere — the best single local model went from answering 23.2% of this workload in 2023 to 48.7% in 2024 to 71.3% in 2025, rising in lockstep with the efficiency gains we'll chart later.",
+      "visualMetaphor": "A single large horizontal coverage bar (0–100%) with a domain selector: buttons for 'Chat & creative', 'Information seeking', 'Graduate technical reasoning', and 'All 1M queries'. Below it, a small pie shows real ChatGPT usage shares (77% guidance/info/writing). A side mini-timeline shows best-single-model coverage: 23.2% → 48.7% → 71.3%.",
+      "animatedVariable": {
+        "name": "query domain",
+        "control": "buttons",
+        "range": "chat/creative · information seeking · graduate technical reasoning · overall",
+        "whatChangesOnScreen": "The coverage bar jumps between 93–98% (chat/creative), high coverage for information seeking, 40–60% (technical reasoning), and 88.7% (overall), with the unlit remainder shown in red."
+      },
+      "quantitativeAnchor": "88.7% of 1M real queries covered overall; chat/creative 93–98%; graduate technical reasoning 40–60%",
+      "physicsChecks": [
+        "'All queries' reads 88.7%",
+        "Chat/creative reads at least 93% and technical reasoning reads between 40 and 60%",
+        "The mini-timeline shows 23.2%, 48.7%, 71.3% at 2023, 2024, 2025"
+      ]
+    },
+    {
+      "id": "cloud-per-query-gap",
+      "conceptId": "cloud-local-efficiency-gap",
+      "part": "Head to head with the datacenter",
+      "title": "Per query, datacenter chips are still 1.4–7.4× more efficient",
+      "teaches": "Running identical models one query at a time, specialized datacenter accelerators beat laptop silicon by 1.4–1.8× per watt and up to 7.4× per joule, because of far higher memory bandwidth and looser thermal budgets.",
+      "requires": [
+        "bandwidth-sets-the-pace",
+        "ipw-figure-of-merit"
+      ],
+      "caption": "Now the other side of the ledger: give the datacenter its due. Run the very same model on three chips, one query at a time on each — no tricks, no sharing — and switch between them. Against the Apple M4 Max, an NVIDIA B200 delivers 1.40× the intelligence per watt and 1.6–2.3× per joule; SambaNova's SN40L reaches 1.78× per watt and a striking 6.5–7.4× per joule. The cause is architectural, and you already have the tools to read it off the spec panel: the datacenter chips carry stacked high-bandwidth memory at 4.8–8 TB/s and 400–1000 W thermal budgets, single-purpose machines for exactly this job, while the laptop's 546 GB/s unified memory must also serve the CPU and graphics under a thin-chassis heat ceiling. Notice the per-joule gap always exceeds the per-watt gap — the cloud chip is both leaner and faster, and speed compounds into energy. File that asymmetry away; it becomes a theme in the final part.",
+      "visualMetaphor": "Three selectable hardware cards (M4 Max / B200 / SN40L), each with a spec panel (bandwidth, thermal budget). Selecting a card sets two bars normalized to the M4 Max = 1.0: 'IPW relative' and 'IPJ relative'. A footnote badge reads 'batch size 1 on all chips — same model, same queries'.",
+      "animatedVariable": {
+        "name": "accelerator running the model",
+        "control": "buttons",
+        "range": "Apple M4 Max (546 GB/s) · NVIDIA B200 · SambaNova SN40L (4.8–8 TB/s class)",
+        "whatChangesOnScreen": "The two relative bars jump: B200 shows 1.40× IPW and 1.6–2.3× IPJ; SN40L shows 1.78× IPW and 6.5–7.4× IPJ; the spec panel updates bandwidth and thermal budget."
+      },
+      "quantitativeAnchor": "vs M4 Max: B200 = 1.40× IPW, 1.6–2.3× IPJ; SN40L = 1.78× IPW, 6.5–7.4× IPJ (all at batch size 1)",
+      "physicsChecks": [
+        "For every cloud chip, the IPJ bar exceeds its own IPW bar",
+        "SN40L's IPJ bar sits in the 6.5–7.4× range while its IPW bar is only 1.78×",
+        "The M4 Max card shows 546 GB/s and both its bars read exactly 1.0",
+        "The batch-size-1 badge is visible in all states"
+      ]
+    },
+    {
+      "id": "batching-amortizes",
+      "conceptId": "batching-amortization",
+      "part": "Head to head with the datacenter",
+      "title": "Serving 64 users at once cuts energy per answer 12–20×",
+      "teaches": "Processing many queries simultaneously shares each per-token weight-read across the whole batch, collapsing per-query energy 11.8–19.7× — a lever datacenters have and single-user laptops don't.",
+      "requires": [
+        "one-token-one-full-pass"
+      ],
+      "caption": "Recall the dominant cost: reading all the weights from memory once per token. Now suppose 64 users' queries arrive at once — the chip can read the weights a single time and apply them to all 64 token-streams before the data goes cold, so that one expensive read is split 64 ways. Slide the batch size up and watch it happen in the measurements: Qwen3-8B on a B200 drops from 6,449 J per query at batch 1 to 548 J at batch 64, while total power rises only from 255 W to 883 W — far less than 64-fold — for an 11.8–19.7× gain in intelligence per joule. This sharing trick is called batching, and it is a structural asymmetry, not a clever benchmark: a datacenter always has strangers' queries to bundle, while your laptop serves one person and has nothing to batch across except, perhaps someday, its own apps. Keep this in mind for what comes next — it is exactly why the paper's cloud baseline runs batched, to avoid stacking the deck for the laptop.",
+      "visualMetaphor": "A memory bar streams one weight-read sweep per token into a splitter that fans out to B parallel query lanes (B set by the slider). Readouts: energy per query (6,449 J at B=1 shrinking toward 548 J at B=64), total power (255 W rising sublinearly to 883 W), and an IPJ multiplier gauge.",
+      "animatedVariable": {
+        "name": "batch size (concurrent queries)",
+        "control": "slider",
+        "range": "B = 1 to 64",
+        "whatChangesOnScreen": "More lanes share each weight-read sweep; the per-query energy readout collapses from 6,449 J to 548 J while total power climbs only from 255 W to 883 W."
+      },
+      "quantitativeAnchor": "Qwen3-8B on B200: 6,449 J/query at batch 1 → 548 J/query at batch 64; power 255 W → 883 W; IPJ up 11.8–19.7×",
+      "physicsChecks": [
+        "Per-query energy at B=64 is ≈11.8× lower than at B=1 (6,449/548)",
+        "Total power at B=64 (883 W) is far below 64 × 255 W — visibly sublinear",
+        "Per-query energy decreases monotonically as the slider rises",
+        "The IPJ gauge lands in the 11.8–19.7× range at B=64"
+      ]
+    },
+    {
+      "id": "routing-inversion",
+      "conceptId": "routing-inversion",
+      "part": "Head to head with the datacenter",
+      "title": "Routing most queries to small local models cuts total energy by up to 80%",
+      "teaches": "The system-level saving comes from invoking 10–50× fewer parameters per query when a small model suffices, which dwarfs the cloud's 1.4–7.4× per-query hardware advantage.",
+      "requires": [
+        "cloud-per-query-gap",
+        "batching-amortizes"
+      ],
+      "caption": "Here is the inversion that resolves the tension of the last two scenes. Take one everyday question and choose who answers it: the giant in the datacenter — Qwen3-235B on an H200, batched 16 ways with strangers' queries — or the small model on your own laptop, an 8B on the M4 Max. Flip the switch and compare the bars: the datacenter chip is the better machine, but the giant model must drag 235B parameters through memory while the local one drags 8B — roughly 10–50× less arithmetic and traffic across the paper's local lineup of Qwen3-4B/8B/14B and GPT-OSS-20B — and that factor swamps the 1.4–7.4× silicon penalty. Scale it up: in a simulated 24-hour workload of 80.2 million queries where a perfect selector sends every locally-answerable query local and the rest to the cloud, total energy falls 80.4%, compute 77.3%, and cost 73.8%. The lever is not where the query runs; it is refusing to wake 235 billion parameters when 8 billion suffice.",
+      "visualMetaphor": "Top: a single query card with a two-position switch — 'local: Qwen3-8B on M4 Max' vs 'cloud: Qwen3-235B on H200, batch 16' — driving two bar pairs: parameters touched per token (8B vs 235B) and joules per query. Bottom: an aggregate panel for the 80.2M-query day showing three savings dials (energy 80.4%, compute 77.3%, cost 73.8%) under a perfect-selector assumption.",
+      "animatedVariable": {
+        "name": "which model answers the query",
+        "control": "toggle",
+        "range": "local 8B on laptop ↔ cloud 235B on datacenter chip (batch 16)",
+        "whatChangesOnScreen": "The parameters-touched bar jumps ~29× between positions and the joules-per-query bar follows it, ending lower on the local side despite a 'worse chip' badge shown on the laptop."
+      },
+      "quantitativeAnchor": "Oracle routing over 80.2M queries/24 h: −80.4% energy, −77.3% compute, −73.8% cost",
+      "physicsChecks": [
+        "Parameters-touched ratio between toggle positions is ≈29× (235B vs 8B)",
+        "The local position shows lower joules per query even though its chip badge marks it 1.4–7.4× less efficient per query",
+        "The aggregate dials read 80.4 / 77.3 / 73.8 percent"
+      ]
+    },
+    {
+      "id": "router-good-enough",
+      "conceptId": "router-accuracy-saturation",
+      "part": "Head to head with the datacenter",
+      "title": "A selector that is right 80% of the time captures most of the savings",
+      "teaches": "System savings grow roughly linearly with router accuracy and saturate at the oracle bound, so past ~80% the payoff shifts from better routing to a more diverse model pool and the unsolved hard tail.",
+      "requires": [
+        "routing-inversion"
+      ],
+      "caption": "The last scene assumed a perfect selector; no real one exists, so how good must the router actually be? Slide its accuracy and read the curve: at 60% correct decisions you already save 48.4% of total energy, at 80% you save 64.3%, and perfection tops out at 80.4% — each extra point of router accuracy buys less than a point of savings. The reason the floor is so forgiving is that a misroute isn't a wrong answer; the query simply falls back to the big cloud model, so answer quality is preserved and only some joules are wasted. Published routing systems (RouteLLM) already report 70–85% accuracy, so routing is not the bottleneck. The real frontier shows in the difficulty slices: the hardest reasoning tier — 16.5% of the reasoning set, beyond every model evaluated — remains 95% unsolved and improved only +1.5 points from 2023 to 2025, while the easier tiers jumped 24–76 points.",
+      "visualMetaphor": "A curve of energy savings (y, 0–100%) vs router accuracy (x, 60–100%) with a draggable marker on the x-axis; labeled points at (60, 48.4), (80, 64.3), (100, 80.4) and a dashed 'oracle bound' asymptote. A companion flat line labeled 'answer quality' stays constant. An inset bar shows the Level-5 hard tier: 95% unsolved, +1.5 pp since 2023.",
+      "animatedVariable": {
+        "name": "router decision accuracy",
+        "control": "slider",
+        "range": "60% to 100%",
+        "whatChangesOnScreen": "The marker slides along the savings curve (48.4% → 64.3% → 80.4%), the local slope readout shrinks below 1 pp of savings per pp of accuracy, and the answer-quality line never moves."
+      },
+      "quantitativeAnchor": "Savings vs router accuracy: 60% → 48.4%, 80% → 64.3%, oracle → 80.4%; Level-5 reasoning tail: 95% unsolved, +1.5 pp in two years",
+      "physicsChecks": [
+        "The curve passes through (60, 48.4), (80, 64.3), and (100, 80.4)",
+        "The curve's slope decreases toward the right — visibly flatter near 100% than near 60%",
+        "The answer-quality line is identical at slider minimum and maximum",
+        "The hard-tail inset shows 95% unsolved regardless of slider position"
+      ]
+    },
+    {
+      "id": "watt-vs-joule-decomposition",
+      "conceptId": "watts-vs-joules-decomposition",
+      "part": "Why now: crossing the efficiency threshold",
+      "title": "The same two years of progress read 5.3× per watt but 18× per joule",
+      "teaches": "Latency improvements are invisible to a power ratio but multiply into an energy ratio, so IPW gains credit mostly models (3.1×) while IPJ gains credit mostly hardware (5.9×).",
+      "requires": [
+        "energy-is-power-times-time",
+        "ipw-figure-of-merit",
+        "cloud-per-query-gap"
+      ],
+      "caption": "Here is a puzzle you can now solve with scene one's toolkit: the paper reports that models drove recent progress (3.1× of the 5.3× per-watt gain, versus 1.7× from hardware) and that hardware drove it (5.9× of an 18× per-joule gain over 16 months) — and both are true. A new chip does two things at once: it draws somewhat less power per unit of accuracy, and it finishes each query much faster. Slide the speedup and watch: the per-watt gauge doesn't budge, because \\(\\mathrm{IPW} = \\mathrm{acc}/P\\) contains no time at all, while the per-joule gauge climbs in proportion, because energy is \\(P·τ\\) and the shrinking \\(τ\\) multiplies straight in. Which metric you should care about depends on your constraint: a laptop lives under a thermal ceiling, a hard cap on watts, so per-watt governs what it can sustain; a battery or an electric bill is a budget in joules, so per-joule governs what a day of use costs. Two honest metrics, one dataset, no contradiction.",
+      "visualMetaphor": "A power-vs-time rectangle for one query (echoing scene 1) whose width shrinks as the latency-speedup slider rises, height fixed. Beside it, two gauges: IPW (frozen) and IPJ (rising with the slider). Below, two stacked decomposition bars: 'IPW gain 5.3× = model 3.1× × hardware 1.7×' and 'IPJ gain 18×, hardware share 5.9×'.",
+      "animatedVariable": {
+        "name": "hardware latency speedup at fixed power",
+        "control": "slider",
+        "range": "1× to 4× faster query completion",
+        "whatChangesOnScreen": "The rectangle narrows (less area = fewer joules), the IPJ gauge rises in direct proportion to the speedup, and the IPW gauge stays exactly still."
+      },
+      "quantitativeAnchor": "2023–2025: IPW ×5.3 (model 3.1× × hardware 1.7×); IPJ ×18 with hardware contributing 5.9× over 16 months",
+      "physicsChecks": [
+        "The IPW gauge reading is identical at slider positions 1× and 4×",
+        "The IPJ gauge reading at 4× is exactly 4× its 1× reading",
+        "The rectangle's area at 4× is one quarter of its 1× area",
+        "The decomposition bars display 5.3 = 3.1 × 1.7 (within rounding) and 18 with a 5.9 hardware factor"
+      ]
+    },
+    {
+      "id": "efficiency-threshold",
+      "conceptId": "mainframe-pc-precedent",
+      "part": "Why now: crossing the efficiency threshold",
+      "title": "Computing moves to the small machine when it becomes efficient enough, not when it wins",
+      "teaches": "As with the mainframe-to-PC shift, workloads migrate once the small machine's efficiency crosses the threshold of typical user needs — and local AI's efficiency is compounding at ~2.3× per year while its coverage climbs.",
+      "requires": [
+        "ipw-figure-of-merit",
+        "coverage-88",
+        "watt-vs-joule-decomposition"
+      ],
+      "caption": "One last question: why is this happening now, and should we expect it to continue? History offers a control experiment: from 1946 to 2009, computations per joule doubled every ~1.5 years (a trend named for Jonathan Koomey), and work migrated from room-sized mainframes to desktop PCs not when PCs outperformed them — they never did at the time — but when a wall-socket machine became efficient enough to satisfy a typical user's needs. That is precisely a per-watt threshold, which is why this paper tracks a ratio rather than raw benchmark scores. Drag the year and watch both curves: local intelligence per watt compounding at ~2.3× per year (2.27× in 2024, 2.32× in 2025), while the share of real queries a single best local model can service climbs 23.2% → 48.7% → 71.3%, with the pooled figure at 88.7% — and the old storage barrier gone, since consumer accelerator memory has grown 126× since 2012. The datacenter keeps the hard 11%: the graduate-level reasoning tail, and every workload that batching makes cheap. But if these curves hold for even a few more years, the default answer to 'where does an AI query run?' quietly changes from 'a warehouse somewhere' to 'the machine in front of you.'",
+      "visualMetaphor": "A dual-axis chart vs year (2023–2025, with a faint dashed extrapolation to 2027): left log-scale axis shows local IPW as a straight compounding line (~2.3×/yr), right linear axis shows workload coverage points at 23.2%, 48.7%, 71.3% with 88.7% marked as the pooled 2025 level. A ghost overlay in the background shows Koomey's historical line doubling every 1.5 years, labeled '1946–2009: computations per joule'. A year slider moves a cursor that updates both readouts.",
+      "animatedVariable": {
+        "name": "year",
+        "control": "slider",
+        "range": "2023 to 2025 (dashed extrapolation to 2027)",
+        "whatChangesOnScreen": "The cursor advances along both curves; the IPW readout multiplies by ≈2.3 per year step (2.27× then 2.32×) and the coverage readout steps 23.2% → 48.7% → 71.3%, with the extrapolated region visibly dashed and labeled as projection."
+      },
+      "quantitativeAnchor": "Local IPW compounding ~2.3×/yr (2.27× in 2024, 2.32× in 2025); best-single coverage 23.2% → 48.7% → 71.3%; Koomey doubling every ~1.5 yr; consumer accelerator memory ×126 since 2012",
+      "physicsChecks": [
+        "On the log axis, the IPW line is straight with year-over-year ratios of 2.27 and 2.32",
+        "Coverage readouts at 2023/2024/2025 are exactly 23.2%, 48.7%, 71.3%",
+        "The Koomey ghost line doubles every 1.5 years on the same log axis",
+        "The post-2025 region is dashed and labeled as extrapolation, not data"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "paper": {
+    "title": "An Extensible, Data-Oriented Architecture for High-Performance, Many-World Simulation",
+    "authors": [
+      "Brennan Shacklett",
+      "Luc Guy Rosenzweig",
+      "Zhiqiang Xie",
+      "Bidipta Sarkar",
+      "Andrew Szot",
+      "Erik Wijmans",
+      "Vladlen Koltun",
+      "Dhruv Batra",
+      "Kayvon Fatahalian"
+    ],
+    "oneSentenceClaim": "Training AI agents requires billions of simulated steps, and the simulator is usually the bottleneck. Madrona compiles simple per-agent logic into one GPU program that runs thousands of worlds at once. It reaches 1.9 million simulated steps per second on one GPU, 5 to 33 times faster than strong CPU baselines.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "Reinforcement learning basics (agents, policies, environment steps, rewards)",
+    "General notion of a GPU as a massively parallel processor",
+    "Basic familiarity with game engines / simulation loops",
+    "C++/systems programming concepts (structs, arrays, pointers)"
+  ],
+  "concepts": [
+    {
+      "id": "rl-sample-hunger",
+      "name": "RL training needs billions of environment steps, and simulation speed is the bottleneck",
+      "whyItMatters": "This is the entire motivation for the paper: if the simulator producing training data can't be sped up, no amount of GPU compute for the neural network helps, since agents need billions of steps to learn complex behavior.",
+      "coreMechanism": "Reinforcement learning agents improve by repeatedly acting in an environment and updating a policy from the resulting experience. Complex behaviors (e.g., tool use in hide-and-seek) only emerge after ~115 billion environment steps of play, so the wall-clock time to generate experience directly limits how fast research can iterate, even with unlimited compute for the learning algorithm itself.",
+      "foundational": true
+    },
+    {
+      "id": "gpu-simt-coherence",
+      "name": "GPUs execute in lockstep groups (warps), so divergence and scattered memory access kill throughput",
+      "whyItMatters": "Every design decision in Madrona (unified tables, sorting, megakernels) exists to keep neighboring GPU threads doing the same work on nearby memory, because that's the only way to actually get a GPU's theoretical speed.",
+      "coreMechanism": "A GPU groups ~32 threads into a warp that executes the same instruction simultaneously (SIMT model); if threads in a warp take different code paths (divergence) or read memory scattered across the address space (incoherent access), the hardware serializes the work or stalls on memory, and most of the GPU's parallel capacity goes unused.",
+      "foundational": true
+    },
+    {
+      "id": "batch-simulation",
+      "name": "Batch simulation: one engine simultaneously stepping thousands of independent environments",
+      "whyItMatters": "This is the core strategy the paper builds on and extends — rather than running many copies of a black-box simulator, running many environments *inside* one program lets the engine see across environments and exploit coherence the naive approach can't.",
+      "coreMechanism": "Instead of launching N separate simulator processes (one per environment) that a scheduler distributes across CPU cores, batch simulation runs N environments as N parallel instances of the same computation inside a single engine. Because the engine has visibility into the state of every environment at once, it can lay out data and dispatch parallel work in a way that keeps GPU threads coherent, producing orders-of-magnitude higher throughput than naively parallelizing pre-existing simulators."
+    },
+    {
+      "id": "ecs-pattern",
+      "name": "Entity-Component-System (ECS): separating state (components) from logic (systems) via typed collections (archetypes)",
+      "whyItMatters": "ECS is the programming abstraction that lets developers write simple, per-entity code without worrying about parallelization, while still giving the engine enough structure to know exactly what data each computation touches — this is what makes the framework both programmable and GPU-mappable.",
+      "coreMechanism": "In ECS, an environment is a collection of entities (e.g., Agent, Obstacle); each entity's state lives in components (e.g., position, velocity, team); entities sharing the same components form an archetype stored as a column-oriented table. Systems are plain functions written once per entity (e.g., 'given position and velocity, integrate') that a query automatically applies to every matching entity across every environment, so the developer never writes an explicit parallel loop.",
+      "misconception": "It's tempting to think ECS is just a code-organization pattern for readability; in Madrona it is actually the mechanism that exposes fine-grained, structured parallelism to the compiler/runtime — the same structure that makes CPU game code clean is what lets the GPU know which threads can run coherently together."
+    },
+    {
+      "id": "single-table-per-archetype",
+      "name": "One shared table per archetype across *all* environments, not one table per environment",
+      "whyItMatters": "This single storage decision is why BATCH-ECS-GPU achieves 33% compute and 69% memory bandwidth utilization while the naive per-environment design (ECS-GPU) hits only ~1.9% utilization on both — it's the single biggest lever the paper pulls for coherent GPU execution.",
+      "coreMechanism": "Madrona stores every entity of a given archetype (e.g., all Obstacles from every one of 16,384 environments) contiguously in one big column-store table, tagging each row with an implicit EnvID. When a system runs, consecutive GPU threads read consecutive rows — which may belong to different environments — and still get coherent, cache-friendly memory access; if each environment instead had its own small table, threads processing a query that matches only a handful of entities per environment would each read from a different table, causing scattered memory access and wasted GPU bandwidth. It also lets over-allocated memory headroom for dynamic entity growth be amortized across all environments rather than duplicated per-environment, and lets component data be exposed as one big contiguous tensor for zero-copy handoff to the learning framework."
+    },
+    {
+      "id": "dynamic-entity-management",
+      "name": "Lock-free entity deletion via sentinel values, reclaimed by periodic radix sort",
+      "whyItMatters": "Hide-and-seek constantly creates and destroys entities (e.g., collision-pair candidates each physics step), so the engine needs a way to grow and shrink tables on the GPU without synchronization overhead that would erase the performance gains from batching.",
+      "coreMechanism": "When an entity is deleted, its EnvID is set to -1 with no locking or synchronization needed between threads doing deletions in parallel. Periodically, Madrona runs a parallel radix sort on the EnvID column to push all deleted (-1) rows to the end of the table, then simply truncates the table to reclaim memory — this also happens to re-sort live rows by environment, which improves memory coherence for subsequent per-environment data accesses (a happy side effect, not just a cleanup step)."
+    },
+    {
+      "id": "megakernel-design",
+      "name": "Compile the entire simulation step into one GPU megakernel instead of many small kernel launches",
+      "whyItMatters": "This solves two problems at once: it avoids the overhead of ~200 separate kernel launches per step, and it avoids CPU-GPU round trips to determine how many threads a dynamically-sized system (e.g., collision narrow-phase, whose entity count depends on the previous system's output) needs to launch.",
+      "coreMechanism": "Instead of launching a separate CUDA kernel per ECS system (which would require the CPU to read back how many entities matched each query before launching the next kernel — costly synchronization for dynamic-count systems), Madrona compiles all systems in the computation graph into a single persistent-threads megakernel launched once per environment step. Warps repeatedly pull work at the granularity of individual task-graph nodes, and when a warp finishes a node it immediately advances to the next node's work without any CPU involvement, so low-cost nodes (of which there are ~200 in hide-and-seek) essentially disappear from the execution timeline instead of dominating it with launch overhead."
+    },
+    {
+      "id": "profile-guided-register-allocation",
+      "name": "Splitting the megakernel into sub-kernels with different register allocations, chosen by profiling",
+      "whyItMatters": "This single optimization yields a measured 35% throughput improvement (1.4M → 1.9M steps/sec) by fixing an inherent tension in the megakernel approach: complex systems need many registers, but that starves simpler systems of the GPU occupancy they need to hide memory latency.",
+      "coreMechanism": "All systems sharing one megakernel means they all get the same per-thread register allocation; complex systems like narrow-phase collision detection need up to 255 registers per thread, but forcing that allocation onto simple systems reduces how many threads/warps can be simultaneously resident on an SM, hurting the GPU's ability to hide memory latency. Madrona profiles each system's execution time under different register budgets, then splits the task graph into multiple kernel launches with different allocations (down to 64 registers/thread) chosen by comparing measured speedup against the added kernel-launch cost — raising compute utilization from 22% to 33% and memory bandwidth utilization from 46% to 69% in one hide-and-seek profiled step."
+    },
+    {
+      "id": "intra-environment-parallelism",
+      "name": "Exploiting parallelism *within* a single environment (agents, collision pairs, rays), not just across environments",
+      "whyItMatters": "This is why Madrona still hits 75%+ of peak throughput at batch sizes as small as 8,000 environments for hide-and-seek — cross-environment parallelism alone isn't enough when batch size is modest, so the engine must also parallelize the work inside each environment.",
+      "coreMechanism": "A single hide-and-seek environment contains ~5 agents and ~30 obstacles, generating dozens of collision pairs and per-agent, per-ray visibility computations; Madrona parallelizes across these units within one environment (down to per-ray granularity using warp-level parallelism), so even with relatively few concurrent environments there is enough total parallel work (collision pairs, agent observations) to fill the GPU's 30,000+ threads. Tasks with more agents (Overcooked, HideSeek) reach near-peak throughput at far smaller batch sizes than tasks with none (Cartpole needs ~512K environments; Hanabi's lack of internal parallelism instead makes it memory-bandwidth-bound at just 32K environments)."
+    },
+    {
+      "id": "naive-gpu-parallelization-fails",
+      "name": "Naively mapping one environment to one GPU thread is much worse than true batch simulation",
+      "whyItMatters": "This is the paper's key negative-result comparison (ECS-GPU) that proves the architectural choices matter — simply 'putting it on a GPU' isn't sufficient, and even beats out by CPU baselines, demonstrating batching itself (not just GPU hardware) is the source of the speedup.",
+      "coreMechanism": "ECS-GPU assigns each entire environment (with its own private ECS tables) to a single CUDA thread; since different threads may be executing different systems at any moment and reading from separately-allocated, fragmented memory, this suffers severe warp divergence and incoherent memory access, realizing only 1.9% of peak compute and memory bandwidth. It is also capped at ~8K concurrent environments by memory fragmentation. The result: ECS-GPU is over 42x slower than the properly batched BATCH-ECS-GPU design on hide-and-seek, and even 3x slower than a strong single-threaded-per-environment CPU baseline (ECS-CPU).",
+      "keyFigureRef": "Table 2"
+    },
+    {
+      "id": "headline-performance-numbers",
+      "name": "1.9M steps/sec for physics + ray-traced hide-and-seek; 5-33x over strong CPU, 100-1000x over open source",
+      "whyItMatters": "These are the concrete, quantitative payoffs that justify the whole architecture: they translate into training runs that used to take 40 days on a 32-thread CPU completing in about 1.5 days on one GPU.",
+      "coreMechanism": "At a batch size of 32K environments, Madrona's BATCH-ECS-GPU runs the full hide-and-seek simulation (rigid body physics, collision detection, LIDAR ray casting, reward computation) at over 1.9 million environment steps per second on one RTX 4090 GPU, versus 1.6×10^5 steps/sec for a strong 32-thread CPU ECS baseline (11x) and 6.9×10^3 steps/sec for the original open-source MuJoCo/Python implementation (270x). Similar gains show up in Overcooked (33x over CPU) and other tasks, and the paper projects the 115-billion-step training run needed for hide-and-seek's full emergent behaviors would take ~1.5 days on a single GPU versus ~40 days on the CPU reference.",
+      "keyFigureRef": "Table 1"
+    },
+    {
+      "id": "column-store-storage",
+      "name": "Column-oriented (structure-of-arrays) storage keeps same-field data contiguous for fast batched access",
+      "whyItMatters": "This underlies every claim about coherent memory access in the paper — it's the basic data layout choice that makes centralized per-archetype tables and tensor export work efficiently.",
+      "coreMechanism": "Storing entity data as a column store means all values of one component (e.g., all positions) are packed contiguously in memory, rather than each entity's full set of components stored together (row/struct-of-arrays layout). When a system reads only position and velocity, contiguous columns mean neighboring threads fetch adjacent memory addresses, maximizing memory-coalescing on the GPU, and the same layout lets the whole column be exposed directly as a tensor to a learning framework without a copy.",
+      "foundational": true
+    }
+  ]
+}

@@ -252,8 +252,8 @@ async function refreshFeed() {
     renderFeed();
   } catch { /* transient; try again on next tick */ }
 }
+// Explainers are pre-computed, so fetch the feed once (no live "generating" states to poll).
 refreshFeed();
-setInterval(refreshFeed, 4000);
 </script>
 </body>
 </html>

@@ -1,0 +1,323 @@
+{
+  "title": "Intelligence per Watt: Why Your Laptop Should Answer Most AI Queries",
+  "hook": "Every time you ask a chatbot to rewrite an email, a datacenter somewhere streams hundreds of gigabytes of neural-network weights through a 700-watt accelerator. This paper measures a quiet crossover: small models on a laptop now answer 88.7% of everyday queries correctly, and their intelligence per watt grew 5.3× in two years. Follow one real query through both paths — laptop and datacenter — and you'll see why routing the easy 80% locally cuts AI's energy bill by 60–80%. Datacenter chips are strictly better, yet the whole argument comes down to one accounting identity: energy = power × time.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "We take one real query and ask what it physically costs to answer. Two facts — energy is power times time, and generating text is a memory-streaming problem — fix the cost of every answer, and expose what today's cloud-only serving wastes."
+    },
+    {
+      "title": "The new technology",
+      "lede": "With the cost model in hand, the paper builds one number — intelligence per watt — and shows the three tricks (sparse experts, aggressive quantization, model diversity) that let laptop-class models answer 88.7% of real queries."
+    },
+    {
+      "title": "Why it beats existing tech",
+      "lede": "Here is the puzzle: measured chip against chip, cloud accelerators beat the laptop on every efficiency metric. Yet routing queries locally saves 60–80% of energy. This part resolves the apparent contradiction with the paper's real numbers."
+    },
+    {
+      "title": "Why now",
+      "lede": "None of this was possible in 2023. A memory constraint broke, efficiency compounded 5.3× in two years, and the same trend now points one tier further down — to the phone in your pocket."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "joules-per-answer",
+      "conceptId": "power-vs-energy",
+      "part": "The basic building blocks",
+      "title": "Energy per answer is power times time, so low wattage alone proves nothing",
+      "teaches": "The cost of answering a query is \\(E = P·τ\\), so a low-power device that runs long can spend as many joules as a high-power device that finishes fast.",
+      "requires": [],
+      "caption": "Meet our running example: 'draft a polite email declining a meeting,' one query from a trace of 1M real chats. Before you press play — which spends more energy answering it, a 12 W phone or a 240 W workstation GPU?",
+      "visualMetaphor": "Three devices side by side — iPhone (12 W), MacBook M4 Max (~50 W), workstation GPU (240 W) — each with a live power meter and a stopwatch. Pressing play runs the email query on the selected device; an energy bar fills at a rate proportional to the power meter, and stops when the answer completes. The phone's bar fills slowly but for 37 s (~440 J); the workstation's fills fast but stops after ~1.4 s (~340 J). The reveal: the 12 W device spent MORE total energy. Equation displayed and updated live: \\(E = P·τ\\).",
+      "animatedVariable": {
+        "name": "device answering the query",
+        "control": "buttons",
+        "range": "iPhone (12 W, 37 s) / MacBook (~50 W) / workstation GPU (240 W, ~1.4 s)",
+        "whatChangesOnScreen": "Power meter level, stopwatch duration, and the final height of the energy bar (joules) for the same answered query"
+      },
+      "quantitativeAnchor": "12 W × 37 s ≈ 440 J on the phone vs 240 W × ~1.4 s ≈ 340 J on the workstation — the 20×-lower-power device consumes comparable or more energy per query.",
+      "physicsChecks": [
+        "Energy bar height always equals power × elapsed time; doubling duration at fixed power doubles the bar",
+        "The lowest-power device does not have the lowest energy bar — the phone's 440 J exceeds the workstation's 340 J",
+        "Power meters never change during a run; only the stopwatch and energy bar accumulate"
+      ]
+    },
+    {
+      "id": "token-streaming",
+      "conceptId": "inference-memory-bound",
+      "part": "The basic building blocks",
+      "title": "Generation speed is set by memory bandwidth, not arithmetic",
+      "teaches": "Every generated token requires streaming all of the model's active weights from memory, so tokens per second ≈ memory bandwidth ÷ bytes of active weights.",
+      "requires": [
+        "joules-per-answer"
+      ],
+      "caption": "Why did the phone take 37 s? Watch the email reply generate token by token: each token forces the entire 10 GB of model weights through the memory pipe while the arithmetic units sit mostly idle.",
+      "visualMetaphor": "A mechanism diagram: model weights drawn as a 10 GB stack of blocks in DRAM, a pipe (labeled with bandwidth) carrying them to compute units, and the email reply appearing one token at a time. Each token visibly re-streams the full stack; the compute units show an idle/busy gauge stuck near idle. A slider sets bandwidth to real chips: A18 Pro (60 GB/s), M4 Max (546 GB/s), B200 (8 TB/s). Tokens/s readout ≈ bandwidth ÷ 10 GB. Predict first: will 10× more FLOPs speed this up? A 'FLOPs ×10' toggle changes nothing — the pipe is the bottleneck.",
+      "animatedVariable": {
+        "name": "memory bandwidth of the chip",
+        "control": "slider",
+        "range": "60 GB/s (iPhone A18 Pro) → 546 GB/s (M4 Max) → 8 TB/s (NVIDIA B200)",
+        "whatChangesOnScreen": "Tokens per second of the email reply scales linearly with bandwidth; the compute-idle gauge stays high throughout"
+      },
+      "quantitativeAnchor": "10 GB of active weights ÷ 546 GB/s ≈ 55 tokens/s ceiling on the M4 Max; the A18 Pro at 60 GB/s is 9–26× slower on the same model.",
+      "physicsChecks": [
+        "Tokens/s is proportional to bandwidth: 8 TB/s produces ~13× the M4 Max rate and ~133× the A18 Pro rate",
+        "Toggling extra FLOPs leaves tokens/s unchanged — the cause (full weight stream per token) is visible",
+        "Every token animation re-streams the entire weight stack, never a fraction of it"
+      ]
+    },
+    {
+      "id": "cloud-baseline-batching",
+      "conceptId": "batching-amortization",
+      "part": "The basic building blocks",
+      "title": "Cloud serving amortizes the weight stream across users — yet still pays frontier-scale cost per query",
+      "teaches": "Batching lets a server stream weights once for many users' tokens, cutting joules per query 11–20×, but every query still pays for a 235B-parameter frontier model.",
+      "requires": [
+        "token-streaming"
+      ],
+      "caption": "Here is today's baseline: your email query joins 15 others on an H200 running a 235B-parameter frontier model. Batching is a real, huge advantage — drag the slider and watch joules per query collapse — but the model is still frontier-scale for a two-line email.",
+      "visualMetaphor": "The scene-2 pipe redrawn as a datacenter lane: one weight stream, with 1–64 user queries riding it in parallel (each user's tokens tinted a different color, sharing each weight-load). A slider sets batch size on a B200 running Qwen3-8B; two meters respond: joules per query (6,449 J at batch 1 → 548 J at batch 64) and total power (255 W → 883 W). Predict first: does power grow 64×? No — only ~3.5×. Closing annotation: even fully batched, the frontier model Qwen3-235B streams frontier-scale weights for our trivial email — the limitation the paper attacks.",
+      "animatedVariable": {
+        "name": "batch size on the cloud accelerator",
+        "control": "slider",
+        "range": "1 → 64 concurrent queries",
+        "whatChangesOnScreen": "Joules-per-query meter drops 11–20× while the power meter rises only ~3.5×; more colored token lanes share each weight stream"
+      },
+      "quantitativeAnchor": "Qwen3-8B on a B200: 6,449 J/query at batch 1 → 548 J/query at batch 64, while power rises only from 255 W to 883 W.",
+      "physicsChecks": [
+        "Joules per query decreases monotonically with batch size; total power increases sub-linearly (~3.5× for 64× batch)",
+        "At batch 1 the meters match the unbatched pipe from scene 2's regime",
+        "The weight stream animates once per token regardless of batch size — the amortization cause is visible"
+      ]
+    },
+    {
+      "id": "ipw-defined",
+      "conceptId": "ipw-metric",
+      "part": "The new technology",
+      "title": "Intelligence per watt scores capability and efficiency in one number",
+      "teaches": "The paper's figure of merit is \\(\\mathrm{APW}(m,h)=\\mathbb{E}[\\mathrm{acc}]/\\mathbb{E}[P]\\): expected fraction of queries answered correctly, divided by expected power draw.",
+      "requires": [
+        "joules-per-answer",
+        "cloud-baseline-batching"
+      ],
+      "caption": "A laptop has a fixed thermal budget, so the right question is: how much correct answering per watt? Toggle between (model, chip) pairs and watch both the green fraction and the wattage move the dial.",
+      "visualMetaphor": "The 1M real queries drawn as a dot field (our email query highlighted as one dot). Selecting a (model, chip) pair colors the dots it answers correctly green — exact-match where ground truth exists, win/tie against a frontier model judged by an LLM for open chat. Two readouts feed a dial: \\(\\mathbb{E}[\\mathrm{acc}]\\) (green fraction) on top, \\(\\mathbb{E}[P]\\) (watts) on the bottom, dial = their ratio. Predict first: a smaller model draws fewer watts — does its dial beat the bigger model's? Reveal: GPT-OSS-120B on M4 Max wins at 4.18×10⁻³ acc/W because accuracy climbed faster than power.",
+      "animatedVariable": {
+        "name": "(model, hardware) pair being scored",
+        "control": "buttons",
+        "range": "small dense model / mid model / GPT-OSS-120B, each on M4 Max",
+        "whatChangesOnScreen": "Fraction of green dots, the watt readout, and the resulting APW dial position"
+      },
+      "quantitativeAnchor": "GPT-OSS-120B on an Apple M4 Max: 71.4% of queries answered correctly, APW = 4.18×10⁻³ accuracy per watt — the best single local pair in 2025.",
+      "physicsChecks": [
+        "Dial position always equals green fraction ÷ watt readout for the selected pair",
+        "Raising accuracy at fixed power moves the dial up; raising power at fixed accuracy moves it down",
+        "The email-query dot flips green/gray consistently with each model's selection"
+      ]
+    },
+    {
+      "id": "moe-active-params",
+      "conceptId": "moe-active-parameters",
+      "part": "The new technology",
+      "title": "A mixture-of-experts model stores 120B parameters but streams only 20B per token",
+      "teaches": "MoE decouples capacity from cost: total parameters set memory footprint, but only the few 'expert' sub-networks the router activates per token get streamed — so a 120B model pays 20B-model energy.",
+      "requires": [
+        "token-streaming",
+        "ipw-defined"
+      ],
+      "caption": "How does a 120B-parameter model win the per-watt contest? Step through the email reply token by token: the router lights up only a few experts each time, so the memory pipe carries ≤20B parameters, not 120B.",
+      "visualMetaphor": "GPT-OSS-120B drawn as a grid of expert blocks totaling 120B parameters, with a small router in front. Step-through control generates the email reply one token at a time; each step, the router visibly lights ~4 experts and only those flow into the scene-2 memory pipe. Two meters: 'memory footprint' pinned at all 120B (needs 128 GB — fits the M4 Max's unified memory) and 'bytes streamed per token' at ≤20B-worth. Toggle to a dense 32B model for contrast: every parameter streams every token. Predict first: which streams more per token, dense 32B or MoE 120B? The 120B MoE streams less.",
+      "animatedVariable": {
+        "name": "token-by-token generation with router",
+        "control": "play-pause",
+        "range": "step through ~20 tokens of the email reply; toggle dense-32B vs MoE-120B",
+        "whatChangesOnScreen": "Which expert blocks light up and flow into the pipe each token; the streamed-bytes meter (≤20B for MoE, all 32B for dense) vs the fixed 120B footprint meter"
+      },
+      "quantitativeAnchor": "GPT-OSS-120B: 120B total parameters (128 GB of unified memory to store) but ≤20B active per token — 71.4% coverage at roughly 20B-model energy.",
+      "physicsChecks": [
+        "The footprint meter never changes during generation; the streamed-bytes meter changes only with the dense/MoE toggle",
+        "Different tokens light different expert subsets, but never more than the active budget",
+        "Dense 32B streams more bytes per token than MoE 120B — visible directly in the pipe"
+      ]
+    },
+    {
+      "id": "quantization-trade",
+      "conceptId": "quantization-tradeoff",
+      "part": "The new technology",
+      "title": "A big model quantized to 4 bits beats a small model at full precision",
+      "teaches": "Cutting weight precision from 16 to 4 bits shrinks memory 4× and energy 3–3.5× per step (because inference is bandwidth-bound), at ~2.5 accuracy points per step — a trade that favors picking the biggest model that fits.",
+      "requires": [
+        "token-streaming",
+        "moe-active-params"
+      ],
+      "caption": "One more lever: store each weight in 4 bits instead of 16. Predict before clicking — does Qwen3-14B squeezed to FP4 still beat Qwen3-4B at full FP16? It does: 49.0% vs 48.5% on SuperGPQA.",
+      "visualMetaphor": "A single weight drawn as a bar of bits that shrinks as precision buttons step FP16 → FP8 → FP4; the full weight stack in DRAM shrinks proportionally, and the scene-2 pipe visibly needs fewer bytes per token. Three linked meters: memory footprint (÷2 per step), energy per query (÷3–3.5 per step), accuracy (−2.5 points per step, shown as slight noise on weights). Below, the head-to-head bar chart: Qwen3-14B@FP4 = 49.0% vs Qwen3-4B@FP16 = 48.5%, with the 14B's memory bar still smaller. Verdict annotation: 'pick the biggest model that fits, then quantize hard.'",
+      "animatedVariable": {
+        "name": "weight precision",
+        "control": "buttons",
+        "range": "FP16 → FP8 → FP4",
+        "whatChangesOnScreen": "Bit-bar and weight-stack width, bytes streamed per token, energy-per-query meter (3–3.5× drop per step), accuracy meter (−2.5 pts per step)"
+      },
+      "quantitativeAnchor": "FP16→FP4 cuts energy per query 3–3.5× per precision step at ~2.5 accuracy points each; Qwen3-14B at FP4 scores 49.0% on SuperGPQA vs 48.5% for Qwen3-4B at FP16.",
+      "physicsChecks": [
+        "Memory footprint halves per precision step; energy drops 3–3.5× per step; accuracy declines ~2.5 points per step",
+        "The quantized 14B's accuracy bar exceeds the full-precision 4B's despite lower precision",
+        "Bytes-per-token in the pipe scales with bits per weight, matching the bandwidth-bound cost model from scene 2"
+      ]
+    },
+    {
+      "id": "ensemble-coverage",
+      "conceptId": "local-coverage-and-ensemble-diversity",
+      "part": "The new technology",
+      "title": "Twenty diverse small models cover 88.7% of real queries — far more than the best one alone",
+      "teaches": "Different local models have complementary blind spots, so routing each query to whichever handles it best lifts coverage from 71.4% (best single model) to 88.7%.",
+      "requires": [
+        "ipw-defined"
+      ],
+      "caption": "GPT-OSS-120B alone answers 71.4% of the 1M queries. Predict before adding a second, individually weaker model — can coverage rise? Drag the slider: 20+ models with different blind spots reach 88.7%.",
+      "visualMetaphor": "The scene-4 dot field again. A slider adds local models one at a time; each new model colors green some dots that were still gray (its non-overlapping strengths visible as distinct patches), and a coverage curve climbs from 71.4% toward 88.7%, flattening as overlap grows. Side panel splits the final number honestly: 88.9% on chat vs 64.9% on hard reasoning, with the hardest reasoning tier 95% unsolved. Annotation: on reasoning benchmarks this best-of-N ensemble even beats the best of three frontier cloud models — and 88.7% is an oracle over the ensemble, not one small model matching GPT-5.",
+      "animatedVariable": {
+        "name": "number of local models in the ensemble",
+        "control": "slider",
+        "range": "1 → 20+ models",
+        "whatChangesOnScreen": "New green patches appear in previously gray regions of the dot field; the coverage curve rises 71.4% → 88.7% with diminishing increments"
+      },
+      "quantitativeAnchor": "Best single local model: 71.4% coverage; oracle routing across 20+ local models: 88.7% — a 16.3-point jump, with 88.9% on chat vs 64.9% on reasoning.",
+      "physicsChecks": [
+        "Coverage is monotonically non-decreasing as models are added and never exceeds 88.7%",
+        "Each added model's new green dots appear in regions other models left gray — complementarity is visible, not asserted",
+        "The chat/reasoning split bars average consistently with the 88.7% headline"
+      ]
+    },
+    {
+      "id": "chip-vs-chip",
+      "conceptId": "local-cloud-hardware-gap",
+      "part": "Why it beats existing tech",
+      "title": "Chip for chip, cloud accelerators beat the laptop on every efficiency metric",
+      "teaches": "Running identical models at batch size 1, the B200 delivers 1.40× the M4 Max's intelligence per watt and 1.6–2.3× per joule (SN40L up to 7.4×), so the local hardware itself is strictly less efficient.",
+      "requires": [
+        "ipw-defined",
+        "token-streaming"
+      ],
+      "caption": "A fair fight: the same GPT-OSS model, batch size 1, on laptop vs cloud silicon — and the cloud chip wins everything, up to 7.4× per joule. So how can routing queries to the loser save energy? Hold that tension.",
+      "visualMetaphor": "Head-to-head bar chart, same model on M4 Max vs NVIDIA B200 vs SambaNova SN40L, with a toggle between per-watt and per-joule scoring. Per watt: B200 = 1.40× the M4 Max. Per joule: 1.6–2.3× (B200), up to 7.4× (SN40L). Annotations name the cause from scene 2: HBM3e at 4.8–8 TB/s plus dedicated tensor units, vs 546 GB/s unified memory shared by CPU, GPU, and NPU under laptop thermal limits. Callout: per-joule gaps exceed per-watt gaps because faster memory also finishes each query sooner — \\(E = P·τ\\) again. Closing banner: 'local loses per query — the next scene shows why the system still wins.'",
+      "animatedVariable": {
+        "name": "efficiency metric",
+        "control": "toggle",
+        "range": "intelligence per watt ↔ intelligence per joule",
+        "whatChangesOnScreen": "Bar ratios shift: cloud advantage grows from 1.40× (per watt) to 1.6–7.4× (per joule), with the latency annotation explaining the growth"
+      },
+      "quantitativeAnchor": "Same models, batch size 1: B200 has 1.40× the M4 Max's IPW and 1.6–2.3× its intelligence per joule; SambaNova SN40L reaches up to 7.4× per joule.",
+      "physicsChecks": [
+        "Cloud bars exceed local bars under both metric settings — no configuration shows the laptop winning",
+        "The per-joule gap is strictly larger than the per-watt gap for each cloud chip",
+        "Bandwidth labels (8 TB/s vs 546 GB/s) are consistent with the scene-2 tokens/s relationship"
+      ]
+    },
+    {
+      "id": "routing-wins",
+      "conceptId": "hybrid-routing-savings",
+      "part": "Why it beats existing tech",
+      "title": "Routing easy queries to a 20× smaller model saves 60–80% of energy — despite worse local chips",
+      "teaches": "The savings come from skipping the 235B-parameter forward pass entirely, a lever so large it dwarfs the local chip's per-query efficiency deficit — and an imperfect 80%-accurate router still captures most of it.",
+      "requires": [
+        "chip-vs-chip",
+        "ensemble-coverage",
+        "cloud-baseline-batching"
+      ],
+      "caption": "Simulate 80.2M queries a day through a router: 80.7% — including our email — go to small local models, the rest to Qwen3-235B on an H200 batched at 16. Drag router accuracy and watch the savings saturate around 80%.",
+      "visualMetaphor": "A flow diagram: the daily query stream hits a router node and splits — left lane to laptops running small models (batch 1), right lane to the batched H200 frontier baseline from scene 3. Misrouted queries visibly bounce back to the cloud lane, so answer quality is preserved. A slider sets router accuracy from 50% to 100% (oracle); three meters respond: energy saved, compute saved, cost saved. At oracle: −80.4% energy, −77.3% compute, −73.8% cost. At 80% accuracy: −64.3% energy, and the curve visibly flattens beyond that. Predict first: do you need a near-perfect router? Annotation resolves scene 8's tension: the win is avoiding the 235B forward pass, not the local chip.",
+      "animatedVariable": {
+        "name": "router accuracy",
+        "control": "slider",
+        "range": "50% → 80% → 100% (oracle)",
+        "whatChangesOnScreen": "Split ratio of the two lanes, bounce-back traffic thinning, and the three savings meters rising along a curve that saturates near 80% accuracy"
+      },
+      "quantitativeAnchor": "Oracle routing of 80.2M queries/day: 80.4% energy, 77.3% compute, and 73.8% cost saved; a realistic 80%-accurate router still saves 64.3% of energy.",
+      "physicsChecks": [
+        "All three savings meters increase monotonically with router accuracy and cap at the oracle values",
+        "The savings-vs-accuracy curve visibly flattens past 80% — marginal router precision buys little",
+        "Misrouted queries always route to the cloud lane, so the answered-correctly rate never drops below the cloud-only baseline",
+        "The cloud lane uses the batched (bs=16) baseline from scene 3, not an artificially weak unbatched one"
+      ]
+    },
+    {
+      "id": "memory-broke",
+      "conceptId": "memory-capacity-enabler",
+      "part": "Why now",
+      "title": "A 126× jump in local memory is the constraint that broke",
+      "teaches": "Unified memory grew consumer-accessible capacity from ~20 GB of VRAM to 128–512 GB, and since total parameters govern storage while active parameters govern speed, that is exactly what lets a 120B-total MoE live on a laptop.",
+      "requires": [
+        "moe-active-params"
+      ],
+      "caption": "Why couldn't we do this in 2020? Slide through the years: GPT-OSS-120B's 128 GB footprint never fits a 24–48 GB discrete GPU, then unified memory arrives and the model drops in.",
+      "visualMetaphor": "A timeline slider (2012 → 2025) driving a log-scale memory-capacity bar (126× total growth). Two container shapes: a discrete GPU with dedicated VRAM stuck at 24–48 GB, and an Apple-style unified pool (CPU+GPU sharing one space) reaching 128–512 GB. The GPT-OSS-120B footprint is a fixed 128 GB block the reader tries to place; it overflows every discrete-VRAM container in every year, then fits the unified pool from ~2024. Annotation ties back to scene 5: capacity stores all experts; the memory pipe still streams only the ≤20B active ones, so fitting doesn't mean slowing.",
+      "animatedVariable": {
+        "name": "year / memory architecture",
+        "control": "slider",
+        "range": "2012 → 2025, with discrete-VRAM vs unified-memory containers shown side by side",
+        "whatChangesOnScreen": "Container capacities grow along the 126× log-scale trajectory; the fixed 128 GB model block snaps into the unified pool only in the final years"
+      },
+      "quantitativeAnchor": "Consumer accelerator memory grew ~126× from 2012 to 2025; discrete consumer GPUs offer 24–48 GB of VRAM vs 128–512 GB of unified memory on Apple Silicon.",
+      "physicsChecks": [
+        "The 128 GB model block never fits any 24–48 GB discrete-VRAM container at any year",
+        "Capacity increases monotonically along the timeline, totaling ~126×",
+        "Fitting the model changes the storage container only — the streamed-bytes-per-token meter from scene 5 is unchanged"
+      ]
+    },
+    {
+      "id": "ipw-trend",
+      "conceptId": "compounding-efficiency-gains",
+      "part": "Why now",
+      "title": "Intelligence per watt grew 5.3× in two years — mostly from better models",
+      "teaches": "Tracking the best (local model, local chip) pair each year shows IPW compounding at 2.27–2.32× annually, with models contributing 3.1× and hardware 1.7× per watt — but hardware 5.9× per joule, because faster chips also cut latency.",
+      "requires": [
+        "ipw-defined",
+        "memory-broke",
+        "joules-per-answer"
+      ],
+      "caption": "Step through the years: Mixtral-8x7B on a 2023 workstation GPU scores 7.92×10⁻⁴ accuracy per watt; GPT-OSS-120B on an M4 Max scores 4.18×10⁻³ — 5.3× in two years. Flip to per-joule and the total jumps to 18×.",
+      "visualMetaphor": "Year buttons (2023 / 2024 / 2025) place points on an IPW axis, each labeled with that year's best local pair; coverage tags rise in lockstep (23.2% → 48.7% → 71.3%). A stacked decomposition bar splits each year-over-year gain into a model factor and a hardware factor: per watt, 3.1× (model) × 1.7× (hardware) ≈ 5.3×. A metric toggle switches to per-joule: total becomes 18× and the hardware slice swells to 5.9×, with an \\(E = P·τ\\) callout — new accelerators cut latency as well as power, and joules pay for both. Predict before toggling: which factor grows when time enters the denominator?",
+      "animatedVariable": {
+        "name": "year and efficiency metric",
+        "control": "buttons",
+        "range": "2023 / 2024 / 2025, plus a per-watt ↔ per-joule toggle",
+        "whatChangesOnScreen": "The best-pair point jumps up the axis each year; the model/hardware decomposition bar re-splits (hardware 1.7× per watt vs 5.9× per joule)"
+      },
+      "quantitativeAnchor": "2023: 7.92×10⁻⁴ acc/W (Mixtral-8x7B, Quadro RTX 6000) → 2025: 4.18×10⁻³ (GPT-OSS-120B, M4 Max) = 5.3× per watt (models 3.1×, hardware 1.7×); 18× per joule (hardware 5.9×).",
+      "physicsChecks": [
+        "Year-over-year multipliers (2.27×, 2.32×) compound to the 5.3× total within rounding",
+        "Model factor × hardware factor reproduces each metric's total (3.1 × 1.7 ≈ 5.3 per watt)",
+        "The hardware slice is strictly larger under per-joule than per-watt, consistent with latency entering the denominator",
+        "Coverage tags increase monotonically: 23.2% → 48.7% → 71.3%"
+      ]
+    },
+    {
+      "id": "phone-tier",
+      "conceptId": "phone-power-regime",
+      "part": "Why now",
+      "title": "The phone wins per watt, loses per joule — the next routing tier is already forming",
+      "teaches": "The iPhone's A18 Pro delivers ~7× a workstation's intelligence per watt at 9.5 W, but 60 GB/s bandwidth stretches each query to 37 s, so per joule the ranking can invert — the power-vs-energy distinction from scene 1, live.",
+      "requires": [
+        "joules-per-answer",
+        "token-streaming",
+        "routing-wins"
+      ],
+      "caption": "Back to where we started: our email query on an iPhone drawing 9.5 W. Flip the metric — per watt the phone crushes a workstation 7×; per joule, 37 s of latency erases the win.",
+      "visualMetaphor": "The scene-1 setup returns, now with the iPhone 16 Pro running Qwen3-4B at FP4 against a workstation GPU on the same model. A metric toggle re-ranks them: per watt, the phone posts ~13.3×10⁻³ acc/W (~7× the workstation); per joule, its 37 s runtime vs 2.5–3.5 s shrinks or inverts the advantage — the energy bars from scene 1 make the cause visible. Side labels note the phone's 8 GB memory ceiling forces FP4 and caps models near 4B parameters (~6.5 accuracy points below laptop-class). Closing annotation: a third routing tier below the laptop — phone for the easiest queries, laptop for most, datacenter for the hard 11% — is where the 5.3×-and-compounding trend points next.",
+      "animatedVariable": {
+        "name": "efficiency metric ranking phone vs workstation",
+        "control": "toggle",
+        "range": "per watt ↔ per joule",
+        "whatChangesOnScreen": "The leaderboard reorders: phone leads ~7× per watt; per joule the gap shrinks or inverts, with the 37 s vs ~3 s stopwatches and energy bars showing why"
+      },
+      "quantitativeAnchor": "iPhone 16 Pro (A18 Pro, Qwen3-4B, FP4): ~9.5 W and ~13.3×10⁻³ accuracy per watt — ~7× a workstation GPU per watt — but 37 s per query vs 2.5–3.5 s.",
+      "physicsChecks": [
+        "Per-watt view: phone bar ≈ 7× the workstation's; per-joule view: the ratio shrinks toward or below 1×",
+        "Energy bars obey \\(E = P·τ\\): 9.5 W × 37 s vs ~240 W × ~3 s, consistent with scene 1's numbers",
+        "The 60 GB/s bandwidth label and 37 s latency are consistent with the scene-2 tokens/s relationship",
+        "The phone never runs a model above ~4B parameters or above FP4 — the 8 GB ceiling is enforced on screen"
+      ]
+    }
+  ]
+}

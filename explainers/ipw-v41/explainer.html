@@ -1,0 +1,3456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intelligence per Watt: When Your Laptop Should Answer Instead of a Data Center</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Intelligence per Watt: When Your Laptop Should Answer Instead of a Data Center</h1>
+  <p class="hook">Every question you type into a chatbot is shipped to a warehouse of GPUs and shipped back. On one million real queries, a handful of laptop-sized models together answered 88.7% correctly. The paper scores every answer with one ratio: accuracy divided by power draw, intelligence per watt. For local models it improved 5.3× between 2023 and 2025.</p>
+  <p class="page-links"><a href="https://arxiv.org/abs/2511.07885" target="_blank" rel="noopener noreferrer">Intelligence per Watt: Measuring Intelligence Efficiency of Local AI</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.1.0 · Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Before we can score any answer, we need to know what answering physically costs. We follow one query — 'explain why ice floats,' a typical single-turn chat question — through a laptop's chip, and end on the problem: watts alone can't tell you whether local AI is good enough.</div>
+</header>
+<section class="scene" id="token-by-token-cost">
+  <h3>Generating an answer means re-reading the whole model for every word</h3>
+  <div class="caption">Each new token of the ice-floats answer forces another full read of all 16 GB of weights, so a 500-token answer moves about 8 TB through memory. Answer length, not question difficulty, is what the hardware bills you for.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="token-by-token-cost"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Token-by-token inference cost</title>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --panel:#ffffff;
+  --fg:#181a1f;
+  --muted:#5a5a66;
+  --accent:#2563eb;
+  --accent2:#059669;
+  --beam:#dc2626;
+  --border:#cfd2da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#111318;
+    --panel:#1b1e26;
+    --fg:#e9eaee;
+    --muted:#9aa0ab;
+    --accent:#60a5fa;
+    --accent2:#34d399;
+    --beam:#f87171;
+    --border:#333744;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h1{font-size:15px;font-weight:600;margin:2px 0 8px;line-height:1.3;}
+svg{width:100%;max-width:640px;height:auto;display:block;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;}
+svg text{fill:var(--fg);font-size:11px;}
+.small{font-size:9.5px;fill:var(--muted);}
+.predict{font-size:12px;color:var(--muted);margin:8px 0 4px;}
+.answerWrap{margin-top:8px;border:1px solid var(--border);border-radius:8px;
+  background:var(--panel);padding:8px 10px;min-height:56px;}
+.answerLabel{font-size:11px;color:var(--muted);margin-bottom:4px;}
+#answerText{font-size:13px;line-height:1.5;word-wrap:break-word;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;}
+.ctrl{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);flex:1;min-width:180px;}
+input[type=range]{width:100%;}
+button{font-size:12.5px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--fg);cursor:pointer;}
+button:hover{border-color:var(--accent);}
+ul.readouts{list-style:none;margin:10px 0 0;padding:0;display:grid;
+  grid-template-columns:1fr 1fr;gap:6px 12px;}
+ul.readouts li{font-size:12px;background:var(--panel);border:1px solid var(--border);
+  border-radius:6px;padding:6px 8px;}
+ul.readouts b{display:block;font-size:13px;}
+math{color:var(--fg);}
+.eqBlock{margin-top:14px;text-align:center;}
+.legend{font-size:10.5px;color:var(--muted);text-align:center;margin-top:2px;}
+@media(max-width:400px){
+  ul.readouts{grid-template-columns:1fr;}
+  .ctrl{min-width:100%;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h1>Generating an answer means re-reading the whole model for every word</h1>
+
+<svg viewBox=&quot;0 0 640 210&quot; role=&quot;img&quot; aria-label=&quot;pipeline diagram of model weight streaming&quot;>
+  <!-- memory box -->
+  <rect x=&quot;8&quot; y=&quot;46&quot; width=&quot;150&quot; height=&quot;92&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;2&quot;/>
+  <text x=&quot;83&quot; y=&quot;66&quot; text-anchor=&quot;middle&quot; font-weight=&quot;600&quot;>Model weights</text>
+  <text x=&quot;83&quot; y=&quot;82&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>8B params × 2 bytes</text>
+  <text x=&quot;83&quot; y=&quot;98&quot; text-anchor=&quot;middle&quot; font-weight=&quot;600&quot; fill=&quot;var(--accent)&quot;>= 16 GB</text>
+  <text x=&quot;83&quot; y=&quot;122&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>stored in memory</text>
+
+  <!-- compute box -->
+  <rect x=&quot;482&quot; y=&quot;46&quot; width=&quot;150&quot; height=&quot;92&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent2)&quot; stroke-width=&quot;2&quot;/>
+  <text x=&quot;557&quot; y=&quot;70&quot; text-anchor=&quot;middle&quot; font-weight=&quot;600&quot;>Compute units</text>
+  <text x=&quot;557&quot; y=&quot;86&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>(matrix multiply</text>
+  <text x=&quot;557&quot; y=&quot;100&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>against every weight)</text>
+  <text x=&quot;557&quot; y=&quot;122&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>emits 1 token</text>
+
+  <!-- bus -->
+  <rect x=&quot;160&quot; y=&quot;86&quot; width=&quot;322&quot; height=&quot;12&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--border)&quot;/>
+  <rect id=&quot;beam&quot; x=&quot;160&quot; y=&quot;86&quot; width=&quot;46&quot; height=&quot;12&quot; fill=&quot;var(--beam)&quot;/>
+  <text x=&quot;321&quot; y=&quot;112&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>full 16 GB streamed, every single step</text>
+
+  <!-- phase labels -->
+  <text id=&quot;phaseLbl&quot; x=&quot;321&quot; y=&quot;34&quot; text-anchor=&quot;middle&quot; font-weight=&quot;600&quot; fill=&quot;var(--beam)&quot;>prefill: reading prompt once</text>
+
+  <!-- token counter tick marks -->
+  <text x=&quot;321&quot; y=&quot;150&quot; text-anchor=&quot;middle&quot; class=&quot;small&quot;>token #1 costs the same 16 GB as token #400 — no step is cheaper</text>
+</svg>
+
+<p class=&quot;predict&quot;>Predict before you press play: does token #400 cost less to generate than token #1? Watch whether the beam ever gets shorter.</p>
+
+<div class=&quot;answerWrap&quot;>
+  <div class=&quot;answerLabel&quot;>Answer being generated, one token per full memory pass:</div>
+  <div id=&quot;answerText&quot;>Ice</div>
+</div>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrl&quot;>
+    <label for=&quot;tokSlider&quot;>tokens generated (n): <span id=&quot;tokVal&quot;>0</span> / 500</label>
+    <input id=&quot;tokSlider&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;500&quot; step=&quot;1&quot; value=&quot;0&quot;>
+  </div>
+  <button id=&quot;playBtn&quot;>▶ Play</button>
+</div>
+
+<ul class=&quot;readouts&quot;>
+  <li>tokens generated<b id=&quot;roTokens&quot;>0</b></li>
+  <li>total bytes moved<b id=&quot;roBytes&quot;>16.0 GB</b></li>
+  <li>cost of this step (constant)<b id=&quot;roStep&quot;>16.0 GB</b></li>
+  <li>phase<b id=&quot;roPhase&quot;>prefill (one-time)</b></li>
+</ul>
+
+<div class=&quot;eqBlock&quot;>
+<math display=&quot;block&quot;>
+  <mi>B</mi><mo>=</mo><msub><mi>W</mi><mtext>bytes</mtext></msub>
+  <mo>+</mo><mi>n</mi><mo>·</mo><msub><mi>W</mi><mtext>bytes</mtext></msub>
+</math>
+</div>
+<div class=&quot;legend&quot;>B — total bytes moved from memory (bytes) · W<sub>bytes</sub> — size of the weights, 16 GB, read once for prefill and again for every decode step · n — tokens generated so far (0–500)</div>
+
+</div>
+
+<script>
+(function(){
+  const PARAMS = 8e9;              // parameters in the model
+  const BYTES_PER_PARAM = 2;       // 16-bit storage
+  const MODEL_BYTES = PARAMS*BYTES_PER_PARAM; // 1.6e10 bytes = 16 GB
+  const PREFILL_BYTES = MODEL_BYTES;   // one full read of weights for the prompt
+  const PER_TOKEN_BYTES = MODEL_BYTES; // one full read of weights per generated token
+  const MAX_TOKENS = 500;
+  const TOKEN_DURATION_MS = 90; // pace of auto-play
+
+  const baseText = &quot;Ice floats because water expands by about nine percent when it freezes, lowering its density below that of liquid water. Hydrogen bonds force water molecules into an open hexagonal lattice, leaving empty space between them. Liquid water near zero degrees Celsius packs molecules more closely, giving it a higher density near one gram per cubic centimeter, so buoyancy pushes the less dense solid ice upward and it settles at the surface of the liquid rather than sinking to the bottom of the container or the lake.&quot;;
+  const words = baseText.split(/\s+/);
+
+  const tokSlider = document.getElementById('tokSlider');
+  const playBtn = document.getElementById('playBtn');
+  const beam = document.getElementById('beam');
+  const phaseLbl = document.getElementById('phaseLbl');
+  const answerText = document.getElementById('answerText');
+  const tokVal = document.getElementById('tokVal');
+  const roTokens = document.getElementById('roTokens');
+  const roBytes = document.getElementById('roBytes');
+  const roStep = document.getElementById('roStep');
+  const roPhase = document.getElementById('roPhase');
+
+  const BUS_X0 = 160, BUS_X1 = 482, BEAM_W = 46;
+
+  let tokens = 0;       // integer tokens generated, 0..500
+  let progress = 0;     // 0..1 fraction of current in-flight pass
+  let playing = false;
+  let lastTs = null;
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function fmtBytes(b){
+    const GB = 1e9, TB = 1e12;
+    if (b < TB) return (b/GB).toFixed(1) + &quot; GB&quot;;
+    return (b/TB).toFixed(2) + &quot; TB&quot;;
+  }
+
+  function wordFor(i){
+    return words[i % words.length];
+  }
+
+  function render(){
+    tokVal.textContent = Math.round(tokens);
+    roTokens.textContent = Math.round(tokens);
+
+    const total = PREFILL_BYTES + tokens*PER_TOKEN_BYTES;
+    roBytes.textContent = fmtBytes(total);
+    roStep.textContent = fmtBytes(PER_TOKEN_BYTES);
+    roPhase.textContent = tokens < 1 ? &quot;prefill (one-time)&quot; : &quot;decode, step &quot; + Math.round(tokens);
+    phaseLbl.textContent = tokens < 1
+      ? &quot;prefill: reading prompt once&quot;
+      : &quot;decode: reading full model again, step &quot; + Math.round(tokens);
+
+    // beam position: pass 0 = prefill, passes 1..n = decode
+    const x = BUS_X0 + progress*(BUS_X1 - BUS_X0 - BEAM_W);
+    beam.setAttribute('x', x.toFixed(1));
+
+    // answer text
+    let out = [];
+    const n = Math.round(tokens);
+    for(let i=0;i<Math.max(1,n);i++) out.push(wordFor(i));
+    answerText.textContent = out.join(' ') + (n>0 ? ' …' : '');
+  }
+
+  function setTokens(n){
+    tokens = Math.max(0, Math.min(MAX_TOKENS, n));
+    progress = 0;
+    tokSlider.value = Math.round(tokens);
+    render();
+  }
+
+  tokSlider.addEventListener('input', ()=>{
+    playing = false;
+    playBtn.textContent = '▶ Play';
+    setTokens(Number(tokSlider.value));
+  });
+
+  playBtn.addEventListener('click', ()=>{
+    if (tokens >= MAX_TOKENS) setTokens(0);
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+    lastTs = null;
+  });
+
+  function frame(ts){
+    if (lastTs === null) lastTs = ts;
+    const dt = ts - lastTs;
+    lastTs = ts;
+
+    if (playing){
+      progress += dt / TOKEN_DURATION_MS;
+      while (progress >= 1){
+        progress -= 1;
+        if (tokens < MAX_TOKENS){
+          tokens += 1;
+          tokSlider.value = tokens;
+        }
+        if (tokens >= MAX_TOKENS){
+          playing = false;
+          playBtn.textContent = '▶ Play';
+          progress = 0;
+        }
+      }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // initial state
+  setTokens(0);
+  if (!reduceMotion){
+    // still start paused per spec; user presses play explicitly
+  }
+  requestAnimationFrame(frame);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;token-by-token-cost&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Generating an answer means re-reading the whole model for every word"
+  ></iframe>
+</section>
+
+<section class="scene" id="bandwidth-sets-speed">
+  <h3>Memory bandwidth, not arithmetic speed, sets tokens per second</h3>
+  <div class="caption">Every token re-reads 16 GB, so the pipe from memory is the bottleneck while the arithmetic units sit idle. That's why an iPhone is ~9× slower than a MacBook on the same model.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="bandwidth-sets-speed"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Memory bandwidth sets tokens/sec</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f4f6f8;
+  --fg:#12151b;
+  --muted:#5b6472;
+  --mem:#0ea5e9;
+  --pipe:#2563eb;
+  --compute:#7c3aed;
+  --util:#f59e0b;
+  --needle:#dc2626;
+  --grid:#c7ced7;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b0d12;
+    --panel:#151922;
+    --fg:#e7eaf0;
+    --muted:#9aa4b2;
+    --mem:#38bdf8;
+    --pipe:#60a5fa;
+    --compute:#a78bfa;
+    --util:#fbbf24;
+    --needle:#f87171;
+    --grid:#2a3140;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:12px; background:var(--bg); color:var(--fg);
+  font-family:system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif;
+}
+.wrap{max-width:680px; margin:0 auto;}
+h2{font-size:15px; margin:2px 0 8px; font-weight:600;}
+svg{width:100%; height:auto; max-width:100%; display:block;}
+.eqbox{background:var(--panel); border-radius:8px; padding:8px 10px; margin-bottom:10px;}
+math{font-size:17px;}
+.legend{font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.4;}
+.controls{margin-top:10px;}
+.controls label{font-size:13px; display:block; margin-bottom:4px;}
+input[type=range]{width:100%;}
+ul.devices{list-style:none; margin:6px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px;}
+ul.devices li{
+  flex:1 1 150px; background:var(--panel); border-radius:6px; padding:5px 7px;
+  font-size:11.5px; color:var(--muted);
+}
+ul.devices b{color:var(--fg); display:block; font-size:12px;}
+.readouts{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+.readout{
+  flex:1 1 140px; background:var(--panel); border-radius:8px; padding:6px 8px;
+}
+.readout .k{font-size:10.5px; color:var(--muted);}
+.readout .v{font-size:15px; font-weight:600;}
+button{
+  font-size:12px; padding:5px 10px; border-radius:6px; border:1px solid var(--grid);
+  background:var(--panel); color:var(--fg); cursor:pointer;
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Memory bandwidth sets tokens per second</h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mfrac><mi>tokens</mi><mi>s</mi></mfrac>
+      <mo>&amp;#8776;</mo>
+      <mfrac><mi>BW</mi><msub><mi>W</mi><mtext>active</mtext></msub></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      BW — memory bandwidth (GB/s), the control below · W<sub>active</sub> — bytes of active weights every token must re-read from memory (fixed at 16&amp;nbsp;GB here) · tokens/s — generation speed.
+    </div>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 300&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; aria-label=&quot;Pipeline diagram: memory feeding compute through a bandwidth-limited pipe&quot;>
+    <!-- memory box -->
+    <rect x=&quot;20&quot; y=&quot;40&quot; width=&quot;150&quot; height=&quot;70&quot; rx=&quot;8&quot; fill=&quot;var(--mem)&quot; opacity=&quot;0.18&quot; stroke=&quot;var(--mem)&quot;/>
+    <text x=&quot;95&quot; y=&quot;63&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--fg)&quot;>Memory pool</text>
+    <text x=&quot;95&quot; y=&quot;78&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>16 GB active weights</text>
+    <text x=&quot;95&quot; y=&quot;93&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>re-read every token</text>
+
+    <!-- pipe -->
+    <rect id=&quot;pipe&quot; x=&quot;170&quot; y=&quot;70&quot; width=&quot;290&quot; height=&quot;10&quot; fill=&quot;var(--pipe)&quot;/>
+    <text x=&quot;315&quot; y=&quot;30&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>pipe width = memory bandwidth</text>
+    <g id=&quot;particles&quot;></g>
+
+    <!-- compute box -->
+    <rect x=&quot;460&quot; y=&quot;40&quot; width=&quot;150&quot; height=&quot;70&quot; rx=&quot;8&quot; fill=&quot;var(--compute)&quot; opacity=&quot;0.18&quot; stroke=&quot;var(--compute)&quot;/>
+    <text x=&quot;535&quot; y=&quot;63&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--fg)&quot;>Compute units</text>
+    <text x=&quot;535&quot; y=&quot;78&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>matrix-multiply engines</text>
+    <text x=&quot;535&quot; y=&quot;93&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>mostly idle, waiting on data</text>
+
+    <!-- utilization bar -->
+    <text x=&quot;460&quot; y=&quot;128&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>compute utilization</text>
+    <rect x=&quot;460&quot; y=&quot;133&quot; width=&quot;150&quot; height=&quot;12&quot; rx=&quot;3&quot; fill=&quot;none&quot; stroke=&quot;var(--grid)&quot;/>
+    <rect id=&quot;utilBar&quot; x=&quot;460&quot; y=&quot;133&quot; height=&quot;12&quot; rx=&quot;3&quot; fill=&quot;var(--util)&quot;/>
+    <text id=&quot;utilLabel&quot; x=&quot;535&quot; y=&quot;160&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--fg)&quot;></text>
+
+    <!-- speedometer (linear, log-scaled) -->
+    <text x=&quot;340&quot; y=&quot;200&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--fg)&quot;>tokens / second</text>
+    <line x1=&quot;40&quot; y1=&quot;230&quot; x2=&quot;640&quot; y2=&quot;230&quot; stroke=&quot;var(--grid)&quot; stroke-width=&quot;2&quot;/>
+    <g id=&quot;ticks&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;></g>
+    <polygon id=&quot;needle&quot; points=&quot;0,220 -6,210 6,210&quot; fill=&quot;var(--needle)&quot;/>
+    <text id=&quot;speedLabel&quot; x=&quot;340&quot; y=&quot;255&quot; text-anchor=&quot;middle&quot; font-size=&quot;15&quot; font-weight=&quot;600&quot; fill=&quot;var(--fg)&quot;></text>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;bw&quot;>Memory bandwidth (GB/s) — the width of the pipe</label>
+    <input type=&quot;range&quot; id=&quot;bw&quot; min=&quot;0&quot; max=&quot;1000&quot; step=&quot;1&quot; value=&quot;500&quot;>
+    <button id=&quot;playBtn&quot; style=&quot;display:none; margin-top:6px;&quot;>&amp;#9654; play flow animation</button>
+  </div>
+
+  <ul class=&quot;devices&quot;>
+    <li><b>iPhone A18 Pro</b>60 GB/s unified memory</li>
+    <li><b>Apple M4 Max</b>546 GB/s unified memory (shared CPU/GPU pool)</li>
+    <li><b>NVIDIA B200</b>8000 GB/s HBM3e (stacked next to the chip)</li>
+  </ul>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>tokens / s ≈ BW ÷ 16 GB</div><div class=&quot;v&quot; id=&quot;rTps&quot;>–</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>time for 500-token answer</div><div class=&quot;v&quot; id=&quot;rTime&quot;>–</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>compute utilization</div><div class=&quot;v&quot; id=&quot;rUtil&quot;>–</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;k&quot;>speed vs. iPhone A18 Pro</div><div class=&quot;v&quot; id=&quot;rRel&quot;>–</div></div>
+  </div>
+</div>
+
+<script>
+const W_ACTIVE_GB = 16;               // GB of active weights streamed per token
+const BW_MIN = 60, BW_MAX = 8000;     // GB/s, slider range
+const logMin = Math.log10(BW_MIN), logMax = Math.log10(BW_MAX);
+
+// Rough published peak FP16/BF16 compute throughput anchors (GFLOP/s), used only
+// to show that arithmetic units are never the bottleneck (roofline utilization).
+const anchors = [
+  {bw:60,   peak:3500},
+  {bw:546,  peak:34000},
+  {bw:8000, peak:9.0e6}
+];
+function peakFlops(bw){
+  const pts = anchors.map(a=>({x:Math.log10(a.bw), y:Math.log10(a.peak)}));
+  const x = Math.log10(bw);
+  for(let i=0;i<pts.length-1;i++){
+    if(x>=pts[i].x &amp;&amp; x<=pts[i+1].x){
+      const t=(x-pts[i].x)/(pts[i+1].x-pts[i].x);
+      return Math.pow(10, pts[i].y + t*(pts[i+1].y-pts[i].y));
+    }
+  }
+  return anchors[anchors.length-1].peak;
+}
+
+const slider = document.getElementById('bw');
+const pipe = document.getElementById('pipe');
+const utilBar = document.getElementById('utilBar');
+const utilLabel = document.getElementById('utilLabel');
+const speedLabel = document.getElementById('speedLabel');
+const needle = document.getElementById('needle');
+const ticksG = document.getElementById('ticks');
+const rTps = document.getElementById('rTps');
+const rTime = document.getElementById('rTime');
+const rUtil = document.getElementById('rUtil');
+const rRel = document.getElementById('rRel');
+const playBtn = document.getElementById('playBtn');
+
+const TPS_MIN = BW_MIN / W_ACTIVE_GB;   // 3.75
+const TPS_MAX = BW_MAX / W_ACTIVE_GB;   // 500
+const tLogMin = Math.log10(TPS_MIN), tLogMax = Math.log10(TPS_MAX);
+const trackX0 = 40, trackX1 = 640;
+
+function sliderToBW(v){
+  const t = v/1000;
+  return Math.pow(10, logMin + t*(logMax-logMin));
+}
+function normLog(v, lo, hi){ return (Math.log10(v)-lo)/(hi-lo); }
+
+// ticks on speedometer
+[[TPS_MIN,'iPhone 3.75'], [34.1,'M4 Max 34'], [TPS_MAX,'B200 500']].forEach(([val,label])=>{
+  const x = trackX0 + normLog(val, tLogMin, tLogMax)*(trackX1-trackX0);
+  const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+  tick.setAttribute('x1', x); tick.setAttribute('x2', x);
+  tick.setAttribute('y1', 224); tick.setAttribute('y2', 236);
+  tick.setAttribute('stroke', 'var(--grid)');
+  ticksG.appendChild(tick);
+  const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x', x); t.setAttribute('y', 245);
+  t.textContent = label;
+  ticksG.appendChild(t);
+});
+
+let bw = sliderToBW(+slider.value);
+
+function render(){
+  bw = sliderToBW(+slider.value);
+  const tNorm = (Math.log10(bw)-logMin)/(logMax-logMin);
+
+  // pipe width: 6px at min bandwidth, 70px at max, log-scaled
+  const pipeW = 6 + tNorm*64;
+  pipe.setAttribute('y', 75 - pipeW/2);
+  pipe.setAttribute('height', pipeW);
+
+  const tps = bw / W_ACTIVE_GB;
+  const timeSec = 500 / tps;
+  const requiredGFlops = bw;               // derivation: 2 FLOPs/param, 2 bytes/param -> 1 FLOP/byte
+  const peak = peakFlops(bw);
+  const util = 100 * requiredGFlops / peak;
+  const relSpeed = tps / TPS_MIN;
+
+  // speedometer needle
+  const nx = trackX0 + normLog(tps, tLogMin, tLogMax)*(trackX1-trackX0);
+  needle.setAttribute('transform', `translate(${nx},0)`);
+  speedLabel.textContent = `≈ ${tps<10?tps.toFixed(2):Math.round(tps)} tokens/s`;
+
+  // utilization bar (visual floor so it stays visible even at <0.1%)
+  const barMaxPct = 5; // full-scale reference for the drawn bar
+  const barW = Math.max(3, Math.min(150, (util/barMaxPct)*150));
+  utilBar.setAttribute('width', barW);
+  utilLabel.textContent = `≈ ${util.toFixed(2)}%  (arithmetic idle)`;
+
+  // readouts
+  rTps.textContent = (tps<10? tps.toFixed(2): Math.round(tps));
+  rTime.textContent = timeSec<10 ? timeSec.toFixed(1)+' s' : Math.round(timeSec)+' s';
+  rUtil.textContent = util.toFixed(2)+' %';
+  rRel.textContent = relSpeed.toFixed(1)+'×';
+}
+
+// --- flow particle animation ---
+const NPARTS = 6;
+const particlesG = document.getElementById('particles');
+const parts = [];
+for(let i=0;i<NPARTS;i++){
+  const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('r', 4);
+  c.setAttribute('fill', 'var(--pipe)');
+  particlesG.appendChild(c);
+  parts.push({el:c, t:i/NPARTS});
+}
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = !reduced;
+if(reduced){ playBtn.style.display = 'inline-block'; }
+playBtn.addEventListener('click', ()=>{ playing = true; playBtn.style.display='none'; });
+
+let lastT = performance.now();
+function frame(now){
+  const dt = (now-lastT)/1000; lastT = now;
+  if(playing){
+    const tNorm = (Math.log10(bw)-logMin)/(logMax-logMin);
+    const speed = 0.25 + tNorm*2.75; // cycles/sec, illustrative only
+    parts.forEach(p=>{
+      p.t = (p.t + dt*speed) % 1;
+    });
+  }
+  parts.forEach(p=>{
+    const x = 170 + p.t*(460-170);
+    p.el.setAttribute('cx', x);
+    p.el.setAttribute('cy', 75);
+  });
+  requestAnimationFrame(frame);
+}
+
+slider.addEventListener('input', render);
+render();
+requestAnimationFrame(frame);
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;bandwidth-sets-speed&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Memory bandwidth, not arithmetic speed, sets tokens per second"
+  ></iframe>
+</section>
+
+<section class="scene" id="energy-equals-power-times-time">
+  <h3>Energy per query is power times latency: E = P·τ</h3>
+  <div class="caption">Faster memory shortens latency τ — the time to produce the answer, not the answer itself. The equation <math><msub><mi>E</mi><mrow><mi>query</mi></mrow></msub><mo>=</mo><mi>P</mi><mo>·</mo><mi>τ</mi></math> means a chip that halves both power and time is 2× better per watt but 4× better per joule.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="energy-equals-power-times-time"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Energy = Power × Latency</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --text:#1b1c1e;
+    --muted:#5a5d63;
+    --grid:#d8dadd;
+    --power:#c0473a;
+    --time:#2a6fb0;
+    --energy:#3a8f5c;
+    --dashed:#9a9da3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171a;
+      --panel:#1e2124;
+      --text:#e9eaec;
+      --muted:#a7abb2;
+      --grid:#3a3d42;
+      --power:#e0776a;
+      --time:#6fa8dc;
+      --energy:#5fbf85;
+      --dashed:#6a6d73;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  h1{font-size:15px;font-weight:600;text-align:center;margin:4px 0 2px;color:var(--muted);}
+  math{font-size:19px;}
+  .eqBlock{text-align:center;margin-bottom:2px;}
+  .legend{font-size:12px;color:var(--muted);text-align:center;line-height:1.5;margin:2px 6px 12px;}
+  .controls{display:flex;justify-content:center;margin-bottom:8px;}
+  button{font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button:active{transform:translateY(1px);}
+  svg{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);
+    border-radius:10px;border:1px solid var(--grid);}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:12px;font-size:13px;}
+  .readout{background:var(--panel);border:1px solid var(--grid);border-radius:8px;
+    padding:6px 10px;min-width:120px;text-align:center;}
+  .readout b{display:block;font-size:15px;}
+  ul.effList{list-style:none;margin:10px 6px 0;padding:0;font-size:12.5px;}
+  ul.effList li{background:var(--panel);border:1px solid var(--grid);border-radius:6px;
+    padding:5px 9px;margin:4px 0;}
+  .note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Energy per query: E<sub>query</sub> = P · τ</h1>
+  <div class=&quot;eqBlock&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>E</mi><mtext>query</mtext></msub>
+      <mo>=</mo>
+      <mi>P</mi><mo>(</mo><mi>m</mi><mo>,</mo><mi>h</mi><mo>,</mo><mi>q</mi><mo>)</mo>
+      <mo>·</mo>
+      <mi>τ</mi><mo>(</mo><mi>m</mi><mo>,</mo><mi>h</mi><mo>,</mo><mi>q</mi><mo>)</mo>
+    </math>
+  </div>
+  <div class=&quot;legend&quot;>
+    E<sub>query</sub> — energy to answer one query (J) &amp;nbsp;·&amp;nbsp;
+    P — average power draw while answering (W), a function of model m, hardware h, query q &amp;nbsp;·&amp;nbsp;
+    τ — latency: seconds from question to final token, also a function of m, h, q
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;>Switch to hypothetical next-gen chip (P and τ each halved)</button>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 340&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; aria-label=&quot;Power-time-energy diagram&quot;></svg>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;><span>Power P</span><b id=&quot;roP&quot;>— W</b></div>
+    <div class=&quot;readout&quot;><span>Latency τ</span><b id=&quot;roTau&quot;>— s</b></div>
+    <div class=&quot;readout&quot;><span>Energy E = P·τ</span><b id=&quot;roE&quot;>— J</b></div>
+    <div class=&quot;readout&quot;><span>Units check</span><b>W · s = J</b></div>
+  </div>
+
+  <ul class=&quot;effList&quot;>
+    <li id=&quot;liWatt&quot;>Per-watt improvement: 1.0× (compares power draw only)</li>
+    <li id=&quot;liJoule&quot;>Per-joule improvement: 1.0× (compares power × time together)</li>
+  </ul>
+
+  <div class=&quot;note&quot;>
+    Example query: &quot;do ice floes displace water when they melt?&quot; run on an M4 Max laptop chip.
+    Per-watt sets thermal limits (how much heat a laptop can shed); per-joule sets battery life and grid energy cost.
+  </div>
+</div>
+
+<script>
+(function(){
+  const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('diagram');
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- real numbers (M4 Max, ice-floats query) ----
+  const CURRENT = { P: 45.0, tau: 8.0 };      // watts, seconds
+  const NEXTGEN = { P: 22.5, tau: 4.0 };      // both halved
+
+  // ---- plot geometry ----
+  const x0 = 80, y0 = 290, xmax = 620, ymin = 20;
+  const tauMax = 10, pMax = 50;
+  const sx = (xmax - x0) / tauMax;
+  const sy = (y0 - ymin) / pMax;
+
+  function mk(tag, attrs){
+    const el = document.createElementNS(svgNS, tag);
+    for(const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  // axes
+  svg.appendChild(mk('line',{x1:x0,y1:y0,x2:xmax,y2:y0,stroke:'var(--grid)','stroke-width':1.5}));
+  svg.appendChild(mk('line',{x1:x0,y1:y0,x2:x0,y2:ymin,stroke:'var(--grid)','stroke-width':1.5}));
+
+  // ticks
+  for(let t=0;t<=tauMax;t+=2){
+    const px = x0 + t*sx;
+    svg.appendChild(mk('line',{x1:px,y1:y0,x2:px,y2:y0+5,stroke:'var(--grid)'}));
+    const lab = mk('text',{x:px,y:y0+18,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});
+    lab.textContent = t; svg.appendChild(lab);
+  }
+  for(let p=0;p<=pMax;p+=10){
+    const py = y0 - p*sy;
+    svg.appendChild(mk('line',{x1:x0-5,y1:py,x2:x0,y2:py,stroke:'var(--grid)'}));
+    const lab = mk('text',{x:x0-9,y:py+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'});
+    lab.textContent = p; svg.appendChild(lab);
+  }
+
+  // axis titles
+  const xTitle = mk('text',{x:(x0+xmax)/2,y:334,'text-anchor':'middle','font-size':13,fill:'var(--text)'});
+  xTitle.textContent = 'τ — latency (s)'; svg.appendChild(xTitle);
+  const yTitle = mk('text',{x:16,y:(ymin+y0)/2,'text-anchor':'middle','font-size':13,fill:'var(--text)',
+    transform:`rotate(-90 16 ${(ymin+y0)/2})`});
+  yTitle.textContent = 'P — power draw (W)'; svg.appendChild(yTitle);
+
+  // dashed baseline rectangle (always current chip, for comparison)
+  const baseRect = mk('rect',{x:x0,y:y0-CURRENT.P*sy,width:CURRENT.tau*sx,height:CURRENT.P*sy,
+    fill:'none',stroke:'var(--dashed)','stroke-dasharray':'5,4','stroke-width':1.5});
+  svg.appendChild(baseRect);
+  const baseLab = mk('text',{x:x0+CURRENT.tau*sx+6,y:y0-CURRENT.P*sy-6,'font-size':11,fill:'var(--muted)'});
+  baseLab.textContent = 'baseline: current chip'; svg.appendChild(baseLab);
+
+  // solid rectangle (animated state)
+  const rect = mk('rect',{x:x0,y:y0,width:1,height:1,fill:'var(--energy)','fill-opacity':0.35,
+    stroke:'var(--energy)','stroke-width':2});
+  svg.appendChild(rect);
+
+  const pLab = mk('text',{x:x0+8,y:0,'font-size':12,fill:'var(--power)'});
+  svg.appendChild(pLab);
+  const tLab = mk('text',{x:0,y:y0-8,'font-size':12,fill:'var(--time)'});
+  svg.appendChild(tLab);
+  const eLab = mk('text',{x:0,y:0,'text-anchor':'middle','font-size':13,fill:'var(--text)','font-weight':'bold'});
+  svg.appendChild(eLab);
+
+  // ---- state / animation ----
+  let target = {...CURRENT};
+  let display = {...CURRENT};
+  let toggled = false;
+
+  function draw(){
+    const w = display.tau*sx, h = display.P*sy;
+    const rx = x0, ry = y0-h;
+    rect.setAttribute('x', rx); rect.setAttribute('y', ry);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+
+    pLab.setAttribute('x', rx+8); pLab.setAttribute('y', ry+16);
+    pLab.textContent = 'P = ' + display.P.toFixed(1) + ' W';
+
+    tLab.setAttribute('x', rx+8); tLab.setAttribute('y', y0-8);
+    tLab.textContent = 'τ = ' + display.tau.toFixed(1) + ' s';
+
+    const E = display.P*display.tau;
+    eLab.setAttribute('x', rx+w/2); eLab.setAttribute('y', ry+h/2+5);
+    eLab.textContent = 'E = ' + E.toFixed(0) + ' J';
+
+    document.getElementById('roP').textContent = display.P.toFixed(1) + ' W';
+    document.getElementById('roTau').textContent = display.tau.toFixed(1) + ' s';
+    document.getElementById('roE').textContent = E.toFixed(0) + ' J';
+
+    const perWatt = CURRENT.P/display.P;
+    const perJoule = (CURRENT.P*CURRENT.tau)/(display.P*display.tau);
+    document.getElementById('liWatt').textContent =
+      'Per-watt improvement: ' + perWatt.toFixed(1) + '× (compares power draw only)';
+    document.getElementById('liJoule').textContent =
+      'Per-joule improvement: ' + perJoule.toFixed(1) + '× (compares power × time together)';
+  }
+
+  function animate(){
+    const dP = target.P - display.P, dT = target.tau - display.tau;
+    if(Math.abs(dP) < 0.02 &amp;&amp; Math.abs(dT) < 0.02){
+      display.P = target.P; display.tau = target.tau;
+      draw();
+      return;
+    }
+    display.P += dP*0.14; display.tau += dT*0.14;
+    draw();
+    requestAnimationFrame(animate);
+  }
+
+  document.getElementById('toggleBtn').addEventListener('click', function(){
+    toggled = !toggled;
+    target = toggled ? {...NEXTGEN} : {...CURRENT};
+    this.textContent = toggled
+      ? 'Switch back to current chip (M4 Max)'
+      : 'Switch to hypothetical next-gen chip (P and τ each halved)';
+    if(reduced){ display = {...target}; draw(); }
+    else requestAnimationFrame(animate);
+  });
+
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;energy-equals-power-times-time&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Energy per query is power times latency: E = P·τ"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">The physics of the last part said cost is set by bytes moved per token. This part introduces the paper's metric — accuracy per watt — and the two engineering tricks (sparse expert routing and 4-bit weights) that let a 120-billion-parameter model run on a laptop at small-model cost.</div>
+</header>
+<section class="scene" id="ipw-definition">
+  <h3>Intelligence per watt scores smartness and power draw in one ratio</h3>
+  <div class="caption">Joules told us what an answer costs but nothing about whether it's right — this ratio fixes that by putting accuracy in the numerator and watts in the denominator. The 2025 champion pair, GPT-OSS-120B on the M4 Max, scores 4.18×10⁻³ accuracy per watt across 1M real queries.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="ipw-definition"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Intelligence per Watt</title>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --panel:#ffffff;
+  --fg:#1a1a1e;
+  --muted:#5a5a66;
+  --accent:#1f6feb;
+  --accent2:#c2410c;
+  --card-border:#d8d8e0;
+  --bar-bg:#e3e3ea;
+  --highlight-bg:#eaf1ff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15161a;
+    --panel:#1e2026;
+    --fg:#eceef2;
+    --muted:#9a9ca6;
+    --accent:#5b9bff;
+    --accent2:#ff9159;
+    --card-border:#3a3c46;
+    --bar-bg:#33353d;
+    --highlight-bg:#233248;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+h1.head{font-size:15px;margin:0 0 10px;text-align:center;color:var(--muted);
+  letter-spacing:.3px;font-weight:600;}
+.eq-block{background:var(--panel);border:1px solid var(--card-border);
+  border-radius:10px;padding:10px 8px 6px;margin-bottom:12px;}
+math{font-size:17px;}
+.legend{margin-top:6px;}
+.legend ul{list-style:none;margin:0;padding:0;font-size:12px;color:var(--muted);}
+.legend li{padding:2px 0;line-height:1.4;}
+.legend b{color:var(--fg);font-weight:600;}
+.controls{margin-bottom:12px;}
+.control-label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.buttons{display:flex;flex-wrap:wrap;gap:6px;}
+button{font-size:12px;padding:7px 10px;border-radius:7px;border:1px solid var(--card-border);
+  background:var(--panel);color:var(--fg);cursor:pointer;flex:1 1 auto;min-width:110px;}
+button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.content{display:flex;flex-wrap:wrap;gap:14px;}
+.cards{flex:1 1 300px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media (max-width:420px){.cards{grid-template-columns:1fr;}}
+.card{background:var(--panel);border:1px solid var(--card-border);border-radius:8px;
+  padding:6px 8px;transition:background .3s, border-color .3s;}
+.card.sel{background:var(--highlight-bg);border-color:var(--accent);}
+.card-title{font-size:11.5px;font-weight:600;margin-bottom:2px;}
+.card-sub{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.card math{font-size:12.5px;}
+.ranking{flex:1 1 220px;min-width:200px;}
+.ranking-label{font-size:12px;color:var(--muted);margin-bottom:4px;}
+svg{width:100%;height:auto;display:block;max-width:100%;}
+.note{font-size:10.5px;color:var(--accent2);margin-top:4px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1 class=&quot;head&quot;>Intelligence per Watt — accuracy divided by power</h1>
+
+  <div class=&quot;eq-block&quot;>
+    <math display=&quot;block&quot;>
+      <mi>IPW</mi><mo>(</mo><mi>m</mi><mo>,</mo><mi>h</mi><mo>)</mo>
+      <mo>=</mo>
+      <mfrac>
+        <mrow><msub><mi>E</mi><mrow><mi>q</mi><mo>~</mo><mi>Q</mi></mrow></msub>
+          <mo>[</mo><mtext>acc</mtext><mo>(</mo><mi>m</mi><mo>,</mo><mi>q</mi><mo>)</mo><mo>]</mo></mrow>
+        <mrow><msub><mi>E</mi><mrow><mi>q</mi><mo>~</mo><mi>Q</mi></mrow></msub>
+          <mo>[</mo><mi>P</mi><mo>(</mo><mi>m</mi><mo>,</mo><mi>h</mi><mo>,</mo><mi>q</mi><mo>)</mo><mo>]</mo></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      <ul>
+        <li><b>m, h</b> — the model and the hardware it runs on (the pair being scored)</li>
+        <li><b>Q</b> — query distribution: 1,000,000 real single-turn chat &amp;amp; reasoning queries</li>
+        <li><b>acc(m,q)</b> — 1 if model m answers query q correctly, else 0 (unitless)</li>
+        <li><b>P(m,h,q)</b> — power measured on hardware h while m answers q (watts)</li>
+        <li><b>E<sub>q~Q</sub>[ · ]</b> — average of that quantity over the query distribution</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;control-label&quot;>Choose a model–hardware pair — populates the equation and moves its bar in the ranking:</div>
+    <div class=&quot;buttons&quot; id=&quot;btnRow&quot;></div>
+  </div>
+
+  <div class=&quot;content&quot;>
+    <div class=&quot;cards&quot; id=&quot;cards&quot;></div>
+    <div class=&quot;ranking&quot;>
+      <div class=&quot;ranking-label&quot;>Ranked by intelligence per watt (accuracy ÷ power)</div>
+      <svg id=&quot;rankSvg&quot; viewBox=&quot;0 0 260 190&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+      <div class=&quot;note&quot; id=&quot;note&quot;></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// --- data: four illustrative model/hardware pairs (acc in [0,1], power in watts) ---
+const pairs = [
+  {name:&quot;Frontier cloud model&quot;, sub:&quot;large model · datacenter GPU cluster&quot;, acc:0.91, power:850},
+  {name:&quot;Tiny local model&quot;,     sub:&quot;small model · phone NPU&quot;,              acc:0.30, power:90},
+  {name:&quot;GPT-OSS-120B / M4 Max&quot;,sub:&quot;2025 champion pair&quot;,                   acc:0.78, power:186.6},
+  {name:&quot;Weak, hungry pair&quot;,    sub:&quot;old model · inefficient GPU&quot;,          acc:0.25, power:500}
+];
+pairs.forEach(p=> p.ipw = p.acc/p.power); // IPW = E[acc]/E[power], the paper's ratio
+
+let selected = 2; // start on the champion pair
+
+const supMap={'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+function toSup(s){return s.toString().split('').map(c=>supMap[c]||c).join('');}
+function sciParts(num){
+  const exp = Math.floor(Math.log10(Math.abs(num)));
+  const mant = num/Math.pow(10,exp);
+  return {mant:mant.toFixed(2), exp};
+}
+function mathSci(num){
+  const {mant,exp}=sciParts(num);
+  const sign = exp<0?'-':'';
+  return `<mn>${mant}</mn><mo>&amp;#215;</mo><msup><mn>10</mn><mrow><mo>${sign}</mo><mn>${Math.abs(exp)}</mn></mrow></msup>`;
+}
+function sciText(num){
+  const {mant,exp}=sciParts(num);
+  return `${mant}×10${toSup(exp)}`;
+}
+
+const btnRow = document.getElementById('btnRow');
+const cardsDiv = document.getElementById('cards');
+
+function buildButtons(){
+  btnRow.innerHTML='';
+  pairs.forEach((p,i)=>{
+    const b=document.createElement('button');
+    b.textContent = p.name;
+    b.dataset.i=i;
+    b.addEventListener('click',()=>{ selected=i; render(); });
+    btnRow.appendChild(b);
+  });
+}
+
+function buildCards(){
+  cardsDiv.innerHTML='';
+  pairs.forEach((p,i)=>{
+    const c=document.createElement('div');
+    c.className='card';
+    c.dataset.i=i;
+    c.innerHTML = `
+      <div class=&quot;card-title&quot;>${p.name}</div>
+      <div class=&quot;card-sub&quot;>${p.sub}</div>
+      <math display=&quot;block&quot;>
+        <mfrac>
+          <mrow><mn>${p.acc.toFixed(2)}</mn></mrow>
+          <mrow><mn>${p.power.toFixed(p.power<100?1:0)}</mn><mtext>&amp;nbsp;W</mtext></mrow>
+        </mfrac>
+        <mo>=</mo>
+        <mrow>${mathSci(p.ipw)}</mrow>
+      </math>`;
+    c.addEventListener('click',()=>{ selected=i; render(); });
+    cardsDiv.appendChild(c);
+  });
+}
+
+// --- ranking bar chart (SVG), animated with requestAnimationFrame ---
+const svg = document.getElementById('rankSvg');
+const W=260,H=190,padL=8,padR=56,barH=26,gap=10,topPad=14;
+let animId=null;
+let currentState = pairs.map(()=>({w:0}));
+
+function sortedOrder(){
+  return pairs.map((p,i)=>({...p,i})).sort((a,b)=>b.ipw-a.ipw);
+}
+function ns(tag){return document.createElementNS('http://www.w3.org/2000/svg',tag);}
+
+function drawFrame(widths){
+  svg.innerHTML='';
+  const order = sortedOrder();
+  const maxIpw = order[0].ipw;
+  const plotW = W-padL-padR;
+  order.forEach((p,rank)=>{
+    const y = topPad + rank*(barH+gap);
+    const target = (p.ipw/maxIpw)*plotW;
+    const w = widths ? widths[rank] : target;
+    const g = ns('g');
+    const rect = ns('rect');
+    rect.setAttribute('x',padL); rect.setAttribute('y',y);
+    rect.setAttribute('width',Math.max(2,w)); rect.setAttribute('height',barH);
+    rect.setAttribute('rx',4);
+    const isSel = p.i===selected;
+    rect.setAttribute('fill', isSel? getVar('--accent') : getVar('--bar-bg'));
+    g.appendChild(rect);
+
+    const rankLbl = ns('text');
+    rankLbl.setAttribute('x',padL+4); rankLbl.setAttribute('y',y-4);
+    rankLbl.setAttribute('font-size','9.5'); rankLbl.setAttribute('fill',getVar('--muted'));
+    rankLbl.textContent = `#${rank+1}  ${p.name}`;
+    g.appendChild(rankLbl);
+
+    const valLbl = ns('text');
+    valLbl.setAttribute('x', padL+Math.max(2,w)+6); valLbl.setAttribute('y', y+barH/2+4);
+    valLbl.setAttribute('font-size','10'); valLbl.setAttribute('fill', isSel? getVar('--accent'): getVar('--fg'));
+    valLbl.setAttribute('font-weight', isSel? '700':'400');
+    valLbl.textContent = sciText(p.ipw);
+    g.appendChild(valLbl);
+
+    svg.appendChild(g);
+  });
+  const axisLbl = ns('text');
+  axisLbl.setAttribute('x', padL); axisLbl.setAttribute('y', H-4);
+  axisLbl.setAttribute('font-size','9.5'); axisLbl.setAttribute('fill',getVar('--muted'));
+  axisLbl.textContent = 'bar length ∝ accuracy per watt';
+  svg.appendChild(axisLbl);
+}
+
+function getVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function animateBars(){
+  const order = sortedOrder();
+  const maxIpw = order[0].ipw;
+  const plotW = W-padL-padR;
+  const targets = order.map(p=>(p.ipw/maxIpw)*plotW);
+  if(reduceMotion){ drawFrame(targets); currentState = targets.map(w=>({w})); return; }
+  const starts = currentState.length===targets.length ? currentState.map(s=>s.w) : targets.map(()=>0);
+  const t0 = performance.now();
+  const dur = 450;
+  cancelAnimationFrame(animId);
+  function step(t){
+    const p = Math.min(1,(t-t0)/dur);
+    const eased = p<0.5 ? 2*p*p : -1+(4-2*p)*p;
+    const widths = targets.map((tv,i)=> starts[i] + (tv-starts[i])*eased);
+    drawFrame(widths);
+    currentState = widths.map(w=>({w}));
+    if(p<1) animId = requestAnimationFrame(step);
+  }
+  animId = requestAnimationFrame(step);
+}
+
+function render(){
+  // buttons
+  [...btnRow.children].forEach((b,i)=> b.classList.toggle('active', i===selected));
+  // cards
+  [...cardsDiv.children].forEach((c,i)=> c.classList.toggle('sel', i===selected));
+  // note
+  const p = pairs[selected];
+  const note = document.getElementById('note');
+  if(p.name.includes('M4 Max')){
+    note.textContent = `Matches paper's reported champion: ${sciText(p.ipw)} acc/W over 1M queries, 20+ models, 8 accelerators.`;
+  } else if (p.acc>0.85){
+    note.textContent = `Higher accuracy (${p.acc.toFixed(2)}) than the champion, but ${p.power.toFixed(0)} W power drags IPW down.`;
+  } else {
+    note.textContent = `IPW = ${sciText(p.ipw)} acc/W — check the ranking at right.`;
+  }
+  animateBars();
+}
+
+buildButtons();
+buildCards();
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;ipw-definition&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Intelligence per watt scores smartness and power draw in one ratio"
+  ></iframe>
+</section>
+
+<section class="scene" id="moe-active-params">
+  <h3>Mixture-of-experts models pay per token for active parameters, not stored ones</h3>
+  <div class="caption">GPT-OSS-120B stores 120B parameters but activates at most 20B per token — exactly the frugality that intelligence per watt (IPW) rewards. Toggle the architecture and watch which weight blocks light up: each word of the ice-floats answer costs like a 20B model, backed by 120B of stored knowledge.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="moe-active-params"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Mixture-of-Experts: active vs. total parameters</title>
+<style>
+:root{
+  --bg:#f7f7fa; --panel:#ffffff; --text:#1a1a1a; --muted:#5a5a66;
+  --accent:#2f7dd1; --tokenc:#c0392b; --idle:#d8d8e2; --line:#8888a0; --good:#1f8a52;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14141a; --panel:#1e1e28; --text:#eaeaf2; --muted:#a5a5b8;
+    --accent:#5b9bd9; --tokenc:#e2735f; --idle:#33333f; --line:#77778c; --good:#4fbf82;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;padding:12px;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+.scene{max-width:700px;margin:0 auto;}
+h2{font-size:1.05rem;margin:0 0 10px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+button{background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:7px 12px;font-size:0.85rem;cursor:pointer;}
+button:hover{border-color:var(--accent);}
+canvas{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);
+  border-radius:8px;border:1px solid var(--line);}
+ul.readouts{list-style:none;margin:10px 0;padding:0;display:flex;flex-wrap:wrap;gap:8px;}
+ul.readouts li{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:6px 10px;font-size:0.8rem;flex:1 1 140px;min-width:130px;}
+ul.readouts b{display:block;font-size:1.0rem;color:var(--accent);}
+.eqBlock{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:8px 12px;margin-top:8px;}
+math{font-size:1.0rem;color:var(--text);}
+.legend{font-size:0.72rem;color:var(--muted);margin:2px 0 10px;}
+.caption{font-size:0.75rem;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot; id=&quot;scene&quot;>
+<h2>Active vs. total parameters in a mixture-of-experts model</h2>
+
+<div class=&quot;controls&quot;>
+  <button id=&quot;archBtn&quot;>Architecture: <span id=&quot;archLabel&quot;>Dense 120B</span> (click to toggle)</button>
+  <button id=&quot;playBtn&quot;>Pause animation</button>
+</div>
+
+<canvas id=&quot;cv&quot; width=&quot;680&quot; height=&quot;420&quot; aria-label=&quot;expert routing diagram&quot;></canvas>
+
+<ul class=&quot;readouts&quot;>
+  <li>Total parameters stored<b id=&quot;roTotal&quot;>120 B</b></li>
+  <li>Active parameters / token<b id=&quot;roActive&quot;>120 B</b></li>
+  <li>Bytes streamed / token<b id=&quot;roBytes&quot;>240 GB</b></li>
+  <li>Experts lit this token<b id=&quot;roExperts&quot;>12 / 12</b></li>
+</ul>
+
+<div class=&quot;eqBlock&quot;>
+  <math display=&quot;block&quot;>
+    <msub><mi>B</mi><mtext>token</mtext></msub><mo>=</mo>
+    <msub><mi>N</mi><mtext>active</mtext></msub><mo>&amp;#183;</mo>
+    <msub><mi>b</mi><mtext>param</mtext></msub>
+  </math>
+  <div class=&quot;legend&quot;>B<sub>token</sub> — bytes streamed per token (GB) &amp;middot;
+    N<sub>active</sub> — parameters activated for that token (billions) &amp;middot;
+    b<sub>param</sub> — storage per parameter, 2 bytes (fp16)</div>
+  <math display=&quot;block&quot;>
+    <mn id=&quot;mnActive&quot;>120</mn><mo>&amp;#183;</mo><mn>2</mn><mtext> bytes&amp;#160;=&amp;#160;</mtext>
+    <mn id=&quot;mnBytes&quot;>240</mn><mtext>&amp;#160;GB / token</mtext>
+  </math>
+  <div class=&quot;legend&quot;>Total storage S<sub>total</sub> = N<sub>total</sub>&amp;middot;b<sub>param</sub> = 120&amp;middot;2 = <b>240 GB</b>, fixed regardless of routing.</div>
+</div>
+<div class=&quot;caption&quot;>Router picks a different pair of experts for each word; unlit blocks stay in storage but never move data this step.</div>
+</div>
+
+<script>
+const N_TOTAL = 120;        // billion parameters stored (weights)
+const N_ACTIVE_DENSE = 120; // billion parameters touched per token, dense
+const N_ACTIVE_MOE = 20;    // billion parameters touched per token, MoE
+const BYTES_PER_PARAM = 2;  // bytes stored per parameter (fp16)
+const NUM_EXPERTS = 12;
+const ACTIVE_EXPERTS_MOE = 2; // 2/12 = 1/6, matches 20/120
+
+const words = [&quot;Ice&quot;,&quot;floats&quot;,&quot;because&quot;,&quot;it&quot;,&quot;is&quot;,&quot;less&quot;,&quot;dense&quot;,&quot;than&quot;,&quot;liquid&quot;,&quot;water&quot;];
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+
+function col(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+let isMoE = false;
+let tokenIndex = 0;
+let lastSwitch = 0;
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = !reduceMotion;
+
+function selectedExperts(i){
+  let a = (i*7+3) % NUM_EXPERTS;
+  let b = (i*5+11) % NUM_EXPERTS;
+  if(b===a) b = (b+1) % NUM_EXPERTS;
+  return [a,b];
+}
+
+function litSet(i){
+  if(!isMoE){
+    const all=[]; for(let k=0;k<NUM_EXPERTS;k++) all.push(k);
+    return all;
+  }
+  return selectedExperts(i);
+}
+
+function updateReadouts(){
+  const active = isMoE ? N_ACTIVE_MOE : N_ACTIVE_DENSE;
+  const bytesGB = active * BYTES_PER_PARAM;
+  document.getElementById('roTotal').textContent = N_TOTAL + ' B';
+  document.getElementById('roActive').textContent = active + ' B';
+  document.getElementById('roBytes').textContent = bytesGB + ' GB';
+  const lit = litSet(tokenIndex).length;
+  document.getElementById('roExperts').textContent = lit + ' / ' + NUM_EXPERTS;
+  document.getElementById('mnActive').textContent = active;
+  document.getElementById('mnBytes').textContent = bytesGB;
+  document.getElementById('archLabel').textContent = isMoE ? 'MoE 120B (\u226420B active)' : 'Dense 120B';
+}
+
+function drawBox(x,y,w,h,label,fill,textc){
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = col('--line');
+  ctx.lineWidth = 1;
+  roundRect(x,y,w,h,6);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = textc || col('--text');
+  ctx.font = '12px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+
+  // Support multi-line labels (split on \n) and keep the top line clear
+  // of the box's top border by centering the whole text block vertically
+  // with generous padding from the edges.
+  const lines = String(label).split('\n');
+  const lineHeight = 14;
+  const totalHeight = lines.length * lineHeight;
+  const topPad = 10, bottomPad = 10;
+  let startY = y + h/2 - totalHeight/2 + lineHeight/2;
+  // clamp so the first line's top never gets closer than topPad to the box edge
+  const minStartY = y + topPad + lineHeight/2;
+  const maxStartY = y + h - bottomPad - totalHeight + lineHeight/2;
+  if(startY < minStartY) startY = minStartY;
+  if(lines.length > 1 &amp;&amp; startY > maxStartY) startY = maxStartY;
+
+  for(let i=0;i<lines.length;i++){
+    ctx.fillText(lines[i], x+w/2, startY + i*lineHeight);
+  }
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function arrow(x1,y1,x2,y2,color){
+  ctx.strokeStyle = color; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = col('--panel'); ctx.fillRect(0,0,W,H);
+
+  const word = words[tokenIndex % words.length];
+  // token input box
+  drawBox(16,20,120,36,'Token: &quot;'+word+'&quot;', col('--idle'), col('--tokenc'));
+  // router node
+  drawBox(280,20,120,36,'Router (learned switch)', col('--accent'), '#ffffff');
+  arrow(136,38,280,38,col('--line'));
+
+  // expert grid: 4 cols x 3 rows
+  const cols=4, rows=3, gx=40, gy=95, cw=140, ch=62, padX=20, padY=14;
+  const lit = litSet(tokenIndex);
+  const perExpertB = Math.round(N_TOTAL/NUM_EXPERTS*10)/10;
+  let idx=0;
+  const centers=[];
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const x = gx + c*(cw+padX);
+      const y = gy + r*(ch+padY);
+      const isLit = lit.includes(idx);
+      drawBox(x,y,cw,ch,'Expert '+(idx+1)+'\n\u2248'+perExpertB+'B',
+        isLit ? col('--accent') : col('--idle'),
+        isLit ? '#ffffff' : col('--muted'));
+      centers.push([x+cw/2,y]);
+      idx++;
+    }
+  }
+  // router -> lit experts
+  for(const i of lit){
+    arrow(340,56,centers[i][0],centers[i][1],col('--accent'));
+  }
+  // output box
+  const gridBottom = gy + rows*ch + (rows-1)*padY;
+  const outY = gridBottom + 14;
+  drawBox(200,outY,280,34,'Predicted next word \u2192 &quot;'+words[(tokenIndex+1)%words.length]+'&quot;',
+    col('--idle'), col('--good'));
+  for(const i of lit){
+    arrow(centers[i][0],centers[i][1]+ch, 340, outY, col('--good'));
+  }
+
+  ctx.fillStyle = col('--muted');
+  ctx.font='11px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('Each expert block stores its own weights; only lit blocks stream data this step.',16,H-10);
+}
+
+function frame(t){
+  if(playing &amp;&amp; t - lastSwitch > 1400){
+    tokenIndex++;
+    lastSwitch = t;
+    updateReadouts();
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+document.getElementById('archBtn').addEventListener('click', ()=>{
+  isMoE = !isMoE;
+  updateReadouts();
+  draw();
+});
+const playBtn = document.getElementById('playBtn');
+playBtn.textContent = playing ? 'Pause animation' : 'Play animation';
+playBtn.addEventListener('click', ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? 'Pause animation' : 'Play animation';
+  lastSwitch = performance.now();
+});
+
+updateReadouts();
+draw();
+window.__sceneReady = true;
+requestAnimationFrame(frame);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;moe-active-params&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Mixture-of-experts models pay per token for active parameters, not stored ones"
+  ></iframe>
+</section>
+
+<section class="scene" id="fp4-quantization">
+  <h3>4-bit weights cut energy 3–3.5× and cost only ~2.5 points of accuracy per step</h3>
+  <div class="caption">Generation is memory-bound, so dropping weights from 16-bit to 4-bit precision cuts energy 3–3.5×. Accuracy falls only ~2.5 points per halving of precision (16→8→4 bit), so Qwen3-14B at 4-bit (FP4) scores 49.0% on SuperGPQA, edging out Qwen3-4B at 16-bit (FP16) with 48.5%.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="fp4-quantization"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>4-bit weights: energy vs accuracy</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel-bg:#f4f6f9;
+  --text:#161a20;
+  --muted:#5a6472;
+  --accent:#2563eb;
+  --accent2:#dc2626;
+  --good:#16a34a;
+  --grid:#c7d0da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0e1420;
+    --panel-bg:#161e2c;
+    --text:#e8edf5;
+    --muted:#9aa6ba;
+    --accent:#60a5fa;
+    --accent2:#f87171;
+    --good:#4ade80;
+    --grid:#2b3648;
+  }
+}
+*{box-sizing:border-box;}
+html,body{background:var(--bg);color:var(--text);font-family:system-ui,Arial,sans-serif;margin:0;padding:0;}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h1{font-size:14px;margin:2px 0 8px;color:var(--muted);font-weight:600;}
+canvas{width:100%;max-width:100%;display:block;border-radius:8px;background:var(--bg);}
+.controls{margin-top:10px;}
+.controls label{display:block;font-size:13px;margin-bottom:4px;}
+input[type=range]{width:100%;}
+.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px;}
+button.play{margin-top:8px;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--grid);background:var(--panel-bg);color:var(--text);cursor:pointer;}
+ul.readouts{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px;}
+ul.readouts li{flex:1 1 130px;background:var(--panel-bg);border:1px solid var(--grid);border-radius:8px;padding:6px 8px;font-size:12px;}
+ul.readouts li b{display:block;font-size:15px;margin-top:2px;}
+.eq{margin-top:14px;padding:10px 12px;background:var(--panel-bg);border:1px solid var(--grid);border-radius:8px;}
+math{font-size:16px;}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.benchnote{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Weight precision → energy, speed, accuracy, storage</h1>
+  <canvas id=&quot;cv&quot; width=&quot;660&quot; height=&quot;380&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;prec&quot;>Weight precision (bits per weight) — sets Qwen3-14B's storage format</label>
+    <input type=&quot;range&quot; id=&quot;prec&quot; min=&quot;0&quot; max=&quot;2&quot; step=&quot;1&quot; value=&quot;0&quot;>
+    <div class=&quot;ticks&quot;><span>FP16 (16 bit)</span><span>FP8 (8 bit)</span><span>FP4 (4 bit)</span></div>
+    <button class=&quot;play&quot; id=&quot;playBtn&quot; hidden>▶ Play flow animation</button>
+  </div>
+
+  <ul class=&quot;readouts&quot;>
+    <li>Bytes / weight<b id=&quot;ro_bytes&quot;>2.0</b></li>
+    <li>Tokens generated / sec<b id=&quot;ro_tok&quot;>–</b></li>
+    <li>Energy per query (% of FP16)<b id=&quot;ro_e&quot;>100%</b></li>
+    <li>Qwen3-14B accuracy (SuperGPQA)<b id=&quot;ro_acc&quot;>–</b></li>
+  </ul>
+  <div class=&quot;benchnote&quot;>
+    SuperGPQA is a benchmark of graduate-level, multiple-choice science questions. The percentage shown is accuracy — the share of questions the model answers correctly — so higher is better.
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>E</mi><mtext>token</mtext></msub><mo>=</mo>
+      <msub><mi>E</mi><mtext>compute</mtext></msub><mo>+</mo>
+      <msub><mi>E</mi><mtext>mem</mtext></msub><mo>&amp;#183;</mo><mi>b</mi>
+    </math>
+    <div class=&quot;legend&quot;>
+      E<sub>token</sub> — energy to produce one token (relative units) &amp;middot;
+      E<sub>compute</sub> — fixed compute energy, independent of precision &amp;middot;
+      E<sub>mem</sub> — energy to move one byte of weights &amp;middot;
+      b — bytes per weight (2, 1, or 0.5 for FP16 / FP8 / FP4)
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- physical constants (auditable) ----------
+const BW = 546;              // GB/s, M4 Max unified-memory bandwidth
+const ACTIVE_PARAMS = 14e9;  // active parameters moved per token, Qwen3-14B (dense)
+const TOTAL_120B = 120e9;    // total parameters, GPT-OSS-120B
+const MEM_CAP = 128;         // GB, M4 Max unified memory capacity
+const E_COMPUTE = 0.2;       // relative fixed compute energy / token (precision-independent)
+const E_MEM = 1.0;           // relative memory energy per byte-per-weight moved / token
+const ACC_4B_FP16 = 48.5;    // % SuperGPQA, Qwen3-4B at FP16 (fixed reference)
+const ACC_14B_FP4 = 49.0;    // % SuperGPQA, Qwen3-14B at FP4 (anchor)
+const ACC_STEP = 2.5;        // pp accuracy gained per doubling of precision
+const PRECISIONS = [16,8,4];
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const slider = document.getElementById('prec');
+const playBtn = document.getElementById('playBtn');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let targetBits = 16, currentBits = 16, flowPhase = 0, lastTime = null, playing = false;
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function wrapLines(text, maxWidth){
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for(const w of words){
+    const test = cur ? cur+' '+w : w;
+    if(ctx.measureText(test).width > maxWidth &amp;&amp; cur){
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = test;
+    }
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+function layoutRects(w,h,stacked){
+  const gap = 14;
+  if(!stacked){
+    const pw = (w - 2*gap)/3;
+    return [{x:0,y:0,w:pw,h:h},{x:pw+gap,y:0,w:pw,h:h},{x:2*(pw+gap),y:0,w:pw,h:h}];
+  } else {
+    const ph = (h - 2*gap)/3;
+    return [{x:0,y:0,w:w,h:ph},{x:0,y:ph+gap,w:w,h:ph},{x:0,y:2*(ph+gap),w:w,h:ph}];
+  }
+}
+
+function panelBg(r){
+  ctx.fillStyle = cssVar('--panel-bg');
+  ctx.strokeStyle = cssVar('--grid');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(r.x,r.y,r.w,r.h,8) : ctx.rect(r.x,r.y,r.w,r.h);
+  ctx.fill(); ctx.stroke();
+}
+
+function drawPanelA(r, bits, bpw){
+  panelBg(r);
+  ctx.fillStyle = cssVar('--text'); ctx.font='12px system-ui'; ctx.textBaseline='alphabetic';
+  ctx.fillText('Weight storage', r.x+10, r.y+18);
+  ctx.fillStyle = cssVar('--muted'); ctx.font='11px system-ui';
+  ctx.fillText('FP'+Math.round(bits)+' \u00b7 '+bpw.toFixed(1)+' bytes/weight', r.x+10, r.y+32);
+  const count = Math.round(bits);
+  const size = Math.min(14,(r.w-20)/17);
+  let sx = r.x+10, sy = r.y+44;
+  const perRow = Math.max(1,Math.floor((r.w-20)/(size+2)));
+  ctx.fillStyle = cssVar('--accent');
+  for(let i=0;i<count;i++){
+    const col = i%perRow, row = Math.floor(i/perRow);
+    ctx.fillRect(sx+col*(size+2), sy+row*(size+2), size, size);
+  }
+  ctx.fillStyle = cssVar('--muted'); ctx.font='10px system-ui';
+  ctx.fillText('each square = 1 stored bit', r.x+10, r.y+r.h-10);
+}
+
+function drawPanelB(r, bits, bpw, phase){
+  panelBg(r);
+  ctx.fillStyle = cssVar('--text'); ctx.font='12px system-ui';
+  ctx.fillText('Memory pipe \u2192 speed', r.x+10, r.y+18);
+  const bytesPerToken = ACTIVE_PARAMS*bpw;
+  const tokPerSec = (BW*1e9)/bytesPerToken;
+  const minBpt = ACTIVE_PARAMS*0.5, maxBpt = ACTIVE_PARAMS*2;
+  const thick = 6 + (bytesPerToken-minBpt)/(maxBpt-minBpt)*26;
+  const px0 = r.x+10, px1 = r.x+r.w-56, py = r.y+56;
+  ctx.strokeStyle = cssVar('--grid'); ctx.fillStyle = cssVar('--accent')+'33';
+  ctx.lineWidth=1.5;
+  ctx.fillRect(px0, py-thick/2, px1-px0, thick);
+  ctx.strokeRect(px0, py-thick/2, px1-px0, thick);
+  // GPU box
+  ctx.strokeStyle = cssVar('--muted'); ctx.strokeRect(px1+4, py-20, 44, 40);
+  ctx.fillStyle = cssVar('--muted'); ctx.font='10px system-ui'; ctx.fillText('GPU', px1+12, py+4);
+  // particles
+  ctx.fillStyle = cssVar('--accent');
+  const n=5, pw=px1-px0;
+  for(let i=0;i<n;i++){
+    const x = px0 + ((phase*70 + i*(pw/n)) % pw);
+    ctx.beginPath(); ctx.arc(x, py, 3, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = cssVar('--muted'); ctx.font='10px system-ui';
+  ctx.fillText((bytesPerToken/1e9).toFixed(1)+' GB moved per token', px0, py+thick/2+16);
+
+  // speedometer
+  const cx = r.x + r.w/2, cy = r.y + r.h - 30, rad = Math.min(46, r.w/2-14);
+  const maxTok = (BW*1e9)/(ACTIVE_PARAMS*0.5);
+  ctx.strokeStyle = cssVar('--grid'); ctx.lineWidth=6;
+  ctx.beginPath(); ctx.arc(cx,cy,rad, Math.PI, 2*Math.PI); ctx.stroke();
+  const frac = Math.min(1, tokPerSec/maxTok);
+  const ang = Math.PI + frac*Math.PI;
+  ctx.strokeStyle = cssVar('--accent'); ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+rad*0.85*Math.cos(ang), cy+rad*0.85*Math.sin(ang)); ctx.stroke();
+  ctx.fillStyle = cssVar('--text'); ctx.font='11px system-ui'; ctx.textAlign='center';
+  ctx.fillText(tokPerSec.toFixed(1)+' tok/s', cx, cy+16);
+  ctx.font='9px system-ui'; ctx.fillStyle=cssVar('--muted');
+  ctx.fillText('speed of generation', cx, cy+28);
+  ctx.textAlign='left';
+
+  const eNow = E_COMPUTE + E_MEM*bpw, eFP16 = E_COMPUTE + E_MEM*2;
+  const pct = eNow/eFP16*100;
+  ctx.fillStyle = cssVar('--text'); ctx.font='11px system-ui';
+  ctx.fillText('energy/query: '+pct.toFixed(0)+'% of FP16', r.x+10, r.y+r.h-8);
+  return {tokPerSec, pct};
+}
+
+function drawPanelC(r, bits){
+  panelBg(r);
+  ctx.fillStyle = cssVar('--text'); ctx.font='12px system-ui';
+  ctx.fillText('Accuracy duel &amp; storage', r.x+10, r.y+18);
+
+  ctx.fillStyle = cssVar('--muted'); ctx.font='9px system-ui';
+  const subtitleMaxWidth = r.w-20;
+  const subtitleLines = wrapLines('SuperGPQA: grad-level science Q&amp;A benchmark, % = accuracy', subtitleMaxWidth);
+  let subY = r.y+29;
+  subtitleLines.forEach(line=>{ ctx.fillText(line, r.x+10, subY); subY += 10; });
+
+  const stepsUp = Math.log2(bits/4);
+  const acc14 = ACC_14B_FP4 + stepsUp*ACC_STEP;
+  const minAcc=40, maxAcc=60;
+  const barTop = subY+7, barBottom = r.y + (r.h*0.68);
+  const scaleY = v => barBottom - (v-minAcc)/(maxAcc-minAcc)*(barBottom-barTop);
+  // 4B baseline dashed line
+  const y48 = scaleY(ACC_4B_FP16);
+  ctx.setLineDash([4,3]); ctx.strokeStyle = cssVar('--muted');
+  ctx.beginPath(); ctx.moveTo(r.x+10,y48); ctx.lineTo(r.x+r.w-10,y48); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = cssVar('--muted'); ctx.font='9px system-ui'; ctx.textAlign='right';
+  ctx.fillText('Qwen3-4B baseline (FP16)', r.x+r.w-10, y48-4);
+  ctx.textAlign='left';
+  // bars
+  const bw=36, bx1=r.x+28, bx2=r.x+r.w/2+14;
+  ctx.fillStyle = cssVar('--accent');
+  ctx.fillRect(bx1, scaleY(acc14), bw, barBottom-scaleY(acc14));
+  ctx.fillStyle = cssVar('--muted');
+  ctx.fillRect(bx2, scaleY(ACC_4B_FP16), bw, barBottom-scaleY(ACC_4B_FP16));
+  ctx.fillStyle = cssVar('--text'); ctx.font='10px system-ui'; ctx.textAlign='center';
+  ctx.fillText('Qwen3-14B', bx1+bw/2, barBottom+12);
+  ctx.fillText(acc14.toFixed(1)+'%', bx1+bw/2, scaleY(acc14)-4);
+  ctx.fillText('Qwen3-4B', bx2+bw/2, barBottom+12);
+  // value label placed inside the bar (below its top edge) so it never collides
+  // with the dashed baseline label, which is right-aligned along the same line
+  ctx.fillStyle = cssVar('--bg');
+  ctx.fillText('48.5%', bx2+bw/2, scaleY(ACC_4B_FP16)+14);
+  ctx.textAlign='left';
+
+  // storage gauge
+  const bpw = bits/8;
+  const storageGB = TOTAL_120B*bpw/1e9;
+  const gy = r.y+r.h-26, gx = r.x+16, gw = r.w-32, maxScale=260, cap=128;
+  ctx.strokeStyle = cssVar('--grid'); ctx.strokeRect(gx,gy,gw,12);
+  const fillW = Math.min(gw, storageGB/maxScale*gw);
+  ctx.fillStyle = storageGB<=cap ? cssVar('--good') : cssVar('--accent2');
+  ctx.fillRect(gx,gy,fillW,12);
+  const capX = gx + cap/maxScale*gw;
+  ctx.strokeStyle = cssVar('--text'); ctx.beginPath(); ctx.moveTo(capX,gy-4); ctx.lineTo(capX,gy+16); ctx.stroke();
+  ctx.fillStyle = cssVar('--text'); ctx.font='9px system-ui';
+  ctx.fillText('128 GB capacity', Math.min(capX+3, gx+gw-90), gy-6);
+  ctx.fillStyle = cssVar('--muted'); ctx.font='10px system-ui';
+  ctx.fillText('GPT-OSS-120B @ FP'+Math.round(bits)+': '+storageGB.toFixed(0)+' GB', gx, gy-14);
+  return acc14;
+}
+
+function resizeCanvas(){
+  const cssW = cv.clientWidth || 660;
+  const stacked = cssW < 560;
+  const cssH = stacked ? 620 : 380;
+  const dpr = window.devicePixelRatio || 1;
+  cv.style.height = cssH+'px';
+  cv.width = cssW*dpr; cv.height = cssH*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  cv.__stacked = stacked; cv.__w = cssW; cv.__h = cssH;
+}
+
+function draw(){
+  const w = cv.__w, h = cv.__h, stacked = cv.__stacked;
+  ctx.clearRect(0,0,w,h);
+  const rects = layoutRects(w,h,stacked);
+  const bits = currentBits, bpw = bits/8;
+  drawPanelA(rects[0], bits, bpw);
+  const b = drawPanelB(rects[1], bits, bpw, flowPhase);
+  const acc = drawPanelC(rects[2], bits);
+
+  document.getElementById('ro_bytes').textContent = bpw.toFixed(1);
+  document.getElementById('ro_tok').textContent = b.tokPerSec.toFixed(1);
+  document.getElementById('ro_e').textContent = Math.round(b.pct)+'%';
+  document.getElementById('ro_acc').textContent = acc.toFixed(1)+'%';
+}
+
+function loop(ts){
+  if(lastTime===null) lastTime=ts;
+  const dt = Math.min(0.05,(ts-lastTime)/1000);
+  lastTime = ts;
+  const diff = targetBits - currentBits;
+  if(Math.abs(diff) > 0.01) currentBits += diff*Math.min(1,dt*6);
+  else currentBits = targetBits;
+  const bpw = currentBits/8;
+  const tok = (BW*1e9)/(ACTIVE_PARAMS*bpw);
+  flowPhase += dt*(tok/40);
+  draw();
+  if(playing) requestAnimationFrame(loop); else lastTime=null;
+}
+
+slider.addEventListener('input', ()=>{
+  targetBits = PRECISIONS[+slider.value];
+  if(!playing){ currentBits = targetBits; draw(); }
+});
+
+playBtn.addEventListener('click', ()=>{
+  playing = true; playBtn.hidden = true; lastTime=null;
+  requestAnimationFrame(loop);
+});
+
+window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
+
+// init
+resizeCanvas();
+draw();
+if(!reduced){ playing = true; requestAnimationFrame(loop); }
+else { playBtn.hidden = false; }
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;fp4-quantization&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="4-bit weights cut energy 3–3.5× and cost only ~2.5 points of accuracy per step"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing tech</h2>
+  <div class="part-lede">Now we have a fair scoreboard and a capable local model. This part runs the head-to-head against the cloud on 1M real queries: where local models win, where they still fail, why cloud silicon is still more efficient per query — and why routing queries between the two saves 60–80% of total energy anyway.</div>
+</header>
+<section class="scene" id="ensemble-coverage">
+  <h3>One local model answers 71.4% of real queries; the local ensemble covers 88.7%</h3>
+  <div class="caption">GPT-OSS-120B alone answers 71.4% of the 1M queries; adding more local models lifts the union of correct answers to 88.7%. Their error sets only partially overlap, so diversity buys what scaling one model doesn't.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="ensemble-coverage"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Ensemble coverage of local models</title>
+<style>
+:root{
+  --bg:#f7f7f9; --text:#1b1b1f; --muted:#5a5d68; --panel:#ffffff; --border:#d9d9e2;
+  --dot-off:#c7c7d1;
+  --m1:#2563eb; --m2:#16a34a; --m3:#ea580c; --m4:#9333ea;
+  --accent:#dc2626;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#101218; --text:#e8e9ee; --muted:#a2a6b3; --panel:#1b1e26; --border:#333849;
+    --dot-off:#3a3f4c;
+    --m1:#60a5fa; --m2:#4ade80; --m3:#fb923c; --m4:#c084fc;
+    --accent:#f87171;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 18px;}
+h2{font-size:16px;margin:0 0 4px;}
+.sub{font-size:12px;color:var(--muted);margin:0 0 10px;}
+.stage{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;}
+canvas{display:block;width:100%;height:auto;max-width:100%;background:transparent}
+.eq-box{font-size:13px;text-align:center;margin:4px 0 2px;}
+.legend{font-size:11px;color:var(--muted);text-align:center;margin:0 0 10px;line-height:1.4}
+.caption-hint{font-size:12px;color:var(--muted);margin:6px 0 8px;}
+ul.toggles{list-style:none;margin:6px 0;padding:0;display:flex;flex-wrap:wrap;gap:8px;}
+ul.toggles li{flex:1 1 140px;}
+button.toggle{width:100%;text-align:left;border:1px solid var(--border);background:var(--panel);
+  color:var(--text);border-radius:6px;padding:7px 8px;font-size:12px;cursor:pointer;
+  display:flex;align-items:center;gap:7px;}
+button.toggle:disabled{cursor:default;opacity:.9;}
+button.toggle .sw{width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:var(--dot-off);border:1px solid var(--border);}
+button.toggle.on{border-color:currentColor;}
+button.toggle .lbl{display:flex;flex-direction:column;line-height:1.25;}
+button.toggle .lbl b{font-size:12px}
+button.toggle .lbl span{font-size:10px;color:var(--muted)}
+.reset{margin:8px 0 4px;border:1px solid var(--border);background:var(--panel);color:var(--text);
+  border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;}
+ul.readouts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px;}
+ul.readouts li{flex:1 1 260px;background:var(--panel);border:1px solid var(--border);border-radius:6px;
+  padding:7px 9px;font-size:12px;}
+ul.readouts b{font-size:14px;display:block;margin-top:2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>One local model covers 71.4% of queries; the full local ensemble covers 88.7%</h2>
+  <p class=&quot;sub&quot;>Each dot = 1,000 queries (1,000,000 total, WildChat chat + reasoning queries). GPT-OSS-120B is the always-on baseline; add the other local models to grow the union of correctly-answered queries.</p>
+
+  <div class=&quot;stage&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;400&quot; height=&quot;250&quot;></canvas>
+    <div class=&quot;eq-box&quot;>
+      <math display=&quot;block&quot;>
+        <mi>Coverage</mi><mo>=</mo>
+        <mfrac>
+          <mrow><mo>|</mo><munder><mo>&amp;#x22C3;</mo><mi>i</mi></munder><msub><mi>C</mi><mi>i</mi></msub><mo>|</mo></mrow>
+          <mi>N</mi>
+        </mfrac>
+      </math>
+    </div>
+    <div class=&quot;legend&quot;>
+      C<sub>i</sub> — set of queries the i-th <b>enabled</b> local model answers correctly &amp;middot;
+      N — total queries (1,000,000, shown as 1,000 dots &amp;times; 1,000 queries) &amp;middot;
+      &amp;#x22C3; — union: a query counts once it's answered by <i>at least one</i> enabled model.
+    </div>
+  </div>
+
+  <p class=&quot;caption-hint&quot;>GPT-OSS-120B (baseline) always stays on. Toggle the other models to add the queries only they get right — new dots pop into that model's color; already-covered dots keep their color, showing overlap.</p>
+  <ul class=&quot;toggles&quot; id=&quot;toggles&quot;></ul>
+  <button class=&quot;reset&quot; id=&quot;resetBtn&quot;>Reset — GPT-OSS-120B only</button>
+
+  <ul class=&quot;readouts&quot; id=&quot;readouts&quot;></ul>
+</div>
+
+<script>
+const TOTAL_QUERIES = 1000000;
+const DOTS = 1000; // each dot represents 1000 queries
+const COLS = 40, ROWS = 25;
+
+// deterministic seeded RNG (mulberry32) so the coverage pattern is fixed &amp; auditable
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(20240517);
+const perm = [...Array(DOTS).keys()];
+for(let i = DOTS - 1; i > 0; i--){
+  const j = Math.floor(rng() * (i + 1));
+  [perm[i], perm[j]] = [perm[j], perm[i]];
+}
+function sl(a,b){ return new Set(perm.slice(a,b)); }
+function uni(...sets){ const s = new Set(); sets.forEach(x => x.forEach(v => s.add(v))); return s; }
+
+// coverage sets built so unions land exactly on 71.4% / 80.0% / 85.0% / 88.7%
+const A_M1 = sl(0,714);                       // 714 -> 71.4%
+const A_M2 = uni(sl(0,564), sl(714,800));     // 650 alone, union w/ M1 -> 800 (80.0%)
+const A_M3 = uni(sl(0,550), sl(800,850));     // 600 alone, union -> 850 (85.0%)
+const A_M4 = uni(sl(0,463), sl(850,887));     // 500 alone, union -> 887 (88.7%)
+
+const MODELS = [
+  {idx:0, name:'GPT-OSS-120B', alone:71.4, color:'--m1', set:A_M1, baseline:true},
+  {idx:1, name:'Qwen3-30B-A3B', alone:65.0, color:'--m2', set:A_M2, baseline:false},
+  {idx:2, name:'Qwen3-14B',    alone:60.0, color:'--m3', set:A_M3, baseline:false},
+  {idx:3, name:'Qwen3-8B',     alone:50.0, color:'--m4', set:A_M4, baseline:false},
+];
+// GPT-OSS-120B is the baseline and is always enabled — it cannot be switched off,
+// so &quot;all four enabled&quot; always includes it and correctly reaches the full 88.7% union.
+const enabled = [true, false, false, false];
+const highlightIndex = perm[820]; // unique to Qwen3-14B (M3), demonstrates why diversity matters
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function computeColors(){
+  const arr = new Array(DOTS).fill(null);
+  for(let id = 0; id < DOTS; id++){
+    for(const m of MODELS){
+      if(enabled[m.idx] &amp;&amp; m.set.has(id)){ arr[id] = m.color; break; }
+    }
+  }
+  return arr;
+}
+let currentColors = computeColors();
+let revealSet = new Set();
+let revealStart = 0;
+const REVEAL_DUR = 300;
+
+function draw(p = 1){
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0,0,w,h);
+  const cw = w / COLS, ch = h / ROWS;
+  const offColor = cssVar('--dot-off');
+  const accent = cssVar('--accent');
+  const base = Math.min(cw, ch) * 0.32;
+  for(let id = 0; id < DOTS; id++){
+    const col = id % COLS, row = Math.floor(id / COLS);
+    const cx = cw * (col + 0.5), cy = ch * (row + 0.5);
+    const colorVar = currentColors[id];
+    let r = base;
+    if(revealSet.has(id)) r = base * (0.3 + 0.7 * p);
+    let isHi = id === highlightIndex;
+    if(isHi) r *= 1.4;
+    ctx.beginPath();
+    ctx.fillStyle = colorVar ? cssVar(colorVar) : offColor;
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    if(isHi){
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = accent;
+      ctx.stroke();
+    }
+  }
+}
+
+function animLoop(t){
+  const p = Math.min(1, (t - revealStart) / REVEAL_DUR);
+  draw(p);
+  if(p < 1) requestAnimationFrame(animLoop);
+  else { revealSet.clear(); draw(1); }
+}
+
+function applyChange(){
+  const newColors = computeColors();
+  const newly = [];
+  for(let id = 0; id < DOTS; id++){
+    if(!currentColors[id] &amp;&amp; newColors[id]) newly.push(id);
+  }
+  currentColors = newColors;
+  updateReadouts();
+  if(newly.length &amp;&amp; !reduced){
+    revealSet = new Set(newly);
+    revealStart = performance.now();
+    requestAnimationFrame(animLoop);
+  } else {
+    revealSet.clear();
+    draw(1);
+  }
+}
+
+function coveredCount(){
+  let c = 0;
+  for(let id = 0; id < DOTS; id++) if(currentColors[id]) c++;
+  return c;
+}
+
+function updateReadouts(){
+  const covered = coveredCount();
+  const pct = covered / 10; // covered/1000*100
+  const queries = covered * 1000;
+  const gain = pct - 71.4;
+  const hiCovered = !!currentColors[highlightIndex];
+  const nEnabled = enabled.filter(Boolean).length;
+  document.getElementById('readouts').innerHTML = `
+    <li>Coverage (${nEnabled} model${nEnabled===1?'':'s'} enabled)<b>${pct.toFixed(1)}%</b></li>
+    <li>Queries answered<b>${queries.toLocaleString()} / ${TOTAL_QUERIES.toLocaleString()}</b></li>
+    <li>Gain vs. GPT-OSS-120B alone (71.4%)<b>${gain >= 0 ? '+' : ''}${gain.toFixed(1)} pts</b></li>
+    <li>Example: &quot;why does ice float?&quot; query<b>${hiCovered ? 'Covered ✓' : 'Not covered'}</b></li>
+  `;
+}
+
+function buildToggles(){
+  const ul = document.getElementById('toggles');
+  ul.innerHTML = MODELS.map(m => `
+    <li><button class=&quot;toggle&quot; data-idx=&quot;${m.idx}&quot; aria-pressed=&quot;${enabled[m.idx]}&quot; ${m.baseline ? 'disabled title=&quot;Baseline model — always included&quot;' : ''}>
+      <span class=&quot;sw&quot;></span>
+      <span class=&quot;lbl&quot;><b>${m.name}${m.baseline ? ' (baseline)' : ''}</b><span>${m.alone.toFixed(1)}% alone${m.baseline ? ' · always on' : ''}</span></span>
+    </button></li>
+  `).join('');
+  refreshToggleStyles();
+  ul.querySelectorAll('button.toggle').forEach(btn => {
+    const i = +btn.dataset.idx;
+    if(MODELS[i].baseline) return; // baseline cannot be toggled off
+    btn.addEventListener('click', () => {
+      enabled[i] = !enabled[i];
+      refreshToggleStyles();
+      applyChange();
+    });
+  });
+}
+function refreshToggleStyles(){
+  document.querySelectorAll('button.toggle').forEach(btn => {
+    const i = +btn.dataset.idx;
+    const on = enabled[i];
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on);
+    const sw = btn.querySelector('.sw');
+    sw.style.background = on ? cssVar(MODELS[i].color) : cssVar('--dot-off');
+    btn.style.color = on ? cssVar(MODELS[i].color) : cssVar('--text');
+  });
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  enabled[0] = true; enabled[1] = false; enabled[2] = false; enabled[3] = false;
+  refreshToggleStyles();
+  applyChange();
+});
+
+buildToggles();
+draw(1);
+updateReadouts();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;ensemble-coverage&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One local model answers 71.4% of real queries; the local ensemble covers 88.7%"
+  ></iframe>
+</section>
+
+<section class="scene" id="reasoning-frontier">
+  <h3>Chat is nearly solved locally; the hardest reasoning tier is 95% unsolved</h3>
+  <div class="caption">That 88.7% union hides a steep gradient: coverage falls from 88.9% on chat (WildChat) to 64.9% on hard reasoning (NaturalReasoning). The hardest 'Level 5' tier — 16.5% of the reasoning set — stays 95% unsolved locally.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="reasoning-frontier"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Chat vs Reasoning Coverage Frontier</title>
+<style>
+:root{
+  --bg:#f6f7fa;
+  --panel:#ffffff;
+  --text:#1b1f24;
+  --muted:#5c6570;
+  --covered:#1f9d78;
+  --uncovered:#d9534f;
+  --window:rgba(74,111,220,0.20);
+  --window-border:#4a6fdc;
+  --accent:#4a6fdc;
+  --border:#d7dbe2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14171c;
+    --panel:#1b1f26;
+    --text:#e9ecf1;
+    --muted:#9aa4b2;
+    --covered:#38caa0;
+    --uncovered:#f07068;
+    --window:rgba(122,162,255,0.24);
+    --window-border:#7aa2ff;
+    --accent:#7aa2ff;
+    --border:#333a45;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:10px;
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
+}
+.scene{
+  max-width:680px; margin:0 auto;
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px 16px;
+}
+h2{
+  font-size:14.5px; margin:0 0 6px; font-weight:700;
+}
+.datasetdefs{ font-size:11px; color:var(--muted); margin:0 0 10px; line-height:1.4; }
+.datasetdefs b{ color:var(--text); }
+ul.badges{ margin:0 0 10px; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:6px 14px; }
+ul.badges li{ font-size:11.5px; color:var(--muted); }
+ul.badges b{ color:var(--text); }
+canvas#field{ width:100%; height:190px; display:block; max-width:100%; }
+.dotlegend{ display:flex; flex-wrap:wrap; gap:4px 16px; font-size:11px; color:var(--muted); margin:4px 0 8px; align-items:center; }
+.dotlegend .sw{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+.dotlegend .sw.cov{ background:var(--covered); }
+.dotlegend .sw.unc{ background:var(--uncovered); }
+.examples{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:6px 0 10px; font-size:11px; color:var(--muted); }
+.examples .ex{ max-width:48%; }
+.examples b{ color:var(--text); }
+.controls{ margin:10px 0 4px; }
+.controls label{ display:block; font-size:12px; margin-bottom:4px; }
+.controls input[type=range]{ width:100%; }
+.readouts{ display:flex; gap:18px; flex-wrap:wrap; margin:10px 0 6px; }
+.readouts .val{ font-size:22px; font-weight:700; color:var(--accent); }
+.readouts .lbl{ font-size:10.5px; color:var(--muted); margin-top:1px; }
+.refline{ font-size:11px; color:var(--muted); margin:4px 0 10px; }
+.eq{ margin-top:10px; border-top:1px solid var(--border); padding-top:8px; }
+.eq math{ font-size:15px; }
+.legend{ font-size:10.5px; color:var(--muted); margin-top:4px; line-height:1.4; }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Local-model coverage: chat vs. reasoning difficulty</h2>
+
+  <div class=&quot;datasetdefs&quot;>
+    <b>WildChat</b> — a dataset of real user chat logs (everyday conversational queries).
+    <b>NaturalReasoning</b> — a dataset of hard technical reasoning problems, split into difficulty tiers Level 1 (easiest) through Level 5 (hardest).
+  </div>
+
+  <ul class=&quot;badges&quot;>
+    <li><b>Creative &amp;amp; humanities queries:</b> &amp;gt;93% covered locally</li>
+    <li><b>Architecture &amp;amp; Engineering queries:</b> ~60% covered locally</li>
+  </ul>
+
+  <canvas id=&quot;field&quot; aria-label=&quot;Dot field of queries sorted from chat to reasoning Level 5, with a highlight window and coverage colors&quot;></canvas>
+
+  <div class=&quot;dotlegend&quot;>
+    <span><span class=&quot;sw cov&quot;></span>green dot = query answerable by the local model</span>
+    <span><span class=&quot;sw unc&quot;></span>red dot = query not covered locally</span>
+  </div>
+
+  <div class=&quot;examples&quot;>
+    <div class=&quot;ex left&quot;>&amp;#8220;Does ice float on water?&amp;#8221; &amp;mdash; <b>covered &amp;#10003;</b> (chat, left end)</div>
+    <div class=&quot;ex right&quot;>Level-5 engineering derivation &amp;mdash; <b>uncovered &amp;#10007;</b> (right end)</div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;slider&quot;>Highlight-window position &amp;mdash; drag right to slide the window from chat queries toward the hardest reasoning tier (Level 5). This is the only control; nothing moves on its own.</label>
+    <input type=&quot;range&quot; id=&quot;slider&quot; min=&quot;0&quot; max=&quot;100&quot; value=&quot;0&quot; step=&quot;1&quot;>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div><span class=&quot;val&quot; id=&quot;gaugeVal&quot;>88.9%</span><div class=&quot;lbl&quot;>local coverage inside the window</div></div>
+    <div><span class=&quot;val&quot; id=&quot;segVal&quot;>Chat (WildChat)</span><div class=&quot;lbl&quot;>window currently sits over</div></div>
+  </div>
+  <div class=&quot;refline&quot; id=&quot;refline&quot;>Reference: chat avg 88.9% &amp;middot; reasoning-wide avg 64.9% &amp;middot; Level 5 ~5% (95% unsolved)</div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>C</mi><mo>=</mo>
+      <mfrac>
+        <mrow><munder><mo>&amp;#8721;</mo><mi>i</mi></munder><msub><mi>w</mi><mi>i</mi></msub><msub><mi>c</mi><mi>i</mi></msub></mrow>
+        <mrow><munder><mo>&amp;#8721;</mo><mi>i</mi></munder><msub><mi>w</mi><mi>i</mi></msub></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>C &amp;mdash; coverage inside the highlight window (%) &amp;middot; i &amp;mdash; index over difficulty tiers the window overlaps &amp;middot; w<sub>i</sub> &amp;mdash; width of window's overlap with tier i (fraction of the axis) &amp;middot; c<sub>i</sub> &amp;mdash; that tier's local-model coverage rate (%)</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- deterministic PRNG (mulberry32) so the dot field is reproducible ----
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const rand = mulberry32(918273645);
+
+  // ---- category data: coverage rates are the real quantities being taught ----
+  // widthFrac: fraction of the whole axis (chat = 60%, reasoning tiers split the remaining 40%
+  // in proportion to their real share of the NaturalReasoning set: 20/20/22/21.5/16.5%)
+  const categories = [
+    {key:'chat', label:'Chat', sub:'WildChat', coverage:88.9, widthFrac:0.60},
+    {key:'L1',   label:'L1',   sub:'', coverage:88,   widthFrac:0.4*0.200},
+    {key:'L2',   label:'L2',   sub:'', coverage:84,   widthFrac:0.4*0.200},
+    {key:'L3',   label:'L3',   sub:'', coverage:74.5, widthFrac:0.4*0.220},
+    {key:'L4',   label:'L4',   sub:'', coverage:62,   widthFrac:0.4*0.215},
+    {key:'L5',   label:'L5',   sub:'', coverage:5,    widthFrac:0.4*0.165},
+  ];
+  let cum = 0;
+  categories.forEach(c=>{ c.x0 = cum; cum += c.widthFrac; c.x1 = cum; });
+
+  // reasoning-wide average, computed from the tier data (not hardcoded)
+  const reasoningWidth = categories.slice(1).reduce((s,c)=>s+c.widthFrac,0);
+  const reasoningAvg = categories.slice(1).reduce((s,c)=>s+c.widthFrac*c.coverage,0) / reasoningWidth;
+  document.getElementById('refline').textContent =
+    'Reference: chat avg 88.9% \u00b7 reasoning-wide avg ' + reasoningAvg.toFixed(1) + '% \u00b7 Level 5 ~5% (95% unsolved)';
+
+  // ---- generate dots per category (visual sample; covered flag via even distribution) ----
+  const TOTAL_DOTS = 240;
+  categories.forEach(c=>{
+    const n = Math.max(6, Math.round(c.widthFrac * TOTAL_DOTS));
+    const dots = [];
+    let acc = 0;
+    for(let i=0;i<n;i++){
+      acc += c.coverage/100;
+      let covered = false;
+      if(acc >= 1){ covered = true; acc -= 1; }
+      const jitter = (rand()-0.5) * (0.9/n);
+      dots.push({
+        xFrac: Math.min(0.98, Math.max(0.02, (i+0.5)/n + jitter)),
+        yFrac: 0.12 + 0.76*rand(),
+        covered: covered
+      });
+    }
+    c.dots = dots;
+  });
+
+  // ---- coverage-in-window formula: C = sum(w_i * c_i) / sum(w_i) over overlaps ----
+  const WINDOW_WIDTH = 0.06; // fraction of axis; small enough to fit fully inside Level 5
+  function coverageInWindow(wx0, wx1){
+    let wsum = 0, csum = 0;
+    categories.forEach(c=>{
+      const ov = Math.max(0, Math.min(wx1,c.x1) - Math.max(wx0,c.x0));
+      if(ov > 0){ wsum += ov; csum += ov*c.coverage; }
+    });
+    return wsum > 0 ? csum/wsum : 0;
+  }
+  function dominantSegment(wx0, wx1){
+    let best=null, bestOv=-1;
+    categories.forEach(c=>{
+      const ov = Math.max(0, Math.min(wx1,c.x1) - Math.max(wx0,c.x0));
+      if(ov > bestOv){ bestOv = ov; best = c; }
+    });
+    if(best.key==='chat') return 'Chat (WildChat)';
+    return 'Reasoning ' + best.label + ' (NaturalReasoning)';
+  }
+
+  // ---- canvas setup ----
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d');
+  const cssVar = (name)=>getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(rect.width*dpr));
+    canvas.height = Math.max(1, Math.round(rect.height*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  const slider = document.getElementById('slider');
+  const gaugeVal = document.getElementById('gaugeVal');
+  const segVal = document.getElementById('segVal');
+
+  function draw(){
+    const rect = canvas.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    if(W===0||H===0) return;
+    ctx.clearRect(0,0,W,H);
+
+    const covered = cssVar('--covered'), uncovered = cssVar('--uncovered');
+    const border = cssVar('--border'), muted = cssVar('--muted');
+    const winFill = cssVar('--window'), winBorder = cssVar('--window-border');
+
+    const left=14, right=14, top=40, bottom=26;
+    const plotW = W-left-right;
+    const dotTop = top, dotH = H-top-bottom;
+
+    // dots + dividers + tick labels
+    categories.forEach(c=>{
+      const x0px = left + c.x0*plotW, x1px = left + c.x1*plotW, wpx = x1px-x0px;
+      if(c.key!=='chat'){
+        ctx.strokeStyle = border; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x0px, dotTop); ctx.lineTo(x0px, dotTop+dotH); ctx.stroke();
+      }
+      c.dots.forEach(d=>{
+        const xpx = x0px + d.xFrac*wpx;
+        const ypx = dotTop + d.yFrac*dotH;
+        ctx.fillStyle = d.covered ? covered : uncovered;
+        ctx.beginPath(); ctx.arc(xpx, ypx, 2.1, 0, Math.PI*2); ctx.fill();
+      });
+      ctx.fillStyle = muted;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(c.label, x0px+wpx/2, H-bottom+14);
+    });
+
+    // group labels
+    ctx.font = '10px sans-serif'; ctx.fillStyle = muted; ctx.textAlign='center';
+    const chatC = categories[0];
+    ctx.fillText('Chat \u2014 WildChat', left+(chatC.x0+chatC.x1)/2*plotW, top-24);
+    const rx0 = categories[1].x0, rx1 = categories[5].x1;
+    ctx.fillText('Reasoning L1\u2013L5 \u2014 NaturalReasoning', left+(rx0+rx1)/2*plotW, top-24);
+
+    // headline coverage callouts
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = covered;
+    ctx.fillText('88.9%', left+(chatC.x0+chatC.x1)/2*plotW, top-8);
+    const l5 = categories[5];
+    ctx.fillStyle = uncovered;
+    ctx.fillText('~5%', left+(l5.x0+l5.x1)/2*plotW, top-8);
+
+    // highlight window
+    const t = slider.value/100;
+    const wx0 = t*(1-WINDOW_WIDTH), wx1 = wx0+WINDOW_WIDTH;
+    const xw0 = left+wx0*plotW, xw1 = left+wx1*plotW;
+    ctx.fillStyle = winFill;
+    ctx.fillRect(xw0, dotTop-4, xw1-xw0, dotH+8);
+    ctx.strokeStyle = winBorder; ctx.lineWidth=1.5;
+    ctx.strokeRect(xw0, dotTop-4, xw1-xw0, dotH+8);
+
+    // readouts
+    const g = coverageInWindow(wx0, wx1);
+    gaugeVal.textContent = g.toFixed(1) + '%';
+    segVal.textContent = dominantSegment(wx0, wx1);
+  }
+
+  let pending = false;
+  function scheduleDraw(){
+    if(pending) return;
+    pending = true;
+    requestAnimationFrame(()=>{ pending=false; resizeCanvas(); draw(); });
+  }
+
+  slider.addEventListener('input', scheduleDraw);
+  window.addEventListener('resize', scheduleDraw);
+
+  // first frame (synchronous, so ready flag reflects an actually drawn scene)
+  resizeCanvas();
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;reasoning-frontier&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+    scheduleDraw();
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Chat is nearly solved locally; the hardest reasoning tier is 95% unsolved"
+  ></iframe>
+</section>
+
+<section class="scene" id="cloud-hardware-gap">
+  <h3>On identical models, cloud chips still beat the M4 Max by 1.4–7.4× per query</h3>
+  <div class="caption">Same models, one query at a time: M4 Max vs cloud silicon. The B200 wins 1.4× on IPW and 1.6–2.3× per joule, and SambaNova's SN40L reaches 7.4× per joule, because 4.8–8 TB/s of high-bandwidth memory beats 546 GB/s of shared laptop memory.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="cloud-hardware-gap"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Cloud vs Laptop Silicon — Same Model, Batch 1</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1a; --muted:#63666b;
+  --grid:#dcdce0; --m4:#4a72c9; --chip:#d9722f; --eff:#2ca58d; --border:#c9cbd1;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#111318; --panel:#1b1e25; --text:#e9e9ec; --muted:#a2a7ae;
+  --grid:#33363e; --m4:#7ea2ff; --chip:#ffab63; --eff:#5cd1b8; --border:#3a3d45; }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+h2{font-size:15px;margin:2px 0 8px;font-weight:600;}
+.modelcard{border:1px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px;}
+.bays{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.bay{flex:1 1 260px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--panel);}
+.bay-title{font-weight:700;font-size:13px;margin-bottom:3px;}
+.bay-note{font-size:11px;color:var(--muted);line-height:1.35;}
+.buttons{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+button{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;}
+button.active{background:var(--chip);color:#fff;border-color:var(--chip);}
+svg{width:100%;height:auto;max-width:680px;display:block;}
+.readrow{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 4px;}
+.readout{font-size:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:5px 10px;}
+.readout b{font-size:14px;}
+.legend{font-size:11px;color:var(--muted);text-align:center;max-width:640px;margin:2px auto 10px;line-height:1.4;}
+math{font-size:16px;}
+.eqwrap{text-align:center;margin:8px 0 2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Same model, batch size 1: M4 Max bay vs swappable cloud-chip bay</h2>
+
+  <div class=&quot;modelcard&quot; id=&quot;modelcard&quot;>Model card (fixed, identical both sides): FP4-quantized weights, same architecture, one query at a time</div>
+
+  <div class=&quot;bays&quot;>
+    <div class=&quot;bay&quot;>
+      <div class=&quot;bay-title&quot;>Left bay: Apple M4 Max (reference)</div>
+      <div class=&quot;bay-note&quot;>Thermal-limited: one 546 GB/s unified memory pool shared by CPU + GPU + NPU inside a laptop's heat budget.</div>
+    </div>
+    <div class=&quot;bay&quot;>
+      <div class=&quot;bay-title&quot; id=&quot;challTitle&quot;>Right bay: NVIDIA B200</div>
+      <div class=&quot;bay-note&quot; id=&quot;challNote&quot;></div>
+    </div>
+  </div>
+
+  <div class=&quot;buttons&quot; id=&quot;btns&quot;>
+    <button data-k=&quot;m4&quot;>Apple M4 Max</button>
+    <button data-k=&quot;b200&quot;>NVIDIA B200</button>
+    <button data-k=&quot;sn40l&quot;>SambaNova SN40L</button>
+  </div>
+  <div class=&quot;legend&quot; style=&quot;margin-top:-4px;margin-bottom:6px;&quot;>Buttons pick the challenger chip for the right bay; the left bay always stays M4 Max.</div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 680 300&quot;></svg>
+
+  <div class=&quot;readrow&quot;>
+    <div class=&quot;readout&quot;>Intelligence-per-watt (IPW) ratio: <b id=&quot;ipwOut&quot;>1.0×</b></div>
+    <div class=&quot;readout&quot;>Intelligence-per-joule ratio: <b id=&quot;pjOut&quot;>1.0×</b></div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mfrac><msub><mi>E</mi><mtext>M4</mtext></msub><msub><mi>E</mi><mtext>chip</mtext></msub></mfrac>
+      <mo>=</mo>
+      <mfrac><msub><mi>P</mi><mtext>M4</mtext></msub><msub><mi>P</mi><mtext>chip</mtext></msub></mfrac>
+      <mo>&amp;#183;</mo>
+      <mfrac><msub><mi>&amp;#964;</mi><mtext>M4</mtext></msub><msub><mi>&amp;#964;</mi><mtext>chip</mtext></msub></mfrac>
+    </math>
+  </div>
+  <div class=&quot;legend&quot;>
+    E — energy per query (J), from E = P·τ &amp;nbsp;·&amp;nbsp; P — power drawn while answering one query (W) &amp;nbsp;·&amp;nbsp;
+    τ — latency to finish one query (s) &amp;nbsp;·&amp;nbsp; the first fraction is the IPW (per-watt) ratio; the second (speed-up) is always ≥ 1, so the per-joule ratio is always ≥ the per-watt ratio.
+  </div>
+</div>
+
+<script>
+// ---- physical inputs (measured/reported per-chip specs, batch = 1) ----
+const chips = {
+  m4:    { name:&quot;Apple M4 Max&quot;,     bw:546,  bwLabel:&quot;546 GB/s (unified memory)&quot;,             power:60.0, latency:42.0 },
+  b200:  { name:&quot;NVIDIA B200&quot;,      bw:8000, bwLabel:&quot;8000 GB/s (8 TB/s HBM3e)&quot;,               power:42.9, latency:29.4 },
+  sn40l: { name:&quot;SambaNova SN40L&quot;,  bw:6400, bwLabel:&quot;6400 GB/s (6.4 TB/s, HBM3e class)&quot;,       power:20.0, latency:17.0 }
+};
+const REF = chips.m4; // left bay, always the reference
+
+function ratios(key){
+  const c = chips[key];
+  const ipw = REF.power / c.power;                 // Q/P ratio, same model => same Q
+  const perJoule = ipw * (REF.latency / c.latency); // E = P*tau -> ratio of energies
+  return { ipw, perJoule };
+}
+
+// ---- bar chart geometry ----
+const svg = document.getElementById('chart');
+const NS = &quot;http://www.w3.org/2000/svg&quot;;
+const baseline = 232, topY = 42, maxH = baseline - topY;
+const cats = [
+  { key:'bw',  cx:95,  label:'Memory bandwidth (GB/s)', max:9000, min:400, log:true,  fmt:v=>Math.round(v) },
+  { key:'pow', cx:265, label:'Power draw (W)',           max:70,   min:0,   log:false, fmt:v=>v.toFixed(1) },
+  { key:'lat', cx:435, label:'Latency per query (ms)',   max:46,   min:0,   log:false, fmt:v=>v.toFixed(1) },
+  { key:'eff', cx:600, label:'Per-joule efficiency (×)', max:8,    min:0,   log:false, fmt:v=>v.toFixed(1) }
+];
+const barW = 26, gap = 6;
+
+function frac(cat, v){
+  if(cat.log) return (Math.log10(v)-Math.log10(cat.min))/(Math.log10(cat.max)-Math.log10(cat.min));
+  return v / cat.max;
+}
+
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+// static elements: axis baseline, category labels, legend swatches
+svg.innerHTML = '';
+svg.appendChild(el('line',{x1:30,y1:baseline,x2:650,y2:baseline,stroke:'var(--grid)','stroke-width':1}));
+
+const legendM4 = el('rect',{x:180,y:8,width:12,height:12,fill:'var(--m4)',rx:2});
+const legendChip = el('rect',{x:340,y:8,width:12,height:12,fill:'var(--chip)',rx:2});
+svg.appendChild(legendM4);
+svg.appendChild(el('text',{x:196,y:18,'font-size':11,fill:'var(--text)'})).textContent = 'M4 Max (left bay)';
+svg.appendChild(legendChip);
+svg.appendChild(el('text',{x:356,y:18,'font-size':11,fill:'var(--text)'})).textContent = 'Challenger (right bay)';
+
+const bars = {}, labels = {};
+cats.forEach(cat=>{
+  svg.appendChild(el('text',{x:cat.cx,y:252,'font-size':11,fill:'var(--muted)','text-anchor':'middle'})).textContent = cat.label;
+  const r1 = el('rect',{x:cat.cx-barW-gap/2,y:baseline,width:barW,height:0,fill:'var(--m4)',rx:2});
+  const r2 = el('rect',{x:cat.cx+gap/2,y:baseline,width:barW,height:0,fill:'var(--chip)',rx:2});
+  const t1 = el('text',{x:cat.cx-barW/2-gap/2,y:baseline,'font-size':10,'text-anchor':'middle',fill:'var(--text)'});
+  const t2 = el('text',{x:cat.cx+barW/2+gap/2,y:baseline,'font-size':10,'text-anchor':'middle',fill:'var(--text)'});
+  svg.appendChild(r1); svg.appendChild(r2); svg.appendChild(t1); svg.appendChild(t2);
+  bars[cat.key] = {r1,r2,t1,t2,cat};
+});
+
+let current = null; // animation state: {bw,pow,lat,eff} challenger values currently drawn
+let target = null;
+let animStart = 0;
+const DUR = 450; // ms
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function targetsFor(key){
+  const c = chips[key];
+  const r = ratios(key);
+  return { bw:c.bw, pow:c.power, lat:c.latency, eff:r.perJoule, ipw:r.ipw };
+}
+
+function drawFrame(vals){
+  const refVals = { bw:REF.bw, pow:REF.power, lat:REF.latency, eff:1.0 };
+  cats.forEach(cat=>{
+    const b = bars[cat.key];
+    const fRef = Math.max(0, Math.min(1, frac(cat, refVals[cat.key])));
+    const fChip = Math.max(0, Math.min(1, frac(cat, vals[cat.key])));
+    const hRef = fRef * maxH, hChip = fChip * maxH;
+    b.r1.setAttribute('y', baseline - hRef); b.r1.setAttribute('height', hRef);
+    b.r2.setAttribute('y', baseline - hChip); b.r2.setAttribute('height', hChip);
+    b.t1.setAttribute('y', baseline - hRef - 4);
+    b.t2.setAttribute('y', baseline - hChip - 4);
+    b.t1.textContent = cat.fmt(refVals[cat.key]);
+    b.t2.textContent = cat.fmt(vals[cat.key]);
+  });
+  document.getElementById('ipwOut').textContent = vals.ipw.toFixed(1) + '×';
+  document.getElementById('pjOut').textContent = vals.eff.toFixed(1) + '×';
+}
+
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+function step(ts){
+  if(!animStart) animStart = ts;
+  const t = Math.min(1, (ts-animStart)/DUR);
+  const ease = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+  const vals = {};
+  for(const k in target){ vals[k] = lerp(current[k], target[k], ease); }
+  drawFrame(vals);
+  if(t < 1){ requestAnimationFrame(step); }
+  else { current = target; }
+}
+
+function setChallenger(key){
+  const notes = {
+    m4:&quot;Same laptop chip on both sides — 1.0× baseline, no advantage either way.&quot;,
+    b200:&quot;HBM3e-based accelerator: 8 TB/s memory feed, purpose-built for large-model inference.&quot;,
+    sn40l:&quot;Dataflow architecture tuned for LLM inference; wins big on energy per query.&quot;
+  };
+  document.getElementById('challTitle').textContent = 'Right bay: ' + chips[key].name;
+  document.getElementById('challNote').textContent = chips[key].bwLabel + '. ' + notes[key];
+  document.querySelectorAll('#btns button').forEach(b=>b.classList.toggle('active', b.dataset.k===key));
+
+  const t = targetsFor(key);
+  if(current === null || reduced){
+    current = { bw:t.bw, pow:t.pow, lat:t.lat, eff:t.eff, ipw:t.ipw };
+    target = t;
+    drawFrame(current);
+  } else {
+    target = t;
+    animStart = 0;
+    requestAnimationFrame(step);
+  }
+}
+
+document.getElementById('btns').addEventListener('click', e=>{
+  const k = e.target.dataset.k;
+  if(k) setChallenger(k);
+});
+
+setChallenger('b200');
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;cloud-hardware-gap&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="On identical models, cloud chips still beat the M4 Max by 1.4–7.4× per query"
+  ></iframe>
+</section>
+
+<section class="scene" id="batching-cloud">
+  <h3>Batching lets cloud servers split one weight-stream across many users</h3>
+  <div class="caption">Slide the batch size: Qwen3-8B's per-query energy on a B200 falls from 6,449 J to 548 J at batch 64, while power rises only 255 W → 883 W. The paper scores the cloud baseline at batch 16, a realistic serving load — a discount a batch-1 laptop never gets.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="batching-cloud"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Batching amortizes the weight-stream</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f2f5f9;
+  --panel2:#e7ebf1;
+  --text:#1b1f24;
+  --muted:#5b6472;
+  --border:#c7d0dc;
+  --accent:#2563eb;
+  --accent2:#dc2626;
+  --lane:#93c5fd;
+  --laneHighlight:#f59e0b;
+  --laptop:#9aa3af;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#14171c;
+    --panel:#1d232b;
+    --panel2:#242b34;
+    --text:#e8ecf1;
+    --muted:#9aa5b1;
+    --border:#3a4451;
+    --accent:#5b8def;
+    --accent2:#f06262;
+    --lane:#3f6db3;
+    --laneHighlight:#e2a53a;
+    --laptop:#5b6472;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:14px;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+svg{width:100%;height:auto;max-width:100%;display:block;}
+.eqbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin:10px 0;}
+.legend{color:var(--muted);font-size:11.5px;line-height:1.45;margin-top:4px;}
+math{font-size:16px;}
+.controls{margin:14px 0 6px;}
+.controls label{display:block;font-size:13px;margin-bottom:4px;}
+input[type=range]{width:100%;}
+.subnote{font-size:11px;color:var(--muted);margin-top:2px;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.readout{flex:1 1 140px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+.readout .lab{font-size:11px;color:var(--muted);}
+.readout .val{font-size:18px;font-weight:600;margin-top:2px;}
+.bar{height:6px;border-radius:3px;background:var(--panel2);margin-top:6px;overflow:hidden;}
+.bar>div{height:100%;border-radius:3px;transition:width .25s ease;}
+@media (prefers-reduced-motion:reduce){.bar>div{transition:none;}}
+.energybar{background:var(--accent);}
+.powerbar{background:var(--accent2);}
+@media (max-width:400px){.readout{flex:1 1 100%;}}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 400&quot; role=&quot;img&quot; aria-label=&quot;Diagram of a single weight-stream feeding many query lanes&quot;></svg>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>E</mi><mtext>query</mtext></msub>
+      <mo>=</mo>
+      <mfrac><msub><mi>E</mi><mtext>w</mtext></msub><mi>B</mi></mfrac>
+      <mo>+</mo>
+      <msub><mi>e</mi><mtext>c</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      E_query — energy delivered per user query (J) &amp;nbsp;·&amp;nbsp;
+      E_w — energy to stream all model weights through memory once per token-step (J); fixed, no matter how many queries share it &amp;nbsp;·&amp;nbsp;
+      B — batch size: number of concurrent queries sharing that one stream &amp;nbsp;·&amp;nbsp;
+      e_c — compute energy per query per token-step (J); this part does NOT shrink with batching
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;batch&quot;>Batch size B — concurrent queries sharing one weight-stream on an NVIDIA B200: <strong id=&quot;batchLbl&quot;>1</strong></label>
+    <input type=&quot;range&quot; id=&quot;batch&quot; min=&quot;1&quot; max=&quot;64&quot; step=&quot;1&quot; value=&quot;1&quot; list=&quot;ticks&quot;>
+    <datalist id=&quot;ticks&quot;><option value=&quot;16&quot;></option></datalist>
+    <div class=&quot;subnote&quot;>Tick at 16 marks the realistic serving batch the paper uses as its cloud baseline.</div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;><div class=&quot;lab&quot;>Batch size</div><div class=&quot;val&quot; id=&quot;rBatch&quot;>1 query</div></div>
+    <div class=&quot;readout&quot;><div class=&quot;lab&quot;>Energy per query</div><div class=&quot;val&quot; id=&quot;rEnergy&quot;>6,449 J</div>
+      <div class=&quot;bar&quot;><div class=&quot;energybar&quot; id=&quot;barEnergy&quot; style=&quot;width:100%&quot;></div></div>
+    </div>
+    <div class=&quot;readout&quot;><div class=&quot;lab&quot;>Total server power</div><div class=&quot;val&quot; id=&quot;rPower&quot;>255 W</div>
+      <div class=&quot;bar&quot;><div class=&quot;powerbar&quot; id=&quot;barPower&quot; style=&quot;width:28.9%&quot;></div></div>
+    </div>
+    <div class=&quot;readout&quot;><div class=&quot;lab&quot;>Savings vs. batch 1</div><div class=&quot;val&quot; id=&quot;rSave&quot;>1.0×</div></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const svg=document.getElementById('diagram');
+
+  // --- physics: derive fixed constants from two published anchor points (Qwen3-8B, B200) ---
+  const E1=6449, E64=548, P1=255, P64=883; // J/query and W at batch 1 and batch 64
+  const ec = (E64*64 - E1)/63;        // J, compute energy per query per token-step
+  const Ew = E1 - ec;                 // J, weight-stream energy per token-step (batch-independent)
+  const T1 = E1/P1, T64=(E64*64)/P64; // s, token-step time at B=1 and B=64
+  const Tc = (T64-T1)/63;             // s, added compute time per extra query in the batch
+  const Tmem = T1-Tc;                 // s, fixed memory-streaming time per token-step
+
+  function perQueryEnergy(B){ return (Ew+ec*B)/B; }
+  function totalPower(B){ return (Ew+ec*B)/(Tmem+Tc*B); }
+
+  const slider=document.getElementById('batch');
+  const batchLbl=document.getElementById('batchLbl');
+  const rBatch=document.getElementById('rBatch');
+  const rEnergy=document.getElementById('rEnergy');
+  const rPower=document.getElementById('rPower');
+  const rSave=document.getElementById('rSave');
+  const barEnergy=document.getElementById('barEnergy');
+  const barPower=document.getElementById('barPower');
+
+  function diagramSVG(B){
+    // Fixed-size grid region (sized for the worst case, B=64) so lanes never
+    // grow into the weight-stream annotation area above them.
+    const cols=8,size=16,gap=4,x0=18,y0=124;
+    let lanes='';
+    for(let i=0;i<B;i++){
+      const col=i%cols, row=Math.floor(i/cols);
+      const x=x0+col*(size+gap), y=y0+row*(size+gap);
+      const fill = i===0 ? 'var(--laneHighlight)':'var(--lane)';
+      lanes += `<rect x=&quot;${x}&quot; y=&quot;${y}&quot; width=&quot;${size}&quot; height=&quot;${size}&quot; rx=&quot;2&quot; style=&quot;fill:${fill};stroke:var(--border);stroke-width:0.6&quot;/>`;
+    }
+    const rows=Math.ceil(B/cols);
+    const gridBottom=y0+rows*(size+gap);
+    return `
+    <text x=&quot;18&quot; y=&quot;16&quot; font-size=&quot;12&quot; style=&quot;fill:var(--text)&quot;>Cloud server: one weight-stream feeds every query lane</text>
+
+    <rect x=&quot;18&quot; y=&quot;40&quot; width=&quot;130&quot; height=&quot;55&quot; rx=&quot;6&quot; style=&quot;fill:var(--panel);stroke:var(--border)&quot;/>
+    <text x=&quot;83&quot; y=&quot;63&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; style=&quot;fill:var(--text)&quot;>GPU memory</text>
+    <text x=&quot;83&quot; y=&quot;78&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; style=&quot;fill:var(--text)&quot;>(model weights)</text>
+
+    <text x=&quot;152&quot; y=&quot;54&quot; font-size=&quot;10.5&quot; style=&quot;fill:var(--accent)&quot;>weight-stream: read once per token-step</text>
+    <line x1=&quot;150&quot; y1=&quot;67&quot; x2=&quot;248&quot; y2=&quot;67&quot; style=&quot;stroke:var(--accent);stroke-width:3&quot;/>
+    <polygon points=&quot;248,61 260,67 248,73&quot; style=&quot;fill:var(--accent)&quot;/>
+    <text x=&quot;152&quot; y=&quot;88&quot; font-size=&quot;10&quot; style=&quot;fill:var(--muted)&quot;>(one arrow — same cost no matter how many lanes below)</text>
+
+    <text x=&quot;18&quot; y=&quot;112&quot; font-size=&quot;11&quot; style=&quot;fill:var(--text)&quot;>B = ${B} concurrent query lane${B>1?'s':''}</text>
+    ${lanes}
+    <text x=&quot;18&quot; y=&quot;${gridBottom+14}&quot; font-size=&quot;10&quot; style=&quot;fill:var(--muted)&quot;>orange lane = the ice-floats query</text>
+
+    <rect x=&quot;18&quot; y=&quot;316&quot; width=&quot;604&quot; height=&quot;70&quot; rx=&quot;6&quot; style=&quot;fill:var(--panel2);stroke:var(--border)&quot;/>
+    <text x=&quot;30&quot; y=&quot;334&quot; font-size=&quot;11.5&quot; style=&quot;fill:var(--text)&quot;>Single-user laptop — no one to share the stream with</text>
+    <rect x=&quot;30&quot; y=&quot;344&quot; width=&quot;60&quot; height=&quot;22&quot; rx=&quot;4&quot; style=&quot;fill:var(--panel);stroke:var(--border)&quot;/>
+    <text x=&quot;60&quot; y=&quot;358&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; style=&quot;fill:var(--text)&quot;>memory</text>
+    <line x1=&quot;92&quot; y1=&quot;355&quot; x2=&quot;122&quot; y2=&quot;355&quot; style=&quot;stroke:var(--laptop);stroke-width:3&quot;/>
+    <polygon points=&quot;122,350 132,355 122,360&quot; style=&quot;fill:var(--laptop)&quot;/>
+    <rect x=&quot;140&quot; y=&quot;347&quot; width=&quot;16&quot; height=&quot;16&quot; rx=&quot;2&quot; style=&quot;fill:var(--laptop)&quot;/>
+    <text x=&quot;170&quot; y=&quot;353&quot; font-size=&quot;10.5&quot; style=&quot;fill:var(--muted)&quot;>batch pinned at 1 lane —</text>
+    <text x=&quot;170&quot; y=&quot;368&quot; font-size=&quot;10.5&quot; style=&quot;fill:var(--muted)&quot;>always pays 6,449 J/query, never amortized</text>
+    `;
+  }
+
+  function update(){
+    const B=parseInt(slider.value,10);
+    const Eq=perQueryEnergy(B);
+    const P=totalPower(B);
+    const save=perQueryEnergy(1)/Eq;
+
+    batchLbl.textContent=B;
+    rBatch.textContent=B+(B===1?' query':' queries');
+    rEnergy.textContent=Math.round(Eq).toLocaleString()+' J';
+    rPower.textContent=Math.round(P)+' W';
+    rSave.textContent=save.toFixed(1)+'×';
+    barEnergy.style.width=(Eq/E1*100).toFixed(1)+'%';
+    barPower.style.width=(P/P64*100).toFixed(1)+'%';
+
+    svg.innerHTML=diagramSVG(B);
+  }
+
+  slider.addEventListener('input',update);
+  update();
+  window.__sceneReady=true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;batching-cloud&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Batching lets cloud servers split one weight-stream across many users"
+  ></iframe>
+</section>
+
+<section class="scene" id="routing-savings">
+  <h3>Routing easy queries to small local models cuts system energy 60–80%</h3>
+  <div class="caption">Simulating 80.2M queries/day, a perfect router saves 80.4% of energy against the batch-16 cloud baseline; a realistic 80%-accurate router still saves 64.3%. The win comes from replacing each pass through the 235B-parameter Qwen3-235B with a ≤20B-active local model.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="routing-savings"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Routing savings</title>
+<style>
+:root{
+  --bg:#f7f8fa; --panel:#ffffff; --text:#1b2430; --muted:#5b6572;
+  --local:#2f7d5f; --cloud:#3a5ba0; --fallback:#c0762b; --grid:#d7dce2;
+  --accent:#7a3fa0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12161c; --panel:#1a2028; --text:#e7ebef; --muted:#98a3ad;
+    --local:#57c497; --cloud:#7fa4e8; --fallback:#e2a25c; --grid:#333c46;
+    --accent:#c58bf0;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+h1{font-size:15px;margin:4px 0 8px;font-weight:600;}
+svg{width:100%;height:auto;display:block;max-width:100%;}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;}
+.readouts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+.card{flex:1 1 130px;background:var(--panel);border:1px solid var(--grid);
+  border-radius:8px;padding:6px 8px;text-align:center;}
+.card .val{font-size:19px;font-weight:700;}
+.card .lab{font-size:10.5px;color:var(--muted);}
+label{font-size:12.5px;}
+input[type=range]{width:230px;vertical-align:middle;}
+button{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--grid);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+.eq{background:var(--panel);border:1px solid var(--grid);border-radius:8px;
+  padding:6px 10px;margin:10px 0 2px;}
+.legend{font-size:11px;color:var(--muted);margin:2px 0 10px;}
+ul.gloss{margin:6px 0 0;padding-left:18px;font-size:11.5px;color:var(--muted);}
+ul.gloss li{margin:2px 0;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h1>Hybrid routing: sending easy queries local, hard ones to the cloud</h1>
+
+<svg id=&quot;dia&quot; viewBox=&quot;0 0 640 390&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+ <defs>
+  <marker id=&quot;ah&quot; markerWidth=&quot;8&quot; markerHeight=&quot;8&quot; refX=&quot;6&quot; refY=&quot;3&quot; orient=&quot;auto&quot;>
+   <path d=&quot;M0,0 L6,3 L0,6 Z&quot; class=&quot;mfill&quot;/>
+  </marker>
+ </defs>
+ <!-- source -->
+ <rect x=&quot;8&quot; y=&quot;140&quot; width=&quot;118&quot; height=&quot;56&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--muted)&quot;/>
+ <text x=&quot;67&quot; y=&quot;163&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot;>Query stream</text>
+ <text id=&quot;qtot&quot; x=&quot;67&quot; y=&quot;178&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>80.2M/day</text>
+
+ <!-- stream to router -->
+ <path d=&quot;M126,168 L192,168&quot; stroke=&quot;var(--muted)&quot; stroke-width=&quot;8&quot; marker-end=&quot;url(#ah)&quot; fill=&quot;none&quot;/>
+
+ <!-- router -->
+ <circle cx=&quot;228&quot; cy=&quot;168&quot; r=&quot;36&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;2&quot;/>
+ <text x=&quot;228&quot; y=&quot;172&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--text)&quot;>Router</text>
+
+ <!-- arrows drawn/updated in JS -->
+ <path id=&quot;pLocal&quot; d=&quot;&quot; stroke=&quot;var(--local)&quot; fill=&quot;none&quot; marker-end=&quot;url(#ah)&quot;/>
+ <path id=&quot;pHard&quot; d=&quot;&quot; stroke=&quot;var(--cloud)&quot; fill=&quot;none&quot; marker-end=&quot;url(#ah)&quot;/>
+ <path id=&quot;pFallback&quot; d=&quot;&quot; stroke=&quot;var(--fallback)&quot; stroke-dasharray=&quot;5 4&quot; fill=&quot;none&quot; marker-end=&quot;url(#ah)&quot;/>
+
+ <!-- local box -->
+ <rect x=&quot;392&quot; y=&quot;46&quot; width=&quot;228&quot; height=&quot;86&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--local)&quot;/>
+ <text x=&quot;506&quot; y=&quot;64&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--local)&quot; font-weight=&quot;600&quot;>Local models — M4 Max</text>
+ <text x=&quot;506&quot; y=&quot;79&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>(laptop chip, on device)</text>
+ <text x=&quot;506&quot; y=&quot;94&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>active params ≤20B — used per query</text>
+ <text x=&quot;506&quot; y=&quot;108&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>batch size = 1 — one query per pass</text>
+ <text id=&quot;localQ&quot; x=&quot;506&quot; y=&quot;123&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--local)&quot;></text>
+
+ <!-- cloud box -->
+ <rect x=&quot;392&quot; y=&quot;214&quot; width=&quot;228&quot; height=&quot;94&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--cloud)&quot;/>
+ <text x=&quot;506&quot; y=&quot;232&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--cloud)&quot; font-weight=&quot;600&quot;>Cloud model — H200</text>
+ <text x=&quot;506&quot; y=&quot;247&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>Qwen3-235B (data-center GPU)</text>
+ <text x=&quot;506&quot; y=&quot;261&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>batch size = 16 — honest baseline</text>
+ <text x=&quot;506&quot; y=&quot;275&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>(not a slow batch-1 strawman)</text>
+ <text id=&quot;cloudQ&quot; x=&quot;506&quot; y=&quot;292&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; fill=&quot;var(--cloud)&quot;></text>
+
+ <!-- router mechanism explanation — placed in its own band, clear of every flow line -->
+ <text x=&quot;320&quot; y=&quot;326&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot;>Router: a lightweight classifier that predicts, before answering,</text>
+ <text x=&quot;320&quot; y=&quot;340&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot;>whether a small local model can handle the query.</text>
+
+ <text id=&quot;fbLab&quot; x=&quot;320&quot; y=&quot;358&quot; text-anchor=&quot;middle&quot; font-size=&quot;9&quot; fill=&quot;var(--fallback)&quot;></text>
+
+ <g id=&quot;particles&quot;></g>
+</svg>
+
+<div class=&quot;row&quot;>
+ <label>Router accuracy: <input type=&quot;range&quot; id=&quot;acc&quot; min=&quot;50&quot; max=&quot;100&quot; step=&quot;1&quot; value=&quot;80&quot;>
+ <span id=&quot;accVal&quot;>80%</span></label>
+ <button id=&quot;playBtn&quot;>Pause</button>
+</div>
+<div style=&quot;font-size:10.5px;color:var(--muted);margin:-4px 0 4px;&quot;>
+ Slider moves the classifier's accuracy. 100% = oracle router. 80% detent ≈ today's RouteLLM benchmark (a published benchmark measuring how accurately routers pick the right model; today's routers reach ~70–85%).
+</div>
+
+<div class=&quot;readouts&quot;>
+ <div class=&quot;card&quot;><div class=&quot;val&quot; id=&quot;sE&quot;>–</div><div class=&quot;lab&quot;>energy saved vs all-cloud</div></div>
+ <div class=&quot;card&quot;><div class=&quot;val&quot; id=&quot;sC&quot;>–</div><div class=&quot;lab&quot;>compute saved vs all-cloud</div></div>
+ <div class=&quot;card&quot;><div class=&quot;val&quot; id=&quot;sD&quot;>–</div><div class=&quot;lab&quot;>cost saved vs all-cloud</div></div>
+ <div class=&quot;card&quot;><div class=&quot;val&quot; id=&quot;qG&quot;>–</div><div class=&quot;lab&quot;>answer quality (flat)</div></div>
+</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+ <mi>S</mi><mo>(</mo><mi>a</mi><mo>)</mo><mo>=</mo><mi>a</mi><mo>·</mo>
+ <msub><mi>f</mi><mtext>easy</mtext></msub><mo>·</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>r</mi><mo>)</mo>
+</math>
+</div>
+<div class=&quot;legend&quot;>
+S(a) — fraction of the all-cloud cost saved · a — router accuracy (0–1) ·
+f<sub>easy</sub> — fraction of queries small local models answer correctly (≈85% here, the ensemble's tested coverage) ·
+r — per-query local÷cloud ratio, computed separately for energy, compute, and cost from active params and batch size
+</div>
+
+<ul class=&quot;gloss&quot;>
+ <li><b>active params</b> — the parameters actually touched to answer one query (local ≤20B; this sim engages the full 235B on the cloud pass).</li>
+ <li><b>batch size</b> — how many queries the GPU answers together in one pass (laptop: 1; cloud: 16).</li>
+ <li><b>honest baseline</b> — every saving here is measured against the efficient batch-16 cloud, not a slow batch-1 strawman.</li>
+ <li><b>RouteLLM</b> — a published benchmark measuring router accuracy; today's routers reach ~70–85%, bracketing the 80% detent.</li>
+ <li><b>Fallback / misrouted-easy</b> — an easy query the router wrongly sends toward local, then bounces back (dashed return arrow) to the cloud so answer quality never drops.</li>
+</ul>
+</div>
+
+<script>
+(function(){
+&quot;use strict&quot;;
+// ---- named physical constants (auditable) ----
+const N = 80.2e6;            // queries per day
+const P_local = 4e9;         // avg active params, local ensemble (each model <=20B)
+const P_cloud = 235e9;       // params engaged per cloud pass (Qwen3-235B, simplified dense)
+const B_cloud = 16;          // cloud batch size (honest baseline)
+const f_easy = 0.85;         // fraction of queries small models can answer (ensemble coverage)
+const mE = 3, mC = 6, mD = 12; // memory-overhead : compute-cost ratio, per metric
+const Q_local = 97, Q_cloud = 97; // quality score (0-100) local vs cloud on routed queries
+
+function ratio(m){
+  // per-query cost ratio local/cloud: local always pays (1+m) at batch1;
+  // cloud amortizes the memory term m across the batch.
+  return (P_local/P_cloud) * (1+m) / (1 + m/B_cloud);
+}
+const rE = ratio(mE), rC = ratio(mC), rD = ratio(mD);
+
+function savings(a, r){ return a * f_easy * (1-r); }
+
+const acc = document.getElementById('acc');
+const accVal = document.getElementById('accVal');
+const sE = document.getElementById('sE'), sC = document.getElementById('sC'),
+      sD = document.getElementById('sD'), qG = document.getElementById('qG');
+const pLocal = document.getElementById('pLocal'), pHard = document.getElementById('pHard'),
+      pFallback = document.getElementById('pFallback');
+const localQ = document.getElementById('localQ'), cloudQ = document.getElementById('cloudQ'),
+      fbLab = document.getElementById('fbLab');
+const particlesG = document.getElementById('particles');
+const playBtn = document.getElementById('playBtn');
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let running = !reduced;
+playBtn.textContent = running ? 'Pause' : 'Play';
+
+let a = 0.8; // router accuracy fraction
+
+function widthFor(flow){ return 2 + flow*46; }
+
+function layout(){
+  const flowLocal = f_easy*a;
+  const flowHard = (1-f_easy);
+  const flowFallback = f_easy*(1-a);
+
+  pLocal.setAttribute('d','M258,150 L392,90');
+  pLocal.setAttribute('stroke-width', widthFor(flowLocal).toFixed(1));
+  pHard.setAttribute('d','M255,188 L392,255');
+  pHard.setAttribute('stroke-width', widthFor(flowHard).toFixed(1));
+  pFallback.setAttribute('d','M248,178 Q300,225 392,278');
+  pFallback.setAttribute('stroke-width', widthFor(flowFallback).toFixed(1));
+
+  localQ.textContent = (N*flowLocal/1e6).toFixed(1)+'M/day handled locally';
+  cloudQ.textContent = (N*(1-flowLocal)/1e6).toFixed(1)+'M/day sent to cloud';
+  fbLab.textContent = 'Fallback: '+(N*flowFallback/1e6).toFixed(2)+'M/day misrouted-easy, returned to cloud';
+}
+
+function update(){
+  a = (+acc.value)/100;
+  accVal.textContent = acc.value+'%';
+  const eE = savings(a,rE)*100, eC = savings(a,rC)*100, eD = savings(a,rD)*100;
+  sE.textContent = eE.toFixed(1)+'%';
+  sC.textContent = eC.toFixed(1)+'%';
+  sD.textContent = eD.toFixed(1)+'%';
+  const quality = f_easy*a*Q_local + (1-f_easy*a)*Q_cloud; // constant since Q_local=Q_cloud
+  qG.textContent = Math.round(quality)+'%';
+  layout();
+}
+
+acc.addEventListener('input', ()=>{
+  let v = +acc.value;
+  if (Math.abs(v-80) <= 2) { v = 80; acc.value = 80; } // snap to realistic detent
+  update();
+});
+playBtn.addEventListener('click', ()=>{
+  running = !running;
+  playBtn.textContent = running ? 'Pause' : 'Play';
+  if (running) requestAnimationFrame(tick);
+});
+
+// --- decorative particles along the three flows ---
+const PATHS = [
+  {el:pLocal, color:'var(--local)', getFlow:()=>f_easy*a},
+  {el:pHard, color:'var(--cloud)', getFlow:()=>(1-f_easy)},
+  {el:pFallback, color:'var(--fallback)', getFlow:()=>f_easy*(1-a)}
+];
+const dots = [];
+PATHS.forEach((p,pi)=>{
+  for(let i=0;i<4;i++){
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('r','3');
+    c.setAttribute('fill', p.color);
+    particlesG.appendChild(c);
+    dots.push({el:c, path:p.el, phase:i/4});
+  }
+});
+
+let t0 = performance.now();
+function tick(now){
+  if(!running) return;
+  const dt = (now - t0)/1000; t0 = now;
+  dots.forEach(d=>{
+    d.phase = (d.phase + dt*0.28) % 1;
+    const len = d.path.getTotalLength();
+    if(len>0){
+      const pt = d.path.getPointAtLength(d.phase*len);
+      d.el.setAttribute('cx', pt.x.toFixed(1));
+      d.el.setAttribute('cy', pt.y.toFixed(1));
+    }
+  });
+  // opacity encodes current flow magnitude
+  const flows = PATHS.map(p=>p.getFlow());
+  dots.forEach((d,i)=>{
+    const pi = Math.floor(i/4);
+    d.el.setAttribute('opacity', Math.min(1, 0.15+flows[pi]*2.2).toFixed(2));
+  });
+  requestAnimationFrame(tick);
+}
+
+update();
+if(running) requestAnimationFrame(tick);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;routing-savings&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+})();
+</script>
+<style>.mfill{fill:var(--muted);}</style>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Routing easy queries to small local models cuts system energy 60–80%"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now</h2>
+  <div class="part-lede">The routing result only pays off if local models can handle most traffic — and two years ago they couldn't. This part shows the trend that changed the answer: intelligence per watt is compounding at roughly 2.3× per year, the same kind of curve that once moved computing from mainframes to PCs.</div>
+</header>
+<section class="scene" id="ipw-trend">
+  <h3>Intelligence per watt improved 5.3× in two years, from compounding model and hardware gains</h3>
+  <div class="caption">IPW climbed from 7.92×10⁻⁴ in 2023 (Mixtral-8x7B on a Quadro RTX 6000) to 4.18×10⁻³ in 2025 (GPT-OSS-120B on M4 Max), a 5.3× gain. Coverage rose in step: 23.2% → 48.7% → 71.4%.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="ipw-trend"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Intelligence per watt — trend</title>
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#ffffff; --fg:#1b1e22; --muted:#6b7280;
+  --grid:#d8dce2; --accent:#1d6fd6; --accent2:#c2410c; --accent3:#0f9d58;
+  --line:#94a3b8;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161a; --panel:#1c1f24; --fg:#e7e9ec; --muted:#9aa3ad;
+    --grid:#3a3f47; --accent:#5b9dfd; --accent2:#ff8a4c; --accent3:#39d17a;
+    --line:#5b6572;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 20px;}
+h1{font-size:14px;font-weight:600;margin:0 0 8px;}
+svg{width:100%;height:auto;display:block;background:var(--panel);border-radius:8px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:10px 0;}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);}
+.yearbtns{display:flex;gap:6px;}
+button{font:inherit;font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);
+  background:var(--panel);color:var(--fg);cursor:pointer;}
+button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+select{font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;border:1px solid var(--line);
+  background:var(--panel);color:var(--fg);}
+.readouts{display:flex;flex-wrap:wrap;gap:8px 18px;margin:8px 0 4px;font-size:12.5px;}
+.readouts b{color:var(--fg);}
+.readouts span{color:var(--muted);}
+.eqbox{margin-top:10px;padding:10px 12px;border:1px solid var(--grid);border-radius:8px;font-size:12.5px;}
+.legend{color:var(--muted);font-size:11px;margin-top:4px;line-height:1.5;}
+math{font-size:16px;}
+.note{color:var(--muted);font-size:11.5px;margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Champion intelligence-per-watt, 2023–2025</h1>
+  <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 460&quot; role=&quot;img&quot; aria-label=&quot;IPW trend chart&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      Year — advances to that year's champion model+chip pair
+      <div class=&quot;yearbtns&quot;>
+        <button id=&quot;b0&quot;>2023</button>
+        <button id=&quot;b1&quot;>2024</button>
+        <button id=&quot;b2&quot;>2025</button>
+      </div>
+    </div>
+    <div class=&quot;ctrl&quot;>
+      Efficiency axis — per-watt vs. per-joule accounting
+      <select id=&quot;axisSel&quot;>
+        <option value=&quot;watt&quot;>per-watt (IPW / W)</option>
+        <option value=&quot;joule&quot;>per-joule (IPW / J)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div><span>IPW now:</span> <b id=&quot;r_ipw&quot;>—</b></div>
+    <div><span>Model factor:</span> <b id=&quot;r_model&quot;>—</b></div>
+    <div><span>Hardware factor:</span> <b id=&quot;r_hw&quot;>—</b></div>
+    <div><span>Query coverage:</span> <b id=&quot;r_cov&quot;>—</b></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>E</mi><mo>=</mo><mi>P</mi><mo>&amp;#183;</mo><mi>&amp;#964;</mi>
+    </math>
+    <div class=&quot;legend&quot;>
+      E — energy spent per query (J) · P — average power draw (W) · τ — latency per query (s).
+      Newer hardware lowers both P and τ, so switching the axis from per-watt to per-joule lets hardware's
+      share of the gain grow (1.7× → 5.9×) even though the model's share stays near 3.1×.
+    </div>
+    <div class=&quot;note&quot;>Predict first: is the 5.3× per-watt gain mostly chips or mostly models? Toggle the axis above to see the answer flip.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('svg');
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // ---- physics-anchored constants (auditable) ----
+  const MODEL_FACTOR = 3.1;                 // model contribution, ~constant across axes
+  const HW_FACTOR = { watt: 1.7, joule: 5.9 }; // hardware contribution, axis-dependent
+
+  const IPW = {
+    watt:  [7.92e-4, 1.80e-3, 4.18e-3],   // 2023 -> 2024 -> 2025, per watt
+    joule: [1.50e-4, 6.42e-4, 2.744e-3]   // 2023 -> 2024 -> 2025, per joule
+  };
+  const COVERAGE = [23.2, 48.7, 71.3];    // % of queries routable to the champion pair
+  const PAIRS = [
+    { model:'Mixtral-8x7B', chip:'Quadro RTX 6000' },
+    { model:'Llama-3-70B',  chip:'RTX 6000 Ada' },
+    { model:'GPT-OSS-120B', chip:'Apple M4 Max' }
+  ];
+  const YEARS = [2023, 2024, 2025];
+
+  const DOMAIN = {
+    watt:  { lo:5e-4, hi:6e-3, ticks:[1e-3,2e-3,4e-3] },
+    joule: { lo:1e-4, hi:4e-3, ticks:[2e-4,1e-3,3e-3] }
+  };
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const state = { axis:'watt', target:0, t:0 };
+
+  function fmtSci(v){
+    const exp = Math.floor(Math.log10(v));
+    let mant = v / Math.pow(10, exp);
+    let mstr = mant.toFixed(2);
+    if (parseFloat(mstr) >= 10){ mstr=(mant/10).toFixed(2); }
+    return mstr + '\u00d710<tspan baseline-shift=&quot;super&quot; font-size=&quot;8&quot;>' + exp + '</tspan>';
+  }
+
+  const PLOT = { l:74, r:610, t:34, b:190 };
+  function xPos(i){ return 124 + 218*i; }
+  function yScale(v, dom){
+    const f = Math.log10(v/dom.lo)/Math.log10(dom.hi/dom.lo);
+    return PLOT.b - f*(PLOT.b-PLOT.t);
+  }
+
+  function pointOpacity(i,t){ return Math.max(0, Math.min(1, t - i + 1)); }
+
+  function svgEl(tag, attrs, html){
+    let s = '<'+tag;
+    for (const k in attrs) s += ' '+k+'=&quot;'+attrs[k]+'&quot;';
+    s += html!==undefined ? '>'+html+'</'+tag+'>' : '/>';
+    return s;
+  }
+
+  function render(){
+    const axis = state.axis;
+    const dom = DOMAIN[axis];
+    const arr = IPW[axis];
+    const t = state.t;
+    const i0 = Math.min(2, Math.floor(t)), i1 = Math.min(2, i0+1), f = t - i0;
+    const curVal = arr[i0] * Math.pow(arr[i1]/arr[i0] || 1, f);
+    const curCov = COVERAGE[i0] + (COVERAGE[i1]-COVERAGE[i0])*f;
+    const progress = t/2;
+    const modelF = Math.pow(MODEL_FACTOR, progress);
+    const hwF = Math.pow(HW_FACTOR[axis], progress);
+    const revealed = Math.round(t);
+
+    // readouts
+    document.getElementById('r_ipw').innerHTML = curVal.toExponential(2).replace('e','\u00d710<sup>')+'</sup> ('+(axis==='watt'?'per W':'per J')+')';
+    document.getElementById('r_model').textContent = modelF.toFixed(1)+'\u00d7';
+    document.getElementById('r_hw').textContent = hwF.toFixed(1)+'\u00d7';
+    document.getElementById('r_cov').textContent = curCov.toFixed(1)+'%';
+
+    let s = '';
+    // ---- title ----
+    s += svgEl('text', {x:74,y:20,'font-size':13,fill:'var(--fg)','font-weight':600}, 'Intelligence per watt (log scale) — champion model + chip per year');
+
+    // ---- y axis ----
+    s += svgEl('line',{x1:PLOT.l,y1:PLOT.t,x2:PLOT.l,y2:PLOT.b,stroke:'var(--grid)'});
+    dom.ticks.forEach(v=>{
+      const y = yScale(v,dom);
+      s += svgEl('line',{x1:PLOT.l-4,y1:y,x2:PLOT.r,y2:y,stroke:'var(--grid)','stroke-dasharray':'2,3'});
+      s += svgEl('text',{x:PLOT.l-8,y:y+4,'font-size':10,fill:'var(--muted)','text-anchor':'end'}, fmtSci(v));
+    });
+    // ---- x axis ----
+    s += svgEl('line',{x1:PLOT.l,y1:PLOT.b,x2:PLOT.r,y2:PLOT.b,stroke:'var(--grid)'});
+    YEARS.forEach((y,i)=>{
+      s += svgEl('text',{x:xPos(i),y:PLOT.b+18,'font-size':11,fill:'var(--muted)','text-anchor':'middle'}, y);
+    });
+
+    // ---- connecting line across revealed points ----
+    let pts='';
+    for(let i=0;i<=2;i++){
+      const op = pointOpacity(i,t);
+      if(op>0.02) pts += xPos(i)+','+yScale(arr[i],dom)+' ';
+    }
+    s += svgEl('polyline',{points:pts.trim(),fill:'none',stroke:'var(--accent)','stroke-width':2,opacity:0.85});
+
+    // ---- points + labels ----
+    for(let i=0;i<=2;i++){
+      const op = pointOpacity(i,t);
+      if(op<=0.02) continue;
+      const x = xPos(i), y = yScale(arr[i],dom);
+      s += svgEl('circle',{cx:x,cy:y,r:5,fill:'var(--accent)',opacity:op});
+      const above = (i%2===0);
+      const ly = above ? y-30 : y+22;
+      s += svgEl('text',{x:x,y:ly,'font-size':10.5,fill:'var(--fg)','text-anchor':'middle',opacity:op}, PAIRS[i].model);
+      s += svgEl('text',{x:x,y:ly+12,'font-size':10.5,fill:'var(--muted)','text-anchor':'middle',opacity:op}, PAIRS[i].chip);
+      s += svgEl('text',{x:x,y:ly-12,'font-size':10.5,fill:'var(--accent2)','text-anchor':'middle',opacity:op}, fmtSci(arr[i]));
+    }
+    // ---- total-gain bracket, only once 2025 fully selected ----
+    if (revealed===2 &amp;&amp; t>1.85){
+      const x0=xPos(0), x2=xPos(2), yb = PLOT.t+10;
+      const ratio = arr[2]/arr[0];
+      s += svgEl('line',{x1:x0,y1:yb,x2:x2,y2:yb,stroke:'var(--accent3)','stroke-width':1.4});
+      s += svgEl('text',{x:(x0+x2)/2,y:yb-6,'font-size':11,fill:'var(--accent3)','text-anchor':'middle'},
+        ratio.toFixed(1)+'\u00d7 total gain ('+(axis==='watt'?'per-watt':'per-joule')+')');
+    }
+
+    // ---- factor bars ----
+    const barL = 116, barMaxW = 380;
+    const barDomMax = axis==='watt' ? 6 : 20;
+    const bx = f0 => barL + barMaxW * (Math.log10(f0)/Math.log10(barDomMax));
+    s += svgEl('text',{x:20,y:222,'font-size':12,fill:'var(--fg)','font-weight':600}, 'Cumulative factor decomposition (model \u00d7 hardware)');
+    // model bar
+    s += svgEl('text',{x:20,y:250,'font-size':11,fill:'var(--muted)'}, 'Model');
+    s += svgEl('rect',{x:barL,y:238,width:Math.max(0,bx(modelF)-barL),height:16,fill:'var(--accent)'});
+    s += svgEl('text',{x:bx(modelF)+6,y:250,'font-size':11,fill:'var(--fg)'}, modelF.toFixed(1)+'\u00d7');
+    // hardware bar
+    s += svgEl('text',{x:20,y:278,'font-size':11,fill:'var(--muted)'}, 'Hardware');
+    s += svgEl('rect',{x:barL,y:266,width:Math.max(0,bx(hwF)-barL),height:16,fill:'var(--accent2)'});
+    s += svgEl('text',{x:bx(hwF)+6,y:278,'font-size':11,fill:'var(--fg)'}, hwF.toFixed(1)+'\u00d7');
+    // ticks
+    [1,2,5,10,20].filter(v=>v<=barDomMax*1.05).forEach(v=>{
+      const x = bx(v);
+      s += svgEl('line',{x1:x,y1:290,x2:x,y2:296,stroke:'var(--grid)'});
+      s += svgEl('text',{x:x,y:307,'font-size':9.5,fill:'var(--muted)','text-anchor':'middle'}, v+'\u00d7');
+    });
+    s += svgEl('text',{x:barL,y:322,'font-size':10.5,fill:'var(--muted)'}, 'total = model \u00d7 hardware = '+(modelF*hwF).toFixed(1)+'\u00d7');
+
+    // ---- coverage track ----
+    s += svgEl('text',{x:20,y:346,'font-size':12,fill:'var(--fg)','font-weight':600}, 'Query coverage by year (%)');
+    const covTop=354, covBot=420;
+    [0,50,100].forEach(v=>{
+      const y = covBot - (v/100)*(covBot-covTop);
+      s += svgEl('line',{x1:74,y1:y,x2:610,y2:y,stroke:'var(--grid)','stroke-dasharray':'2,3'});
+      s += svgEl('text',{x:68,y:y+4,'font-size':9.5,fill:'var(--muted)','text-anchor':'end'}, v);
+    });
+    for(let i=0;i<=2;i++){
+      const op = pointOpacity(i,t);
+      if(op<=0.02) continue;
+      const val = i<revealed ? COVERAGE[i] : curCov;
+      const x = xPos(i);
+      const y = covBot - (val/100)*(covBot-covTop);
+      s += svgEl('rect',{x:x-16,y:y,width:32,height:covBot-y,fill:'var(--accent3)',opacity:0.8*op});
+      s += svgEl('text',{x:x,y:y-6,'font-size':10.5,fill:'var(--fg)','text-anchor':'middle',opacity:op}, val.toFixed(1)+'%');
+    }
+
+    svg.innerHTML = s;
+  }
+
+  function setActiveButtons(){
+    for(let i=0;i<3;i++) document.getElementById('b'+i).classList.toggle('active', i===state.target);
+  }
+
+  let raf=null;
+  function tick(){
+    const d = state.target - state.t;
+    if (Math.abs(d) < 0.004){ state.t = state.target; render(); raf=null; return; }
+    state.t += d*0.16;
+    render();
+    raf = requestAnimationFrame(tick);
+  }
+  function goTo(idx){
+    state.target = idx;
+    setActiveButtons();
+    if (reduced){ state.t = idx; render(); return; }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+
+  document.getElementById('b0').addEventListener('click',()=>goTo(0));
+  document.getElementById('b1').addEventListener('click',()=>goTo(1));
+  document.getElementById('b2').addEventListener('click',()=>goTo(2));
+  document.getElementById('axisSel').addEventListener('change', e=>{
+    state.axis = e.target.value;
+    render();
+  });
+
+  setActiveButtons();
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;ipw-trend&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Intelligence per watt improved 5.3× in two years, from compounding model and hardware gains"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Intelligence per Watt: Measuring Intelligence Efficiency of Local AI</em> — Jon Saad-Falcon, Avanika Narayan, Hakki Orhun Akengin, J. Wes Griffin, Herumb Shandilya, Adrian Gamarra Lafuente, Medhya Goel, Rebecca Joseph, Shlok Natarajan, Etash Kumar Guha, Shang Zhu, Ben Athiwaratkun, John Hennessy, Azalia Mirhoseini, Christopher Ré. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

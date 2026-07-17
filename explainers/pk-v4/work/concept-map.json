@@ -1,0 +1,101 @@
+{
+  "paper": {
+    "title": "ParallelKittens: Systematic and Practical Simplification of Multi-GPU AI Kernels",
+    "authors": [
+      "Stuart H. Sul",
+      "Simran Arora",
+      "Benjamin F. Spector",
+      "Christopher Ré"
+    ],
+    "oneSentenceClaim": "Moving data between GPUs is now the main bottleneck when training big AI models. This work distills multi-GPU programming into eight simple primitives and one kernel template. With under 50 lines of extra code, its kernels run up to 4× faster than standard libraries.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "Basic linear algebra (matrix multiplication and its O(MNK) cost)",
+    "Order-of-magnitude reasoning about bandwidth and latency (bytes/second, nanoseconds)",
+    "The idea that a neural network layer is dominated by large matrix multiplications",
+    "Basic notion of a computer program running instructions on a processor"
+  ],
+  "concepts": [
+    {
+      "id": "gpu-memory-hierarchy",
+      "name": "The GPU as a Bandwidth Pyramid",
+      "whyItMatters": "Every design decision in the paper is about where data lives and how fast it can move between levels; without the pyramid, none of the trade-offs make sense.",
+      "coreMechanism": "A GPU contains ~130 independent processors called streaming multiprocessors (SMs), each running thousands of threads. Memory forms a strict hierarchy: per-thread registers (64 KB per SM, ~130 TB/s), per-SM shared memory (227 KB, 33 TB/s), a shared L2 cache (50 MB, 12 TB/s), and the main on-board HBM memory (80 GB, 3 TB/s). Each level trades capacity for bandwidth by roughly an order of magnitude. Fast kernels are choreography problems: keep the compute units fed by staging data upward through this pyramid.",
+      "keyFigureRef": "Fig. 1",
+      "foundational": true
+    },
+    {
+      "id": "model-parallelism-collectives",
+      "name": "Splitting Models Across GPUs and the Collectives That Glue Them",
+      "whyItMatters": "The paper's benchmark workloads (AG+GEMM, GEMM+RS, ring attention, expert dispatch) are exactly these splitting strategies; you need to know what an all-gather or reduce-scatter is to see what is being overlapped.",
+      "coreMechanism": "Modern models are too large for one GPU, so weights or inputs are partitioned: tensor parallelism splits weight matrices by rows/columns, sequence parallelism splits a long input sequence, expert parallelism scatters tokens to different specialist sub-networks. Each split creates mandatory data exchanges called collectives: all-gather (everyone assembles the full tensor), reduce-scatter (partial sums are added and distributed), all-reduce (everyone gets the full sum), and all-to-all (everyone exchanges slices). These exchanges are pure overhead — they do no useful math — so their cost must be hidden or minimized.",
+      "foundational": true
+    },
+    {
+      "id": "communication-wall",
+      "name": "Compute Is Outrunning the Interconnect",
+      "whyItMatters": "This widening gap is the paper's motivation: as GPUs get faster, the fraction of time wasted on inter-GPU transfers grows unless kernels are redesigned.",
+      "coreMechanism": "From Nvidia's A100 to B200, matrix-multiply (tensor core) throughput improved 7.2× and on-board memory bandwidth 5.1×, but the GPU-to-GPU link (NVLink) improved only 3× and node-to-node links only 2×. Compute per GPU is growing faster than the pipes between GPUs, so communication's share of wall-clock time keeps rising — already over 50% in some large-language-model workloads, during which the compute units sit idle.",
+      "misconception": "It's tempting to think faster interconnects will fix this; the paper's premise is that hardware bandwidth trends won't catch up, so software must overlap communication with computation instead."
+    },
+    {
+      "id": "overlap-cost-model",
+      "name": "The Overlap Cost Model: Total Time = max, Not Sum",
+      "whyItMatters": "This one equation organizes the entire paper: every technique attacks one term — shrinking T_comm, eliminating T_non-overlap, or cutting T_sync.",
+      "coreMechanism": "GPUs have separate hardware units for computing (tensor cores), moving memory (TMA), and inter-GPU transfer, and they can run simultaneously. If a kernel is pipelined perfectly, total time is the maximum of compute, memory, and communication time rather than their sum — communication becomes free whenever it finishes before the compute it hides behind. Real kernels also pay launch cost, a non-overlappable residue, and synchronization overhead; multi-GPU kernel design is the art of driving the last two terms to zero.",
+      "keyEquation": "T_{\\text{kernel}} = T_{\\text{launch}} + \\max(T_{\\text{comp}}, T_{\\text{mem}}, T_{\\text{comm}}) + T_{\\text{non-overlap}} + T_{\\text{sync}}"
+    },
+    {
+      "id": "transfer-mechanism-tradeoff",
+      "name": "Three Ways to Move Data Between GPUs, Three Very Different Sweet Spots",
+      "whyItMatters": "The paper's first principle: picking the wrong mechanism can make an 'optimized' overlapped kernel slower than doing nothing, which is exactly what happens to prior systems on small matrices.",
+      "coreMechanism": "GPUs offer three transfer mechanisms. The copy engine (a DMA unit driven by the CPU host) reaches 81–82% of peak NVLink bandwidth but needs contiguous messages ≥256 MB to get there — useless for fine-grained exchanges. The Tensor Memory Accelerator (TMA) is launched asynchronously by a single GPU thread and hits ~74–78% of peak with messages as small as 2 KB, leaving the rest of the SM free to compute. Plain register-level load/store instructions work at 128-byte granularity but are synchronous: saturating the link takes ~76 SMs issuing instructions (vs 15 for TMA), burning compute resources. Crucially, only register instructions can invoke the switch's in-network reduction hardware.",
+      "keyFigureRef": "Fig. 2, Fig. 3, Table 2",
+      "misconception": "The highest-bandwidth mechanism (copy engine) is not the best default: below ~256 MB per message its throughput collapses, which is why Flux, CUTLASS, and Triton Distributed fall below the non-overlapped baseline on small matrices."
+    },
+    {
+      "id": "intra-vs-inter-sm-overlap",
+      "name": "Intra-SM vs Inter-SM Overlapping",
+      "whyItMatters": "This is the paper's second principle: no prior system supports both scheduling strategies, and each wins for different workloads — Flux's intra-SM design applied to GEMM all-reduce would be 3.6× slower.",
+      "coreMechanism": "There are two ways to run compute and communication simultaneously. Intra-SM: within each SM, most threads do math while one thread fires asynchronous TMA transfers — every SM's tensor cores stay busy, and synchronization stays on-chip (~64 ns via mbarrier). Inter-SM: a few whole SMs are dedicated to communication while the rest compute — this sacrifices some compute and pays ~832 ns per synchronization (signals must traverse HBM), but frees communication from following the compute pattern, enabling bulk transfers, better cache reuse, and in-network reduction. Empirically, intra-SM wins GEMM+reduce-scatter (743.7 vs 618.1 TFLOP/s) while inter-SM wins GEMM+all-reduce (623.9 vs 172.3 TFLOP/s).",
+      "keyFigureRef": "Fig. 4"
+    },
+    {
+      "id": "communication-hiding-condition",
+      "name": "When Communication Vanishes: The K ≥ sR/2B Condition",
+      "whyItMatters": "This closed-form condition tells you exactly when overlap can drive non-overlapped communication below 1%, and the paper verifies it experimentally to within a factor of ~2.",
+      "coreMechanism": "For each m×n output tile of a GEMM with inner dimension K, compute time is 2mnK/R (R = tensor-core FLOP/s) while shipping the tile costs smn/B (s = bytes per element, B = link bandwidth). The mn factors cancel: compute fully hides communication whenever K ≥ sR/2B, independent of tile shape. For BF16 on H100 (s=2, R=989×10¹², B=450×10⁹) this gives K ≳ 2197. Measurements confirm it: at K=512 communication is 68% of runtime, at K=2048 it drops to 26%, and at K=4096 it is under 1%.",
+      "keyEquation": "K \\geq \\frac{sR}{2B}",
+      "keyFigureRef": "Table 3"
+    },
+    {
+      "id": "in-network-reduction",
+      "name": "Letting the Switch Do the Math: In-Network Reduction",
+      "whyItMatters": "This is the mechanism behind the paper's biggest single win — a 3.62× speedup on GEMM all-reduce — and it is only reachable via register instructions plus inter-SM scheduling, a combination no prior system used.",
+      "coreMechanism": "In a naive all-reduce among N GPUs, each output tile is atomically added to N destinations, and every GPU's single 450 GB/s ingress port serializes the N incoming writes. The NVSwitch fabric, however, contains arithmetic units: a special 'multicast' memory mapping makes one write fan out to all GPUs, and multimem PTX instructions make the switch itself sum data from all GPUs in-flight. Accumulating partial results locally, then having a few dedicated SMs issue one in-network all-reduce, cuts communication volume by roughly a factor of N.",
+      "misconception": "The interconnect is usually pictured as a passive wire; here the switch is an active compute participant, and exploiting it requires the 'inefficient' register-level instructions that other libraries avoid."
+    },
+    {
+      "id": "library-design-tax",
+      "name": "The Hidden Tax in NCCL and NVSHMEM",
+      "whyItMatters": "The paper's third principle: even with perfect scheduling, standard libraries' internal design choices cost up to 1.79× in pure communication kernels and 4.5× in transfer latency — overhead PK removes by construction.",
+      "coreMechanism": "NCCL forces two-way synchronization on every transfer — sender and receiver must handshake even for one-sided writes — and stages data through small pre-allocated intermediate buffers, adding extra copies. NVSHMEM's API performs a global-memory load to fetch the peer's address and a full thread-group synchronization on every remote access. These costs amortize away for huge messages but dominate fine-grained communication. PK instead pre-exchanges destination buffers once (via OS-level virtual-memory mapping) and keeps peer addresses in registers, enabling direct one-way writes: up to 1.79× faster all-reduce and ~20 GB/s more bandwidth.",
+      "keyFigureRef": "Fig. 6"
+    },
+    {
+      "id": "pk-abstractions",
+      "name": "Eight Primitives and One Template Instead of Bespoke Kernels",
+      "whyItMatters": "This is the paper's central deliverable: the claim is that the three principles compress into a tiny API that reproduces hand-tuned performance with under 50 lines of added device code per kernel.",
+      "coreMechanism": "PK operates on tiles — 16×16 up to ~256×256 blocks matched to tensor-core layouts — and adds a Parallel Global Layout (PGL) representing identically-shaped buffers replicated across all GPUs. Eight primitives cover everything: two asynchronous P2P ops (store_async, store_add_async via TMA), two switch-accelerated ops (reduce, all_reduce via multimem), and four barrier ops (signal, signal_all, wait, barrier). A unified template splits work among four roles — loader, consumer, storer (intra-SM overlap) and communicator (dedicated SMs, inter-SM overlap) — and auto-tunes the SM split, since the optimal compute/communication partition shifts with problem size.",
+      "keyFigureRef": "Fig. 1, Fig. 18"
+    },
+    {
+      "id": "generality-results",
+      "name": "One Framework, Four Parallelism Regimes, Two Architectures",
+      "whyItMatters": "The evidence for the paper's thesis: simple reusable principles beat both compilers and off-the-shelf libraries, and match specialists, across heterogeneous workloads and GPU generations.",
+      "coreMechanism": "Because each workload demands a different point in the mechanism/scheduling design space — intra-SM TMA overlap for GEMM+reduce-scatter, inter-SM in-network reduction for all-reduce, dedicated bulk-transfer SMs for ring attention, fine-grained P2P for expert token dispatch — PK's ability to express all of them is what generalizes. Results on 8×H100: up to 2.33× over hand-tuned Flux on tensor-parallel GEMMs, 4.08× over xDiT on ring attention, 1.22× vs Comet on MoE dispatch, and 1.07–5.63× over the Triton Distributed compiler, which was tuned for H800s and sometimes underperforms the non-overlapped baseline on H100s. The same kernels run unmodified on Blackwell B200s with similar gains (e.g., 1409 vs 960 TFLOP/s on GEMM+RS).",
+      "keyFigureRef": "Figs. 7–12"
+    }
+  ]
+}

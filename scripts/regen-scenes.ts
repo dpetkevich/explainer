@@ -9,13 +9,12 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import Database from "better-sqlite3";
 import { AudienceProfileSchema, ConceptMapSchema, StoryboardSchema } from "../src/lib/schemas.js";
 import { paths, type Ctx } from "../src/lib/context.js";
 import { runScenePipeline } from "../src/stages/pipeline.js";
 import { runAssemble } from "../src/stages/assemble.js";
 import type { QaSummary } from "../src/stages/qa.js";
-import { DATA_DIR } from "../src/server/db.js";
+import { listExplainers, updateExplainer } from "../src/server/db.js";
 
 // Minimal .env loader (mirrors cli.ts) so ANTHROPIC_API_KEY is available.
 (() => {
@@ -63,20 +62,13 @@ async function main(): Promise<void> {
   console.log(`[regen-scenes] ${passed}/${board.scenes.length} scenes passing after regen`);
 
   // Sync the feed row (matched by out_dir) so the gallery shows the new count.
-  const db = new Database(join(DATA_DIR, "explainers.db"));
-  const row = db.prepare("SELECT id FROM explainers WHERE out_dir = ?").get(outDirArg) as { id: string } | undefined;
+  const row = (await listExplainers()).find((r) => r.out_dir === outDirArg);
   if (row) {
-    db.prepare("UPDATE explainers SET scenes_passed = ?, scenes_total = ?, updated_at = ? WHERE id = ?").run(
-      passed,
-      board.scenes.length,
-      Date.now(),
-      row.id
-    );
+    await updateExplainer(row.id, { scenes_passed: passed, scenes_total: board.scenes.length });
     console.log(`[regen-scenes] updated feed row ${row.id}: ${passed}/${board.scenes.length}`);
   } else {
     console.log(`[regen-scenes] no feed row for out_dir=${outDirArg} (skipped DB update)`);
   }
-  db.close();
 }
 
 main().catch((err) => {

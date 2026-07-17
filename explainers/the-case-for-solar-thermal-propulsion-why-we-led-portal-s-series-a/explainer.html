@@ -1,0 +1,2213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why Solar-Thermal Propulsion Breaks a 50-Year Tradeoff</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h2 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Why Solar-Thermal Propulsion Breaks a 50-Year Tradeoff</h1>
+  <p class="hook">Every spacecraft ever flown has been forced to choose: burn fast and die young (chemical) or sip propellant and take 18 months to move (electric). With over 1.2 million satellites now filed for orbit, maneuvering is becoming a continuous operational load, and neither legacy architecture can serve it. This explainer walks through the physics — one equation, one heat exchanger, one cost model — showing why concentrated sunlight is the first architecture to escape the binary.</p>
+
+<section class="scene" id="logarithm-punishes-propellant">
+  <h2>The Logarithm That Governs Everything in Orbit</h2>
+  <p class="caption">Total velocity change obeys Δv = Isp·g₀·ln(m_wet/m_dry): it grows linearly with exhaust efficiency (Isp) but only logarithmically with propellant load. Doubling propellant buys you a fixed ln(2) increment, and tank mass grows with it — so a 500 kg spacecraft on storable bipropellant (Isp ≈ 300s) hits a practical wall near 700 m/s no matter how much fuel you cram aboard. Electric thrusters at 1,500s Isp escape the wall by multiplying the whole logarithm by 5, which is why Isp, not tank size, is the lever that matters.</p>
+  <iframe
+    class="scene-frame"
+    data-scene-id="logarithm-punishes-propellant"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The Logarithm That Governs Everything in Orbit</title>
+<style>
+:root{
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --text: #1c1e21;
+  --muted: #5c636e;
+  --grid: #d9dde3;
+  --axis: #8a919c;
+  --red: #c8372d;
+  --red-soft: rgba(200,55,45,0.16);
+  --blue: #1f5fd6;
+  --ceil: #8a6d00;
+  --dry: #7c8794;
+  --tank: #d98a3a;
+  --chipbg: #f0f1f3;
+  --border: #d5d8dd;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg: #14161a;
+    --panel: #1d2026;
+    --text: #e7e9ec;
+    --muted: #9aa2ad;
+    --grid: #2e333b;
+    --axis: #6b7380;
+    --red: #ef6a5e;
+    --red-soft: rgba(239,106,94,0.18);
+    --blue: #6b9bf2;
+    --ceil: #d6b74a;
+    --dry: #9aa5b1;
+    --tank: #e09a52;
+    --chipbg: #262a31;
+    --border: #363b44;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.eq{font-size:16px;text-align:center;margin:2px 0 10px 0;letter-spacing:0.2px;}
+.eq b{font-weight:600}
+canvas{display:block;width:100%;max-width:100%;height:auto;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;}
+.controls button{
+  font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;cursor:pointer;
+  background:var(--chipbg);color:var(--text);border:1px solid var(--border);
+}
+.controls label{flex:1 1 260px;font-size:13px;color:var(--muted);}
+.controls input[type=range]{width:100%;margin-top:4px;display:block;accent-color:var(--red);}
+.controls .val{color:var(--text);font-variant-numeric:tabular-nums;font-weight:600;}
+.readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.chip{flex:1 1 180px;background:var(--chipbg);border:1px solid var(--border);border-radius:8px;
+  padding:7px 10px;font-size:12px;color:var(--muted);min-width:0;}
+.chip .num{display:block;font-size:17px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:2px;}
+.chip.red .num{color:var(--red)} .chip.blue .num{color:var(--blue)} .chip.pr .num{color:var(--ceil)}
+.chip .sub{font-size:11px;}
+</style>
+</head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;eq&quot;>Δv = <b>I<sub>sp</sub></b> · g₀ · ln(m<sub>wet</sub>/m<sub>dry</sub>)&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;g₀ = 9.80665 m/s²</div>
+    <canvas id=&quot;c&quot; aria-label=&quot;Delta-v versus mass ratio plot with spacecraft schematic&quot;></canvas>
+    <div class=&quot;controls&quot;>
+      <button id=&quot;play&quot; type=&quot;button&quot;>▶</button>
+      <label for=&quot;rslider&quot;>propellant mass ratio m<sub>wet</sub>/m<sub>dry</sub> (dimensionless): <span class=&quot;val&quot; id=&quot;rval&quot;>2.00</span>
+        <input id=&quot;rslider&quot; type=&quot;range&quot; min=&quot;1&quot; max=&quot;10&quot; step=&quot;0.05&quot; value=&quot;2&quot;>
+      </label>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;chip red&quot;>Δv, I<sub>sp</sub> = 300 s (storable biprop)<span class=&quot;num&quot; id=&quot;dvRed&quot;>–</span></div>
+      <div class=&quot;chip blue&quot;>Δv, I<sub>sp</sub> = 1500 s (Hall electric)<span class=&quot;num&quot; id=&quot;dvBlue&quot;>–</span><span class=&quot;sub&quot; id=&quot;mult&quot;></span></div>
+      <div class=&quot;chip pr&quot;>practical Δv @ 300 s, tank-limited<span class=&quot;num&quot; id=&quot;dvPr&quot;>–</span><span class=&quot;sub&quot;>propellant ≤ 21% of wet mass</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+&quot;use strict&quot;;
+
+// ---------- physics (all outputs computed live from these) ----------
+const G0 = 9.80665;        // m/s^2, standard gravity
+const ISP_CHEM = 300;      // s, storable bipropellant
+const ISP_EP   = 1500;     // s, Hall-effect electric
+const P_MAX = 0.21;        // max propellant fraction of wet mass, 500 kg-class biprop bus
+const R_CAP = 1/(1-P_MAX); // mass ratio ceiling once tanks/structure counted (~1.266)
+const DV_CEIL = 700;       // m/s, quoted practical biprop ceiling, 500 kg vehicle
+const R_MIN = 1, R_MAX = 10;
+const DV_AXIS_MAX = 8000;  // m/s, plot ceiling
+
+const dv = (isp, R) => isp * G0 * Math.log(R);                       // ideal rocket equation
+const dvPractical = R => ISP_CHEM * G0 * Math.log(Math.min(R, R_CAP)); // tank-limited
+
+// ---------- state ----------
+let R = 2.0;
+const rmq = window.matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;);
+let playing = !rmq.matches;
+let dir = 1;
+let lastT = null;
+const SWEEP_SPEED = 1.1; // mass-ratio units per second
+
+// ---------- dom ----------
+const canvas = document.getElementById(&quot;c&quot;);
+const ctx = canvas.getContext(&quot;2d&quot;);
+const slider = document.getElementById(&quot;rslider&quot;);
+const playBtn = document.getElementById(&quot;play&quot;);
+const rvalEl = document.getElementById(&quot;rval&quot;);
+const dvRedEl = document.getElementById(&quot;dvRed&quot;);
+const dvBlueEl = document.getElementById(&quot;dvBlue&quot;);
+const dvPrEl = document.getElementById(&quot;dvPr&quot;);
+const multEl = document.getElementById(&quot;mult&quot;);
+
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---------- layout ----------
+const CSS_H = 436;
+const M = {l:56, r:14, t:18, b:26};
+const PH = 292;                 // plot height (css px)
+let W = 640, dpr = 1;
+
+function sizeCanvas(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = Math.max(300, Math.min(680, rect.width - 24));
+  dpr = window.devicePixelRatio || 1;
+  canvas.style.width = W + &quot;px&quot;;
+  canvas.style.height = CSS_H + &quot;px&quot;;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(CSS_H * dpr);
+}
+
+const xOf = r => M.l + (r - R_MIN) / (R_MAX - R_MIN) * (W - M.l - M.r);
+const yOf = v => M.t + PH * (1 - v / DV_AXIS_MAX);
+
+// ---------- drawing ----------
+function draw(){
+  const col = {
+    text: cssVar(&quot;--text&quot;), muted: cssVar(&quot;--muted&quot;), grid: cssVar(&quot;--grid&quot;),
+    axis: cssVar(&quot;--axis&quot;), red: cssVar(&quot;--red&quot;), blue: cssVar(&quot;--blue&quot;),
+    ceil: cssVar(&quot;--ceil&quot;), dry: cssVar(&quot;--dry&quot;), tank: cssVar(&quot;--tank&quot;),
+    panel: cssVar(&quot;--panel&quot;)
+  };
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,CSS_H);
+  ctx.lineJoin = &quot;round&quot;;
+  const plotR = W - M.r, plotB = M.t + PH;
+
+  // grid + ticks
+  ctx.font = &quot;11px ui-sans-serif, system-ui, sans-serif&quot;;
+  ctx.strokeStyle = col.grid; ctx.fillStyle = col.muted; ctx.lineWidth = 1;
+  for(let v = 0; v <= DV_AXIS_MAX; v += 2000){
+    const y = yOf(v);
+    ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(plotR, y); ctx.stroke();
+    ctx.textAlign = &quot;right&quot;; ctx.textBaseline = &quot;middle&quot;;
+    ctx.fillText(String(v), M.l - 6, y);
+  }
+  for(let r = 1; r <= 10; r++){
+    const x = xOf(r);
+    ctx.beginPath(); ctx.moveTo(x, plotB); ctx.lineTo(x, plotB + 4); ctx.strokeStyle = col.axis; ctx.stroke();
+    ctx.strokeStyle = col.grid;
+    ctx.textAlign = &quot;center&quot;; ctx.textBaseline = &quot;top&quot;;
+    ctx.fillText(String(r), x, plotB + 7);
+  }
+  // axes
+  ctx.strokeStyle = col.axis; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(M.l, M.t); ctx.lineTo(M.l, plotB); ctx.lineTo(plotR, plotB); ctx.stroke();
+  ctx.fillStyle = col.muted; ctx.textAlign = &quot;left&quot;; ctx.textBaseline = &quot;bottom&quot;;
+  ctx.fillText(&quot;Δv (m/s)&quot;, M.l + 4, M.t - 4);
+  ctx.textAlign = &quot;center&quot;; ctx.textBaseline = &quot;top&quot;;
+  ctx.fillText(&quot;mass ratio m_wet / m_dry&quot;, (M.l + plotR)/2, plotB + 7 + 12);
+
+  // ceiling line at 700 m/s
+  const yCeil = yOf(DV_CEIL);
+  ctx.save();
+  ctx.strokeStyle = col.ceil; ctx.setLineDash([6,4]); ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(M.l, yCeil); ctx.lineTo(plotR, yCeil); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = col.ceil; ctx.textAlign = &quot;right&quot;; ctx.textBaseline = &quot;bottom&quot;;
+  ctx.fillText(&quot;700 m/s · practical biprop ceiling, 500 kg vehicle&quot;, plotR - 2, yCeil - 3);
+
+  // curves (clipped to plot area)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(M.l, M.t, plotR - M.l, PH); ctx.clip();
+
+  function curve(fn, color, dash, width){
+    ctx.beginPath();
+    const N = 240;
+    for(let i = 0; i <= N; i++){
+      const r = R_MIN + (R_MAX - R_MIN) * i / N;
+      const x = xOf(r), y = yOf(fn(r));
+      if(i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]);
+  }
+  curve(r => dv(ISP_EP, r),   col.blue, [], 2.2);
+  curve(r => dv(ISP_CHEM, r), col.red,  [], 2.2);
+  curve(dvPractical,          col.red,  [2,4], 1.6);
+  ctx.restore();
+
+  // curve labels
+  ctx.font = &quot;11px ui-sans-serif, system-ui, sans-serif&quot;;
+  ctx.fillStyle = col.blue; ctx.textAlign = &quot;left&quot;; ctx.textBaseline = &quot;top&quot;;
+  ctx.fillText(&quot;Isp = 1500 s (electric)&quot;, xOf(1.78) + 4, M.t + 4);
+  ctx.fillStyle = col.red; ctx.textAlign = &quot;right&quot;; ctx.textBaseline = &quot;bottom&quot;;
+  ctx.fillText(&quot;Isp = 300 s (chemical)&quot;, plotR - 4, yOf(dv(ISP_CHEM, 10)) - 5);
+  ctx.fillStyle = col.red; ctx.textAlign = &quot;right&quot;; ctx.textBaseline = &quot;top&quot;;
+  ctx.fillText(&quot;practical, tank-limited&quot;, plotR - 4, yOf(dvPractical(10)) + 5);
+
+  // cursor
+  const cx = xOf(R);
+  const dRed = dv(ISP_CHEM, R), dBlue = dv(ISP_EP, R), dPr = dvPractical(R);
+  ctx.strokeStyle = col.axis; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(cx, M.t); ctx.lineTo(cx, plotB); ctx.stroke();
+  ctx.setLineDash([]);
+
+  function labelBox(txt, x, y, color, align){
+    ctx.font = &quot;600 12px ui-sans-serif, system-ui, sans-serif&quot;;
+    const w = ctx.measureText(txt).width;
+    let tx = align === &quot;left&quot; ? x + 9 : x - 9 - w;
+    if(tx + w > plotR - 2) tx = x - 9 - w;
+    if(tx < M.l + 2) tx = M.l + 2;
+    ctx.fillStyle = col.panel; ctx.globalAlpha = 0.85;
+    ctx.fillRect(tx - 3, y - 9, w + 6, 16);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = color; ctx.textAlign = &quot;left&quot;; ctx.textBaseline = &quot;middle&quot;;
+    ctx.fillText(txt, tx, y);
+  }
+
+  // red intersection dot + label
+  const yR = yOf(dRed);
+  ctx.fillStyle = col.red;
+  ctx.beginPath(); ctx.arc(cx, yR, 4.5, 0, 2*Math.PI); ctx.fill();
+  labelBox(Math.round(dRed) + &quot; m/s&quot;, cx, Math.min(yR, plotB - 10), col.red, &quot;left&quot;);
+
+  // practical dot
+  ctx.fillStyle = col.ceil;
+  ctx.beginPath(); ctx.arc(cx, yOf(dPr), 3, 0, 2*Math.PI); ctx.fill();
+
+  // blue intersection dot (clamped to top edge if off-scale)
+  const yBraw = yOf(dBlue);
+  ctx.fillStyle = col.blue;
+  if(dBlue <= DV_AXIS_MAX){
+    ctx.beginPath(); ctx.arc(cx, yBraw, 4.5, 0, 2*Math.PI); ctx.fill();
+    labelBox(Math.round(dBlue) + &quot; m/s&quot;, cx, Math.max(yBraw, M.t + 10), col.blue, &quot;left&quot;);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(cx, M.t + 1); ctx.lineTo(cx - 5, M.t + 10); ctx.lineTo(cx + 5, M.t + 10);
+    ctx.closePath(); ctx.fill();
+    labelBox(&quot;▲ &quot; + Math.round(dBlue) + &quot; m/s (off scale)&quot;, cx, M.t + 20, col.blue, &quot;left&quot;);
+  }
+
+  // ---------- spacecraft schematic ----------
+  const sTop = plotB + 40, sh = 26, sy = sTop + 12;
+  const availW = plotR - M.l - 30;
+  const unit = availW / (R_MAX - R_MIN + 1);  // width of dry-mass segment
+  const dryW = unit, tankW = unit * (R - 1);
+  let x0 = M.l;
+
+  ctx.fillStyle = col.muted; ctx.font = &quot;11px ui-sans-serif, system-ui, sans-serif&quot;;
+  ctx.textAlign = &quot;left&quot;; ctx.textBaseline = &quot;bottom&quot;;
+  ctx.fillText(&quot;spacecraft mass budget (lengths ∝ mass)&quot;, x0, sTop + 6);
+
+  // nose cone
+  ctx.fillStyle = col.dry;
+  ctx.beginPath();
+  ctx.moveTo(x0, sy + sh/2); ctx.lineTo(x0 + 14, sy); ctx.lineTo(x0 + 14, sy + sh);
+  ctx.closePath(); ctx.fill();
+  // dry segment
+  ctx.fillRect(x0 + 14, sy, dryW, sh);
+  // tank segment
+  ctx.fillStyle = col.tank;
+  if(tankW > 0.5) ctx.fillRect(x0 + 14 + dryW, sy, tankW, sh);
+  // nozzle
+  const nx = x0 + 14 + dryW + tankW;
+  ctx.fillStyle = col.dry;
+  ctx.beginPath();
+  ctx.moveTo(nx, sy + 5); ctx.lineTo(nx + 12, sy - 2); ctx.lineTo(nx + 12, sy + sh + 2);
+  ctx.lineTo(nx, sy + sh - 5); ctx.closePath(); ctx.fill();
+
+  ctx.textBaseline = &quot;top&quot;; ctx.textAlign = &quot;center&quot;;
+  ctx.fillStyle = col.dry;
+  ctx.fillText(&quot;dry = 1.00&quot;, x0 + 14 + dryW/2, sy + sh + 5);
+  ctx.fillStyle = col.tank;
+  const propTxt = &quot;propellant = &quot; + (R - 1).toFixed(2) + &quot; × dry&quot;;
+  if(tankW > 90){
+    ctx.fillText(propTxt, x0 + 14 + dryW + tankW/2, sy + sh + 5);
+  } else {
+    ctx.textAlign = &quot;left&quot;;
+    ctx.fillText(propTxt, x0 + 14 + dryW + Math.max(tankW, 0) + 20, sy + sh + 5);
+  }
+}
+
+// ---------- readouts ----------
+function updateReadouts(){
+  const dRed = dv(ISP_CHEM, R), dBlue = dv(ISP_EP, R), dPr = dvPractical(R);
+  rvalEl.textContent = R.toFixed(2);
+  dvRedEl.textContent = Math.round(dRed) + &quot; m/s&quot;;
+  dvBlueEl.textContent = Math.round(dBlue) + &quot; m/s&quot;;
+  dvPrEl.textContent = Math.round(dPr) + &quot; m/s&quot;;
+  multEl.textContent = dRed > 0 ? &quot;= &quot; + (dBlue/dRed).toFixed(1) + &quot;× chemical (Isp ratio)&quot; : &quot;&quot;;
+}
+
+function render(){
+  slider.value = String(R);
+  updateReadouts();
+  draw();
+}
+
+// ---------- animation ----------
+function setPlayBtn(){
+  playBtn.textContent = playing ? &quot;⏸ pause&quot; : &quot;▶ sweep mass ratio&quot;;
+  playBtn.setAttribute(&quot;aria-label&quot;, playing ? &quot;pause sweep&quot; : &quot;play sweep of mass ratio&quot;);
+}
+function frame(t){
+  if(playing){
+    if(lastT !== null){
+      const dt = Math.min(0.05, (t - lastT)/1000);
+      R += dir * SWEEP_SPEED * dt;
+      if(R >= R_MAX){ R = R_MAX; dir = -1; }
+      if(R <= R_MIN){ R = R_MIN; dir = 1; }
+      render();
+    }
+    lastT = t;
+  } else {
+    lastT = t;
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- interaction ----------
+slider.addEventListener(&quot;input&quot;, () => {
+  playing = false; setPlayBtn();
+  R = parseFloat(slider.value);
+  render();
+});
+playBtn.addEventListener(&quot;click&quot;, () => {
+  playing = !playing; setPlayBtn();
+});
+let dragging = false;
+function setFromPointer(e){
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  let r = R_MIN + (x - M.l) / (W - M.l - M.r) * (R_MAX - R_MIN);
+  R = Math.min(R_MAX, Math.max(R_MIN, r));
+  render();
+}
+canvas.addEventListener(&quot;pointerdown&quot;, e => {
+  dragging = true; playing = false; setPlayBtn();
+  canvas.setPointerCapture(e.pointerId);
+  setFromPointer(e);
+});
+canvas.addEventListener(&quot;pointermove&quot;, e => { if(dragging) setFromPointer(e); });
+canvas.addEventListener(&quot;pointerup&quot;, () => { dragging = false; });
+
+window.addEventListener(&quot;resize&quot;, () => { sizeCanvas(); render(); });
+const dmq = window.matchMedia(&quot;(prefers-color-scheme: dark)&quot;);
+if(dmq.addEventListener) dmq.addEventListener(&quot;change&quot;, () => render());
+
+// ---------- init ----------
+sizeCanvas();
+setPlayBtn();
+render();
+requestAnimationFrame(frame);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;logarithm-punishes-propellant&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    title="The Logarithm That Governs Everything in Orbit"
+  ></iframe>
+</section>
+
+<section class="scene" id="tempo-is-not-efficiency">
+  <h2>Isp Measures Economy, Not Tempo</h2>
+  <p class="caption">Maneuver time is Δv divided by acceleration, so it scales inversely with thrust — and electric propulsion's millinewtons make it catastrophically slow regardless of its 1,500s Isp. A 100 m/s reposition takes a Hall thruster ~223 hours of continuous firing; a 5,000 m/s LEO-to-GEO transfer takes 527 days. For a defense customer facing a demonstrated adversary maneuver, an asset that arrives in 527 days did not arrive. Solar thermal (100–200 N) is the only class that stays in single-digit hours across the entire Δv range while remaining indefinitely storable on orbit.</p>
+  <iframe
+    class="scene-frame"
+    data-scene-id="tempo-is-not-efficiency"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Isp Measures Economy, Not Tempo</title>
+<style>
+  :root{
+    --bg:#f7f7f4;
+    --panel:#ffffff;
+    --fg:#1c1e21;
+    --muted:#5c6470;
+    --grid:#d8dce2;
+    --border:#d0d4da;
+    --c-chem:#b06a2e;
+    --c-meth:#3f7fd1;
+    --c-solar:#1f9e63;
+    --c-hall:#8f5fd4;
+    --c-threat:#d64545;
+    --c-dead:#a4a9b0;
+    --btn-bg:#eceef1;
+    --btn-fg:#1c1e21;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111318;
+      --panel:#181b21;
+      --fg:#e7e8e4;
+      --muted:#9aa2ad;
+      --grid:#2c313a;
+      --border:#333944;
+      --c-chem:#d78a45;
+      --c-meth:#6ba1e8;
+      --c-solar:#38c184;
+      --c-hall:#ab84e8;
+      --c-threat:#f06a6a;
+      --c-dead:#6a707a;
+      --btn-bg:#262b33;
+      --btn-fg:#e7e8e4;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font:14px/1.45 system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif}
+  .wrap{max-width:680px;margin:0 auto;padding:12px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:10px}
+  .controls label{font-size:13px;color:var(--muted);white-space:nowrap}
+  .controls input[type=range]{flex:1 1 160px;min-width:120px;max-width:100%}
+  .readout{font-variant-numeric:tabular-nums;font-weight:600;min-width:88px;text-align:right}
+  .eq{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+      color:var(--muted);margin:0 0 8px 0}
+  button{background:var(--btn-bg);color:var(--btn-fg);border:1px solid var(--border);
+    border-radius:6px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+  button:hover{filter:brightness(1.06)}
+  canvas{display:block;width:100%;max-width:100%;height:auto}
+</style>
+</head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <p class=&quot;eq&quot;>t<sub>maneuver</sub> = Δv / a = m·Δv / F&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;m = 500&amp;nbsp;kg spacecraft</p>
+    <div class=&quot;controls&quot;>
+      <label for=&quot;dv&quot;>Commanded Δv (m/s)</label>
+      <input id=&quot;dv&quot; type=&quot;range&quot; min=&quot;100&quot; max=&quot;5000&quot; step=&quot;10&quot; value=&quot;100&quot;
+             aria-label=&quot;Commanded delta-v of the maneuver in meters per second&quot;>
+      <span class=&quot;readout&quot; id=&quot;dvOut&quot;>100 m/s</span>
+      <button id=&quot;sweep&quot; aria-label=&quot;Sweep delta-v from 100 to 5000 meters per second&quot;>&amp;#9654; Sweep Δv</button>
+    </div>
+    <canvas id=&quot;cv&quot; height=&quot;340&quot; aria-label=&quot;Maneuver time versus propulsion type on a logarithmic time axis&quot;></canvas>
+  </div>
+</div>
+
+<script>
+&quot;use strict&quot;;
+(function(){
+  /* ---------- physics constants (auditable) ---------- */
+  const G0   = 9.80665;      // m/s^2, standard gravity
+  const M    = 500;          // kg, spacecraft mass (held constant; linear a = F/m regime)
+  const PROP_FRAC_CHEM = 0.20; // storable-chemical propellant mass fraction
+  const ISP_CHEM = 320;      // s, storable bipropellant (MMH/NTO class)
+  // Tsiolkovsky: Δv_max = Isp·g0·ln(1/(1−f)) ≈ 700 m/s for f = 0.20
+  const DV_MAX_CHEM = ISP_CHEM * G0 * Math.log(1/(1-PROP_FRAC_CHEM)); // ≈ 700.3 m/s
+  const METH_DELAY = 24*3600; // s, launch + fueling delay: no on-orbit cryogenic storage
+
+  // Each system: thrust F (N), Isp (s), duty cycle (fraction of elapsed time thrusting)
+  const SYS = [
+    { key:'chem',  name:'Storable chemical',  sub:'440 N · Isp 320 s',
+      F:440,    duty:1.0, cvar:'--c-chem'  },
+    { key:'meth',  name:'Cryogenic methalox', sub:'1,000 N · Isp 360 s',
+      F:1000,   duty:1.0, cvar:'--c-meth'  },
+    { key:'solar', name:'Solar thermal',      sub:'160 N · Isp 800 s · perigee arcs (50% duty)',
+      F:160,    duty:0.5, cvar:'--c-solar' },
+    { key:'hall',  name:'Hall electric',      sub:'0.0623 N · Isp 1,500 s · continuous firing',
+      F:0.0623, duty:1.0, cvar:'--c-hall'  }
+  ];
+
+  // elapsed maneuver time in seconds: burn time Δv·m/F, stretched by coasting duty cycle
+  function maneuverTime(sys, dv){
+    let t = (M * dv / sys.F) / sys.duty;
+    if (sys.key === 'meth') t += METH_DELAY;
+    return t;
+  }
+
+  /* ---------- time axis (log) ---------- */
+  const TMIN = 60;                       // 1 minute
+  const TMAX = 2 * 365.25 * 86400;       // 2 years
+  const TICKS = [
+    [60,        '1 min'],
+    [600,       '10 min'],
+    [3600,      '1 hr'],
+    [86400,     '1 day'],
+    [2592000,   '1 mo'],
+    [31557600,  '1 yr']
+  ];
+  const THREAT = 12*3600;                // 12 h threat window
+
+  function fmtTime(t){
+    if (t < 100)        return t.toFixed(0) + ' s';
+    if (t < 6000)       return (t/60).toFixed(1) + ' min';
+    const h = t/3600;
+    if (h < 100)        return h.toFixed(1) + ' h';
+    if (h < 300)        return h.toFixed(0) + ' h';
+    return Math.round(t/86400) + ' days';
+  }
+
+  /* ---------- DOM ---------- */
+  const cv     = document.getElementById('cv');
+  const ctx    = cv.getContext('2d');
+  const slider = document.getElementById('dv');
+  const dvOut  = document.getElementById('dvOut');
+  const btn    = document.getElementById('sweep');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const CSS_H = 340;
+  let cssW = 656;
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  /* hatched pattern for the methalox 24 h ground-delay prefix */
+  let hatchPattern = null;
+  function makeHatch(){
+    const p = document.createElement('canvas');
+    p.width = 8; p.height = 8;
+    const g = p.getContext('2d');
+    g.strokeStyle = cssVar('--c-meth');
+    g.globalAlpha = 0.55;
+    g.lineWidth = 1.6;
+    g.beginPath();
+    g.moveTo(-2, 10); g.lineTo(10, -2);
+    g.moveTo(-2, 2);  g.lineTo(2, -2);
+    g.moveTo(6, 10);  g.lineTo(10, 6);
+    g.stroke();
+    hatchPattern = ctx.createPattern(p, 'repeat');
+  }
+
+  /* ---------- state ---------- */
+  let dvTarget = 100;
+  let dvShown  = 100;
+  let sweeping = false;
+  let sweepT0  = 0, sweepU0 = 0;
+  const SWEEP_MS = 12000;
+  let raf = null;
+
+  /* ---------- drawing ---------- */
+  function draw(){
+    const dpr = window.devicePixelRatio || 1;
+    const wantW = Math.round(cssW*dpr), wantH = Math.round(CSS_H*dpr);
+    if (cv.width !== wantW || cv.height !== wantH){
+      cv.width = wantW; cv.height = wantH;
+      cv.style.height = CSS_H + 'px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    const fg=cssVar('--fg'), muted=cssVar('--muted'), grid=cssVar('--grid'),
+          panel=cssVar('--panel'), dead=cssVar('--c-dead'), threatC=cssVar('--c-threat');
+
+    ctx.clearRect(0,0,cssW,CSS_H);
+
+    const padL=8, padR=14;
+    const plotW = cssW - padL - padR;
+    const topPad = 30, rowH = 64, barH = 16;
+    const axisY = topPad + SYS.length*rowH + 6;
+    const logSpan = Math.log10(TMAX/TMIN);
+    const xOf = t => padL + (Math.log10(Math.min(Math.max(t,TMIN),TMAX)/TMIN)/logSpan)*plotW;
+
+    /* gridlines + tick labels */
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+    for (const [t,lab] of TICKS){
+      const x = xOf(t);
+      ctx.strokeStyle = grid; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, topPad-6); ctx.lineTo(x, axisY); ctx.stroke();
+      ctx.fillStyle = muted;
+      const w = ctx.measureText(lab).width;
+      let tx = x - w/2;
+      tx = Math.max(2, Math.min(tx, cssW - w - 2));
+      ctx.fillText(lab, tx, axisY + 6);
+    }
+    /* baseline */
+    ctx.strokeStyle = grid;
+    ctx.beginPath(); ctx.moveTo(padL, axisY); ctx.lineTo(cssW-padR, axisY); ctx.stroke();
+
+    /* 12 h threat window line */
+    const xT = xOf(THREAT);
+    ctx.strokeStyle = threatC; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(xT, topPad-12); ctx.lineTo(xT, axisY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = threatC;
+    ctx.font = '600 11px system-ui, sans-serif';
+    const tl = '12 h threat window';
+    const tlw = ctx.measureText(tl).width;
+    ctx.fillText(tl, Math.max(2, Math.min(xT - tlw/2, cssW - tlw - 2)), 2);
+
+    /* bars */
+    const dv = dvShown;
+    SYS.forEach((s, i) => {
+      const yTop = topPad + i*rowH;
+      const barY = yTop + 22;
+      const exceeded = (s.key === 'chem') &amp;&amp; (dv > DV_MAX_CHEM);
+      const dvUsed = exceeded ? DV_MAX_CHEM : dv;
+      const t = maneuverTime(s, dvUsed);
+      const xTip = xOf(t);
+      const color = exceeded ? dead : cssVar(s.cvar);
+
+      /* row label */
+      ctx.fillStyle = exceeded ? dead : fg;
+      ctx.font = '600 12px system-ui, sans-serif';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(s.name, padL, yTop + 14);
+      const nw = ctx.measureText(s.name).width;
+      ctx.fillStyle = muted;
+      ctx.font = '11px system-ui, sans-serif';
+      const sub = ' — ' + s.sub;
+      if (padL + nw + ctx.measureText(sub).width < cssW - padR)
+        ctx.fillText(sub, padL + nw, yTop + 14);
+
+      /* bar body */
+      if (s.key === 'meth'){
+        const xDelay = xOf(METH_DELAY);
+        ctx.fillStyle = hatchPattern;
+        ctx.fillRect(padL, barY, xDelay - padL, barH);
+        ctx.strokeStyle = color; ctx.lineWidth = 1;
+        ctx.strokeRect(padL + .5, barY + .5, xDelay - padL - 1, barH - 1);
+        ctx.fillStyle = color;
+        ctx.fillRect(xDelay, barY, Math.max(xTip - xDelay, 1.5), barH);
+        /* label inside hatched prefix */
+        ctx.font = '10.5px system-ui, sans-serif';
+        ctx.fillStyle = muted;
+        ctx.textBaseline = 'middle';
+        let dl = '+24 h launch &amp; fueling delay (no on-orbit storage)';
+        if (ctx.measureText(dl).width > xDelay - padL - 10) dl = '+24 h launch &amp; fueling delay';
+        if (ctx.measureText(dl).width > xDelay - padL - 10) dl = '+24 h delay';
+        if (ctx.measureText(dl).width <= xDelay - padL - 10)
+          ctx.fillText(dl, padL + 5, barY + barH/2 + 0.5);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(padL, barY, Math.max(xTip - padL, 1.5), barH);
+      }
+
+      /* tip readout */
+      ctx.textBaseline = 'middle';
+      const ty = barY + barH/2 + 0.5;
+      if (exceeded){
+        ctx.font = '700 11px system-ui, sans-serif';
+        ctx.fillStyle = threatC;
+        ctx.fillText('CAPACITY EXCEEDED (Δv > 700 m/s)', xTip + 7, ty);
+      } else {
+        const lab = fmtTime(t);
+        ctx.font = '600 12px system-ui, sans-serif';
+        const lw = ctx.measureText(lab).width;
+        if (xTip + 7 + lw > cssW - 2){
+          ctx.fillStyle = panel;                    /* inside long bar */
+          ctx.fillText(lab, xTip - lw - 7, ty);
+        } else {
+          ctx.fillStyle = fg;
+          ctx.fillText(lab, xTip + 7, ty);
+        }
+      }
+    });
+
+    dvOut.textContent = Math.round(dv).toLocaleString('en-US') + ' m/s';
+  }
+
+  /* ---------- animation loop ---------- */
+  function tick(now){
+    raf = null;
+    if (sweeping){
+      const u = Math.min(1, sweepU0 + (now - sweepT0)/SWEEP_MS);
+      dvTarget = 100 * Math.pow(50, u);           // log sweep 100 → 5000
+      slider.value = String(Math.round(dvTarget));
+      if (u >= 1){ sweeping = false; btn.innerHTML = '&amp;#9654; Sweep Δv'; }
+    }
+    if (reduceMotion) dvShown = dvTarget;
+    else {
+      dvShown += (dvTarget - dvShown)*0.20;
+      if (Math.abs(dvTarget - dvShown) < 0.5) dvShown = dvTarget;
+    }
+    draw();
+    if (sweeping || dvShown !== dvTarget) raf = requestAnimationFrame(tick);
+  }
+  function kick(){ if (!raf) raf = requestAnimationFrame(tick); }
+
+  slider.addEventListener('input', () => {
+    dvTarget = Number(slider.value);
+    if (sweeping){ sweeping = false; btn.innerHTML = '&amp;#9654; Sweep Δv'; }
+    kick();
+  });
+
+  btn.addEventListener('click', () => {
+    sweeping = !sweeping;
+    if (sweeping){
+      sweepT0 = performance.now();
+      sweepU0 = Math.log(Math.max(dvTarget,100)/100)/Math.log(50);
+      if (sweepU0 >= 0.999) sweepU0 = 0;          // restart from left if at end
+      btn.innerHTML = '&amp;#10074;&amp;#10074; Pause';
+      kick();
+    } else {
+      btn.innerHTML = '&amp;#9654; Sweep Δv';
+    }
+  });
+
+  /* ---------- sizing / theme ---------- */
+  function relayout(){
+    const rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(300, Math.round(rect.width - 24)); // panel padding 12+12
+    makeHatch();
+    draw();
+  }
+  window.addEventListener('resize', relayout);
+  const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+  if (scheme.addEventListener) scheme.addEventListener('change', () => { makeHatch(); draw(); });
+
+  /* ---------- height reporting (mandated) ---------- */
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;tempo-is-not-efficiency&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+
+  /* ---------- init ---------- */
+  relayout();
+  window.__sceneReady = true;
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    title="Isp Measures Economy, Not Tempo"
+  ></iframe>
+</section>
+
+<section class="scene" id="decouple-energy-from-mass">
+  <h2>Separate the Energy Source from the Reaction Mass</h2>
+  <p class="caption">In a chemical rocket the propellant is both fuel and reaction mass, so Isp is capped by combustion enthalpy. Solar thermal breaks the coupling: deployable mirrors concentrate sunlight onto a heat exchanger that raises the propellant to ~3,000 K, and exhaust velocity then scales as √(T/M) — set by temperature and molecular weight alone, not chemistry. Choose ammonia (M = 17) and you get 350–450s; choose hydrogen (M = 2) and you get ~800s, well above any storable chemical ceiling, while thrust stays at 100–200 N because the flow is a dense thermal gas, not a trickle of ions. Note what this is not: there is no photovoltaic conversion and no electrostatic acceleration anywhere in the loop.</p>
+  <iframe
+    class="scene-frame"
+    data-scene-id="decouple-energy-from-mass"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Separate the Energy Source from the Reaction Mass</title>
+<style>
+  :root{
+    --bg:#f6f7f9;
+    --panel:#ffffff;
+    --panel-edge:#d8dce2;
+    --text:#1c2430;
+    --muted:#5b6675;
+    --accent:#e8920a;
+    --sun:#f2a71b;
+    --mirror:#7d8b9c;
+    --hx-cold:#a34220;
+    --hx-hot:#ffb347;
+    --nozzle:#5c6773;
+    --plume-nh3:#e07a2f;
+    --plume-h2:#4f8fd6;
+    --curve-nh3:#c65a1a;
+    --curve-h2:#2f6fbd;
+    --chem:#c43b3b;
+    --elec:#2b5fd0;
+    --grid:#dfe3e9;
+    --op:#111a26;
+    --btn-bg:#e9edf2;
+    --btn-on:#1c2430;
+    --btn-on-text:#f6f7f9;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12161c;
+      --panel:#1a2028;
+      --panel-edge:#313a46;
+      --text:#e8ecf1;
+      --muted:#9aa6b4;
+      --accent:#f2a71b;
+      --sun:#f2a71b;
+      --mirror:#93a3b5;
+      --hx-cold:#b1502a;
+      --hx-hot:#ffc266;
+      --nozzle:#8b98a6;
+      --plume-nh3:#f08c3e;
+      --plume-h2:#6ea8ea;
+      --curve-nh3:#f08c3e;
+      --curve-h2:#6ea8ea;
+      --chem:#e26060;
+      --elec:#6f97ec;
+      --grid:#2b333e;
+      --op:#f1f4f8;
+      --btn-bg:#252d37;
+      --btn-on:#e8ecf1;
+      --btn-on-text:#12161c;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.4 system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:680px;margin:0 auto;padding:12px}
+  .eq{font-family:Georgia,&quot;Times New Roman&quot;,serif;font-size:15px;text-align:center;
+    color:var(--muted);margin:2px 0 10px;letter-spacing:.02em}
+  .eq b{color:var(--text);font-weight:600}
+  .controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:10px}
+  .ctl{display:flex;flex-direction:column;gap:4px;min-width:200px;flex:1 1 220px}
+  .ctl label{font-size:12px;color:var(--muted)}
+  .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .toggle{display:flex;gap:6px;align-items:center}
+  button{font:13px system-ui,sans-serif;padding:6px 14px;border-radius:6px;
+    border:1px solid var(--panel-edge);background:var(--btn-bg);color:var(--text);cursor:pointer}
+  button.on{background:var(--btn-on);color:var(--btn-on-text);border-color:var(--btn-on)}
+  .panels{display:flex;flex-wrap:wrap;gap:10px}
+  .panel{flex:1 1 300px;background:var(--panel);border:1px solid var(--panel-edge);
+    border-radius:8px;padding:8px;display:flex;justify-content:center}
+  canvas{max-width:100%;height:auto;display:block}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .ro{flex:1 1 130px;background:var(--panel);border:1px solid var(--panel-edge);
+    border-radius:8px;padding:8px 10px}
+  .ro .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .ro .v{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+  .ro .u{font-size:12px;color:var(--muted);font-weight:400}
+</style>
+</head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;eq&quot;><b>v<sub>e</sub> = η · √( 2γ/(γ−1) · RT/M )</b>&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;<b>I<sub>sp</sub> = v<sub>e</sub>/g₀</b>&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;<b>F = ṁ·v<sub>e</sub></b></div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctl&quot;>
+      <label>Propellant (exhaust molar mass M)</label>
+      <div class=&quot;toggle&quot;>
+        <button id=&quot;btnNH3&quot;>NH₃ → ½N₂+³⁄₂H₂ (M = 8.5 g/mol)</button>
+        <button id=&quot;btnH2&quot; class=&quot;on&quot;>H₂ (M = 2.0 g/mol)</button>
+      </div>
+    </div>
+    <div class=&quot;ctl&quot;>
+      <label>Chamber temperature T (K): <span id=&quot;Tval&quot;>3000</span> K</label>
+      <input type=&quot;range&quot; id=&quot;Tslider&quot; min=&quot;1800&quot; max=&quot;3000&quot; step=&quot;10&quot; value=&quot;3000&quot;>
+    </div>
+    <div class=&quot;ctl&quot; style=&quot;min-width:90px;flex:0 0 auto&quot;>
+      <label>Animation</label>
+      <button id=&quot;btnPlay&quot;>⏸ Pause</button>
+    </div>
+  </div>
+
+  <div class=&quot;panels&quot;>
+    <div class=&quot;panel&quot;><canvas id=&quot;schem&quot; width=&quot;340&quot; height=&quot;235&quot; style=&quot;width:340px&quot;></canvas></div>
+    <div class=&quot;panel&quot;><canvas id=&quot;plot&quot; width=&quot;340&quot; height=&quot;255&quot; style=&quot;width:340px&quot;></canvas></div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Specific impulse</div><div class=&quot;v&quot;><span id=&quot;roIsp&quot;>–</span> <span class=&quot;u&quot;>s</span></div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Exhaust velocity v<sub>e</sub></div><div class=&quot;v&quot;><span id=&quot;roVe&quot;>–</span> <span class=&quot;u&quot;>m/s</span></div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Thrust F</div><div class=&quot;v&quot;><span id=&quot;roF&quot;>–</span> <span class=&quot;u&quot;>N</span></div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Mass flow ṁ</div><div class=&quot;v&quot;><span id=&quot;roMdot&quot;>–</span> <span class=&quot;u&quot;>g/s</span></div></div>
+  </div>
+</div>
+
+<script>
+&quot;use strict&quot;;
+// ---------- physics ----------
+const R  = 8.314;    // J/(mol·K), universal gas constant
+const g0 = 9.80665;  // m/s^2, standard gravity (Isp convention)
+const ETA = 0.82;    // nozzle + frozen-flow efficiency applied to ideal exit velocity
+const PC = 2.0e6;    // Pa, chamber pressure (~20 bar)
+const AT = 4.91e-5;  // m^2, nozzle throat area (~7.9 mm dia): fixed hardware -> F ~ Cf*pc*At
+const PROPS = {
+  NH3: { M: 8.5e-3, gamma: 1.33, key:&quot;NH3&quot; }, // NH3 fully dissociates to 0.5 N2 + 1.5 H2 above ~1500 K: 17/(1+1) = 8.5 g/mol
+  H2:  { M: 2.0e-3, gamma: 1.36, key:&quot;H2&quot;  }  // H2 at ~3000 K, vibration partially excited
+};
+
+function calc(T, p){
+  const vIdeal = Math.sqrt(2*p.gamma/(p.gamma-1) * R*T/p.M); // ideal full-expansion exit velocity
+  const ve = ETA * vIdeal;                                   // m/s
+  const isp = ve / g0;                                       // s
+  // choked throat flow: mdot = pc*At*Gamma / sqrt(R T / M)
+  const G = Math.sqrt(p.gamma) * Math.pow(2/(p.gamma+1), (p.gamma+1)/(2*(p.gamma-1)));
+  const mdot = PC*AT*G / Math.sqrt(R*T/p.M);                 // kg/s
+  const F = mdot * ve;                                       // N  (~ Cf*pc*At: nearly constant)
+  return { ve, isp, mdot, F };
+}
+
+// ---------- state ----------
+let propKey = &quot;H2&quot;;
+let T = 3000;
+const reduced = window.matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;).matches;
+let playing = !reduced;
+let rafId = null;
+
+// ---------- colors ----------
+let C = {};
+function readColors(){
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  C = {
+    panel:g(&quot;--panel&quot;), text:g(&quot;--text&quot;), muted:g(&quot;--muted&quot;), sun:g(&quot;--sun&quot;),
+    mirror:g(&quot;--mirror&quot;), hxCold:g(&quot;--hx-cold&quot;), hxHot:g(&quot;--hx-hot&quot;),
+    nozzle:g(&quot;--nozzle&quot;), plumeNH3:g(&quot;--plume-nh3&quot;), plumeH2:g(&quot;--plume-h2&quot;),
+    curveNH3:g(&quot;--curve-nh3&quot;), curveH2:g(&quot;--curve-h2&quot;),
+    chem:g(&quot;--chem&quot;), elec:g(&quot;--elec&quot;), grid:g(&quot;--grid&quot;), op:g(&quot;--op&quot;)
+  };
+}
+
+// ---------- canvases (device-pixel-ratio aware) ----------
+const dpr = Math.max(1, window.devicePixelRatio || 1);
+function setup(id, w, h){
+  const cv = document.getElementById(id);
+  cv.width = w*dpr; cv.height = h*dpr;
+  cv.style.width = w+&quot;px&quot;;
+  const ctx = cv.getContext(&quot;2d&quot;);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return ctx;
+}
+const SW=340, SH=235, PW=340, PH=255;
+const sctx = setup(&quot;schem&quot;, SW, SH);
+const pctx = setup(&quot;plot&quot;,  PW, PH);
+
+function lerpColor(a,b,t){
+  const pa=parseHex(a), pb=parseHex(b);
+  const m=(i)=>Math.round(pa[i]+(pb[i]-pa[i])*t);
+  return &quot;rgb(&quot;+m(0)+&quot;,&quot;+m(1)+&quot;,&quot;+m(2)+&quot;)&quot;;
+}
+function parseHex(h){
+  h=h.replace(&quot;#&quot;,&quot;&quot;);
+  if(h.length===3) h=h.split(&quot;&quot;).map(c=>c+c).join(&quot;&quot;);
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+// ---------- schematic ----------
+function drawSchem(now){
+  const p = PROPS[propKey];
+  const {ve, F} = calc(T, p);
+  const ctx = sctx;
+  ctx.clearRect(0,0,SW,SH);
+  ctx.fillStyle = C.panel; ctx.fillRect(0,0,SW,SH);
+
+  const yMid = 128;
+
+  // --- sun ---
+  const sx=34, sy=38;
+  ctx.fillStyle = C.sun;
+  ctx.beginPath(); ctx.arc(sx,sy,13,0,2*Math.PI); ctx.fill();
+  ctx.strokeStyle = C.sun; ctx.lineWidth = 1.5;
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4;
+    ctx.beginPath();
+    ctx.moveTo(sx+17*Math.cos(a), sy+17*Math.sin(a));
+    ctx.lineTo(sx+23*Math.cos(a), sy+23*Math.sin(a));
+    ctx.stroke();
+  }
+
+  // --- incoming parallel rays (sun -> mirror) ---
+  const mirrorX = 78;
+  const mirrorTop = 70, mirrorBot = 186;
+  ctx.strokeStyle = C.sun; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.85;
+  const hitYs = [86, 128, 170];
+  for(const hy of hitYs){
+    ctx.beginPath();
+    ctx.moveTo(sx+14, sy+10 + (hy-86)*0.18);
+    ctx.lineTo(mirrorHitX(hy), hy);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // --- parabolic mirror arc ---
+  function mirrorHitX(y){ // parabola opening right, vertex at (mirrorX, yMid)
+    const dy = y - yMid;
+    return mirrorX + dy*dy/280;
+  }
+  ctx.strokeStyle = C.mirror; ctx.lineWidth = 4; ctx.lineCap=&quot;round&quot;;
+  ctx.beginPath();
+  for(let y=mirrorTop; y<=mirrorBot; y+=4){
+    const x = mirrorHitX(y);
+    (y===mirrorTop) ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // --- reflected rays converge to focal spot ---
+  const fx=158, fy=yMid;
+  ctx.strokeStyle = C.sun; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.9;
+  for(const hy of hitYs){
+    ctx.beginPath(); ctx.moveTo(mirrorHitX(hy), hy); ctx.lineTo(fx, fy); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // --- focal glow (pulses when playing) ---
+  const pulse = playing ? 0.75 + 0.25*Math.sin(now*0.004) : 0.9;
+  const gr = ctx.createRadialGradient(fx,fy,0,fx,fy,16);
+  gr.addColorStop(0, C.hxHot); gr.addColorStop(1, &quot;rgba(0,0,0,0)&quot;);
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = gr;
+  ctx.beginPath(); ctx.arc(fx,fy,16,0,2*Math.PI); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // --- heat exchanger block, color follows T ---
+  const tFrac = (T-1800)/1200;
+  ctx.fillStyle = lerpColor(C.hxCold, C.hxHot, tFrac);
+  ctx.strokeStyle = C.nozzle; ctx.lineWidth = 1.5;
+  const hxX=152, hxW=44, hxY=yMid-22, hxH=44;
+  roundRect(ctx,hxX,hxY,hxW,hxH,4); ctx.fill(); ctx.stroke();
+  // channels
+  ctx.strokeStyle = C.panel; ctx.lineWidth = 1; ctx.globalAlpha=0.55;
+  for(let i=1;i<4;i++){
+    ctx.beginPath(); ctx.moveTo(hxX+4, hxY+i*hxH/4); ctx.lineTo(hxX+hxW-4, hxY+i*hxH/4); ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  // --- nozzle (converging-diverging) ---
+  const nx0=hxX+hxW, nx1=nx0+26;
+  ctx.fillStyle = C.nozzle;
+  ctx.beginPath();
+  ctx.moveTo(nx0, yMid-16);
+  ctx.lineTo(nx0+9, yMid-5);
+  ctx.lineTo(nx1, yMid-13);
+  ctx.lineTo(nx1, yMid+13);
+  ctx.lineTo(nx0+9, yMid+5);
+  ctx.lineTo(nx0, yMid+16);
+  ctx.closePath(); ctx.fill();
+
+  // --- plume: length ∝ v_e, width ∝ F ---
+  const L = ve/8200 * 112;        // px, max ~112 at ve≈8000 m/s
+  const Whalf = (F/150) * 13;     // px, ~13 half-width at 150 N
+  const px0 = nx1, py = yMid;
+  const plumeCol = propKey===&quot;H2&quot; ? C.plumeH2 : C.plumeNH3;
+  const pg = ctx.createLinearGradient(px0,0,px0+L,0);
+  pg.addColorStop(0, plumeCol);
+  pg.addColorStop(1, &quot;rgba(0,0,0,0)&quot;);
+  ctx.fillStyle = pg; ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(px0, py-11);
+  ctx.bezierCurveTo(px0+L*0.28, py-Whalf, px0+L*0.72, py-Whalf*0.6, px0+L, py);
+  ctx.bezierCurveTo(px0+L*0.72, py+Whalf*0.6, px0+L*0.28, py+Whalf, px0, py+11);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // animated streaks, speed ∝ v_e
+  const spacing = 22;
+  const off = playing ? (now * ve * 0.000022) % spacing : 6;
+  ctx.strokeStyle = plumeCol; ctx.lineWidth = 2; ctx.lineCap=&quot;round&quot;;
+  for(let d = off; d < L-8; d += spacing){
+    const frac = d/L;
+    const hw = (11 + (Whalf-11)*Math.min(1,frac*3)) * (1-frac*0.85);
+    ctx.globalAlpha = 0.85*(1-frac);
+    for(const yy of [py-hw*0.5, py+hw*0.5]){
+      ctx.beginPath(); ctx.moveTo(px0+d, yy); ctx.lineTo(px0+d+8, yy); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // --- component labels + T readout ---
+  ctx.fillStyle = C.muted; ctx.font = &quot;11px system-ui, sans-serif&quot;; ctx.textAlign=&quot;center&quot;;
+  ctx.fillText(&quot;sun&quot;, sx, sy+38);
+  ctx.fillText(&quot;mirror&quot;, mirrorX+8, mirrorBot+16);
+  ctx.fillText(&quot;heat exchanger&quot;, hxX+hxW/2, hxY-12);
+  // nozzle label: left-aligned to the right of the nozzle exit so it never
+  // overlaps the T readout centered under the heat exchanger
+  ctx.textAlign=&quot;left&quot;;
+  ctx.fillText(&quot;nozzle&quot;, nx1+6, yMid+34);
+  ctx.textAlign=&quot;center&quot;;
+  ctx.fillStyle = C.text; ctx.font = &quot;12px system-ui, sans-serif&quot;;
+  ctx.fillText(&quot;T = &quot; + Math.round(T) + &quot; K&quot;, hxX+hxW/2, hxY+hxH+18);
+  // plume annotation
+  ctx.fillStyle = C.muted; ctx.font = &quot;10px system-ui, sans-serif&quot;; ctx.textAlign=&quot;left&quot;;
+  ctx.fillText(&quot;length ∝ vₑ · width ∝ F&quot;, px0-8, 34);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+// ---------- plot ----------
+const PM = {l:44, r:26, t:12, b:32}; // right padding sized so the '3500' tick label fits
+const TX0=1000, TX1=3500, IY0=0, IY1=1600;
+function xOf(t){ return PM.l + (t-TX0)/(TX1-TX0)*(PW-PM.l-PM.r); }
+function yOf(i){ return PH-PM.b - (i-IY0)/(IY1-IY0)*(PH-PM.t-PM.b); }
+
+function drawPlot(){
+  const ctx = pctx;
+  ctx.clearRect(0,0,PW,PH);
+  ctx.fillStyle = C.panel; ctx.fillRect(0,0,PW,PH);
+
+  // grid + ticks
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+  ctx.fillStyle = C.muted; ctx.font = &quot;10px system-ui, sans-serif&quot;;
+  ctx.textAlign = &quot;center&quot;;
+  for(let t=TX0; t<=TX1; t+=500){
+    const x=xOf(t);
+    ctx.beginPath(); ctx.moveTo(x,PM.t); ctx.lineTo(x,PH-PM.b); ctx.stroke();
+    ctx.fillText(String(t), x, PH-PM.b+13);
+  }
+  ctx.textAlign = &quot;right&quot;;
+  for(let i=0;i<=IY1;i+=400){
+    const y=yOf(i);
+    ctx.beginPath(); ctx.moveTo(PM.l,y); ctx.lineTo(PW-PM.r,y); ctx.stroke();
+    ctx.fillText(String(i), PM.l-5, y+3);
+  }
+  // axis labels
+  ctx.textAlign=&quot;center&quot;;
+  ctx.fillText(&quot;chamber temperature T (K)&quot;, PM.l+(PW-PM.l-PM.r)/2, PH-4);
+  ctx.save();
+  ctx.translate(10, PM.t+(PH-PM.t-PM.b)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(&quot;Isp (s)&quot;, 0, 0);
+  ctx.restore();
+
+  // chemical ceiling band 180-330 s
+  ctx.fillStyle = C.chem; ctx.globalAlpha = 0.18;
+  ctx.fillRect(PM.l, yOf(330), PW-PM.l-PM.r, yOf(180)-yOf(330));
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C.chem; ctx.font=&quot;10px system-ui, sans-serif&quot;; ctx.textAlign=&quot;left&quot;;
+  ctx.fillText(&quot;storable chemical: 180–330 s&quot;, PM.l+5, yOf(330)+11);
+
+  // Hall electric 1500 s line
+  ctx.strokeStyle = C.elec; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(PM.l, yOf(1500)); ctx.lineTo(PW-PM.r, yOf(1500)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = C.elec;
+  ctx.fillText(&quot;Hall electric: 1,500 s&quot;, PM.l+5, yOf(1500)-5);
+
+  // curves: Isp(T) = eta*sqrt(2g/(g-1) RT/M)/g0
+  for(const key of [&quot;NH3&quot;,&quot;H2&quot;]){
+    const p = PROPS[key], sel = (key===propKey);
+    ctx.strokeStyle = key===&quot;H2&quot; ? C.curveH2 : C.curveNH3;
+    ctx.lineWidth = sel ? 2.5 : 1.4;
+    ctx.globalAlpha = sel ? 1 : 0.5;
+    ctx.beginPath();
+    for(let t=TX0; t<=TX1; t+=25){
+      const y = yOf(calc(t,p).isp);
+      (t===TX0) ? ctx.moveTo(xOf(t),y) : ctx.lineTo(xOf(t),y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // curve labels: right-aligned inside the plot area so they are never clipped
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.font = &quot;11px system-ui, sans-serif&quot;; ctx.textAlign=&quot;right&quot;;
+    const lab = key===&quot;H2&quot; ? &quot;H₂&quot; : &quot;NH₃&quot;;
+    ctx.fillText(lab, xOf(3450), yOf(calc(3450,p).isp)-6);
+  }
+
+  // slider range shading (operating envelope)
+  ctx.fillStyle = C.muted; ctx.globalAlpha = 0.07;
+  ctx.fillRect(xOf(1800), PM.t, xOf(3000)-xOf(1800), PH-PM.t-PM.b);
+  ctx.globalAlpha = 1;
+
+  // operating point
+  const cur = calc(T, PROPS[propKey]);
+  const ox = xOf(T), oy = yOf(cur.isp);
+  ctx.strokeStyle = C.op; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.globalAlpha=0.5;
+  ctx.beginPath(); ctx.moveTo(PM.l,oy); ctx.lineTo(ox,oy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox,PH-PM.b); ctx.lineTo(ox,oy); ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha=1;
+  ctx.fillStyle = propKey===&quot;H2&quot; ? C.curveH2 : C.curveNH3;
+  ctx.beginPath(); ctx.arc(ox,oy,5,0,2*Math.PI); ctx.fill();
+  ctx.strokeStyle = C.op; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(ox,oy,5,0,2*Math.PI); ctx.stroke();
+  ctx.fillStyle = C.text; ctx.font=&quot;bold 11px system-ui, sans-serif&quot;; ctx.textAlign=&quot;left&quot;;
+  const lx = ox > PW-90 ? ox-70 : ox+9;
+  ctx.fillText(Math.round(cur.isp) + &quot; s&quot;, lx, oy-8);
+}
+
+// ---------- readouts ----------
+function updateReadouts(){
+  const {ve, isp, F, mdot} = calc(T, PROPS[propKey]);
+  document.getElementById(&quot;roIsp&quot;).textContent  = Math.round(isp);
+  document.getElementById(&quot;roVe&quot;).textContent   = Math.round(ve).toLocaleString(&quot;en-US&quot;);
+  document.getElementById(&quot;roF&quot;).textContent    = Math.round(F);
+  document.getElementById(&quot;roMdot&quot;).textContent = (mdot*1000).toFixed(1);
+  document.getElementById(&quot;Tval&quot;).textContent   = Math.round(T);
+}
+
+// ---------- render loop ----------
+function renderAll(now){
+  drawSchem(now || 0);
+  drawPlot();
+}
+function loop(now){
+  renderAll(now);
+  if(playing) rafId = requestAnimationFrame(loop);
+}
+function setPlaying(on){
+  playing = on;
+  document.getElementById(&quot;btnPlay&quot;).textContent = on ? &quot;⏸ Pause&quot; : &quot;▶ Play&quot;;
+  if(on){ if(rafId===null) rafId = requestAnimationFrame(loop); }
+  else if(rafId!==null){ cancelAnimationFrame(rafId); rafId=null; renderAll(0); }
+}
+
+// ---------- controls ----------
+const btnNH3 = document.getElementById(&quot;btnNH3&quot;);
+const btnH2  = document.getElementById(&quot;btnH2&quot;);
+function setProp(k){
+  propKey = k;
+  btnNH3.classList.toggle(&quot;on&quot;, k===&quot;NH3&quot;);
+  btnH2.classList.toggle(&quot;on&quot;, k===&quot;H2&quot;);
+  updateReadouts();
+  if(!playing) renderAll(0);
+}
+btnNH3.addEventListener(&quot;click&quot;, ()=>setProp(&quot;NH3&quot;));
+btnH2.addEventListener(&quot;click&quot;,  ()=>setProp(&quot;H2&quot;));
+
+document.getElementById(&quot;Tslider&quot;).addEventListener(&quot;input&quot;, e=>{
+  T = Number(e.target.value);
+  updateReadouts();
+  if(!playing) renderAll(0);
+});
+document.getElementById(&quot;btnPlay&quot;).addEventListener(&quot;click&quot;, ()=>setPlaying(!playing));
+
+const schemeMq = window.matchMedia(&quot;(prefers-color-scheme: dark)&quot;);
+if(schemeMq.addEventListener){
+  schemeMq.addEventListener(&quot;change&quot;, ()=>{ readColors(); if(!playing) renderAll(0); });
+}
+
+// ---------- init ----------
+readColors();
+updateReadouts();
+renderAll(0);
+if(playing){ rafId = requestAnimationFrame(loop); }
+else { document.getElementById(&quot;btnPlay&quot;).textContent = &quot;▶ Play&quot;; }
+window.__sceneReady = true;
+
+// ---------- height reporting ----------
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;decouple-energy-from-mass&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    title="Separate the Energy Source from the Reaction Mass"
+  ></iframe>
+</section>
+
+<section class="scene" id="why-now-temperature-ceiling">
+  <h2>The Physics Was Validated in 1979 — Manufacturing Was the Bottleneck</h2>
+  <p class="caption">NASA and the USAF validated solar thermal decades ago; ground tests exceeded 800s Isp with hydrogen. What killed it three times over: 1980s heat exchangers were hundreds of brazed machined parts, 1980s materials failed structurally near 1,800 K, and deployable mirrors were an order of magnitude too heavy. Since Isp scales as √(T/M), the material temperature ceiling directly gated performance — and additively manufactured refractory alloys now hold to ~3,000 K in a single monolithic part, while membrane optics deliver &gt;1,000 W/kg versus ~100 W/kg for conventional arrays. The instinct 'if it worked, someone would have built it' inverts here: it worked, repeatedly, and was shelved on manufacturability grounds that have since dissolved.</p>
+  <iframe
+    class="scene-frame"
+    data-scene-id="why-now-temperature-ceiling"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Temperature ceiling → Isp</title>
+<style>
+  :root{
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1a2230;
+    --muted: #5c6675;
+    --grid: #d7dce3;
+    --axis: #3a4553;
+    --curve: #1f6fd0;
+    --point: #d4560f;
+    --redzone: rgba(214, 69, 55, 0.14);
+    --redline: #c24638;
+    --greenzone: rgba(38, 148, 84, 0.16);
+    --greenline: #1f8a52;
+    --legacyfill: #c9ccd4;
+    --legacyline: #8a5a3a;
+    --modernfill: #b9d9c6;
+    --modernline: #1f8a52;
+    --channel: #4a7fb5;
+    --gaugebg: #e4e8ee;
+    --gaugefill: #1f6fd0;
+    --btnbg: #1f6fd0;
+    --btntext: #f4f8fd;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #12161d;
+      --panel: #1b212b;
+      --text: #e6eaf1;
+      --muted: #9aa5b4;
+      --grid: #313a47;
+      --axis: #aeb8c6;
+      --curve: #5da3f2;
+      --point: #f2884a;
+      --redzone: rgba(226, 94, 80, 0.18);
+      --redline: #e06a5a;
+      --greenzone: rgba(64, 190, 116, 0.16);
+      --greenline: #46c07c;
+      --legacyfill: #454c58;
+      --legacyline: #c78b5e;
+      --modernfill: #2c4a3a;
+      --modernline: #46c07c;
+      --channel: #6fa8dd;
+      --gaugebg: #2a323e;
+      --gaugefill: #5da3f2;
+      --btnbg: #2f7de0;
+      --btntext: #eef4fb;
+    }
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, sans-serif; }
+  .wrap{ max-width: 680px; margin: 0 auto; padding: 10px 12px 16px; }
+  .eq{ font-size: 14px; color: var(--muted); text-align: center; padding: 4px 0 8px; }
+  .eq b{ color: var(--text); font-weight: 600; }
+  .controls{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center;
+    background:var(--panel); border:1px solid var(--grid); border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+  .controls label{ font-size:13px; color:var(--muted); display:block; margin-bottom:4px; }
+  .sliderbox{ flex: 1 1 260px; min-width: 220px; }
+  input[type=range]{ width:100%; }
+  button{ background:var(--btnbg); color:var(--btntext); border:none; border-radius:8px;
+    padding:8px 14px; font-size:14px; cursor:pointer; }
+  .readouts{ display:flex; gap:16px; flex-wrap:wrap; }
+  .readout{ text-align:center; }
+  .readout .val{ font-size:20px; font-variant-numeric: tabular-nums; font-weight:600; }
+  .readout .lbl{ font-size:11px; color:var(--muted); }
+  canvas{ display:block; width:100%; max-width:100%; background:var(--panel);
+    border:1px solid var(--grid); border-radius:10px; }
+  .lower{ display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; align-items:stretch; }
+  .schembox{ flex: 3 1 340px; background:var(--panel); border:1px solid var(--grid); border-radius:10px; padding:8px; min-width:280px; }
+  .gaugebox{ flex: 1 1 150px; background:var(--panel); border:1px solid var(--grid); border-radius:10px;
+    padding:8px; display:flex; flex-direction:column; align-items:center; min-width:140px; }
+  .schembox svg, .gaugebox svg{ max-width:100%; height:auto; display:block; margin:0 auto; }
+  .caplabel{ font-size:12px; color:var(--muted); text-align:center; margin:2px 0 6px; }
+  .schemreadout{ font-size:13px; text-align:center; margin-top:4px; font-variant-numeric: tabular-nums; }
+  .gaugeval{ font-size:20px; font-weight:600; font-variant-numeric: tabular-nums; margin-top:4px; }
+  .gaugeunit{ font-size:11px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;eq&quot;><b>I<sub>sp</sub> = (η/g₀)·√( 2γ/(γ−1) · R·T<sub>max</sub>/M<sub>H₂</sub> )</b> &amp;nbsp;→&amp;nbsp; I<sub>sp</sub> ∝ √T<sub>max</sub></div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;sliderbox&quot;>
+      <label for=&quot;tslider&quot;>Max survivable heat-exchanger temperature T<sub>max</sub> (K) — 1,500 K (1980s brazed) → 3,000 K (printed refractory)</label>
+      <input type=&quot;range&quot; id=&quot;tslider&quot; min=&quot;1500&quot; max=&quot;3000&quot; step=&quot;5&quot; value=&quot;1500&quot;>
+    </div>
+    <div><button id=&quot;playbtn&quot; aria-label=&quot;Sweep temperature&quot;>▶ Sweep</button></div>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;tval&quot;>1500 K</div><div class=&quot;lbl&quot;>T_max</div></div>
+      <div class=&quot;readout&quot;><div class=&quot;val&quot; id=&quot;ispval&quot;>566 s</div><div class=&quot;lbl&quot;>hydrogen I_sp</div></div>
+    </div>
+  </div>
+
+  <canvas id=&quot;plot&quot; width=&quot;680&quot; height=&quot;360&quot;></canvas>
+
+  <div class=&quot;lower&quot;>
+    <div class=&quot;schembox&quot;>
+      <div class=&quot;caplabel&quot;>Heat-exchanger construction at this T_max</div>
+      <svg id=&quot;schem&quot; viewBox=&quot;0 0 340 140&quot; width=&quot;340&quot; height=&quot;140&quot; role=&quot;img&quot; aria-label=&quot;heat exchanger schematic&quot;></svg>
+      <div class=&quot;schemreadout&quot; id=&quot;schemtext&quot;></div>
+    </div>
+    <div class=&quot;gaugebox&quot;>
+      <div class=&quot;caplabel&quot;>Reflector specific power</div>
+      <svg id=&quot;gauge&quot; viewBox=&quot;0 0 90 150&quot; width=&quot;90&quot; height=&quot;150&quot; role=&quot;img&quot; aria-label=&quot;reflector specific power gauge&quot;></svg>
+      <div class=&quot;gaugeval&quot; id=&quot;gval&quot;>100</div>
+      <div class=&quot;gaugeunit&quot;>W/kg</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  &quot;use strict&quot;;
+
+  // ---------- physics (all outputs computed from these constants) ----------
+  const R = 8.314;            // J/(mol·K)  universal gas constant
+  const M_H2 = 0.002016;      // kg/mol     molar mass of H2 propellant
+  const GAMMA = 1.40;         // —          ratio of specific heats, diatomic H2
+  const G0 = 9.80665;         // m/s²       standard gravity
+  // Lumped nozzle/expansion efficiency, calibrated so Isp(3000 K) matches the
+  // ~800 s hydrogen ground-test figure (finite expansion ratio, losses):
+  const NOZZLE_EFF = 0.843;   // —
+
+  function isp(T){ // seconds; ideal exhaust velocity × efficiency / g0
+    const ve = Math.sqrt( (2*GAMMA/(GAMMA-1)) * R * T / M_H2 );
+    return NOZZLE_EFF * ve / G0;
+  }
+
+  // era boundaries (x-axis annotations &amp; schematic switch)
+  const T_1980S_LIMIT = 1800;   // K, structural limit of 1980s materials
+  const T_MODERN_MIN  = 2800;   // K, modern refractory-alloy zone begins
+  const T_SWITCH      = 2200;   // K, schematic + reflector-gauge transition
+  const REFL_LEGACY = 100;      // W/kg conventional arrays
+  const REFL_MODERN = 1000;     // W/kg membrane optics
+
+  const T_MIN = 1500, T_MAX = 3000;      // slider range
+  const X_MIN = 1500, X_MAX = 3200;      // plot x range
+  const Y_MIN = 400,  Y_MAX = 900;       // plot y range (s)
+
+  // ---------- DOM ----------
+  const canvas = document.getElementById('plot');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('tslider');
+  const playbtn = document.getElementById('playbtn');
+  const tval = document.getElementById('tval');
+  const ispval = document.getElementById('ispval');
+  const schem = document.getElementById('schem');
+  const schemtext = document.getElementById('schemtext');
+  const gauge = document.getElementById('gauge');
+  const gval = document.getElementById('gval');
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  // ---------- plot ----------
+  let W = 680, H = 360, dpr = 1;
+  const MARG = { l: 54, r: 14, t: 16, b: 42 };
+
+  function sizeCanvas(){
+    const cw = Math.min(680, canvas.parentElement.clientWidth - 0);
+    W = Math.max(300, cw);
+    H = Math.round(Math.max(240, Math.min(360, W * 0.55)));
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.height = H + 'px';
+  }
+
+  function xToPx(T){ return MARG.l + (T - X_MIN)/(X_MAX - X_MIN) * (W - MARG.l - MARG.r); }
+  function yToPx(s){ return MARG.t + (Y_MAX - s)/(Y_MAX - Y_MIN) * (H - MARG.t - MARG.b); }
+
+  function drawPlot(T){
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    const cText = cssVar('--text'), cMuted = cssVar('--muted'), cGrid = cssVar('--grid'),
+          cAxis = cssVar('--axis'), cCurve = cssVar('--curve'), cPoint = cssVar('--point'),
+          cRedZ = cssVar('--redzone'), cRedL = cssVar('--redline'),
+          cGrnZ = cssVar('--greenzone'), cGrnL = cssVar('--greenline'),
+          cPanel = cssVar('--panel');
+
+    ctx.fillStyle = cPanel;
+    ctx.fillRect(0,0,W,H);
+
+    const plotTop = MARG.t, plotBot = H - MARG.b;
+
+    // zones
+    ctx.fillStyle = cRedZ;
+    ctx.fillRect(xToPx(X_MIN), plotTop, xToPx(T_1980S_LIMIT) - xToPx(X_MIN), plotBot - plotTop);
+    ctx.fillStyle = cGrnZ;
+    ctx.fillRect(xToPx(T_MODERN_MIN), plotTop, xToPx(X_MAX) - xToPx(T_MODERN_MIN), plotBot - plotTop);
+
+    // zone boundary dashed lines
+    ctx.setLineDash([4,4]); ctx.lineWidth = 1.2;
+    ctx.strokeStyle = cRedL;
+    ctx.beginPath(); ctx.moveTo(xToPx(T_1980S_LIMIT), plotTop); ctx.lineTo(xToPx(T_1980S_LIMIT), plotBot); ctx.stroke();
+    ctx.strokeStyle = cGrnL;
+    ctx.beginPath(); ctx.moveTo(xToPx(T_MODERN_MIN), plotTop); ctx.lineTo(xToPx(T_MODERN_MIN), plotBot); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // zone labels
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = cRedL; ctx.textAlign = 'left';
+    ctx.fillText('1980s material limit ~1800 K', xToPx(X_MIN) + 4, plotTop + 13);
+    ctx.fillStyle = cGrnL; ctx.textAlign = 'right';
+    ctx.fillText('modern refractory ~3000 K', xToPx(X_MAX) - 4, plotTop + 13);
+
+    // grid + y ticks
+    ctx.textAlign = 'right';
+    for(let s = Y_MIN; s <= Y_MAX; s += 100){
+      const y = yToPx(s);
+      ctx.strokeStyle = cGrid; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(MARG.l, y); ctx.lineTo(W - MARG.r, y); ctx.stroke();
+      ctx.fillStyle = cMuted;
+      ctx.fillText(String(s), MARG.l - 6, y + 4);
+    }
+    // x ticks
+    ctx.textAlign = 'center';
+    for(let t = 1500; t <= 3200; t += 300){
+      const x = xToPx(t);
+      ctx.strokeStyle = cGrid;
+      ctx.beginPath(); ctx.moveTo(x, plotBot); ctx.lineTo(x, plotBot + 4); ctx.stroke();
+      ctx.fillStyle = cMuted;
+      ctx.fillText(String(t), x, plotBot + 16);
+    }
+
+    // axes
+    ctx.strokeStyle = cAxis; ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(MARG.l, plotTop); ctx.lineTo(MARG.l, plotBot); ctx.lineTo(W - MARG.r, plotBot);
+    ctx.stroke();
+
+    // axis labels
+    ctx.fillStyle = cText; ctx.font = '12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('max survivable heat-exchanger temperature T_max (K)', (MARG.l + W - MARG.r)/2, H - 8);
+    ctx.save();
+    ctx.translate(14, (plotTop + plotBot)/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText('hydrogen I_sp (s)', 0, 0);
+    ctx.restore();
+
+    // √T curve
+    ctx.strokeStyle = cCurve; ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    for(let i = 0; i <= 200; i++){
+      const t = X_MIN + (X_MAX - X_MIN) * i / 200;
+      const x = xToPx(t), y = yToPx(isp(t));
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // operating point + drop lines
+    const s = isp(T), px = xToPx(T), py = yToPx(s);
+    ctx.setLineDash([3,4]); ctx.strokeStyle = cPoint; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, plotBot); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(MARG.l, py); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = cPoint;
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, 2*Math.PI); ctx.fill();
+
+    // point readout label
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillStyle = cText;
+    const lbl = Math.round(T) + ' K → ' + Math.round(s) + ' s';
+    ctx.textAlign = (px > W - 130) ? 'right' : 'left';
+    const lx = (px > W - 130) ? px - 10 : px + 10;
+    ctx.fillText(lbl, lx, Math.max(plotTop + 26, py - 10));
+  }
+
+  // ---------- schematic ----------
+  let lastMode = null;
+  function drawSchematic(T){
+    const modern = T >= T_SWITCH;
+    const mode = modern ? 'modern' : 'legacy';
+    if(mode === lastMode) return;
+    lastMode = mode;
+
+    const x0 = 30, y0 = 18, w = 280, h = 100;
+    let s = '';
+    if(!modern){
+      // legacy: 3 rows × 8 cols = 24 brazed segments with joint lines
+      const cols = 8, rows = 3;
+      const cw = w / cols, ch = h / rows;
+      let joints = 0;
+      for(let r = 0; r < rows; r++){
+        for(let c = 0; c < cols; c++){
+          s += '<rect x=&quot;'+(x0 + c*cw + 1.5).toFixed(1)+'&quot; y=&quot;'+(y0 + r*ch + 1.5).toFixed(1)+
+               '&quot; width=&quot;'+(cw - 3).toFixed(1)+'&quot; height=&quot;'+(ch - 3).toFixed(1)+
+               '&quot; rx=&quot;2&quot; fill=&quot;var(--legacyfill)&quot; stroke=&quot;var(--legacyline)&quot; stroke-width=&quot;1&quot;/>';
+        }
+      }
+      // braze joint lines
+      for(let c = 1; c < cols; c++){
+        joints += rows;
+        s += '<line x1=&quot;'+(x0 + c*cw).toFixed(1)+'&quot; y1=&quot;'+y0+'&quot; x2=&quot;'+(x0 + c*cw).toFixed(1)+'&quot; y2=&quot;'+(y0+h)+
+             '&quot; stroke=&quot;var(--legacyline)&quot; stroke-width=&quot;1.6&quot; stroke-dasharray=&quot;3,2&quot;/>';
+      }
+      for(let r = 1; r < rows; r++){
+        joints += cols;
+        s += '<line x1=&quot;'+x0+'&quot; y1=&quot;'+(y0 + r*ch).toFixed(1)+'&quot; x2=&quot;'+(x0+w)+'&quot; y2=&quot;'+(y0 + r*ch).toFixed(1)+
+             '&quot; stroke=&quot;var(--legacyline)&quot; stroke-width=&quot;1.6&quot; stroke-dasharray=&quot;3,2&quot;/>';
+      }
+      s += '<rect x=&quot;'+x0+'&quot; y=&quot;'+y0+'&quot; width=&quot;'+w+'&quot; height=&quot;'+h+
+           '&quot; fill=&quot;none&quot; stroke=&quot;var(--legacyline)&quot; stroke-width=&quot;1.6&quot;/>';
+      schem.innerHTML = s;
+      schemtext.textContent = (cols*rows) + ' brazed segments · ' + joints + ' braze joints';
+    } else {
+      // modern: one monolithic printed part with smooth internal channels
+      s += '<rect x=&quot;'+x0+'&quot; y=&quot;'+y0+'&quot; width=&quot;'+w+'&quot; height=&quot;'+h+
+           '&quot; rx=&quot;14&quot; fill=&quot;var(--modernfill)&quot; stroke=&quot;var(--modernline)&quot; stroke-width=&quot;2.2&quot;/>';
+      for(let k = 0; k < 4; k++){
+        const yy = y0 + 20 + k * 20;
+        let d = 'M ' + (x0+12) + ' ' + yy;
+        for(let seg = 0; seg < 8; seg++){
+          const xa = x0 + 12 + (w - 24) * (seg + 0.5) / 8;
+          const xb = x0 + 12 + (w - 24) * (seg + 1) / 8;
+          const bump = (seg % 2 === 0 ? -6 : 6);
+          d += ' Q ' + xa.toFixed(1) + ' ' + (yy + bump) + ' ' + xb.toFixed(1) + ' ' + yy;
+        }
+        s += '<path d=&quot;'+d+'&quot; fill=&quot;none&quot; stroke=&quot;var(--channel)&quot; stroke-width=&quot;3&quot; stroke-linecap=&quot;round&quot;/>';
+      }
+      schem.innerHTML = s;
+      schemtext.textContent = '1 monolithic printed part · 0 joints';
+    }
+  }
+
+  // ---------- gauge ----------
+  let lastRefl = null;
+  function drawGauge(T){
+    const refl = (T >= T_SWITCH) ? REFL_MODERN : REFL_LEGACY;
+    if(refl === lastRefl) return;
+    lastRefl = refl;
+    const gh = 120, gw = 30, gx = 30, gy = 12;
+    const frac = refl / 1000; // scale max = 1000 W/kg
+    const fh = Math.max(4, gh * frac);
+    let s = '';
+    s += '<rect x=&quot;'+gx+'&quot; y=&quot;'+gy+'&quot; width=&quot;'+gw+'&quot; height=&quot;'+gh+'&quot; rx=&quot;5&quot; fill=&quot;var(--gaugebg)&quot;/>';
+    s += '<rect x=&quot;'+gx+'&quot; y=&quot;'+(gy + gh - fh).toFixed(1)+'&quot; width=&quot;'+gw+'&quot; height=&quot;'+fh.toFixed(1)+
+         '&quot; rx=&quot;5&quot; fill=&quot;var(--gaugefill)&quot;/>';
+    // ticks at 100 and 1000
+    [100, 500, 1000].forEach(function(v){
+      const ty = gy + gh - gh * v/1000;
+      s += '<line x1=&quot;'+(gx+gw)+'&quot; y1=&quot;'+ty.toFixed(1)+'&quot; x2=&quot;'+(gx+gw+6)+'&quot; y2=&quot;'+ty.toFixed(1)+
+           '&quot; stroke=&quot;var(--axis)&quot; stroke-width=&quot;1&quot;/>';
+      s += '<text x=&quot;'+(gx+gw+9)+'&quot; y=&quot;'+(ty+3.5).toFixed(1)+
+           '&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot; font-family=&quot;system-ui,sans-serif&quot;>'+v+'</text>';
+    });
+    gauge.innerHTML = s;
+    gval.textContent = String(Math.round(refl));
+  }
+
+  // ---------- state &amp; animation ----------
+  let currentT = T_MIN;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = false, dir = 1, lastTs = null, rafId = null;
+  const SWEEP_RATE = 350; // K per second
+
+  function render(){
+    drawPlot(currentT);
+    drawSchematic(currentT);
+    drawGauge(currentT);
+    tval.textContent = Math.round(currentT) + ' K';
+    ispval.textContent = Math.round(isp(currentT)) + ' s';
+  }
+
+  function setT(T){
+    currentT = Math.min(T_MAX, Math.max(T_MIN, T));
+    slider.value = String(Math.round(currentT));
+    render();
+  }
+
+  function tick(ts){
+    if(!playing){ rafId = null; return; }
+    if(lastTs === null) lastTs = ts;
+    const dt = Math.min(0.05, (ts - lastTs)/1000);
+    lastTs = ts;
+    let T = currentT + dir * SWEEP_RATE * dt;
+    if(T >= T_MAX){ T = T_MAX; dir = -1; }
+    if(T <= T_MIN){ T = T_MIN; dir = 1; }
+    setT(T);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function setPlaying(p){
+    playing = p;
+    playbtn.textContent = p ? '⏸ Pause' : '▶ Sweep';
+    if(p){ lastTs = null; if(rafId === null) rafId = requestAnimationFrame(tick); }
+  }
+
+  playbtn.addEventListener('click', function(){ setPlaying(!playing); });
+
+  slider.addEventListener('input', function(){
+    setPlaying(false);
+    setT(parseFloat(slider.value));
+  });
+
+  window.addEventListener('resize', function(){
+    sizeCanvas();
+    render();
+  });
+
+  // ---------- init ----------
+  sizeCanvas();
+  setT(T_MIN);
+  if(!reduceMotion){ setPlaying(true); } // reduced motion: start paused, ▶ visible
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;why-now-temperature-ceiling&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    title="The Physics Was Validated in 1979 — Manufacturing Was the Bottleneck"
+  ></iframe>
+</section>
+
+<section class="scene" id="three-layer-cost-stack">
+  <h2>Cheapest at Every Delta-v, Not Just at a Crossover</h2>
+  <p class="caption">Cost per maneuver is not propellant price — it's three stacked layers, and they interact. Propellant: ammonia at $1/kg keeps the solar-thermal curve flat while xenon at $2,500/kg erodes electric's efficiency edge at high Δv. Amortization: with 50+ restarts across a 5–6 km/s lifetime budget, each solar-thermal maneuver absorbs a sliver of the standardized $10M hardware, whereas chemical stages concentrate full cost into a handful of burns and Hall thrusters wear out from throughput erosion. Energy: sunlight is free and external; chemical systems burn their energy supply, electric thrusters degrade as slow consumables. The result is not a crossover chart — solar thermal is the floor across the entire domain, which is what makes it a platform rather than a niche.</p>
+  <iframe
+    class="scene-frame"
+    data-scene-id="three-layer-cost-stack"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<style>
+  :root{
+    --bg:#f4f5f3;
+    --panel:#ffffff;
+    --text:#1d2530;
+    --muted:#69737f;
+    --grid:#e1e5ea;
+    --border:#d6dbe1;
+    --red:#c8503f;
+    --blue:#3a6fd8;
+    --green:#2c8a55;
+    --layerProp:#dfa137;
+    --layerHw:#8d97a7;
+    --layerEn:#8f66c9;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14181f;
+      --panel:#1b212c;
+      --text:#e7eaf0;
+      --muted:#9aa4b2;
+      --grid:#2a3241;
+      --border:#343d4e;
+      --red:#e5705e;
+      --blue:#75a0f2;
+      --green:#4fbe7f;
+      --layerProp:#e9b256;
+      --layerHw:#9aa5b7;
+      --layerEn:#ab86e0;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.4 system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,Helvetica,Arial,sans-serif}
+  .scene{max-width:680px;margin:0 auto;padding:10px 12px 14px}
+  .hdr{font-size:12px;color:var(--muted);margin:2px 2px 8px}
+  canvas{display:block;width:100%;max-width:100%;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px}
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 4px}
+  .controls button{font:inherit;padding:5px 12px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer}
+  .controls button:hover{border-color:var(--muted)}
+  .slab{font-size:13px;white-space:nowrap}
+  .slab b{font-variant-numeric:tabular-nums}
+  input[type=range]{flex:1 1 160px;min-width:120px;accent-color:var(--green)}
+  .eq{font-size:12px;color:var(--muted);margin:2px 2px 8px;font-family:Georgia,&quot;Times New Roman&quot;,serif}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 2px 8px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .chip{display:inline-block;width:10px;height:10px;border-radius:2px}
+  .chip.p{background:var(--layerProp)}
+  .chip.h{background:var(--layerHw)}
+  .chip.e{background:var(--layerEn)}
+  .cards{display:flex;gap:8px;flex-wrap:wrap}
+  .card{flex:1 1 190px;min-width:0;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:8px}
+  .chead{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:6px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .cbody{display:flex;gap:10px;align-items:flex-end}
+  .barcol{width:30px;height:132px;flex:none;display:flex;flex-direction:column;
+    justify-content:flex-end;border-bottom:2px solid var(--border)}
+  .seg{width:100%}
+  .seg.e{background:var(--layerEn)}
+  .seg.p{background:var(--layerProp)}
+  .seg.h{background:var(--layerHw)}
+  .reads{font-size:12px;min-width:0}
+  .reads .tot{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+  .reads .mp{color:var(--muted);margin-bottom:4px;font-variant-numeric:tabular-nums}
+  .lr{display:flex;align-items:center;gap:5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .lr b{margin-left:auto;padding-left:8px;font-weight:600}
+  .deadmsg{display:none;font-size:12px;color:var(--muted);min-height:132px;align-items:center}
+  .card.dead .cbody{display:none}
+  .card.dead .deadmsg{display:flex}
+</style>
+</head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;hdr&quot;>Cost per maneuver vs Δv — 500 kg spacecraft, standardized $10M hardware (log–log)</div>
+  <canvas id=&quot;plot&quot; aria-label=&quot;cost per maneuver versus delta-v&quot;></canvas>
+  <div class=&quot;controls&quot;>
+    <button id=&quot;play&quot; type=&quot;button&quot;>▶ Sweep Δv</button>
+    <label class=&quot;slab&quot; for=&quot;dv&quot;>Δv per maneuver: <b id=&quot;dvRead&quot;>100</b> m/s</label>
+    <input type=&quot;range&quot; id=&quot;dv&quot; min=&quot;0&quot; max=&quot;1000&quot; step=&quot;1&quot; value=&quot;0&quot; aria-label=&quot;delta-v per maneuver, 100 to 5000 meters per second, log scale&quot;>
+  </div>
+  <div class=&quot;eq&quot;>cost(Δv) = m<sub>p</sub>·p<sub>prop</sub> + C<sub>hw</sub>·Δv/Δv<sub>life</sub> + E(Δv), &amp;nbsp; m<sub>p</sub> = m<sub>dry</sub>(e<sup>Δv/(g₀·I<sub>sp</sub>)</sup> − 1)</div>
+  <div class=&quot;legend&quot;>
+    <span><i class=&quot;chip p&quot;></i>propellant</span>
+    <span><i class=&quot;chip h&quot;></i>hardware amortization</span>
+    <span><i class=&quot;chip e&quot;></i>energy / degradation</span>
+  </div>
+  <div class=&quot;cards&quot; id=&quot;cards&quot;></div>
+</div>
+
+<script>
+&quot;use strict&quot;;
+// ---------- physical constants and cost model ----------
+const G0 = 9.80665;        // m/s^2, standard gravity
+const M_DRY = 500;         // kg, spacecraft dry mass
+const HW_COST = 10e6;      // $, standardized hardware cost, all architectures
+const DV_MIN = 100, DV_MAX = 5000;   // m/s, domain
+const Y_MIN = 1e5, Y_MAX = 1.2e7;    // $, plot range
+
+// Each architecture: exhaust velocity from Isp; propellant mass from the rocket
+// equation; hardware amortized over its lifetime delta-v budget; energy/degradation
+// = per-maneuver overhead (ignition/restart/PPU cycling) + wear priced per m/s.
+const ARCHS = [
+  { key:&quot;biprop&quot;, name:&quot;Storable biprop&quot;, propLabel:&quot;NTO/MMH $200/kg&quot;,
+    isp:315,            // s
+    pricePerKg:200,     // $/kg, storable bipropellant
+    dvLife:700,         // m/s, full stage capability -> full hardware cost over 700 m/s
+    ceil:700,           // m/s, hard ceiling: no burns beyond this
+    enFixed:20000,      // $, pressurant / ignition / thermal conditioning per burn
+    enPerDv:80,         // $/(m/s), chemical-energy handling scales with burn size
+    colorVar:&quot;--red&quot; },
+  { key:&quot;hall&quot;, name:&quot;Hall electric&quot;, propLabel:&quot;Xe $2,500/kg&quot;,
+    isp:1200,           // s
+    pricePerKg:2500,    // $/kg, xenon
+    dvLife:6000,        // m/s, bus/PPU amortization budget
+    ceil:null,
+    enFixed:80000,      // $, PPU + array cycling per maneuver
+    enPerDv:365,        // $/(m/s), channel erosion: thruster consumed with throughput
+    colorVar:&quot;--blue&quot; },
+  { key:&quot;solar&quot;, name:&quot;Solar thermal&quot;, propLabel:&quot;NH\u2083 $1/kg&quot;,
+    isp:350,            // s
+    pricePerKg:1,       // $/kg, ammonia
+    dvLife:5500,        // m/s, 50+ restart lifetime budget
+    ceil:null,
+    enFixed:40000,      // $, restart / thermal-cycle wear per maneuver; sunlight itself free
+    enPerDv:0,          // $/(m/s), external energy source -> no throughput wear term
+    colorVar:&quot;--green&quot; }
+];
+
+function costParts(a, dv){
+  const live = !(a.ceil !== null &amp;&amp; dv > a.ceil);
+  const ve = a.isp * G0;                          // m/s, exhaust velocity
+  const mp = M_DRY * (Math.exp(dv/ve) - 1);       // kg, rocket equation
+  const prop = mp * a.pricePerKg;                 // $ propellant layer
+  const hw = HW_COST * dv / a.dvLife;             // $ hardware amortization layer
+  const en = a.enFixed + a.enPerDv * dv;          // $ energy / degradation layer
+  return { live, mp, prop, hw, en, total: prop + hw + en };
+}
+
+// ---------- formatting ----------
+function fmt$(v){
+  if (v >= 1e6) return &quot;$&quot; + (v/1e6).toFixed(2) + &quot;M&quot;;
+  if (v >= 1e3) return &quot;$&quot; + Math.round(v/1e3) + &quot;k&quot;;
+  return &quot;$&quot; + Math.round(v);
+}
+function fmtKg(m){ return (m >= 100 ? String(Math.round(m)) : m.toFixed(1)) + &quot; kg&quot;; }
+
+// ---------- DOM ----------
+const canvas = document.getElementById(&quot;plot&quot;);
+const ctx = canvas.getContext(&quot;2d&quot;);
+const slider = document.getElementById(&quot;dv&quot;);
+const dvRead = document.getElementById(&quot;dvRead&quot;);
+const playBtn = document.getElementById(&quot;play&quot;);
+const cardsEl = document.getElementById(&quot;cards&quot;);
+
+const cardRefs = {};
+for (const a of ARCHS){
+  const card = document.createElement(&quot;div&quot;);
+  card.className = &quot;card&quot;;
+  card.innerHTML =
+    '<div class=&quot;chead&quot;><span class=&quot;dot&quot;></span><span>' + a.name + &quot; · &quot; + a.propLabel + &quot;</span></div>&quot; +
+    '<div class=&quot;cbody&quot;>' +
+      '<div class=&quot;barcol&quot;><div class=&quot;seg e&quot;></div><div class=&quot;seg p&quot;></div><div class=&quot;seg h&quot;></div></div>' +
+      '<div class=&quot;reads&quot;>' +
+        '<div class=&quot;tot&quot;></div>' +
+        '<div class=&quot;mp&quot;></div>' +
+        '<div class=&quot;lr&quot;><i class=&quot;chip p&quot;></i>propellant<b class=&quot;vp&quot;></b></div>' +
+        '<div class=&quot;lr&quot;><i class=&quot;chip h&quot;></i>hardware<b class=&quot;vh&quot;></b></div>' +
+        '<div class=&quot;lr&quot;><i class=&quot;chip e&quot;></i>energy<b class=&quot;ve&quot;></b></div>' +
+      &quot;</div>&quot; +
+    &quot;</div>&quot; +
+    '<div class=&quot;deadmsg&quot;>no burn — Δv exceeds the 700 m/s stage ceiling</div>';
+  card.querySelector(&quot;.dot&quot;).style.background = &quot;var(&quot; + a.colorVar + &quot;)&quot;;
+  cardsEl.appendChild(card);
+  cardRefs[a.key] = {
+    card,
+    segE: card.querySelector(&quot;.seg.e&quot;),
+    segP: card.querySelector(&quot;.seg.p&quot;),
+    segH: card.querySelector(&quot;.seg.h&quot;),
+    tot: card.querySelector(&quot;.tot&quot;),
+    mp: card.querySelector(&quot;.mp&quot;),
+    vp: card.querySelector(&quot;.vp&quot;),
+    vh: card.querySelector(&quot;.vh&quot;),
+    ve: card.querySelector(&quot;.ve&quot;)
+  };
+}
+
+// ---------- plot geometry ----------
+let W = 680, H = 340;
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function resizeCanvas(){
+  const cssW = Math.max(280, canvas.clientWidth || 640);
+  const cssH = cssW < 460 ? 300 : 340;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.height = cssH + &quot;px&quot;;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = cssW; H = cssH;
+}
+
+const LX0 = Math.log10(DV_MIN), LX1 = Math.log10(DV_MAX);
+const LY0 = Math.log10(Y_MIN),  LY1 = Math.log10(Y_MAX);
+
+function sliderToDv(v){ return DV_MIN * Math.pow(DV_MAX/DV_MIN, v/1000); }
+
+function draw(dv){
+  const mL = 58, mR = 14, mT = 22, mB = 36;
+  const pw = W - mL - mR, ph = H - mT - mB;
+  const xOf = d => mL + (Math.log10(d) - LX0) / (LX1 - LX0) * pw;
+  const yOf = c => mT + (1 - (Math.log10(c) - LY0) / (LY1 - LY0)) * ph;
+
+  const panel = cssVar(&quot;--panel&quot;), grid = cssVar(&quot;--grid&quot;),
+        muted = cssVar(&quot;--muted&quot;), text = cssVar(&quot;--text&quot;);
+  const cols = { biprop: cssVar(&quot;--red&quot;), hall: cssVar(&quot;--blue&quot;), solar: cssVar(&quot;--green&quot;) };
+
+  ctx.fillStyle = panel;
+  ctx.fillRect(0, 0, W, H);
+
+  // grid + ticks
+  ctx.font = &quot;11px system-ui, sans-serif&quot;;
+  ctx.lineWidth = 1;
+  const xt = [100, 200, 500, 1000, 2000, 5000];
+  const yt = [1e5, 2e5, 5e5, 1e6, 2e6, 5e6, 1e7];
+  ctx.strokeStyle = grid;
+  ctx.fillStyle = muted;
+  ctx.textAlign = &quot;center&quot;; ctx.textBaseline = &quot;top&quot;;
+  for (const v of xt){
+    const x = xOf(v);
+    ctx.beginPath(); ctx.moveTo(x, mT); ctx.lineTo(x, mT + ph); ctx.stroke();
+    ctx.fillText(v >= 1000 ? (v/1000) + &quot;k&quot; : String(v), x, mT + ph + 5);
+  }
+  ctx.textAlign = &quot;right&quot;; ctx.textBaseline = &quot;middle&quot;;
+  for (const v of yt){
+    const y = yOf(v);
+    ctx.beginPath(); ctx.moveTo(mL, y); ctx.lineTo(mL + pw, y); ctx.stroke();
+    ctx.fillText(v >= 1e6 ? &quot;$&quot; + (v/1e6) + &quot;M&quot; : &quot;$&quot; + (v/1e3) + &quot;k&quot;, mL - 6, y);
+  }
+  // axis titles
+  ctx.textAlign = &quot;left&quot;; ctx.textBaseline = &quot;alphabetic&quot;;
+  ctx.fillText(&quot;cost per maneuver ($, log)&quot;, mL, 14);
+  ctx.textAlign = &quot;center&quot;;
+  ctx.fillText(&quot;\u0394v per maneuver (m/s, log)&quot;, mL + pw/2, H - 6);
+
+  // curves
+  for (const a of ARCHS){
+    const dvEnd = a.ceil !== null ? Math.min(a.ceil, DV_MAX) : DV_MAX;
+    const N = 140;
+    ctx.strokeStyle = cols[a.key];
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++){
+      const d = DV_MIN * Math.pow(dvEnd/DV_MIN, i/(N-1));
+      const c = costParts(a, d).total;
+      const x = xOf(d), y = yOf(c);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // biprop ceiling: dashed line + open endpoint
+  const bp = ARCHS[0];
+  const xC = xOf(bp.ceil), yC = yOf(costParts(bp, bp.ceil).total);
+  ctx.strokeStyle = cols.biprop;
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xC, yC); ctx.lineTo(xC, mT + ph); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(xC, yC, 4.5, 0, Math.PI*2);
+  ctx.fillStyle = panel; ctx.fill();
+  ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = cols.biprop;
+  ctx.textAlign = &quot;left&quot;; ctx.textBaseline = &quot;middle&quot;;
+  ctx.fillText(&quot;700 m/s ceiling&quot;, xC + 8, yC + 1);
+
+  // in-plot curve legend (bottom-right)
+  const leg = [
+    { c: cols.biprop, t: &quot;storable biprop (Isp 315 s)&quot; },
+    { c: cols.hall,   t: &quot;Hall electric (Isp 1200 s)&quot; },
+    { c: cols.solar,  t: &quot;solar thermal (Isp 350 s)&quot; }
+  ];
+  let lw = 0;
+  for (const it of leg) lw = Math.max(lw, ctx.measureText(it.t).width);
+  const bx = mL + pw - lw - 26, by0 = mT + ph - 8 - leg.length * 15;
+  leg.forEach((it, i) => {
+    const y = by0 + i * 15;
+    ctx.strokeStyle = it.c; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(bx, y); ctx.lineTo(bx + 14, y); ctx.stroke();
+    ctx.fillStyle = it.c; ctx.textAlign = &quot;left&quot;;
+    ctx.fillText(it.t, bx + 19, y);
+  });
+
+  // cursor
+  const xCur = xOf(dv);
+  ctx.strokeStyle = muted;
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xCur, mT); ctx.lineTo(xCur, mT + ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // dots + $ labels at cursor (live curves only), with overlap avoidance
+  const labels = [];
+  for (const a of ARCHS){
+    const p = costParts(a, dv);
+    if (!p.live) continue;
+    const y = yOf(p.total);
+    ctx.beginPath(); ctx.arc(xCur, y, 4.5, 0, Math.PI*2);
+    ctx.fillStyle = cols[a.key]; ctx.fill();
+    ctx.strokeStyle = panel; ctx.lineWidth = 1.5; ctx.stroke();
+    labels.push({ y, text: fmt$(p.total), c: cols[a.key] });
+  }
+  labels.sort((u, v) => u.y - v.y);
+  for (let i = 1; i < labels.length; i++)
+    if (labels[i].y < labels[i-1].y + 13) labels[i].y = labels[i-1].y + 13;
+  const onRight = xCur > mL + pw - 70;
+  ctx.textAlign = onRight ? &quot;right&quot; : &quot;left&quot;;
+  ctx.textBaseline = &quot;middle&quot;;
+  ctx.font = &quot;bold 11px system-ui, sans-serif&quot;;
+  for (const l of labels){
+    ctx.fillStyle = l.c;
+    ctx.fillText(l.text, onRight ? xCur - 9 : xCur + 9, l.y);
+  }
+  ctx.font = &quot;11px system-ui, sans-serif&quot;;
+  ctx.fillStyle = text;
+}
+
+// ---------- cards ----------
+function updateCards(dv){
+  const parts = {};
+  let maxTotal = 0;
+  for (const a of ARCHS){
+    const p = costParts(a, dv);
+    parts[a.key] = p;
+    if (p.live) maxTotal = Math.max(maxTotal, p.total);
+  }
+  const BARH = 130; // px
+  for (const a of ARCHS){
+    const p = parts[a.key], r = cardRefs[a.key];
+    if (!p.live){ r.card.classList.add(&quot;dead&quot;); continue; }
+    r.card.classList.remove(&quot;dead&quot;);
+    const hTot = BARH * p.total / maxTotal;
+    r.segH.style.height = (hTot * p.hw / p.total) + &quot;px&quot;;
+    r.segP.style.height = (hTot * p.prop / p.total) + &quot;px&quot;;
+    r.segE.style.height = (hTot * p.en / p.total) + &quot;px&quot;;
+    r.tot.textContent = &quot;total &quot; + fmt$(p.total);
+    r.mp.textContent = &quot;m\u209A = &quot; + fmtKg(p.mp);
+    r.vp.textContent = fmt$(p.prop);
+    r.vh.textContent = fmt$(p.hw);
+    r.ve.textContent = fmt$(p.en);
+  }
+}
+
+// ---------- update loop / controls ----------
+function update(){
+  const dv = sliderToDv(Number(slider.value));
+  dvRead.textContent = String(Math.round(dv));
+  draw(dv);
+  updateCards(dv);
+}
+
+const reducedMotion = window.matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;).matches;
+let playing = !reducedMotion;
+let phase = 0, lastT = null, rafId = null;
+
+function frame(ts){
+  if (!playing){ rafId = null; return; }
+  if (lastT === null) lastT = ts;
+  phase += (ts - lastT) / 14000; // full sweep ~14 s each way
+  lastT = ts;
+  const u = phase % 2, t = u < 1 ? u : 2 - u;
+  slider.value = String(Math.round(t * 1000));
+  update();
+  rafId = requestAnimationFrame(frame);
+}
+function setBtn(){ playBtn.textContent = playing ? &quot;\u23F8 Pause&quot; : &quot;\u25B6 Sweep \u0394v&quot;; }
+
+playBtn.addEventListener(&quot;click&quot;, () => {
+  playing = !playing;
+  setBtn();
+  if (playing){
+    phase = Number(slider.value) / 1000;
+    lastT = null;
+    if (rafId === null) rafId = requestAnimationFrame(frame);
+  }
+});
+slider.addEventListener(&quot;input&quot;, () => {
+  if (playing){ playing = false; setBtn(); }
+  update();
+});
+
+const schemeMq = window.matchMedia(&quot;(prefers-color-scheme: dark)&quot;);
+if (schemeMq.addEventListener) schemeMq.addEventListener(&quot;change&quot;, update);
+
+const __roCanvas = new ResizeObserver(() => { resizeCanvas(); update(); });
+__roCanvas.observe(canvas);
+
+// init
+resizeCanvas();
+setBtn();
+update();
+if (playing) rafId = requestAnimationFrame(frame);
+window.__sceneReady = true;
+
+// height reporting to parent
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;three-layer-cost-stack&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    title="Cheapest at Every Delta-v, Not Just at a Crossover"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Space Intelligence: Portal Space Systems and Solar-Thermal Propulsion</em> — Mach33 (investment analysis). Explainer generated 2026-07-07.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

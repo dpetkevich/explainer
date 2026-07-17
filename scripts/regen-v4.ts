@@ -7,9 +7,8 @@
  *
  * Usage: SCENE_CONCURRENCY=6 npx tsx scripts/regen-v4.ts
  */
-import Database from "better-sqlite3";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 // Minimal .env loader so ANTHROPIC_API_KEY can live in the project (mirrors cli.ts).
 (() => {
@@ -20,7 +19,7 @@ import { join, resolve } from "node:path";
     if (m && m[1] && !(m[1] in process.env)) process.env[m[1]] = m[2]!.replace(/^["']|["']$/g, "");
   }
 })();
-import { initDb, createExplainer, getExplainer, DATA_DIR, type SourceKind } from "../src/server/db.js";
+import { initDb, createExplainer, getExplainer, deleteExplainer, type SourceKind } from "../src/server/db.js";
 import { runGenerationJob } from "../src/server/jobs.js";
 import { currentPedagogy } from "../src/lib/pedagogy.js";
 
@@ -92,29 +91,28 @@ const POOL = Math.max(1, Number(process.env.GEN_POOL ?? "2"));
 
 async function main(): Promise<void> {
   console.log(`[regen-v4] pedagogy ${currentPedagogy().version} — ${currentPedagogy().label}`);
-  initDb();
+  await initDb();
 
   // Idempotent: skip specs already finished, and reset the rest to a clean
   // queued row. (Out dirs are cache-keyed by input, so kept artifacts resume;
   // changed prompts regen.) A rerun after an interruption thus only picks up
   // what didn't finish.
-  const todo = SPECS.filter((s) => {
-    if (ONLY.size > 0 && !ONLY.has(s.id)) return false;
-    const existing = getExplainer(s.id);
+  const todo: Spec[] = [];
+  for (const s of SPECS) {
+    if (ONLY.size > 0 && !ONLY.has(s.id)) continue;
+    const existing = await getExplainer(s.id);
     if (existing?.status === "done") {
       console.log(`[regen-v4] skipping ${s.id} — already done (${existing.scenes_passed}/${existing.scenes_total})`);
-      return false;
+      continue;
     }
-    return true;
-  });
-  const raw = new Database(join(DATA_DIR, "explainers.db"));
-  const del = raw.prepare("DELETE FROM explainers WHERE id = ?");
-  for (const s of todo) del.run(s.id);
-  raw.close();
+    todo.push(s);
+  }
+  for (const s of todo) await deleteExplainer(s.id);
 
-  const rows = todo.map((s) =>
-    createExplainer({ id: s.id, sourceKind: s.sourceKind, sourceRef: s.sourceRef, sourceLabel: s.sourceLabel, outDir: s.outDir })
-  );
+  const rows = [];
+  for (const s of todo) {
+    rows.push(await createExplainer({ id: s.id, sourceKind: s.sourceKind, sourceRef: s.sourceRef, sourceLabel: s.sourceLabel, outDir: s.outDir }));
+  }
 
   // Run with a small pool so heavy pipelines don't thrash the rate limiter.
   let next = 0;
@@ -125,7 +123,7 @@ async function main(): Promise<void> {
       console.log(`[regen-v4] starting ${row.id}`);
       const t0 = Date.now();
       await runGenerationJob(row); // swallows its own errors -> marks the row failed
-      const after = getExplainer(row.id);
+      const after = await getExplainer(row.id);
       const mins = ((Date.now() - t0) / 1000 / 60).toFixed(1);
       if (after?.status === "done") {
         console.log(`[regen-v4] finished ${row.id} in ${mins}min (${after.scenes_passed}/${after.scenes_total} scenes)`);

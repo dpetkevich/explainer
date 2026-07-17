@@ -1,0 +1,4022 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distilling a Giant Network into a Small One</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Distilling a Giant Network into a Small One</h1>
+  <p class="hook">The most accurate systems for recognizing speech and images are enormous — or worse, they are committees of many big networks whose answers get averaged. They win benchmarks, but running ten huge networks for every voice query is far too slow and costly to deploy. This paper makes a startling claim: nearly all of that skill can be poured into one small, fast network, because the skill lives not in the millions of learned parameters but in the full pattern of probabilities the big system assigns to every input — including the vanishingly tiny probabilities it gives to wrong answers. To see why those tiny numbers matter, and how a temperature knob straight out of thermodynamics transfers them, we have to begin at the beginning.</p>
+  <p class="page-links"><a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener noreferrer">Distilling the Knowledge in a Neural Network</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v1.0.0 · Feynman-first; 3-5 sentence captions</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Before the trick, the ground rules: what a classifier actually outputs (a distribution you already know from statistical mechanics), how it is normally trained, and why the most accurate systems — averaged committees of networks — are too expensive to serve.</div>
+</header>
+<section class="scene" id="softmax-is-boltzmann">
+  <h3>A classifier outputs a Boltzmann distribution, not an answer</h3>
+  <div class="caption">Take a network that must sort inputs into five classes. Its last layer produces one real number per class — the field calls each of these a logit, written <math><msub><mi>z</mi><mi>i</mi></msub></math> — and you should read a logit as a negative energy. A final operation called the softmax converts logits into probabilities, <math><msub><mi>q</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>i</mi></msub></mrow></msup></mrow><mrow><msub><mi>sum</mi><mi>j</mi></msub><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub></mrow></msup></mrow></mfrac></math>, which is exactly the Boltzmann distribution <math><msup><mi>e</mi><mrow><mo>-</mo><mi>E</mi><mo>/</mo><mi>kT</mi></mrow></msup></math> from thermodynamics, evaluated at temperature <math><mi>T</mi><mo>=</mo><mn>1</mn></math>: lower energy means exponentially more occupation. Drag the middle logit upward and watch — every extra unit of logit multiplies its unnormalized weight by <math><mi>e</mi><mo>≈</mo><mn>2.718</mn></math>, and all the other bars must shrink to keep the total at exactly 1. So the network never answers with a single class; it answers with a whole distribution, and the shape of that distribution is where everything in this paper happens.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="softmax-is-boltzmann"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Softmax is a Boltzmann distribution</title>
+<style>
+  :root{
+    --bg:#f7f7f9;
+    --panel-bg:#ffffff;
+    --text:#1a1a1e;
+    --muted:#5b5b63;
+    --grid:#c9c9d1;
+    --accent:#2a6f97;
+    --c1:#e07a5f; --c2:#81b29a; --c3:#3d5a80; --c4:#f2cc8f; --c5:#9b5de5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16161a;
+      --panel-bg:#1f1f24;
+      --text:#f0f0f3;
+      --muted:#a4a4ad;
+      --grid:#3a3a42;
+      --accent:#6fb4d8;
+      --c1:#e8917a; --c2:#9ecbb5; --c3:#7ea5cc; --c4:#f5da9f; --c5:#c294f0;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px; background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif;
+    max-width:100%;
+  }
+  .wrap{max-width:680px; margin:0 auto;}
+  h2{font-size:15px; font-weight:600; margin:0 0 8px 0; color:var(--text);}
+  svg{width:100%; height:auto; max-width:100%; display:block; background:var(--panel-bg); border-radius:8px;}
+  .controls{display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:10px;}
+  .ctrl{display:flex; flex-direction:column; gap:4px; flex:1 1 260px; min-width:200px;}
+  label{font-size:12.5px; color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{
+    padding:6px 10px; font-size:12.5px; border-radius:6px; border:1px solid var(--grid);
+    background:var(--panel-bg); color:var(--text); cursor:pointer;
+  }
+  .readouts{display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; font-size:13px;}
+  .readout{background:var(--panel-bg); border-radius:6px; padding:6px 10px; border:1px solid var(--grid);}
+  .readout .val{font-weight:700; color:var(--accent);}
+  math{font-size:16px;}
+  .legend{font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.5;}
+  .eqbox{margin-top:14px; padding:10px 12px; background:var(--panel-bg); border-radius:8px; border:1px solid var(--grid);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Logits &amp;#8594; softmax: one class's score reshapes the whole distribution</h2>
+
+  <svg id=&quot;scene&quot; viewBox=&quot;0 0 640 380&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; role=&quot;img&quot; aria-label=&quot;Logit and probability bars&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;z3&quot;>Drag: logit for class 3, <span id=&quot;z3label&quot;>z&amp;#8323; = 0.0</span> (other logits fixed at 2, 0, &amp;#8722;1, 0)</label>
+      <input type=&quot;range&quot; id=&quot;z3&quot; min=&quot;-2&quot; max=&quot;5&quot; step=&quot;0.1&quot; value=&quot;0&quot;>
+    </div>
+    <button id=&quot;toggleAnim&quot;>Pause flow arrows</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;>&amp;Sigma; q<sub>i</sub> = <span class=&quot;val&quot; id=&quot;sumq&quot;>1.000</span></div>
+    <div class=&quot;readout&quot;>q<sub>1</sub> = <span class=&quot;val&quot; id=&quot;q1&quot;>0.687</span></div>
+    <div class=&quot;readout&quot;>q<sub>3</sub> = <span class=&quot;val&quot; id=&quot;q3&quot;>0.093</span></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>q</mi><mi>i</mi></msub><mo>=</mo>
+      <mfrac>
+        <msup><mi>e</mi><msub><mi>z</mi><mi>i</mi></msub></msup>
+        <mrow><msub><mo>&amp;#8721;</mo><mi>j</mi></msub><msup><mi>e</mi><msub><mi>z</mi><mi>j</mi></msub></msup></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      q<sub>i</sub> &amp;mdash; probability the network assigns to class i (dimensionless, all q<sub>i</sub> sum to 1) &amp;middot;
+      z<sub>i</sub> &amp;mdash; logit (raw score) for class i, treated as a negative energy &amp;middot;
+      e &amp;mdash; Euler's number &amp;#8776; 2.718 &amp;middot;
+      j &amp;mdash; index running over all 5 classes in the denominator sum
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const svgns = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('scene');
+  const z3slider = document.getElementById('z3');
+  const z3label = document.getElementById('z3label');
+  const sumqEl = document.getElementById('sumq');
+  const q1El = document.getElementById('q1');
+  const q3El = document.getElementById('q3');
+  const toggleBtn = document.getElementById('toggleAnim');
+
+  const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const classColors = ['--c1','--c2','--c3','--c4','--c5'].map(cssVar);
+
+  const E = Math.E; // Euler's number ~ 2.718
+  const kT = 1;      // softmax = Boltzmann distribution evaluated at temperature T=1
+
+  // fixed logits for classes 1,2,4,5 ; class 3 (index 2) is the slider variable
+  const fixed = [2, 0, null, -1, 0];
+
+  function getZ(){
+    const z3 = parseFloat(z3slider.value);
+    return [fixed[0], fixed[1], z3, fixed[3], fixed[4]];
+  }
+
+  // Boltzmann weight w_i = exp(-E_i/kT) with E_i = -z_i  =>  w_i = exp(z_i/kT)
+  function computeQ(zArr){
+    const weights = zArr.map(z => Math.exp(z / kT));
+    const sum = weights.reduce((a,b)=>a+b, 0);
+    return { q: weights.map(w => w / sum), sum };
+  }
+
+  // ---- layout constants ----
+  // leftX0 is pushed in from the SVG edge far enough that the row labels
+  // (e.g. &quot;z1 = 2.0&quot;), which are drawn to the LEFT of leftX0 with
+  // text-anchor=&quot;end&quot;, never run past x=0 and get clipped.
+  const W = 640, H = 380;
+  const leftX0 = 110, leftX1 = 300;       // logit panel x-range
+  const zMin = -4, zMax = 6;
+  const zeroX = leftX0 + (0 - zMin) / (zMax - zMin) * (leftX1 - leftX0);
+  const scaleZ = (leftX1 - leftX0) / (zMax - zMin);
+
+  const rightX0 = 415, rightX1 = 620;    // probability panel x-range
+  const topY = 50, baseY = 320;          // vertical span for both panels
+  const rowH = (baseY - topY) / 5;
+
+  function xForZ(z){ return zeroX + z * scaleZ; }
+  function yForRow(i){ return topY + i*rowH + rowH/2; }
+
+  let flowT = 0;
+  let playing = true;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion){ playing = false; toggleBtn.textContent = 'Play flow arrows'; }
+
+  function el(tag, attrs){
+    const e = document.createElementNS(svgns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const subDigits = ['\u2081','\u2082','\u2083','\u2084','\u2085'];
+
+  function draw(){
+    svg.innerHTML = '';
+    const zArr = getZ();
+    const { q, sum } = computeQ(zArr);
+
+    // ---- panel titles ----
+    svg.appendChild(el('text', {x:leftX0, y:26, fill:cssVar('--muted'), 'font-size':12}));
+    svg.lastChild.textContent = 'logits  z\u1d62  (negative energy)';
+    svg.appendChild(el('text', {x:rightX0, y:26, fill:cssVar('--muted'), 'font-size':12}));
+    svg.lastChild.textContent = 'probabilities  q\u1d62  (softmax output)';
+
+    // ---- left axis ticks ----
+    for (let zt = zMin; zt <= zMax; zt += 2){
+      const x = xForZ(zt);
+      svg.appendChild(el('line', {x1:x, x2:x, y1:topY-6, y2:baseY, stroke:cssVar('--grid'), 'stroke-width':1}));
+      const t = el('text', {x:x, y:baseY+16, fill:cssVar('--muted'), 'font-size':10, 'text-anchor':'middle'});
+      t.textContent = zt; svg.appendChild(t);
+    }
+    // zero line emphasized
+    svg.appendChild(el('line', {x1:zeroX, x2:zeroX, y1:topY-6, y2:baseY, stroke:cssVar('--text'), 'stroke-width':1.2}));
+
+    // ---- right axis ticks (probability 0..1) ----
+    [0, 0.5, 1].forEach(p=>{
+      const y = baseY - p*(baseY-topY);
+      svg.appendChild(el('line', {x1:rightX0-6, x2:rightX1, y1:y, y2:y, stroke:cssVar('--grid'), 'stroke-width':1}));
+      const t = el('text', {x:rightX0-12, y:y+4, fill:cssVar('--muted'), 'font-size':10, 'text-anchor':'end'});
+      t.textContent = p.toFixed(1); svg.appendChild(t);
+    });
+
+    const barH = rowH*0.5;
+    const barW = (rightX1-rightX0)/5 * 0.62;
+
+    for (let i=0;i<5;i++){
+      const y = yForRow(i);
+      const color = classColors[i];
+
+      // logit bar (horizontal)
+      const x0 = Math.min(zeroX, xForZ(zArr[i]));
+      const w = Math.abs(xForZ(zArr[i]) - zeroX);
+      svg.appendChild(el('rect', {x:x0, y:y-barH/2, width:Math.max(w,1), height:barH, fill:color, opacity:0.9, rx:2}));
+      const lab = el('text', {x:leftX0-10, y:y+4, fill:cssVar('--text'), 'font-size':11, 'text-anchor':'end'});
+      lab.textContent = 'z' + subDigits[i] + ' = ' + zArr[i].toFixed(1);
+      svg.appendChild(lab);
+
+      // probability bar (vertical)
+      const cx = rightX0 + (i+0.5)*(rightX1-rightX0)/5;
+      const h = q[i]*(baseY-topY);
+      svg.appendChild(el('rect', {x:cx-barW/2, y:baseY-h, width:barW, height:h, fill:color, opacity:0.9, rx:2}));
+      const qlab = el('text', {x:cx, y:baseY-h-6, fill:cssVar('--text'), 'font-size':11, 'text-anchor':'middle'});
+      qlab.textContent = q[i].toFixed(3);
+      svg.appendChild(qlab);
+      const cxlab = el('text', {x:cx, y:baseY+16, fill:cssVar('--muted'), 'font-size':10, 'text-anchor':'middle'});
+      cxlab.textContent = 'class ' + (i+1);
+      svg.appendChild(cxlab);
+
+      // connecting arrow
+      const startX = xForZ(zArr[i]);
+      const endX = cx - barW/2 - 4;
+      const path = el('line', {x1:startX+4, y1:y, x2:endX, y2:baseY-h+ (h>0?Math.min(h,10):0), stroke:color, 'stroke-width':1.4, 'stroke-dasharray':'4 5'});
+      path.setAttribute('stroke-dashoffset', (-flowT + i*3).toFixed(1));
+      svg.appendChild(path);
+    }
+
+    sumqEl.textContent = sum &amp;&amp; q.reduce((a,b)=>a+b,0).toFixed(3);
+    q1El.textContent = q[0].toFixed(3);
+    q3El.textContent = q[2].toFixed(3);
+    z3label.textContent = 'z\u2083 = ' + zArr[2].toFixed(1);
+  }
+
+  function animate(){
+    if (playing){ flowT = (flowT + 0.6) % 1000; draw(); }
+    requestAnimationFrame(animate);
+  }
+
+  z3slider.addEventListener('input', draw);
+  toggleBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    toggleBtn.textContent = playing ? 'Pause flow arrows' : 'Play flow arrows';
+    if (playing) requestAnimationFrame(animate);
+  });
+
+  draw();
+  if (playing) requestAnimationFrame(animate);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;softmax-is-boltzmann&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A classifier outputs a Boltzmann distribution, not an answer"
+  ></iframe>
+</section>
+
+<section class="scene" id="hard-targets-one-bit">
+  <h3>Normal training tells the network one thing per example: the right answer</h3>
+  <div class="caption">How do we train this thing? The standard recipe uses a hard target: the true class gets probability 1 and every other class gets 0, and we minimize the cross-entropy <math><mi>C</mi><mo>=</mo><mo>-</mo><msub><mi>sum</mi><mi>i</mi></msub><msub><mi>p</mi><mi>i</mi></msub><mi>log</mi><msub><mi>q</mi><mi>i</mi></msub></math> between that target <math><mi>p</mi></math> and the network's output <math><mi>q</mi></math>. For a one-hot target this whole sum collapses to a single term, <math><mo>-</mo><mi>log</mi><msub><mi>q</mi><mi>k</mi></msub></math>, where <math><mi>k</mi></math> is the correct class — try it: slide the correct logit down and the loss climbs without limit, slide it up and the loss falls toward zero. Gradient descent therefore pushes the correct logit up and every other logit down, and that is all it does. Each training example delivers essentially one piece of information — 'the answer is class <math><mi>k</mi></math>' — and says nothing about which wrong answers were nearly right.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="hard-targets-one-bit"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Hard targets: one bit per example</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f4f5f8;
+  --text:#1a1a1a;
+  --muted:#5b5f66;
+  --correct:#1b8a5a;
+  --wrong:#c0392b;
+  --ghost:#7a7f8c;
+  --accent:#2b6cb0;
+  --grid:#d7dae0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12141a;
+    --panel:#1b1e26;
+    --text:#e8e9ee;
+    --muted:#a1a6b0;
+    --correct:#49d495;
+    --wrong:#ff6f61;
+    --ghost:#9096a3;
+    --accent:#7fb1ff;
+    --grid:#333844;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+.controls{background:var(--panel);border-radius:8px;padding:10px 14px;margin-bottom:10px;}
+.controls label{display:block;font-size:14px;margin-bottom:6px;}
+.controls input[type=range]{width:100%;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px 20px;font-size:14px;margin-bottom:8px;}
+.readouts span.val{font-weight:600;color:var(--accent);}
+svg{max-width:100%;height:auto;display:block;background:var(--panel);border-radius:8px;}
+.legend{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.4;}
+math{font-size:16px;}
+.eqwrap{margin-top:14px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;controls&quot;>
+    <label for=&quot;z2&quot;>Correct-class logit z₂ (arbitrary units): <span id=&quot;z2Val&quot; class=&quot;val&quot;></span></label>
+    <input type=&quot;range&quot; id=&quot;z2&quot; min=&quot;-3&quot; max=&quot;6&quot; step=&quot;0.1&quot; value=&quot;2&quot;>
+  </div>
+  <div class=&quot;readouts&quot;>
+    <div>q₂ — predicted probability of correct class: <span id=&quot;q2Val&quot; class=&quot;val&quot;></span></div>
+    <div>Loss C = −log q₂: <span id=&quot;lossVal&quot; class=&quot;val&quot;></span></div>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 380&quot; role=&quot;img&quot; aria-label=&quot;Softmax bar chart with hard target overlay and gradient arrows&quot;></svg>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>C</mi><mo>=</mo><mo>-</mo>
+      <munder><mo>&amp;#8721;</mo><mi>i</mi></munder>
+      <msub><mi>p</mi><mi>i</mi></msub><mo>log</mo><msub><mi>q</mi><mi>i</mi></msub>
+      <mo>=</mo><mo>-</mo><mo>log</mo><msub><mi>q</mi><mi>k</mi></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      C — cross-entropy loss (dimensionless) &amp;middot; p<sub>i</sub> — hard target: 1 for the correct class k, 0 for every other class i &amp;middot;
+      q<sub>i</sub> — network's predicted probability of class i (from softmax) &amp;middot; k — index of the correct class (class 2 here)
+    </div>
+  </div>
+  <div class=&quot;legend&quot; id=&quot;arrowLegend&quot;></div>
+</div>
+
+<script>
+const NS=&quot;http://www.w3.org/2000/svg&quot;;
+const correctIdx=2;
+const fixedLogits=[-1.0, 0.5, null, 1.5, -0.5]; // null = slot for z2
+
+function computeProbs(z2){
+  const logits=fixedLogits.map((v,i)=> i===correctIdx? z2 : v);
+  const maxL=Math.max(...logits);
+  const exps=logits.map(l=>Math.exp(l-maxL));
+  const sum=exps.reduce((a,b)=>a+b,0);
+  return exps.map(e=>e/sum);
+}
+
+const svg=document.getElementById('chart');
+const W=640,H=380;
+svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+
+// layout constants
+const nBars=5;
+const marginX=70;
+const spacing=(W-2*marginX)/nBars;
+const barW=64;
+const centers=[];
+for(let i=0;i<nBars;i++) centers.push(marginX+spacing/2+i*spacing);
+
+const baseY=330;       // y = 0 probability
+const topY=190;        // y = 1.0 probability (full bar height)
+const barScale=baseY-topY;
+
+const arrowMid=95;     // arrow centerline y
+const arrowScale=68;   // px per unit gradient magnitude
+
+function col(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
+function el(tag,attrs){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  return e;
+}
+
+function buildStaticAxes(){
+  // y axis ticks
+  [0,0.5,1.0].forEach(p=>{
+    const y=baseY-p*barScale;
+    svg.appendChild(el('line',{x1:marginX-14,y1:y,x2:W-20,y2:y,stroke:col('--grid'),'stroke-width':1}));
+    const t=el('text',{x:marginX-20,y:y+4,'text-anchor':'end','font-size':11,fill:col('--muted')});
+    t.textContent=p.toFixed(1);
+    svg.appendChild(t);
+  });
+  const ylab=el('text',{x:16,y:(topY+baseY)/2,'font-size':12,fill:col('--muted'),
+    transform:`rotate(-90 16 ${(topY+baseY)/2})`,'text-anchor':'middle'});
+  ylab.textContent=&quot;predicted probability qᵢ&quot;;
+  svg.appendChild(ylab);
+
+  // x labels
+  for(let i=0;i<nBars;i++){
+    const t=el('text',{x:centers[i],y:baseY+22,'text-anchor':'middle','font-size':11.5,fill:col('--muted')});
+    t.textContent = (i===correctIdx)? &quot;class 2 (correct)&quot; : &quot;class &quot;+i+&quot; (wrong)&quot;;
+    svg.appendChild(t);
+  }
+  const title=el('text',{x:W/2,y:20,'text-anchor':'middle','font-size':12.5,fill:col('--muted')});
+  title.textContent=&quot;gradient push on each logit (length ∝ |∂C/∂z|)&quot;;
+  svg.appendChild(title);
+}
+
+// dynamic groups
+const barGroup=el('g',{});
+const ghostGroup=el('g',{});
+const arrowGroup=el('g',{});
+svg.appendChild(ghostGroup);
+svg.appendChild(barGroup);
+svg.appendChild(arrowGroup);
+
+function clearGroup(g){while(g.firstChild)g.removeChild(g.firstChild);}
+
+function arrowPath(x,yStart,yEnd,color){
+  const g=el('g',{});
+  g.appendChild(el('line',{x1:x,y1:yStart,x2:x,y2:yEnd,stroke:color,'stroke-width':4}));
+  const dir = yEnd<yStart? -1:1; // -1 up, 1 down
+  const headSize=8;
+  const tipY=yEnd;
+  const pts=`${x-headSize},${tipY-dir*headSize} ${x+headSize},${tipY-dir*headSize} ${x},${tipY+dir*2}`;
+  g.appendChild(el('polygon',{points:pts,fill:color}));
+  return g;
+}
+
+function draw(z2){
+  const probs=computeProbs(z2);
+  clearGroup(barGroup); clearGroup(ghostGroup); clearGroup(arrowGroup);
+
+  for(let i=0;i<nBars;i++){
+    const x=centers[i]-barW/2;
+    const h=probs[i]*barScale;
+    const y=baseY-h;
+    const isCorrect = i===correctIdx;
+    const barCol = isCorrect? col('--correct') : col('--wrong');
+
+    // ghost hard-target overlay
+    if(isCorrect){
+      ghostGroup.appendChild(el('rect',{x:x,y:topY,width:barW,height:baseY-topY,
+        fill:'none',stroke:col('--ghost'),'stroke-width':1.5,'stroke-dasharray':'5,4'}));
+    } else {
+      ghostGroup.appendChild(el('line',{x1:x,y1:baseY,x2:x+barW,y2:baseY,
+        stroke:col('--ghost'),'stroke-width':1.5,'stroke-dasharray':'5,4'}));
+    }
+
+    // actual probability bar
+    barGroup.appendChild(el('rect',{x:x,y:y,width:barW,height:h,fill:barCol,opacity:0.85}));
+
+    // gradient arrow (above chart, own coordinate strip)
+    const grad = isCorrect ? (1-probs[i]) : probs[i]; // magnitude of push
+    const len = Math.min(grad*arrowScale, 78);
+    const arrowCol = isCorrect? col('--correct') : col('--wrong');
+    if(isCorrect){
+      arrowGroup.appendChild(arrowPath(centers[i], arrowMid, arrowMid-8-len, arrowCol));
+    } else {
+      arrowGroup.appendChild(arrowPath(centers[i], arrowMid, arrowMid+8+len, arrowCol));
+    }
+  }
+  return probs;
+}
+
+buildStaticAxes();
+
+const slider=document.getElementById('z2');
+const z2ValEl=document.getElementById('z2Val');
+const q2ValEl=document.getElementById('q2Val');
+const lossValEl=document.getElementById('lossVal');
+document.getElementById('arrowLegend').textContent =
+  &quot;Green arrow — push on the correct logit z₂ (always upward) · Red arrows — push on the four wrong logits (always downward) · arrow length ∝ gradient magnitude |∂C/∂zᵢ|&quot;;
+
+function update(){
+  const z2=parseFloat(slider.value);
+  const probs=draw(z2);
+  const q2=probs[correctIdx];
+  const loss=-Math.log(q2);
+  z2ValEl.textContent=z2.toFixed(1);
+  q2ValEl.textContent=q2.toFixed(3);
+  lossValEl.textContent=loss.toFixed(3);
+}
+
+const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+slider.addEventListener('input', update);
+update();
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;hard-targets-one-bit&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Normal training tells the network one thing per example: the right answer"
+  ></iframe>
+</section>
+
+<section class="scene" id="averaging-cancels-errors">
+  <h3>Averaging many networks cancels their independent mistakes — at N times the cost</h3>
+  <div class="caption">Here is the oldest trick for buying accuracy: train N copies of the same network from different random starting weights and average their output distributions — the field calls this committee an ensemble. Each copy lands in a different minimum and makes partly independent errors, so averaging cancels the idiosyncratic mistakes while reinforcing the shared, correct structure, the same variance-reduction you get by averaging N noisy measurements. Slide N up and watch the wrong squares in the averaged row wink out. In the paper's speech experiment, averaging 10 identical nets raises frame accuracy — the fraction of short audio slices assigned the correct speech-sound label — from 58.9% to 61.1%. But look at the cost meter: serving the ensemble costs 10 times the compute for every single prediction, which is why the paper calls it cumbersome, and why we need what comes next.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="averaging-cancels-errors"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Averaging cancels independent errors</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel-bg:#f5f7fa;
+  --text:#1a1d23;
+  --muted:#5b6472;
+  --correct:#2e8b57;
+  --wrong:#c0392b;
+  --border:#c7ccd4;
+  --accent:#3468c0;
+  --track:#dfe3e8;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#14171c;
+    --panel-bg:#1d2128;
+    --text:#e8eaee;
+    --muted:#9aa3ad;
+    --correct:#4caf7d;
+    --wrong:#e0574a;
+    --border:#3a4048;
+    --accent:#6f9de8;
+    --track:#2a2f37;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+.panel{background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:14px;}
+h2{font-size:14px;margin:0 0 10px;font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+.controls label{font-size:13px;color:var(--text);display:flex;flex-direction:column;gap:3px;flex:1;min-width:220px;}
+input[type=range]{width:100%;}
+canvas{width:100%;height:auto;max-width:100%;display:block;background:transparent;}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;}
+.readout{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;flex:1;min-width:140px;}
+.readout .val{font-size:18px;font-weight:700;color:var(--accent);}
+.readout .lbl{font-size:11px;color:var(--muted);}
+.barwrap{margin-top:4px;}
+.bartrack{position:relative;height:16px;background:var(--track);border-radius:5px;overflow:hidden;border:1px solid var(--border);}
+.barfill{height:100%;background:var(--accent);width:10%;transition:none;}
+.barticks{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px;}
+math{font-size:15px;}
+.legend{font-size:11.5px;color:var(--muted);margin:2px 0 14px;line-height:1.4;}
+.eqblock{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;panel&quot;>
+    <h2>Ensemble averaging: N independently trained networks vote on each test item</h2>
+    <div class=&quot;controls&quot;>
+      <label>Number of networks in the ensemble, N = <span id=&quot;nVal&quot;>1</span>
+        <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;1&quot; max=&quot;10&quot; step=&quot;1&quot; value=&quot;1&quot;>
+      </label>
+    </div>
+    <canvas id=&quot;grid&quot; width=&quot;620&quot; height=&quot;250&quot; aria-label=&quot;grid of member and averaged predictions&quot;></canvas>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;>
+        <div class=&quot;val&quot; id=&quot;accVal&quot;>58.9%</div>
+        <div class=&quot;lbl&quot;>frame accuracy — fraction of 40 test items the (averaged) prediction gets right</div>
+      </div>
+      <div class=&quot;readout&quot;>
+        <div class=&quot;val&quot; id=&quot;costVal&quot;>1×</div>
+        <div class=&quot;lbl&quot;>compute cost per prediction, relative to one network</div>
+        <div class=&quot;barwrap&quot;>
+          <div class=&quot;bartrack&quot;><div class=&quot;barfill&quot; id=&quot;costBar&quot;></div></div>
+          <div class=&quot;barticks&quot;><span>1×</span><span>5×</span><span>10×</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class=&quot;eqblock&quot;>
+      <math display=&quot;block&quot;>
+        <mi>accuracy</mi><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo>
+        <msub><mi>A</mi><mn>1</mn></msub><mo>+</mo>
+        <mo>(</mo><msub><mi>A</mi><mn>10</mn></msub><mo>-</mo><msub><mi>A</mi><mn>1</mn></msub><mo>)</mo><mo>·</mo>
+        <mfrac>
+          <mrow><mo>(</mo><mn>1</mn><mo>-</mo><mn>1</mn><mo>/</mo><mi>N</mi><mo>)</mo></mrow>
+          <mrow><mo>(</mo><mn>1</mn><mo>-</mo><mn>1</mn><mo>/</mo><mn>10</mn><mo>)</mo></mrow>
+        </mfrac>
+      </math>
+      <div class=&quot;legend&quot;>
+        N — number of independently initialized networks averaged together (count, 1 to 10) ·
+        A₁ — measured frame accuracy of a single network, 58.9% ·
+        A₁₀ — measured frame accuracy of the 10-network ensemble, 61.1% ·
+        accuracy(N) — predicted frame accuracy for N networks (%); interpolated assuming the error's variance falls as 1/N, the same law that governs the standard error of a mean of N independent measurements.
+      </div>
+      <math display=&quot;block&quot;>
+        <mi>cost</mi><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo><mi>N</mi><mo>·</mo><msub><mi>C</mi><mn>1</mn></msub>
+      </math>
+      <div class=&quot;legend&quot;>
+        C₁ — compute cost of one network's forward pass (relative units, defined as 1×) ·
+        cost(N) — total compute needed to produce one ensemble prediction, in units of a single network's cost.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const A1 = 58.9, A10 = 61.1; // measured frame accuracies, %, from Table 1
+  const ITEMS = 40, MAXN = 10;
+  const HARD_CORE = 16;      // items every member always gets right
+  const SHARED_ERR = 4;      // items every member always gets wrong (unfixable by averaging)
+  // remaining ITEMS-HARD_CORE-SHARED_ERR = 20 items are idiosyncratic: each member independently right/wrong
+
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(20240611);
+  const idioStart = HARD_CORE + SHARED_ERR;
+  const q = [];      // per-item probability a given member gets it right
+  const outcome = []; // outcome[item][member] -> boolean correct
+  for(let i=0;i<ITEMS;i++){
+    outcome.push(new Array(MAXN).fill(true));
+    if(i < HARD_CORE){ q.push(1); continue; }
+    if(i < idioStart){ q.push(0); for(let m=0;m<MAXN;m++) outcome[i][m]=false; continue; }
+    const qi = 0.55 + rng()*0.40;
+    q.push(qi);
+    for(let m=0;m<MAXN;m++) outcome[i][m] = rng() < qi;
+  }
+
+  function majorityCorrect(item, N){
+    if(item < HARD_CORE) return true;
+    if(item < idioStart) return false;
+    let c=0; for(let m=0;m<N;m++) if(outcome[item][m]) c++;
+    return c*2 > N;
+  }
+
+  const cvs = document.getElementById('grid');
+  const ctx = cvs.getContext('2d');
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  const leftMargin = 54, topMargin = 22, rightMargin = 10, bottomMargin = 12;
+  const rowH = 13, rowGap = 4.5, avgGap = 12;
+  const cols = ITEMS;
+  const gridW = cvs.width - leftMargin - rightMargin;
+  const cellPitch = gridW / cols;
+  const sq = cellPitch - 2.4;
+
+  function rowY(i){ return topMargin + i*(rowH+rowGap); }
+  const avgY = rowY(MAXN) + avgGap;
+
+  function draw(startN, endN, p){
+    const text = cssVar('--text'), muted = cssVar('--muted'), border = cssVar('--border');
+    const correct = cssVar('--correct'), wrong = cssVar('--wrong');
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+
+    ctx.font = '10px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    ctx.fillStyle = muted;
+    ctx.textBaseline = 'middle';
+    ctx.fillText('40 test items (speech-sound frames) \u2192', leftMargin, 10);
+
+    for(let i=0;i<MAXN;i++){
+      const shown = i < endN;
+      const wasShown = i < startN;
+      let alpha;
+      if(shown &amp;&amp; wasShown) alpha = 1;
+      else if(shown &amp;&amp; !wasShown) alpha = p;
+      else if(!shown &amp;&amp; wasShown) alpha = 1-p;
+      else alpha = 0;
+
+      const y = rowY(i);
+      ctx.font = '10px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+      ctx.fillStyle = muted;
+      ctx.globalAlpha = Math.max(alpha, shown||wasShown ? 0 : 0.35);
+      ctx.fillText('net '+(i+1), 4, y+rowH/2);
+
+      if(alpha <= 0.001 &amp;&amp; !shown){
+        // faint placeholder outline for not-yet-included member row
+        ctx.globalAlpha = 0.35;
+        for(let j=0;j<cols;j++){
+          const x = leftMargin + j*cellPitch;
+          ctx.strokeStyle = border;
+          ctx.strokeRect(x, y, sq, rowH);
+        }
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      ctx.globalAlpha = Math.max(alpha,0);
+      for(let j=0;j<cols;j++){
+        const x = leftMargin + j*cellPitch;
+        const c = j < HARD_CORE ? true : (j < idioStart ? false : outcome[j][i]);
+        ctx.fillStyle = c ? correct : wrong;
+        ctx.fillRect(x, y, sq, rowH);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // averaged row
+    ctx.font = '10px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    ctx.fillStyle = text;
+    ctx.fillText('average', 2, avgY+rowH/2);
+    for(let j=0;j<cols;j++){
+      const x = leftMargin + j*cellPitch;
+      const c = majorityCorrect(j, endN);
+      ctx.fillStyle = c ? correct : wrong;
+      ctx.fillRect(x, avgY, sq, rowH);
+    }
+    ctx.strokeStyle = text;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(leftMargin-2, avgY-2, cols*cellPitch, rowH+4);
+  }
+
+  function accuracyForN(N){
+    if(N<=1) return A1;
+    const frac = (1 - 1/N) / (1 - 1/MAXN);
+    return A1 + (A10-A1)*frac;
+  }
+
+  const slider = document.getElementById('nSlider');
+  const nVal = document.getElementById('nVal');
+  const accVal = document.getElementById('accVal');
+  const costVal = document.getElementById('costVal');
+  const costBar = document.getElementById('costBar');
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let prevN = 1;
+  function updateReadouts(N){
+    nVal.textContent = N;
+    accVal.textContent = accuracyForN(N).toFixed(1) + '%';
+    costVal.textContent = Math.round(N) + '\u00d7';
+    costBar.style.width = (N/MAXN*100).toFixed(1) + '%';
+  }
+
+  function animate(startN, endN){
+    updateReadouts(endN);
+    const t0 = performance.now();
+    const dur = 260;
+    function step(now){
+      const p = reduced ? 1 : Math.min(1, (now-t0)/dur);
+      draw(startN, endN, p);
+      if(p < 1){ requestAnimationFrame(step); }
+      else { prevN = endN; }
+    }
+    requestAnimationFrame(step);
+  }
+
+  slider.addEventListener('input', ()=>{
+    const N = +slider.value;
+    animate(prevN, N);
+  });
+
+  updateReadouts(1);
+  draw(1,1,1);
+  prevN = 1;
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;averaging-cancels-errors&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Averaging many networks cancels their independent mistakes — at N times the cost"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new idea: teaching with the whole distribution</h2>
+  <div class="part-lede">The committee is accurate but undeployable. The paper's move: its knowledge hides in the tiny wrong-answer probabilities, and a temperature knob amplifies them into a training signal that a small student network can learn from.</div>
+</header>
+<section class="scene" id="wrong-answers-carry-structure">
+  <h3>The tiny probabilities on wrong answers encode what the model knows</h3>
+  <div class="caption">You would naturally say a model's knowledge is its weights — millions of numbers, useless to a network with a different shape. The paper says no: the knowledge is the mapping from inputs to full output distributions, and the interesting part hides in the wrong answers. A trained model shown a BMW might assign probability <math><msup><mn>10</mn><mrow><mo>-</mo><mn>4</mn></mrow></msup></math> to 'garbage truck' but <math><msup><mn>10</mn><mrow><mo>-</mo><mn>8</mn></mrow></msup></math> to 'carrot' — both tiny, but their ratio of ten thousand tells you how the model has organized its world. Click between these two handwritten 2s and watch the log-scale bars: one 2 gets <math><msup><mn>10</mn><mrow><mo>-</mo><mn>6</mn></mrow></msup></math> on '3' and <math><msup><mn>10</mn><mrow><mo>-</mo><mn>9</mn></mrow></msup></math> on '7', while the other, written differently, gets the reverse. The paper's community nicknamed this relational information dark knowledge, and a student trained to reproduce it inherits the teacher's way of generalizing — not just its answers.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="wrong-answers-carry-structure"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Dark knowledge: wrong-answer probabilities carry structure</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f6f7f9; --text:#1a1a1a; --muted:#5b6472;
+    --grid:#d7dce2; --bar:#8a94a3; --hi2:#3a7d44; --hi3:#c1440e; --hi7:#2060c0;
+    --btn:#eef1f5; --btn-active:#2060c0; --btn-active-text:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --panel:#1c2027; --text:#e8ebef; --muted:#9aa4b2;
+      --grid:#333a45; --bar:#5c6675; --hi2:#5fd274; --hi3:#ff8a4c; --hi7:#63a6ff;
+      --btn:#232833; --btn-active:#3a7bd5; --btn-active-text:#ffffff;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:15px;margin:4px 0 10px;font-weight:600;}
+  .eqn-block{background:var(--panel);border-radius:8px;padding:8px 12px;margin-bottom:10px;}
+  math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 8px;line-height:1.4;}
+  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;}
+  .col-left{flex:0 0 150px;display:flex;flex-direction:column;gap:8px;}
+  .col-right{flex:1 1 380px;min-width:260px;}
+  button.digit-btn{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:var(--btn);color:var(--text);border:2px solid transparent;
+    border-radius:8px;padding:8px;cursor:pointer;font-size:11px;width:100%;
+  }
+  button.digit-btn[aria-pressed=&quot;true&quot;]{border-color:var(--btn-active);background:var(--btn-active);color:var(--btn-active-text);}
+  button.digit-btn svg{background:var(--panel);border-radius:6px;}
+  button.digit-btn[aria-pressed=&quot;true&quot;] svg{background:#ffffff22;}
+  canvas{max-width:100%;display:block;background:var(--panel);border-radius:8px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:12px;}
+  .readout{background:var(--panel);border-radius:6px;padding:5px 9px;color:var(--text);}
+  .readout b{color:var(--muted);font-weight:600;margin-right:4px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Dark knowledge: what the tiny wrong-answer probabilities encode</h2>
+
+  <div class=&quot;eqn-block&quot;>
+    <math display=&quot;block&quot;>
+      <mi>p</mi><mo>(</mo><mi>i</mi><mo>)</mo><mo>=</mo>
+      <mfrac>
+        <mrow><mi>exp</mi><mo>(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>)</mo></mrow>
+        <mrow><munderover><mo>&amp;#8721;</mo><mrow><mi>j</mi><mo>=</mo><mn>0</mn></mrow><mn>9</mn></munderover><mi>exp</mi><mo>(</mo><msub><mi>z</mi><mi>j</mi></msub><mo>)</mo></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>p(i) — probability the trained network assigns to digit class i (unitless, 0–1) · z<sub></sub>i, z<sub></sub>j — logits (pre-softmax scores) for classes i, j · sum over j — normalization over all 10 digit classes, 0 through 9.</div>
+    <math display=&quot;block&quot;>
+      <mfrac><mrow><mi>p</mi><mo>(</mo><mn>3</mn><mo>)</mo></mrow><mrow><mi>p</mi><mo>(</mo><mn>7</mn><mo>)</mo></mrow></mfrac>
+      <mo>=</mo>
+      <msup><mi>e</mi><mrow><mo>(</mo><msub><mi>z</mi><mn>3</mn></msub><mo>&amp;#8722;</mo><msub><mi>z</mi><mn>7</mn></msub><mo>)</mo></mrow></msup>
+    </math>
+    <div class=&quot;legend&quot;>p(3), p(7) — model's probability on classes &quot;3&quot; and &quot;7&quot; · z₃, z₇ — their logits · this ratio depends only on the logit difference, not on how confident the model is overall about the correct class.</div>
+  </div>
+
+  <div class=&quot;row&quot;>
+    <div class=&quot;col-left&quot;>
+      <button class=&quot;digit-btn&quot; id=&quot;btnA&quot; aria-pressed=&quot;true&quot;>
+        <svg width=&quot;100&quot; height=&quot;100&quot; viewBox=&quot;0 0 100 100&quot;>
+          <path d=&quot;M35 30 Q35 15 50 15 Q68 15 68 30 Q68 45 50 50 Q30 55 28 78 L72 78&quot;
+            stroke=&quot;currentColor&quot; stroke-width=&quot;7&quot; fill=&quot;none&quot; stroke-linecap=&quot;round&quot;/>
+        </svg>
+        Input A — &quot;2&quot; with a loop
+      </button>
+      <button class=&quot;digit-btn&quot; id=&quot;btnB&quot; aria-pressed=&quot;false&quot;>
+        <svg width=&quot;100&quot; height=&quot;100&quot; viewBox=&quot;0 0 100 100&quot;>
+          <path d=&quot;M30 28 Q30 15 50 15 Q70 15 70 28 Q70 40 45 55 L28 78 L74 78&quot;
+            stroke=&quot;currentColor&quot; stroke-width=&quot;7&quot; fill=&quot;none&quot; stroke-linecap=&quot;round&quot;/>
+        </svg>
+        Input B — &quot;2&quot; with a flat base
+      </button>
+    </div>
+    <div class=&quot;col-right&quot;>
+      <canvas id=&quot;chart&quot; width=&quot;640&quot; height=&quot;300&quot;></canvas>
+      <div class=&quot;readouts&quot;>
+        <div class=&quot;readout&quot;><b>p(2)</b><span id=&quot;rp2&quot;></span></div>
+        <div class=&quot;readout&quot;><b>p(3)</b><span id=&quot;rp3&quot;></span></div>
+        <div class=&quot;readout&quot;><b>p(7)</b><span id=&quot;rp7&quot;></span></div>
+        <div class=&quot;readout&quot;><b>p(3)/p(7)</b><span id=&quot;rratio&quot;></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // logits (natural-log units), index = digit 0..9
+  // Input A: &quot;3&quot; gets a much higher logit than &quot;7&quot; -> p(3) >> p(7)
+  const logitsA = [-9.21,-11.51, 0, -13.82,-16.12,-18.42,-11.51,-20.72,-9.21,-16.12];
+  // Input B: swap the logits of &quot;3&quot; and &quot;7&quot; -> reverses the ratio
+  const logitsB = [-9.21,-11.51, 0, -20.72,-16.12,-18.42,-11.51,-13.82,-9.21,-16.12];
+
+  function softmax(z){
+    const m = Math.max(...z);
+    const ex = z.map(v=>Math.exp(v-m));
+    const s = ex.reduce((a,b)=>a+b,0);
+    return ex.map(v=>v/s);
+  }
+
+  let displayed = softmax(logitsA);
+  let target = logitsA;
+  let animT = null;
+  let animStart = null;
+  let animFrom = displayed.slice();
+
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  const FLOOR_EXP = -10; // axis floor: 10^-10
+
+  function fmt(x){
+    if (x <= 0) return '0';
+    return x.toExponential(1).replace('e','×10^');
+  }
+  function fmtRatio(r){
+    if (r >= 1) return r >= 100 ? Math.round(r).toString() : r.toFixed(1);
+    return r.toExponential(2).replace('e','×10^');
+  }
+
+  function draw(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 640;
+    const h = 300;
+    canvas.width = w*dpr; canvas.height = h*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+
+    const marginL = 46, marginR = 14, marginT = 16, marginB = 34;
+    const plotW = w - marginL - marginR;
+    const plotH = h - marginT - marginB;
+
+    const grid = css('--grid'), muted = css('--muted'), text = css('--text');
+    const barColor = css('--bar'), hi2 = css('--hi2'), hi3 = css('--hi3'), hi7 = css('--hi7');
+
+    // y mapping: log10 scale, 10^0 at top, 10^-10 at bottom
+    function yOf(p){
+      const clamped = Math.max(p, Math.pow(10,FLOOR_EXP));
+      const logp = Math.log10(clamped);
+      const frac = (logp - FLOOR_EXP) / (0 - FLOOR_EXP); // 0 at floor, 1 at top
+      return marginT + plotH * (1-frac);
+    }
+
+    // gridlines every 2 decades
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = muted;
+    ctx.strokeStyle = grid;
+    ctx.lineWidth = 1;
+    for(let e=0; e>=FLOOR_EXP; e-=2){
+      const y = yOf(Math.pow(10,e));
+      ctx.beginPath();
+      ctx.moveTo(marginL, y);
+      ctx.lineTo(marginL+plotW, y);
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText('10^'+e, marginL-6, y+4);
+    }
+
+    // bars
+    const n = 10;
+    const gap = 6;
+    const barW = (plotW - gap*(n-1)) / n;
+    ctx.textAlign = 'center';
+    for(let i=0;i<n;i++){
+      const p = displayed[i];
+      const x = marginL + i*(barW+gap);
+      const yTop = yOf(p);
+      const yBase = marginT + plotH;
+      let color = barColor;
+      if (i===2) color = hi2;
+      else if (i===3) color = hi3;
+      else if (i===7) color = hi7;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, yTop, barW, yBase-yTop);
+
+      // x-axis digit label
+      ctx.fillStyle = text;
+      ctx.font = '12px sans-serif';
+      ctx.fillText(String(i), x+barW/2, yBase+18);
+
+      // value label above highlighted bars
+      if (i===2 || i===3 || i===7){
+        ctx.fillStyle = muted;
+        ctx.font = '10px sans-serif';
+        const labY = Math.max(yTop-6, marginT+10);
+        ctx.fillText(fmt(p), x+barW/2, labY);
+      }
+    }
+
+    ctx.fillStyle = muted;
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('digit class', marginL+plotW/2, h-4);
+
+    // update readouts
+    document.getElementById('rp2').textContent = ' ≈ ' + fmt(displayed[2]);
+    document.getElementById('rp3').textContent = ' = ' + fmt(displayed[3]);
+    document.getElementById('rp7').textContent = ' = ' + fmt(displayed[7]);
+    document.getElementById('rratio').textContent = ' = ' + fmtRatio(displayed[3]/displayed[7]);
+  }
+
+  function animate(ts){
+    if (animStart===null) animStart = ts;
+    const dur = 500;
+    const t = Math.min(1, (ts-animStart)/dur);
+    const ease = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+    const targetProbs = softmax(target);
+    displayed = animFrom.map((v,i)=> v + (targetProbs[i]-v)*ease);
+    draw();
+    if (t<1){
+      requestAnimationFrame(animate);
+    } else {
+      displayed = targetProbs;
+      draw();
+    }
+  }
+
+  function setInput(which){
+    const btnA = document.getElementById('btnA');
+    const btnB = document.getElementById('btnB');
+    btnA.setAttribute('aria-pressed', which==='A' ? 'true':'false');
+    btnB.setAttribute('aria-pressed', which==='B' ? 'true':'false');
+    target = which==='A' ? logitsA : logitsB;
+    if (reduced){
+      displayed = softmax(target);
+      draw();
+    } else {
+      animFrom = displayed.slice();
+      animStart = null;
+      requestAnimationFrame(animate);
+    }
+  }
+
+  document.getElementById('btnA').addEventListener('click', ()=>setInput('A'));
+  document.getElementById('btnB').addEventListener('click', ()=>setInput('B'));
+
+  window.addEventListener('resize', draw);
+
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;wrong-answers-carry-structure&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The tiny probabilities on wrong answers encode what the model knows"
+  ></iframe>
+</section>
+
+<section class="scene" id="temperature-exposes-tails">
+  <h3>Raising the temperature makes the tiny probabilities trainable</h3>
+  <div class="caption">There is a problem: a probability of <math><msup><mn>10</mn><mrow><mo>-</mo><mn>6</mn></mrow></msup></math> contributes almost nothing to the cross-entropy gradient, so at <math><mi>T</mi><mo>=</mo><mn>1</mn></math> all that dark knowledge is numerically invisible to a student. The fix is the same knob you would reach for in statistical mechanics — raise the temperature. Divide every logit by <math><mi>T</mi></math> before the softmax, <math><msub><mi>q</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>/</mo><mi>T</mi></mrow></msup></mrow><mrow><msub><mi>sum</mi><mi>j</mi></msub><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi></mrow></msup></mrow></mfrac></math>, and the distribution flattens exactly as heating a physical system populates its excited states; drag the slider to the paper's MNIST setting of <math><mi>T</mi><mo>=</mo><mn>20</mn></math> and the <math><msup><mn>10</mn><mrow><mo>-</mo><mn>6</mn></mrow></msup></math>-scale bars rise to where a loss can feel them. Notice what temperature does not do: it adds no randomness and no information — the same logits go in, the ranking of classes never changes, it merely redistributes the loss's sensitivity toward the tail. The teacher's flattened distribution is what the paper calls soft targets; both teacher and student use the same high <math><mi>T</mi></math> during transfer, and at deployment the student runs at <math><mi>T</mi><mo>=</mo><mn>1</mn></math>, snapping back to a sharp, confident classifier.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="temperature-exposes-tails"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Temperature exposes the tails</title>
+<style>
+  :root{
+    --bg:#f7f7f9;
+    --panel:#ffffff;
+    --ink:#1a1a1e;
+    --muted:#5b5b66;
+    --grid:#d8d8de;
+    --bar:#3a6ea5;
+    --bar-tail:#e0a13c;
+    --dash:#c0392b;
+    --accent:#2e7d32;
+    --badge-bg:#eef3ee;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16161a;
+      --panel:#1f1f24;
+      --ink:#eceff1;
+      --muted:#a6a6ad;
+      --grid:#39393f;
+      --bar:#6fa8dc;
+      --bar-tail:#f0b95a;
+      --dash:#e57373;
+      --accent:#81c784;
+      --badge-bg:#22301f;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px;
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
+    font-size:14px;
+  }
+  .scene{max-width:680px; margin:0 auto;}
+  .panel{
+    background:var(--panel); border-radius:10px; padding:12px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.15);
+  }
+  svg{width:100%; height:auto; display:block; max-width:100%;}
+  .controls{
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+    margin-top:10px;
+  }
+  .ctrl-group{display:flex; flex-direction:column; gap:4px; flex:1 1 220px;}
+  label{font-size:12.5px; color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{
+    padding:6px 10px; font-size:13px; border-radius:6px; border:1px solid var(--grid);
+    background:var(--panel); color:var(--ink); cursor:pointer;
+  }
+  .readouts{
+    display:flex; flex-wrap:wrap; gap:14px; margin-top:8px;
+  }
+  .readout{
+    background:var(--badge-bg); border-radius:6px; padding:6px 10px;
+    font-size:13px; min-width:110px;
+  }
+  .readout b{display:block; font-size:15px; margin-top:2px;}
+  math{font-size:15px;}
+  .legend{color:var(--muted); font-size:12px; margin:4px 0 10px 0; line-height:1.4;}
+  .badge{
+    margin-top:8px; font-size:12.5px; color:var(--muted);
+    background:var(--badge-bg); border-radius:6px; padding:6px 10px;
+  }
+  .badge b{color:var(--ink);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;panel&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>q</mi><mi>i</mi></msub><mo>=</mo>
+      <mfrac>
+        <msup><mi>e</mi><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>/</mo><mi>T</mi></mrow></msup>
+        <mrow><msub><mo>&amp;#8721;</mo><mi>j</mi></msub><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi></mrow></msup></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      q<sub>i</sub> — softened probability of class i (unitless, 0 to 1) ·
+      z<sub>i</sub> — fixed teacher logit for class i (unitless) ·
+      T — temperature (unitless, T = 1 is the ordinary softmax) ·
+      sum over j runs over all 10 classes
+    </div>
+
+    <svg id=&quot;chart&quot; viewBox=&quot;0 0 680 340&quot; role=&quot;img&quot; aria-label=&quot;Bar chart of class probabilities vs temperature&quot;></svg>
+
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl-group&quot;>
+        <label for=&quot;tSlider&quot;>Temperature T (divides every logit before the softmax)</label>
+        <input type=&quot;range&quot; id=&quot;tSlider&quot; min=&quot;1&quot; max=&quot;20&quot; step=&quot;0.5&quot; value=&quot;1&quot;>
+      </div>
+      <button id=&quot;paperBtn&quot;>Jump to paper's setting: T = 20</button>
+      <button id=&quot;resetBtn&quot;>Reset to T = 1</button>
+    </div>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;>T (temperature)<b id=&quot;roT&quot;>1.0</b></div>
+      <div class=&quot;readout&quot;>P(top class)<b id=&quot;roMax&quot;>–</b></div>
+      <div class=&quot;readout&quot;>P(smallest bar)<b id=&quot;roMin&quot;>–</b></div>
+      <div class=&quot;readout&quot;>&amp;Sigma; q<sub>i</sub> (sanity check)<b id=&quot;roSum&quot;>–</b></div>
+    </div>
+
+    <div class=&quot;badge&quot; id=&quot;rankBadge&quot;><b>Ranking preserved</b> (highest &amp;rarr; lowest logit): —</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const style = getComputedStyle(document.documentElement);
+  const col = name => style.getPropertyValue(name).trim();
+
+  // Fixed teacher logits, one dominant class (index 2) and two elevated
+  // &quot;runner-up&quot; classes (3 and 7) carrying dark knowledge, as in the paper's example.
+  const logits = [1.2, -0.5, 8.5, 4.0, -1.0, 0.8, -0.3, 3.0, 1.8, 0.4];
+  const N = logits.length;
+
+  function softmax(zArr, T){
+    const scaled = zArr.map(z => z / T);
+    const maxZ = Math.max(...scaled); // numerical stability, does not change result
+    const exps = scaled.map(z => Math.exp(z - maxZ));
+    const sum = exps.reduce((a,b)=>a+b, 0);
+    return exps.map(e => e / sum);
+  }
+
+  const rankOrder = logits.map((z,i)=>i).sort((a,b)=>logits[b]-logits[a]);
+  document.getElementById('rankBadge').innerHTML =
+    '<b>Ranking preserved</b> (highest &amp;rarr; lowest logit): ' + rankOrder.join(' &amp;gt; ');
+
+  const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('chart');
+  const W = 680, H = 340;
+  const chartLeft = 44, chartRight = 660, chartTop = 24, chartBase = 260;
+  const chartW = chartRight - chartLeft;
+  const chartH = chartBase - chartTop;
+  const barGap = 6;
+  const barW = (chartW / N) - barGap;
+
+  function yOf(p){ return chartBase - p * chartH; }
+
+  // Build static elements once
+  svg.innerHTML = '';
+  // grid + axis
+  const gGrid = document.createElementNS(svgNS,'g');
+  [0,0.2,0.4,0.6,0.8,1.0].forEach(v=>{
+    const y = yOf(v);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('x1', chartLeft); line.setAttribute('x2', chartRight);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', col('--grid')); line.setAttribute('stroke-width','1');
+    gGrid.appendChild(line);
+    const t = document.createElementNS(svgNS,'text');
+    t.setAttribute('x', chartLeft - 8); t.setAttribute('y', y+4);
+    t.setAttribute('text-anchor','end'); t.setAttribute('font-size','11');
+    t.setAttribute('fill', col('--muted'));
+    t.textContent = v.toFixed(1);
+    gGrid.appendChild(t);
+  });
+  svg.appendChild(gGrid);
+
+  // y-axis label
+  const yLab = document.createElementNS(svgNS,'text');
+  yLab.setAttribute('x', 12); yLab.setAttribute('y', chartTop - 6);
+  yLab.setAttribute('font-size','12'); yLab.setAttribute('fill', col('--muted'));
+  yLab.textContent = 'probability q\u1d62';
+  svg.appendChild(yLab);
+
+  // dashed uniform line at 0.1 (the reference line itself stays on the chart at y = 0.1)
+  const dash = document.createElementNS(svgNS,'line');
+  const yUniform = yOf(0.1);
+  dash.setAttribute('x1', chartLeft); dash.setAttribute('x2', chartRight);
+  dash.setAttribute('y1', yUniform); dash.setAttribute('y2', yUniform);
+  dash.setAttribute('stroke', col('--dash')); dash.setAttribute('stroke-width','1.5');
+  dash.setAttribute('stroke-dasharray','5,4');
+  svg.appendChild(dash);
+
+  // Its text label lives in a dedicated caption row below the bars/class labels,
+  // so it never collides with the numeric bar-value labels at any temperature
+  // (at high T many bars cluster right around the 0.1 line, which is what
+  // caused the original overlap with the class 8/9 value labels).
+  const legendY = 302;
+  const dashSample = document.createElementNS(svgNS,'line');
+  dashSample.setAttribute('x1', 250); dashSample.setAttribute('x2', 290);
+  dashSample.setAttribute('y1', legendY - 4); dashSample.setAttribute('y2', legendY - 4);
+  dashSample.setAttribute('stroke', col('--dash')); dashSample.setAttribute('stroke-width','1.5');
+  dashSample.setAttribute('stroke-dasharray','5,4');
+  svg.appendChild(dashSample);
+
+  const dashLab = document.createElementNS(svgNS,'text');
+  dashLab.setAttribute('x', 296); dashLab.setAttribute('y', legendY);
+  dashLab.setAttribute('text-anchor','start'); dashLab.setAttribute('font-size','11');
+  dashLab.setAttribute('fill', col('--dash'));
+  dashLab.textContent = 'dashed line = uniform level 1/10 = 0.1';
+  svg.appendChild(dashLab);
+
+  // bars + labels
+  const bars = [], valLabels = [];
+  for(let i=0;i<N;i++){
+    const x = chartLeft + i*(chartW/N) + barGap/2;
+    const rect = document.createElementNS(svgNS,'rect');
+    rect.setAttribute('x', x); rect.setAttribute('width', barW);
+    rect.setAttribute('y', chartBase); rect.setAttribute('height', 0);
+    rect.setAttribute('fill', (i===2) ? col('--bar') : col('--bar-tail'));
+    rect.setAttribute('rx', 2);
+    svg.appendChild(rect);
+    bars.push(rect);
+
+    const cls = document.createElementNS(svgNS,'text');
+    cls.setAttribute('x', x + barW/2); cls.setAttribute('y', chartBase + 16);
+    cls.setAttribute('text-anchor','middle'); cls.setAttribute('font-size','11');
+    cls.setAttribute('fill', col('--muted'));
+    cls.textContent = 'class ' + i;
+    svg.appendChild(cls);
+
+    const val = document.createElementNS(svgNS,'text');
+    val.setAttribute('x', x + barW/2); val.setAttribute('y', chartBase - 6);
+    val.setAttribute('text-anchor','middle'); val.setAttribute('font-size','10');
+    val.setAttribute('fill', col('--ink'));
+    svg.appendChild(val);
+    valLabels.push(val);
+  }
+
+  // inset panel: fixed T=1 reference
+  const insetX = chartLeft + 4, insetY = chartTop + 4, insetW = 190, insetH = 110;
+  const insetG = document.createElementNS(svgNS,'g');
+  const insetBg = document.createElementNS(svgNS,'rect');
+  insetBg.setAttribute('x', insetX); insetBg.setAttribute('y', insetY);
+  insetBg.setAttribute('width', insetW); insetBg.setAttribute('height', insetH);
+  insetBg.setAttribute('fill', col('--panel')); insetBg.setAttribute('stroke', col('--grid'));
+  insetBg.setAttribute('opacity','0.95'); insetBg.setAttribute('rx','5');
+  insetG.appendChild(insetBg);
+  const insetTitle = document.createElementNS(svgNS,'text');
+  insetTitle.setAttribute('x', insetX+6); insetTitle.setAttribute('y', insetY+14);
+  insetTitle.setAttribute('font-size','10.5'); insetTitle.setAttribute('fill', col('--muted'));
+  insetTitle.textContent = 'reference: T = 1';
+  insetG.appendChild(insetTitle);
+  const q1 = softmax(logits, 1);
+  const iBase = insetY + insetH - 6, iTop = insetY + 20, iH = iBase - iTop;
+  const iBarW = (insetW-12)/N - 1.5;
+  for(let i=0;i<N;i++){
+    const x = insetX + 6 + i*((insetW-12)/N);
+    const h = q1[i]*iH;
+    const r = document.createElementNS(svgNS,'rect');
+    r.setAttribute('x', x); r.setAttribute('width', iBarW);
+    r.setAttribute('y', iBase-h); r.setAttribute('height', h);
+    r.setAttribute('fill', (i===2)?col('--bar'):col('--bar-tail'));
+    insetG.appendChild(r);
+  }
+  svg.appendChild(insetG);
+
+  // readouts
+  const roT = document.getElementById('roT');
+  const roMax = document.getElementById('roMax');
+  const roMin = document.getElementById('roMin');
+  const roSum = document.getElementById('roSum');
+
+  let current = softmax(logits, 1);
+  let animFrom = current.slice();
+  let animTarget = current.slice();
+  let animStart = 0;
+  const ANIM_MS = 300;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function render(qArr, Tval){
+    for(let i=0;i<N;i++){
+      const h = qArr[i]*chartH;
+      bars[i].setAttribute('y', chartBase - h);
+      bars[i].setAttribute('height', Math.max(h,0));
+      valLabels[i].setAttribute('y', chartBase - h - 6);
+      valLabels[i].textContent = qArr[i] < 0.001 ? qArr[i].toExponential(1) : qArr[i].toFixed(3);
+    }
+    const maxQ = Math.max(...qArr);
+    const minQ = Math.min(...qArr);
+    const sum = qArr.reduce((a,b)=>a+b,0);
+    roT.textContent = Tval.toFixed(1);
+    roMax.textContent = maxQ.toFixed(3);
+    roMin.textContent = minQ < 0.001 ? minQ.toExponential(1) : minQ.toFixed(3);
+    roSum.textContent = sum.toFixed(2);
+  }
+
+  function step(ts){
+    if(!animStart) animStart = ts;
+    const t = Math.min(1, (ts-animStart)/ANIM_MS);
+    const q = animFrom.map((v,i)=> v + (animTarget[i]-v)*t);
+    render(q, parseFloat(document.getElementById('tSlider').value));
+    if(t < 1){
+      requestAnimationFrame(step);
+    } else {
+      current = animTarget.slice();
+    }
+  }
+
+  function setTemperature(Tval){
+    const target = softmax(logits, Tval);
+    if(reduceMotion){
+      current = target;
+      render(current, Tval);
+    } else {
+      animFrom = current.slice();
+      animTarget = target;
+      animStart = 0;
+      requestAnimationFrame(step);
+    }
+  }
+
+  const slider = document.getElementById('tSlider');
+  slider.addEventListener('input', ()=> setTemperature(parseFloat(slider.value)));
+  document.getElementById('paperBtn').addEventListener('click', ()=>{
+    slider.value = 20; setTemperature(20);
+  });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    slider.value = 1; setTemperature(1);
+  });
+
+  // initial draw
+  render(current, 1);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;temperature-exposes-tails&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Raising the temperature makes the tiny probabilities trainable"
+  ></iframe>
+</section>
+
+<section class="scene" id="two-loss-recipe">
+  <h3>The distillation loss: soft targets plus a small dose of true labels, rescaled by T²</h3>
+  <div class="caption">Now assemble the actual algorithm, which the paper names distillation. The student computes one set of logits and pays two cross-entropies on them: one against the teacher's soft targets, with both networks run at the same temperature <math><mi>T</mi></math>, and one against the true hard label at <math><mi>T</mi><mo>=</mo><mn>1</mn></math>, given a considerably smaller weight — the real labels still help, but the teacher does most of the teaching. There is a trap hiding in the calculus: each division of the logits by <math><mi>T</mi></math> contributes a factor <math><mfrac><mrow><mn>1</mn></mrow><mrow><mi>T</mi></mrow></mfrac></math> to the gradient, so the soft term's gradient scales as <math><mfrac><mrow><mn>1</mn></mrow><mrow><msup><mi>T</mi><mn>2</mn></msup></mrow></mfrac></math> — at <math><mi>T</mi><mo>=</mo><mn>20</mn></math> it would arrive 400 times weaker than the hard term, and raising the temperature would silently mute the teacher. Slide <math><mi>T</mi></math> with the correction off and watch the soft-gradient bar collapse; flip the <math><msup><mi>T</mi><mn>2</mn></msup></math> rescaling on and it holds steady. That one factor is what makes temperature a clean, independently tunable knob instead of a trade-off against the true labels.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="two-loss-recipe"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Distillation loss: two cross-entropies, one T² correction</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --ink:#1c1c1c;
+    --muted:#666666;
+    --line:#cfcfcf;
+    --soft:#2f6fce;
+    --hard:#c9622a;
+    --box:#eef1f6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171a;
+      --panel:#1e2125;
+      --ink:#eaeaea;
+      --muted:#a3a3a3;
+      --line:#3a3d42;
+      --soft:#6ea3ef;
+      --hard:#f0925a;
+      --box:#252a30;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  .scene{max-width:680px;margin:0 auto;}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px;}
+  svg{width:100%; max-width:640px; height:auto; display:block; margin:0 auto;}
+  .controls{display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-top:12px;}
+  label{font-size:14px;}
+  input[type=range]{width:220px; vertical-align:middle;}
+  button{
+    font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--line);
+    background:var(--box); color:var(--ink); cursor:pointer;
+  }
+  button[aria-pressed=&quot;true&quot;]{background:var(--soft); color:#fff; border-color:var(--soft);}
+  math{font-size:15px;}
+  .legend{font-size:12px; color:var(--muted); margin:2px 0 10px 0; line-height:1.4;}
+  .eqwrap{margin-top:14px;}
+  svg text{font-family:inherit;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;panel&quot;>
+    <svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;Diagram of the distillation loss&quot;>
+      <!-- student logits -->
+      <rect x=&quot;230&quot; y=&quot;8&quot; width=&quot;180&quot; height=&quot;32&quot; rx=&quot;6&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--line)&quot;/>
+      <text x=&quot;320&quot; y=&quot;28&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; fill=&quot;var(--ink)&quot;>student logits z_s</text>
+
+      <!-- branch lines -->
+      <line x1=&quot;320&quot; y1=&quot;40&quot; x2=&quot;140&quot; y2=&quot;60&quot; stroke=&quot;var(--muted)&quot; stroke-width=&quot;1.5&quot;/>
+      <line x1=&quot;320&quot; y1=&quot;40&quot; x2=&quot;500&quot; y2=&quot;60&quot; stroke=&quot;var(--muted)&quot; stroke-width=&quot;1.5&quot;/>
+
+      <!-- left branch: soft -->
+      <rect x=&quot;60&quot; y=&quot;60&quot; width=&quot;160&quot; height=&quot;28&quot; rx=&quot;5&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--soft)&quot;/>
+      <text x=&quot;140&quot; y=&quot;79&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--soft)&quot;>softmax(z_s /T), same T as teacher</text>
+      <line x1=&quot;140&quot; y1=&quot;88&quot; x2=&quot;140&quot; y2=&quot;106&quot; stroke=&quot;var(--soft)&quot; stroke-width=&quot;1.5&quot;/>
+      <rect x=&quot;55&quot; y=&quot;106&quot; width=&quot;170&quot; height=&quot;34&quot; rx=&quot;5&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--soft)&quot;/>
+      <text x=&quot;140&quot; y=&quot;122&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--ink)&quot;>match teacher's</text>
+      <text x=&quot;140&quot; y=&quot;135&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--ink)&quot;>soft targets (weight 1&amp;#8722;&amp;#945;)</text>
+
+      <!-- right branch: hard -->
+      <rect x=&quot;420&quot; y=&quot;60&quot; width=&quot;160&quot; height=&quot;28&quot; rx=&quot;5&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--hard)&quot;/>
+      <text x=&quot;500&quot; y=&quot;79&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--hard)&quot;>softmax(z_s), T = 1</text>
+      <line x1=&quot;500&quot; y1=&quot;88&quot; x2=&quot;500&quot; y2=&quot;106&quot; stroke=&quot;var(--hard)&quot; stroke-width=&quot;1.5&quot;/>
+      <rect x=&quot;415&quot; y=&quot;106&quot; width=&quot;170&quot; height=&quot;34&quot; rx=&quot;5&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--hard)&quot;/>
+      <text x=&quot;500&quot; y=&quot;122&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--ink)&quot;>match true label</text>
+      <text x=&quot;500&quot; y=&quot;135&quot; text-anchor=&quot;middle&quot; font-size=&quot;11.5&quot; fill=&quot;var(--ink)&quot;>y (weight &amp;#945;)</text>
+
+      <line x1=&quot;20&quot; y1=&quot;158&quot; x2=&quot;620&quot; y2=&quot;158&quot; stroke=&quot;var(--line)&quot;/>
+      <text x=&quot;320&quot; y=&quot;176&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--muted)&quot;>gradient magnitude reaching the student logits</text>
+
+      <!-- soft bar -->
+      <text x=&quot;10&quot; y=&quot;207&quot; font-size=&quot;12&quot; fill=&quot;var(--soft)&quot;>soft term (teacher-matching)</text>
+      <rect x=&quot;200&quot; y=&quot;196&quot; width=&quot;1&quot; height=&quot;22&quot; fill=&quot;var(--soft)&quot; id=&quot;barSoft&quot;/>
+      <text x=&quot;588&quot; y=&quot;212&quot; text-anchor=&quot;end&quot; font-size=&quot;12&quot; fill=&quot;var(--ink)&quot; id=&quot;valSoft&quot;>0.900</text>
+
+      <!-- hard bar -->
+      <text x=&quot;10&quot; y=&quot;249&quot; font-size=&quot;12&quot; fill=&quot;var(--hard)&quot;>hard term (true-label)</text>
+      <rect x=&quot;200&quot; y=&quot;238&quot; width=&quot;1&quot; height=&quot;22&quot; fill=&quot;var(--hard)&quot; id=&quot;barHard&quot;/>
+      <text x=&quot;588&quot; y=&quot;254&quot; text-anchor=&quot;end&quot; font-size=&quot;12&quot; fill=&quot;var(--ink)&quot; id=&quot;valHard&quot;>0.100</text>
+
+      <line x1=&quot;20&quot; y1=&quot;268&quot; x2=&quot;620&quot; y2=&quot;268&quot; stroke=&quot;var(--line)&quot;/>
+      <text x=&quot;320&quot; y=&quot;290&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; fill=&quot;var(--ink)&quot;>soft : hard ratio = <tspan id=&quot;ratioVal&quot;>9.00</tspan></text>
+    </svg>
+
+    <div class=&quot;controls&quot;>
+      <label for=&quot;tSlider&quot;>Temperature T (softmax scale, unitless): <b id=&quot;tVal&quot;>1.0</b></label>
+      <input type=&quot;range&quot; id=&quot;tSlider&quot; min=&quot;1&quot; max=&quot;20&quot; step=&quot;0.5&quot; value=&quot;1&quot;>
+      <button id=&quot;rescaleToggle&quot; aria-pressed=&quot;false&quot;>&amp;#215;T&amp;#178; rescaling: OFF</button>
+    </div>
+
+    <div class=&quot;eqwrap&quot;>
+      <math display=&quot;block&quot;>
+        <mi>L</mi><mo>=</mo><mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>&amp;#945;</mi><mo>)</mo>
+        <msup><mi>T</mi><mn>2</mn></msup><mo>&amp;#183;</mo><mtext>CE</mtext>
+        <mo>(</mo><mtext>softmax</mtext><mo>(</mo><msub><mi>z</mi><mtext>s</mtext></msub><mo>/</mo><mi>T</mi><mo>)</mo>
+        <mo>,</mo><mtext>softmax</mtext><mo>(</mo><msub><mi>z</mi><mtext>t</mtext></msub><mo>/</mo><mi>T</mi><mo>)</mo><mo>)</mo>
+        <mo>+</mo><mi>&amp;#945;</mi><mo>&amp;#183;</mo><mtext>CE</mtext><mo>(</mo><mtext>softmax</mtext><mo>(</mo><msub><mi>z</mi><mtext>s</mtext></msub><mo>)</mo><mo>,</mo><mi>y</mi><mo>)</mo>
+      </math>
+      <div class=&quot;legend&quot;>L — total loss the student minimizes (dimensionless) · z_s, z_t — student and teacher logits, raw scores before softmax · T — shared temperature used in both softmaxes · &amp;#945; — weight on the true-label term (small, here 0.1) · CE — cross-entropy between two probability distributions · y — the true one-hot label</div>
+
+      <math display=&quot;block&quot;>
+        <msub><mi>G</mi><mtext>soft</mtext></msub><mo>=</mo>
+        <mfrac><mrow><mn>1</mn><mo>&amp;#8722;</mo><mi>&amp;#945;</mi></mrow><msup><mi>T</mi><mn>2</mn></msup></mfrac>
+        <mo>&amp;#183;</mo><mi>c</mi>
+        <mo>,</mo><mspace width=&quot;10px&quot;/>
+        <msub><mi>G</mi><mtext>hard</mtext></msub><mo>=</mo><mi>&amp;#945;</mi>
+      </math>
+      <div class=&quot;legend&quot;>G_soft, G_hard — gradient magnitude arriving at the student logits from each term (same arbitrary units, shown as the bars above) · c — correction factor: c = 1 with the toggle off, c = T&amp;#178; with the toggle on · this is exactly the &amp;#247;T on each branch above, applied twice by the calculus, that produces the 1/T&amp;#178; unless corrected</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const W_SOFT = 0.9;   // 1 - alpha, weight on the soft (teacher) term
+  const W_HARD = 0.1;   // alpha, weight on the hard (true-label) term
+  const BAR_X = 200, BAR_MAXPX = 388, SCALE_MAX = W_SOFT;
+
+  const tSlider = document.getElementById('tSlider');
+  const tVal = document.getElementById('tVal');
+  const toggle = document.getElementById('rescaleToggle');
+  const barSoft = document.getElementById('barSoft');
+  const barHard = document.getElementById('barHard');
+  const valSoft = document.getElementById('valSoft');
+  const valHard = document.getElementById('valHard');
+  const ratioVal = document.getElementById('ratioVal');
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let rescaleOn = false;
+  let curSoftPx = 0, curHardPx = 0; // animated (lerped) pixel widths
+
+  function computeGradients(T, rescale){
+    const raw = W_SOFT / (T * T);          // 1/T^2 falloff from the two divisions by T
+    const soft = rescale ? raw * T * T : raw;
+    const hard = W_HARD;                   // never depends on T
+    return { soft, hard };
+  }
+
+  function targetWidths(soft, hard){
+    return {
+      soft: Math.max(1, (soft / SCALE_MAX) * BAR_MAXPX),
+      hard: Math.max(1, (hard / SCALE_MAX) * BAR_MAXPX)
+    };
+  }
+
+  function render(){
+    const T = parseFloat(tSlider.value);
+    tVal.textContent = T.toFixed(1);
+    const { soft, hard } = computeGradients(T, rescaleOn);
+    const target = targetWidths(soft, hard);
+
+    if (reduceMotion){
+      curSoftPx = target.soft;
+      curHardPx = target.hard;
+    } else {
+      curSoftPx += (target.soft - curSoftPx) * 0.25;
+      curHardPx += (target.hard - curHardPx) * 0.25;
+    }
+
+    barSoft.setAttribute('width', curSoftPx.toFixed(2));
+    barHard.setAttribute('width', curHardPx.toFixed(2));
+    valSoft.textContent = soft.toFixed(soft < 0.01 ? 5 : 3);
+    valHard.textContent = hard.toFixed(3);
+    ratioVal.textContent = (soft / hard).toFixed(soft/hard < 0.1 ? 4 : 2);
+
+    const settled = Math.abs(target.soft - curSoftPx) < 0.1 &amp;&amp; Math.abs(target.hard - curHardPx) < 0.1;
+    if (!settled &amp;&amp; !reduceMotion){
+      requestAnimationFrame(render);
+    } else {
+      window.__sceneReady = true;
+    }
+  }
+
+  tSlider.addEventListener('input', render);
+  toggle.addEventListener('click', function(){
+    rescaleOn = !rescaleOn;
+    toggle.setAttribute('aria-pressed', rescaleOn ? 'true' : 'false');
+    toggle.textContent = '\u00D7T\u00B2 rescaling: ' + (rescaleOn ? 'ON' : 'OFF');
+    render();
+  });
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;two-loss-recipe&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The distillation loss: soft targets plus a small dose of true labels, rescaled by T²"
+  ></iframe>
+</section>
+
+<section class="scene" id="high-t-logit-matching">
+  <h3>At high temperature, distillation becomes squared-error matching of logits</h3>
+  <div class="caption">What is distillation really asking the student to do? Differentiate the soft-target cross-entropy and you get <math><mfrac><mrow><mo>∂</mo><mi>C</mi></mrow><mrow><mo>∂</mo><msub><mi>z</mi><mi>i</mi></msub></mrow></mfrac><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mi>T</mi></mrow></mfrac><mo>(</mo><msub><mi>q</mi><mi>i</mi></msub><mo>-</mo><msub><mi>p</mi><mi>i</mi></msub><mo>)</mo></math>, where <math><msub><mi>q</mi><mi>i</mi></msub></math> is the student's softened probability and <math><msub><mi>p</mi><mi>i</mi></msub></math> the teacher's. When <math><mi>T</mi></math> is much larger than the logits, expand <math><msup><mi>e</mi><mrow><mi>z</mi><mo>/</mo><mi>T</mi></mrow></msup><mo>≈</mo><mn>1</mn><mo>+</mo><mfrac><mrow><mi>z</mi></mrow><mrow><mi>T</mi></mrow></mfrac></math>; with each example's logits shifted to zero mean, the gradient collapses to <math><mfrac><mrow><mn>1</mn></mrow><mrow><mi>N</mi><msup><mi>T</mi><mn>2</mn></msup></mrow></mfrac><mo>(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>-</mo><msub><mi>v</mi><mi>i</mi></msub><mo>)</mo></math> — exactly gradient descent on <math><mfrac><mrow><mn>1</mn></mrow><mrow><mn>2</mn></mrow></mfrac><mo>(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>-</mo><msub><mi>v</mi><mi>i</mi></msub><msup><mo>)</mo><mn>2</mn></msup></math>, the squared-error logit matching that Caruana's group had used before, now revealed as one extreme of a family. Slide <math><mi>T</mi></math> down and watch the curve peel away from the straight line precisely for logits far below the mean: moderate temperature pays less attention to the teacher's very negative logits, which the teacher's own training barely constrained and which are therefore noisy. That explains the paper's empirical finding — tiny students with 30 hidden units per layer do best at intermediate <math><mi>T</mi><mo>≈</mo><mn>2.5</mn></math>–4, while large students are insensitive to anything above <math><mi>T</mi><mo>=</mo><mn>8</mn></math>.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="high-t-logit-matching"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>High-T logit matching</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f6f7f9;
+  --fg:#1a1a1a;
+  --muted:#5a5a5a;
+  --accent:#1f5fbf;   /* exact curve */
+  --accent2:#c15b17;  /* linear prediction */
+  --grid:#d8dadf;
+  --band:rgba(200,60,60,0.14);
+  --bandtext:#8a2a2a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12141a;
+    --panel:#1a1d24;
+    --fg:#e9eaed;
+    --muted:#a7abb3;
+    --accent:#6aa3ff;
+    --accent2:#ffab6a;
+    --grid:#333844;
+    --band:rgba(255,110,110,0.16);
+    --bandtext:#ff9d9d;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:12px; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;
+}
+.scene{max-width:680px; margin:0 auto;}
+h2{font-size:16px; margin:4px 0 10px; font-weight:600;}
+.eqbox{background:var(--panel); border-radius:8px; padding:8px 12px; margin-bottom:6px;}
+.eqbox math{font-size:16px;}
+.legend{color:var(--muted); font-size:12px; line-height:1.5; margin:0 0 12px;}
+svg{width:100%; max-width:100%; height:auto; display:block; background:var(--panel); border-radius:8px;}
+.controls{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:12px 0 8px;}
+.controls label{display:flex; flex-direction:column; gap:2px; font-size:12.5px; flex:1 1 260px;}
+.controls input[type=range]{width:100%;}
+button{
+  padding:6px 12px; border-radius:6px; border:1px solid var(--grid);
+  background:var(--panel); color:var(--fg); cursor:pointer; font-size:13px;
+  flex:0 0 auto; height:32px; align-self:flex-end;
+}
+.readouts{
+  display:flex; flex-wrap:wrap; gap:8px 18px; font-size:12.5px; color:var(--fg);
+  background:var(--panel); border-radius:8px; padding:8px 12px; margin-top:6px;
+}
+.readouts b{color:var(--fg);}
+.readouts span.lbl{color:var(--muted);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>High-temperature limit of the distillation gradient</h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mfrac><mrow><mo>∂</mo><mi>C</mi></mrow><mrow><mo>∂</mo><msub><mi>z</mi><mi>i</mi></msub></mrow></mfrac>
+      <mo>=</mo>
+      <mfrac><mn>1</mn><mi>T</mi></mfrac>
+      <mo>(</mo><msub><mi>q</mi><mi>i</mi></msub><mo>&amp;#8722;</mo><msub><mi>p</mi><mi>i</mi></msub><mo>)</mo>
+      <mo>&amp;#8594;</mo>
+      <mfrac><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>&amp;#8722;</mo><msub><mi>v</mi><mi>i</mi></msub></mrow><mrow><mi>N</mi><msup><mi>T</mi><mn>2</mn></msup></mrow></mfrac>
+    </math>
+  </div>
+  <p class=&quot;legend&quot;>
+    C — distillation loss (soft-target cross-entropy) &amp;middot;
+    z<sub>i</sub>, v<sub>i</sub> — student and teacher logits for class i &amp;middot;
+    q<sub>i</sub>, p<sub>i</sub> — softened student/teacher probabilities (softmax at temperature T) &amp;middot;
+    N — number of classes (21 in this plot) &amp;middot;
+    T — transfer temperature (unitless softmax parameter)
+  </p>
+
+  <svg id=&quot;plot&quot; viewBox=&quot;0 0 680 400&quot; role=&quot;img&quot; aria-label=&quot;Gradient vs teacher logit plot&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <label>Transfer temperature T (softens both distributions before the gradient is taken)
+      <input type=&quot;range&quot; id=&quot;tSlider&quot; min=&quot;1&quot; max=&quot;50&quot; step=&quot;0.5&quot; value=&quot;10&quot;>
+    </label>
+    <button id=&quot;playBtn&quot;>▶ Auto-sweep T</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div><span class=&quot;lbl&quot;>T =</span> <b id=&quot;rT&quot;>10.0</b></div>
+    <div><span class=&quot;lbl&quot;>N (classes) =</span> <b>21</b></div>
+    <div><span class=&quot;lbl&quot;>&amp;Delta; = z&amp;#8722;v (fixed) =</span> <b>3.00</b></div>
+    <div><span class=&quot;lbl&quot;>sag at v&amp;#8776;&amp;#8722;10 =</span> <b id=&quot;rSag&quot;>0</b></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- physics constants ----------
+  const DELTA = 3.0;           // fixed student-teacher logit offset for the swept class (z_i - v_i)
+  const NBG = 20;               // number of fixed &quot;background&quot; classes
+  const background = [];
+  for(let i=0;i<NBG;i++){ background.push(-10 + 20*i/(NBG-1)); } // zero-mean, spans -10..10
+  const N = NBG + 1;            // total classes including the swept one
+
+  function softmaxLast(logits, T){
+    const scaled = logits.map(v=>v/T);
+    const m = Math.max(...scaled);
+    const exps = scaled.map(v=>Math.exp(v-m));
+    const sum = exps.reduce((a,b)=>a+b,0);
+    return exps[exps.length-1]/sum;
+  }
+
+  function computeCurve(T){
+    const pts = [];
+    for(let x=-10; x<=10.0001; x+=0.2){
+      const teacher = background.concat([x]);
+      const student = background.concat([x+DELTA]);
+      const p = softmaxLast(teacher, T);
+      const q = softmaxLast(student, T);
+      const gradExact = (q - p) / T;
+      const gradLinear = DELTA / (N * T * T);
+      pts.push({x, gradExact, gradLinear});
+    }
+    return pts;
+  }
+
+  function fmt(v){
+    const av = Math.abs(v);
+    if(av !== 0 &amp;&amp; av < 0.001) return v.toExponential(2);
+    return v.toFixed(4);
+  }
+
+  const svg = document.getElementById('plot');
+  const cs = getComputedStyle(document.documentElement);
+  function col(name){ return cs.getPropertyValue(name).trim(); }
+
+  const W=680, H=400, ML=64, MR=20, MT=34, MB=44;
+  const PW = W-ML-MR, PH = H-MT-MB;
+
+  function draw(T){
+    const pts = computeCurve(T);
+    let vals = [];
+    pts.forEach(p=>{ vals.push(p.gradExact, p.gradLinear); });
+    let yMax = Math.max(...vals), yMin = Math.min(...vals);
+    if(yMax === yMin){ yMax += 1e-6; yMin -= 1e-6; }
+    const pad = (yMax-yMin)*0.15 || 1e-6;
+    yMax += pad; yMin -= pad;
+
+    const sx = x => ML + (x+10)/20*PW;
+    const sy = y => MT + PH - (y-yMin)/(yMax-yMin)*PH;
+
+    // band: -10 to -6, &quot;barely constrained&quot; region
+    const bandX0 = sx(-10), bandX1 = sx(-6);
+
+    let solidPath = 'M ' + pts.map(p=>`${sx(p.x).toFixed(2)},${sy(p.gradExact).toFixed(2)}`).join(' L ');
+    let dashPath  = 'M ' + pts.map(p=>`${sx(p.x).toFixed(2)},${sy(p.gradLinear).toFixed(2)}`).join(' L ');
+
+    // ticks
+    const xt = [-10,-5,0,5,10];
+    const yTicks = [];
+    for(let i=0;i<5;i++){ yTicks.push(yMin + i*(yMax-yMin)/4); }
+
+    const gridCol = col('--grid'), fg = col('--fg'), muted = col('--muted');
+    const accent = col('--accent'), accent2 = col('--accent2');
+    const band = col('--band'), bandtext = col('--bandtext');
+
+    let s = '';
+    // axes box
+    s += `<rect x=&quot;${ML}&quot; y=&quot;${MT}&quot; width=&quot;${PW}&quot; height=&quot;${PH}&quot; fill=&quot;none&quot; stroke=&quot;${gridCol}&quot;/>`;
+    // shaded band
+    s += `<rect x=&quot;${bandX0.toFixed(2)}&quot; y=&quot;${MT}&quot; width=&quot;${(bandX1-bandX0).toFixed(2)}&quot; height=&quot;${PH}&quot; fill=&quot;${band}&quot;/>`;
+    s += `<text x=&quot;${((bandX0+bandX1)/2).toFixed(2)}&quot; y=&quot;${MT+16}&quot; font-size=&quot;10.5&quot; fill=&quot;${bandtext}&quot; text-anchor=&quot;middle&quot;>barely constrained</text>`;
+    s += `<text x=&quot;${((bandX0+bandX1)/2).toFixed(2)}&quot; y=&quot;${MT+29}&quot; font-size=&quot;10.5&quot; fill=&quot;${bandtext}&quot; text-anchor=&quot;middle&quot;>by teacher's training</text>`;
+
+    // gridlines + x ticks
+    xt.forEach(x=>{
+      const xp = sx(x);
+      s += `<line x1=&quot;${xp}&quot; y1=&quot;${MT}&quot; x2=&quot;${xp}&quot; y2=&quot;${MT+PH}&quot; stroke=&quot;${gridCol}&quot; stroke-width=&quot;0.5&quot;/>`;
+      s += `<text x=&quot;${xp}&quot; y=&quot;${MT+PH+16}&quot; font-size=&quot;11&quot; fill=&quot;${muted}&quot; text-anchor=&quot;middle&quot;>${x}</text>`;
+    });
+    s += `<text x=&quot;${ML+PW/2}&quot; y=&quot;${H-6}&quot; font-size=&quot;11.5&quot; fill=&quot;${fg}&quot; text-anchor=&quot;middle&quot;>teacher logit v (zero-meaned, class swept along axis)</text>`;
+
+    // y ticks
+    yTicks.forEach(v=>{
+      const yp = sy(v);
+      s += `<line x1=&quot;${ML}&quot; y1=&quot;${yp.toFixed(2)}&quot; x2=&quot;${ML+PW}&quot; y2=&quot;${yp.toFixed(2)}&quot; stroke=&quot;${gridCol}&quot; stroke-width=&quot;0.5&quot;/>`;
+      s += `<text x=&quot;${ML-6}&quot; y=&quot;${(yp+3.5).toFixed(2)}&quot; font-size=&quot;10&quot; fill=&quot;${muted}&quot; text-anchor=&quot;end&quot;>${fmt(v)}</text>`;
+    });
+    s += `<text x=&quot;16&quot; y=&quot;${MT+PH/2}&quot; font-size=&quot;11.5&quot; fill=&quot;${fg}&quot; text-anchor=&quot;middle&quot; transform=&quot;rotate(-90 16 ${MT+PH/2})&quot;>per-class gradient (∂C/∂z_i)</text>`;
+
+    // curves
+    s += `<path d=&quot;${dashPath}&quot; fill=&quot;none&quot; stroke=&quot;${accent2}&quot; stroke-width=&quot;2&quot; stroke-dasharray=&quot;6 5&quot;/>`;
+    s += `<path d=&quot;${solidPath}&quot; fill=&quot;none&quot; stroke=&quot;${accent}&quot; stroke-width=&quot;2.4&quot;/>`;
+
+    // curve labels
+    s += `<text x=&quot;${ML+PW-8}&quot; y=&quot;${MT+14}&quot; font-size=&quot;11&quot; fill=&quot;${accent}&quot; text-anchor=&quot;end&quot;>exact distillation gradient (solid)</text>`;
+    s += `<text x=&quot;${ML+PW-8}&quot; y=&quot;${MT+28}&quot; font-size=&quot;11&quot; fill=&quot;${accent2}&quot; text-anchor=&quot;end&quot;>high-T straight-line prediction (dashed)</text>`;
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = s;
+
+    // readouts
+    const first = pts[0];
+    document.getElementById('rSag').textContent = fmt(first.gradLinear - first.gradExact);
+    document.getElementById('rT').textContent = T.toFixed(1);
+  }
+
+  const slider = document.getElementById('tSlider');
+  const playBtn = document.getElementById('playBtn');
+  let T = parseFloat(slider.value);
+
+  slider.addEventListener('input', ()=>{
+    T = parseFloat(slider.value);
+    draw(T);
+  });
+
+  // ---------- optional auto-sweep animation ----------
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = false, dir = 1, lastTime = null;
+  function tick(now){
+    if(!playing) return;
+    if(lastTime===null) lastTime = now;
+    const dt = (now-lastTime)/1000; lastTime = now;
+    T += dir * dt * 12; // T units per second
+    if(T >= 50){ T = 50; dir = -1; }
+    if(T <= 1){ T = 1; dir = 1; }
+    slider.value = T;
+    draw(T);
+    requestAnimationFrame(tick);
+  }
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pause sweep' : '▶ Auto-sweep T';
+    if(playing){ lastTime=null; requestAnimationFrame(tick); }
+  });
+  if(reduceMotion){ playing = false; } // start paused always; user click still allowed
+
+  draw(T);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;high-t-logit-matching&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="At high temperature, distillation becomes squared-error matching of logits"
+  ></iframe>
+</section>
+
+<section class="scene" id="soft-targets-more-info">
+  <h3>One soft-labeled example teaches far more than one hard-labeled example</h3>
+  <div class="caption">Why should copying probabilities be so much more efficient than copying answers? Count the constraints: on a 14,000-class problem, a hard target pins down one fact per example — 'the answer is class <math><mi>k</mi></math>' — while a high-entropy soft target pins down 13,999 real-valued ratios, the teacher's whole opinion about that input. There is a second effect: soft targets are smooth functions of the input, so the gradient they generate varies far less from one training case to the next than the jumpy one-hot signal does. Slide the number of training examples and watch the two learning curves: the soft-target student climbs steeply and smoothly while the hard-target student crawls and jitters. More information per case plus lower gradient variance is why distilled students can train on much less data, with higher learning rates.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="soft-targets-more-info"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Soft targets teach more per example</title>
+<style>
+:root{
+  --bg:#f7f7f9; --fg:#1a1a1e; --grid:#c9c9d2; --muted:#5a5a66;
+  --hard:#c0392b; --soft:#1f6fb2; --panel:#ffffff; --border:#d4d4dc;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15151a; --fg:#eaeaf0; --grid:#3a3a44; --muted:#a3a3b0;
+    --hard:#ff6b5e; --soft:#5cb3ff; --panel:#1f1f26; --border:#33333d;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+canvas{width:100%;max-width:100%;display:block;background:var(--panel);
+  border:1px solid var(--border);border-radius:6px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;}
+.ctl{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted);flex:1 1 220px;}
+.ctl label{font-size:12px;}
+input[type=range]{width:100%;}
+button{padding:6px 12px;font-size:13px;border-radius:5px;border:1px solid var(--border);
+  background:var(--panel);color:var(--fg);cursor:pointer;}
+.readouts{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;margin:10px 0;}
+.ro{background:var(--panel);border:1px solid var(--border);border-radius:5px;
+  padding:6px 8px;font-size:12.5px;}
+.ro b{font-size:14px;display:block;}
+.eqbox{margin-top:8px;font-size:14px;}
+.legend{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
+math{font-size:16px;}
+sup{font-size:0.7em;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <canvas id=&quot;cv&quot; width=&quot;680&quot; height=&quot;420&quot; aria-label=&quot;learning curves plot&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctl&quot; style=&quot;flex:2 1 260px;&quot;>
+      <label for=&quot;nslider&quot;>Training examples given to student, N (10³ – 10⁷, log scale)</label>
+      <input type=&quot;range&quot; id=&quot;nslider&quot; min=&quot;3&quot; max=&quot;7&quot; step=&quot;0.01&quot; value=&quot;3&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>▶ Play: sweep N to max</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;>Training examples N<br><b id=&quot;roN&quot;>1.00 × 10<sup>3</sup></b></div>
+    <div class=&quot;ro&quot;>Hard-target accuracy<br><b id=&quot;roHard&quot; style=&quot;color:var(--hard)&quot;>0.0%</b></div>
+    <div class=&quot;ro&quot;>Soft-target accuracy<br><b id=&quot;roSoft&quot; style=&quot;color:var(--soft)&quot;>0.0%</b></div>
+    <div class=&quot;ro&quot;>Gradient noise, hard ÷ soft<br><b id=&quot;roRatio&quot;>–</b></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mfrac><msub><mi>I</mi><mtext>soft</mtext></msub><msub><mi>I</mi><mtext>hard</mtext></msub></mfrac>
+      <mo>=</mo>
+      <mfrac><mrow><mi>C</mi><mo>&amp;#8722;</mo><mn>1</mn></mrow><mn>1</mn></mfrac>
+      <mo>=</mo><mn>13999</mn>
+    </math>
+    <div class=&quot;legend&quot;>
+      I<sub>soft</sub>, I<sub>hard</sub> — number of independent real-valued constraints one training example gives the student (unitless) ·
+      C — number of output classes (14,000 for the speech task, so C&amp;#8722;1 = 13,999 ratios per soft target vs. 1 class fact per hard target).
+    </div>
+  </div>
+</div>
+
+<script>
+const A = 0.94;            // asymptotic ceiling accuracy (fraction correct)
+const N_HARD = 1e6;        // characteristic #examples for hard-target learning curve
+const N_SOFT = 1e4;        // characteristic #examples for soft-target learning curve (100x fewer)
+const C = 14000;           // number of output classes in the speech task
+const LOG_MIN = 3, LOG_MAX = 7;
+const STEPS = 260;
+
+function rnd(seed){ const x = Math.sin(seed*12.9898)*43758.5453; return x - Math.floor(x); }
+
+// precompute smooth base curves + noise once
+const pts = [];
+for(let i=0;i<STEPS;i++){
+  const logN = LOG_MIN + (LOG_MAX-LOG_MIN)*i/(STEPS-1);
+  const N = Math.pow(10, logN);
+  const hardBase = A*(1-Math.exp(-N/N_HARD));
+  const softBase = A*(1-Math.exp(-N/N_SOFT));
+  const noiseAmp = 0.02*Math.min(1, Math.sqrt(3e4/N));
+  const noise = (rnd(i*3.1+1)-0.5)*2*noiseAmp;
+  let hard = Math.min(1, Math.max(0, hardBase + noise));
+  let soft = Math.min(0.999, Math.max(softBase, hardBase + noiseAmp + 0.005));
+  pts.push({logN, N, hard, soft});
+}
+
+function sigmaHard(N){ return 0.35*Math.sqrt(3e4/N) + 0.12; }
+function sigmaSoft(N){ return 0.06*Math.sqrt(3e4/N) + 0.02; }
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function fmtN(N){
+  const exp = Math.floor(Math.log10(N));
+  const mant = (N/Math.pow(10,exp)).toFixed(2);
+  return mant+' × 10<sup>'+exp+'</sup>';
+}
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const slider = document.getElementById('nslider');
+const playBtn = document.getElementById('playBtn');
+const roN = document.getElementById('roN');
+const roHard = document.getElementById('roHard');
+const roSoft = document.getElementById('roSoft');
+const roRatio = document.getElementById('roRatio');
+
+function resize(){
+  const dpr = window.devicePixelRatio||1;
+  const w = cv.clientWidth;
+  const h = 420;
+  cv.width = w*dpr; cv.height = h*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+
+function idxForLog(logN){
+  const t = (logN-LOG_MIN)/(LOG_MAX-LOG_MIN);
+  return Math.min(STEPS-1, Math.max(0, Math.round(t*(STEPS-1))));
+}
+
+function draw(){
+  const w = cv.clientWidth, h = 420;
+  const fg=css('--fg'), grid=css('--grid'), muted=css('--muted');
+  const hardC=css('--hard'), softC=css('--soft'), panel=css('--panel');
+  ctx.clearRect(0,0,w,h);
+
+  const small = w < 420;
+  const fs = small?9.5:11;
+  ctx.font = fs+'px sans-serif';
+
+  // ---- main plot region ----
+  const mL=46, mR=14, mT=18, mB=32;
+  const plotH = 240;
+  const pW = w-mL-mR, pH = plotH-mT-mB;
+
+  const logNow = parseFloat(slider.value);
+  const iNow = idxForLog(logNow);
+
+  function X(logN){ return mL + (logN-LOG_MIN)/(LOG_MAX-LOG_MIN)*pW; }
+  function Y(acc){ return mT + pH - acc*pH; }
+
+  // grid + y ticks
+  ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.lineWidth=1;
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  [0,0.25,0.5,0.75,1.0].forEach(v=>{
+    const y = Y(v);
+    ctx.beginPath(); ctx.moveTo(mL,y); ctx.lineTo(mL+pW,y); ctx.stroke();
+    ctx.fillText(Math.round(v*100)+'%', mL-6, y);
+  });
+  // x ticks
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let e=LOG_MIN;e<=LOG_MAX;e++){
+    const x=X(e);
+    ctx.beginPath(); ctx.moveTo(x,mT); ctx.lineTo(x,mT+pH); ctx.strokeStyle=grid; ctx.stroke();
+    const sup = ['','','','³','⁴','⁵','⁶','⁷'][e];
+    ctx.fillStyle=muted;
+    ctx.fillText('10'+sup, x, mT+pH+6);
+  }
+  ctx.textAlign='center';
+  ctx.fillText('training examples given to student, N (log scale)', mL+pW/2, mT+pH+18);
+  ctx.save();
+  ctx.translate(12, mT+pH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillText('student test accuracy', 0,0);
+  ctx.restore();
+
+  // curves up to iNow
+  function drawCurve(key,color){
+    ctx.strokeStyle=color; ctx.lineWidth=2.2; ctx.beginPath();
+    for(let i=0;i<=iNow;i++){
+      const x=X(pts[i].logN), y=Y(pts[i][key]);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    const p=pts[iNow];
+    const x=X(p.logN), y=Y(p[key]);
+    ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fillStyle=color; ctx.fill();
+  }
+  drawCurve('hard',hardC);
+  drawCurve('soft',softC);
+
+  // on-plot legend
+  ctx.textAlign='left'; ctx.font=fs+'px sans-serif';
+  ctx.fillStyle=softC; ctx.fillRect(mL+6, mT+4, 14,3);
+  ctx.fillStyle=fg; ctx.fillText('soft targets (steep, smooth)', mL+24, mT+10);
+  ctx.fillStyle=hardC; ctx.fillRect(mL+6, mT+18, 14,3);
+  ctx.fillStyle=fg; ctx.fillText('hard targets (shallow, jittery)', mL+24, mT+24);
+
+  // ---- gradient-noise inset ----
+  const iT = plotH+8, iH = 118;
+  ctx.strokeStyle=grid; ctx.beginPath(); ctx.moveTo(0,plotH); ctx.lineTo(w,plotH); ctx.stroke();
+  const imL=46, imR=14, imTop=iT+16, imBot=iT+iH-18;
+  ctx.fillStyle=fg; ctx.textAlign='left'; ctx.font=fs+'px sans-serif';
+  ctx.fillText('gradient magnitude per training step (illustrative)', imL, iT+2);
+
+  const N = pts[iNow].N;
+  const sH = sigmaHard(N), sS = sigmaSoft(N);
+  const steps=40;
+  function traceY(sigma, seed, baseline){
+    return Array.from({length:steps},(_,i)=> baseline + (rnd(i*7.7+seed)-0.5)*2*sigma);
+  }
+  const th = traceY(sH, 4.2, 0.6);
+  const ts = traceY(sS, 9.8, 0.25);
+  const maxAbs = 1.0;
+  function drawTrace(arr,color){
+    ctx.strokeStyle=color; ctx.lineWidth=1.6; ctx.beginPath();
+    arr.forEach((v,i)=>{
+      const x = imL + i/(steps-1)*(w-imL-imR);
+      const y = imBot - (v/maxAbs)*(imBot-imTop);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+
+  // Clip the traces to the inset plot area so noisy excursions never
+  // cross into the legend text drawn beneath the inset.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(imL-4, imTop-4, (w-imL-imR)+8, (imBot-imTop)+8);
+  ctx.clip();
+  drawTrace(th,hardC);
+  drawTrace(ts,softC);
+  ctx.restore();
+
+  // Legend for the inset, painted on an opaque background box so it stays
+  // legible even if a trace's line happens to run near this region.
+  ctx.font=(fs-1)+'px sans-serif';
+  const line1 = 'hard-target gradient (noisier)';
+  const line2 = 'soft-target gradient (smoother)';
+  const legendW = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + 8;
+  const legendX = imL - 4;
+  const legendY = imBot + 3;
+  const legendH = 22;
+  ctx.fillStyle = panel;
+  ctx.fillRect(legendX, legendY, legendW, legendH);
+  ctx.strokeStyle = grid;
+  ctx.strokeRect(legendX, legendY, legendW, legendH);
+  ctx.fillStyle = muted;
+  ctx.fillText(line1, imL, imBot+12);
+  ctx.fillText(line2, imL, imBot+22);
+
+  // Plain-word axis note (no arrow glyph, which some canvas font stacks
+  // fail to render and substitute with a stray artifact glyph).
+  ctx.textAlign='right';
+  ctx.fillText('training step (later steps to the right)', w-imR, iT+2);
+
+  // readouts
+  const p = pts[iNow];
+  roN.innerHTML = fmtN(p.N);
+  roHard.textContent = (p.hard*100).toFixed(1)+'%';
+  roSoft.textContent = (p.soft*100).toFixed(1)+'%';
+  roRatio.textContent = (sH/sS).toFixed(1)+'×';
+}
+
+slider.addEventListener('input', draw);
+
+let playing=false, rafId=null, t0=null, startLog=null;
+const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function step(ts){
+  if(t0===null){ t0=ts; startLog=parseFloat(slider.value); }
+  const dur=6000;
+  const frac = Math.min(1, (ts-t0)/dur);
+  // Sweep from wherever the slider currently is up to the maximum —
+  // never snap back to the minimum and override a manually-set position.
+  slider.value = (startLog + frac*(LOG_MAX-startLog)).toFixed(2);
+  draw();
+  if(frac<1 &amp;&amp; playing){ rafId=requestAnimationFrame(step); }
+  else { playing=false; t0=null; startLog=null; playBtn.textContent='▶ Play: sweep N to max'; }
+}
+
+playBtn.addEventListener('click', ()=>{
+  if(playing){ playing=false; cancelAnimationFrame(rafId); playBtn.textContent='▶ Play: sweep N to max'; return; }
+  if(reduced){
+    // Respect prefers-reduced-motion: jump directly to the endpoint
+    // instead of animating, without discarding this instantaneous state.
+    slider.value = LOG_MAX.toFixed(2);
+    draw();
+    return;
+  }
+  playing=true; t0=null; startLog=null; playBtn.textContent='⏸ Pause';
+  rafId=requestAnimationFrame(step);
+});
+
+window.addEventListener('resize', resize);
+resize();
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;soft-targets-more-info&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+
+window.__sceneReady = true;
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One soft-labeled example teaches far more than one hard-labeled example"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Head to head with the heavyweight</h2>
+  <div class="part-lede">The recipe is in hand. Now we run it against the status quo on the paper's own benchmarks — handwritten digits, a production speech system, and a deliberately starved training set — and keep score with the paper's numbers.</div>
+</header>
+<section class="scene" id="mnist-payoff">
+  <h3>On handwritten digits, the distilled student nearly matches its teacher</h3>
+  <div class="caption">Time to keep score, starting on MNIST, the classic dataset of 10,000 handwritten test digits. The teacher is a big net — two layers of 1,200 units, trained with dropout (randomly silencing units during training, a strong regularizer) and with jittered inputs (images randomly shifted a pixel or two) — and it makes 67 test errors. A small student with two layers of 800 units, trained the ordinary hard-target way, makes 146. Press the third button: the same small student, trained with the teacher's soft targets at <math><mi>T</mi><mo>=</mo><mn>20</mn></math> plus a small hard-target term, makes 74 errors — with no dropout, no jitter, no regularization of any kind beyond the soft targets themselves. Half the errors vanished because the student was told not just what each digit is, but what it almost is.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="mnist-payoff"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>MNIST payoff: teacher vs. student vs. distilled student</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f2f4f7;
+  --text:#1b1e24;
+  --muted:#5b6270;
+  --grid:#d7dae0;
+  --teacher:#3a6ea5;
+  --hard:#c0392b;
+  --distill:#1f9d55;
+  --inactive:#c7ccd4;
+  --active-ring:#22252b;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171c;
+    --panel:#20232a;
+    --text:#e7e9ee;
+    --muted:#9aa2b1;
+    --grid:#333844;
+    --teacher:#6fa8dc;
+    --hard:#e07a6b;
+    --distill:#4fce8a;
+    --inactive:#3a3f4a;
+    --active-ring:#e7e9ee;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+button{
+  font-size:13px;padding:7px 10px;border-radius:6px;border:1px solid var(--grid);
+  background:var(--panel);color:var(--text);cursor:pointer;
+}
+button.sel{outline:2px solid var(--active-ring);font-weight:600;}
+svg{width:100%;height:auto;max-width:100%;display:block;}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+.stat{background:var(--panel);border-radius:6px;padding:6px 10px;font-size:12px;min-width:140px;}
+.stat b{font-size:15px;display:block;color:var(--text);}
+.card{background:var(--panel);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin:8px 0;}
+.card b{color:var(--text);}
+.legend{font-size:11px;color:var(--muted);margin:2px 0 12px;}
+#strip{display:flex;flex-wrap:wrap;gap:2px;min-height:34px;margin-top:4px;}
+.sq{width:8px;height:8px;border-radius:1px;opacity:.9;transition:opacity .25s;}
+.small{font-size:11.5px;color:var(--muted);}
+.playwrap{margin:6px 0;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;controls&quot; id=&quot;btns&quot;></div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 250&quot; role=&quot;img&quot; aria-label=&quot;bar chart of test errors&quot;></svg>
+
+  <div class=&quot;stats&quot;>
+    <div class=&quot;stat&quot;>Test errors (this regime)<b id=&quot;rErr&quot;>–</b></div>
+    <div class=&quot;stat&quot;>Errors above teacher<b id=&quot;rGap&quot;>–</b></div>
+    <div class=&quot;stat&quot;>Hard-target gap closed by distillation<b id=&quot;rFrac&quot;>–</b></div>
+  </div>
+
+  <div class=&quot;card&quot; id=&quot;card&quot;></div>
+
+  <div class=&quot;small&quot;>Misclassified-digit strip (one square per test error, current regime)</div>
+  <div id=&quot;strip&quot;></div>
+
+  <math display=&quot;block&quot;>
+    <mi>f</mi><mo>=</mo>
+    <mfrac>
+      <mrow><msub><mi>E</mi><mtext>hard</mtext></msub><mo>&amp;#8722;</mo><msub><mi>E</mi><mtext>distill</mtext></msub></mrow>
+      <mrow><msub><mi>E</mi><mtext>hard</mtext></msub><mo>&amp;#8722;</mo><msub><mi>E</mi><mtext>teacher</mtext></msub></mrow>
+    </mfrac>
+  </math>
+  <div class=&quot;legend&quot;>f — fraction of the hard-target-to-teacher error gap closed by distillation (dimensionless) · E<sub>hard</sub>, E<sub>distill</sub>, E<sub>teacher</sub> — test errors out of 10,000 for each recipe (146, 74, 67)</div>
+
+  <div class=&quot;playwrap&quot; id=&quot;playwrap&quot; style=&quot;display:none;&quot;>
+    <button id=&quot;playBtn&quot;>▶ Replay bar-growth animation</button>
+  </div>
+</div>
+
+<script>
+const regimes = {
+  teacher:{errors:67, name:'Teacher', color:'var(--teacher)',
+    arch:'2 hidden layers × 1200 units', targets:'hard (one-hot) labels',
+    reg:'dropout + jittered inputs (images shifted ±1 px)'},
+  hard:{errors:146, name:'Student, hard targets', color:'var(--hard)',
+    arch:'2 hidden layers × 800 units', targets:'hard labels only',
+    reg:'none'},
+  distill:{errors:74, name:'Student, distilled T = 20', color:'var(--distill)',
+    arch:'2 hidden layers × 800 units', targets:&quot;teacher's soft targets at T = 20, plus a small hard-target term&quot;,
+    reg:'none beyond the soft-target loss'}
+};
+const order = ['teacher','hard','distill'];
+let selected = 'teacher';
+const maxErr = 160; // axis ceiling, errors out of 10,000
+const svgNS = 'http://www.w3.org/2000/svg';
+const chart = document.getElementById('chart');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// --- build buttons ---
+const btnRow = document.getElementById('btns');
+order.forEach(key=>{
+  const b = document.createElement('button');
+  b.textContent = regimes[key].name;
+  b.dataset.key = key;
+  b.addEventListener('click', ()=>{ selected = key; render(); });
+  btnRow.appendChild(b);
+});
+
+// --- build static svg parts ---
+const marginL=48, marginR=20, chartTop=16, chartBottom=196, chartW=640;
+function yFor(e){ return chartBottom - (e/maxErr)*(chartBottom-chartTop); }
+
+function buildAxis(){
+  const ticks=[0,50,100,150];
+  ticks.forEach(t=>{
+    const y = yFor(t);
+    const line = document.createElementNS(svgNS,'line');
+    line.setAttribute('x1',marginL); line.setAttribute('x2',chartW-marginR);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('stroke','var(--grid)'); line.setAttribute('stroke-width','1');
+    chart.appendChild(line);
+    const txt = document.createElementNS(svgNS,'text');
+    txt.setAttribute('x',marginL-8); txt.setAttribute('y',y+4);
+    txt.setAttribute('text-anchor','end'); txt.setAttribute('font-size','11');
+    txt.setAttribute('fill','var(--muted)');
+    txt.textContent = t;
+    chart.appendChild(txt);
+  });
+  const axLabel = document.createElementNS(svgNS,'text');
+  axLabel.setAttribute('x',14); axLabel.setAttribute('y',chartTop-2);
+  axLabel.setAttribute('font-size','11'); axLabel.setAttribute('fill','var(--muted)');
+  axLabel.textContent = 'test errors (out of 10,000)';
+  chart.appendChild(axLabel);
+}
+
+const barW=110, gap=(chartW-marginL-marginR-3*barW)/4;
+const bars={}, labels={};
+function buildBars(){
+  order.forEach((key,i)=>{
+    const x = marginL + gap + i*(barW+gap);
+    const rect = document.createElementNS(svgNS,'rect');
+    rect.setAttribute('x',x); rect.setAttribute('width',barW);
+    rect.setAttribute('y',chartBottom); rect.setAttribute('height',0);
+    rect.setAttribute('rx',3);
+    rect.setAttribute('fill', 'var(--inactive)');
+    chart.appendChild(rect);
+    bars[key]=rect;
+
+    const val = document.createElementNS(svgNS,'text');
+    val.setAttribute('x',x+barW/2); val.setAttribute('text-anchor','middle');
+    val.setAttribute('font-size','13'); val.setAttribute('font-weight','600');
+    chart.appendChild(val);
+    labels[key]=val;
+
+    const nameEl = document.createElementNS(svgNS,'text');
+    nameEl.setAttribute('x',x+barW/2); nameEl.setAttribute('y',chartBottom+16);
+    nameEl.setAttribute('text-anchor','middle'); nameEl.setAttribute('font-size','11');
+    nameEl.setAttribute('fill','var(--muted)');
+    nameEl.textContent = regimes[key].name.replace('Student, ','Student\u2013');
+    chart.appendChild(nameEl);
+  });
+}
+buildAxis();
+buildBars();
+
+// --- growth animation (rAF) ---
+// Bar heights animate for visual effect, but the numeric labels are always
+// the final, correct error counts (67 / 146 / 74) — they never show an
+// intermediate/rounded value, so the chart and the readout box can never
+// disagree.
+function growAnimation(duration=650){
+  order.forEach(key=>{ labels[key].textContent = regimes[key].errors; });
+  const start = performance.now();
+  function step(now){
+    const t = Math.min(1,(now-start)/duration);
+    const ease = 1-Math.pow(1-t,3);
+    order.forEach(key=>{
+      const e = regimes[key].errors;
+      const targetY = yFor(e);
+      const h = (chartBottom-targetY)*ease;
+      bars[key].setAttribute('y', chartBottom-h);
+      bars[key].setAttribute('height', h);
+      labels[key].setAttribute('y', chartBottom-h-6);
+    });
+    if(t<1) requestAnimationFrame(step); else finalizeBars();
+  }
+  requestAnimationFrame(step);
+}
+function finalizeBars(){
+  order.forEach(key=>{
+    const e = regimes[key].errors;
+    const y = yFor(e);
+    bars[key].setAttribute('y',y);
+    bars[key].setAttribute('height', chartBottom-y);
+    labels[key].setAttribute('y', y-6);
+    labels[key].textContent = e;
+  });
+  colorBars();
+}
+function colorBars(){
+  order.forEach(key=>{
+    bars[key].setAttribute('fill', key===selected ? regimes[key].color : 'var(--inactive)');
+    bars[key].style.transition='fill .3s';
+    labels[key].setAttribute('fill', key===selected ? 'var(--text)' : 'var(--muted)');
+  });
+}
+
+// --- recipe card, readouts, digit strip ---
+function renderCard(){
+  const r = regimes[selected];
+  document.getElementById('card').innerHTML =
+    '<div><b>Architecture:</b> '+r.arch+'</div>'+
+    '<div><b>Training targets:</b> '+r.targets+'</div>'+
+    '<div><b>Regularizers:</b> '+r.reg+'</div>';
+}
+function renderStats(){
+  const e = regimes[selected].errors;
+  document.getElementById('rErr').textContent = e + ' / 10,000';
+  document.getElementById('rGap').textContent = (e-67) + ' errors';
+  const f = (regimes.hard.errors - regimes.distill.errors) / (regimes.hard.errors - regimes.teacher.errors);
+  document.getElementById('rFrac').textContent = Math.round(f*100) + '%';
+}
+function renderStrip(){
+  const strip = document.getElementById('strip');
+  strip.innerHTML='';
+  const e = regimes[selected].errors;
+  const color = getComputedStyle(document.documentElement).getPropertyValue(
+    selected==='teacher'?'--teacher':selected==='hard'?'--hard':'--distill');
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<e;i++){
+    const d = document.createElement('div');
+    d.className='sq';
+    d.style.background = color;
+    frag.appendChild(d);
+  }
+  strip.appendChild(frag);
+}
+
+function render(){
+  document.querySelectorAll('#btns button').forEach(b=>{
+    b.classList.toggle('sel', b.dataset.key===selected);
+  });
+  colorBars();
+  renderCard();
+  renderStats();
+  renderStrip();
+}
+
+// initial state
+if(reduceMotion){
+  // Show the correct, final bars/labels immediately (static); offer a
+  // replay button for the optional growth animation.
+  finalizeBars();
+  render();
+  document.getElementById('playwrap').style.display='block';
+  document.getElementById('playBtn').addEventListener('click', ()=>{
+    growAnimation();
+  });
+} else {
+  growAnimation();
+  render();
+}
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;mnist-payoff&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="On handwritten digits, the distilled student nearly matches its teacher"
+  ></iframe>
+</section>
+
+<section class="scene" id="three-percent-data">
+  <h3>With soft targets, 3% of the data buys almost all of the performance</h3>
+  <div class="caption">If soft targets really carry more information per example, starving the model of examples should hurt far less — and it does, dramatically. The 85-million-parameter speech model trained on all 700 million examples reaches 58.9% frame accuracy on held-out test data. Flip to hard targets on just 3% of the data (about 20 million examples) and press play: training accuracy soars to 67.3% while test accuracy peaks and then falls to 44.5% — the model is memorizing its small training set, a failure called overfitting, and you must halt training early ('early stopping') to salvage anything. Now flip to soft targets on the same 3%: the test curve climbs to 57.0% and simply flattens there, no early stopping needed. Each soft target constrains the model's entire output distribution on that example, forbidding the pathological weight settings that memorize the training set — the teacher's generalization behavior itself is being transmitted.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="three-percent-data"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>3% of the data, with soft targets</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1b1f23; --muted:#5b6470; --grid:#d8dde3;
+  --hard:#c0392b; --soft:#1f7a5c; --baseline:#8a8f98; --panel:#f4f6f8; --accent:#2b6cb0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14181c; --fg:#e7ebef; --muted:#9aa4af; --grid:#333b44;
+    --hard:#ff7a68; --soft:#5fd6ac; --baseline:#7d8894; --panel:#1c2126;
+    --accent:#6fb3ff;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+svg{width:100%;max-width:100%;height:auto;display:block;background:var(--bg);}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0 6px;}
+button{font:inherit;font-size:13px;padding:7px 12px;border-radius:6px;border:1px solid var(--grid);
+  background:var(--panel);color:var(--fg);cursor:pointer;}
+button:hover{border-color:var(--accent);}
+.readouts{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;margin:8px 0 4px;}
+.readouts div span.lbl{color:var(--muted);}
+.readouts div span.val{font-variant-numeric:tabular-nums;font-weight:600;}
+.eqwrap{margin-top:14px;padding-top:8px;border-top:1px solid var(--grid);}
+math{font-size:15px;color:var(--fg);}
+.legend{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <svg id=&quot;plot&quot; viewBox=&quot;0 0 640 380&quot; role=&quot;img&quot; aria-label=&quot;Accuracy versus training progress plot&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot; type=&quot;button&quot;>Switch to soft targets (3% data)</button>
+    <button id=&quot;playBtn&quot; type=&quot;button&quot;>Play training</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div><span class=&quot;lbl&quot;>Regime: </span><span class=&quot;val&quot; id=&quot;rRegime&quot;>hard targets, 3% data</span></div>
+    <div><span class=&quot;lbl&quot;>Training progress: </span><span class=&quot;val&quot; id=&quot;rProgress&quot;>0%</span></div>
+    <div><span class=&quot;lbl&quot;>Train accuracy: </span><span class=&quot;val&quot; id=&quot;rTrain&quot;>–</span></div>
+    <div><span class=&quot;lbl&quot;>Test accuracy: </span><span class=&quot;val&quot; id=&quot;rTest&quot;>–</span></div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>A</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo>
+      <msub><mi>A</mi><mtext>floor</mtext></msub><mo>+</mo>
+      <mo>(</mo><msub><mi>A</mi><mtext>peak</mtext></msub><mo>&amp;#8722;</mo><msub><mi>A</mi><mtext>floor</mtext></msub><mo>)</mo>
+      <mfrac>
+        <mrow><msup><mi>e</mi><mrow><mo>&amp;#8722;</mo><msub><mi>k</mi><mn>2</mn></msub><mi>t</mi></mrow></msup><mo>&amp;#8722;</mo><msup><mi>e</mi><mrow><mo>&amp;#8722;</mo><msub><mi>k</mi><mn>1</mn></msub><mi>t</mi></mrow></msup></mrow>
+        <mrow><msup><mi>e</mi><mrow><mo>&amp;#8722;</mo><msub><mi>k</mi><mn>2</mn></msub><msub><mi>t</mi><mtext>peak</mtext></msub></mrow></msup><mo>&amp;#8722;</mo><msup><mi>e</mi><mrow><mo>&amp;#8722;</mo><msub><mi>k</mi><mn>1</mn></msub><msub><mi>t</mi><mtext>peak</mtext></msub></mrow></msup></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>A(t) — test accuracy at training progress t · A<sub>floor</sub>, A<sub>peak</sub> — starting and peak accuracy (%) · k<sub>1</sub>, k<sub>2</sub> — learning-rate and overfitting-rate constants (1/run) · t<sub>peak</sub> — progress fraction where the hard-target test curve peaks before overfitting drags it down (used only in the hard-target regime).</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- named constants from Table 5 (quantitative anchor) ----
+  const FULL_DATA_BASELINE = 58.9;   // % test acc, 100% of data + hard targets
+  const HARD_TRAIN_FINAL   = 67.3;   // % train acc, 3% data + hard targets
+  const HARD_TEST_FINAL    = 44.5;   // % test acc,  3% data + hard targets
+  const SOFT_TEST_FINAL    = 57.0;   // % test acc,  3% data + soft targets
+  const SOFT_TRAIN_FINAL   = 59.5;   // % train acc, 3% data + soft targets (tracks test closely; not separately reported)
+  const START = 18;                  // % accuracy at the very start of training (near chance)
+
+  // two competing rate processes: fast learning (K1) vs slower overfitting (K2)
+  const K1 = 6.0, K2 = 0.9;
+  const bump = t => Math.exp(-K2*t) - Math.exp(-K1*t);
+  const T_PEAK = Math.log(K1/K2)/(K1-K2);
+  const G_PEAK = bump(T_PEAK);
+  const G_END  = bump(1);
+  const HARD_TEST_FLOOR = START;
+  const HARD_TEST_PEAK  = HARD_TEST_FLOOR + (HARD_TEST_FINAL - HARD_TEST_FLOOR) / (G_END / G_PEAK);
+
+  function trainHard(p){ const k=5; return START + (HARD_TRAIN_FINAL-START)*(1-Math.exp(-k*p))/(1-Math.exp(-k)); }
+  function testHard(p){ return HARD_TEST_FLOOR + (HARD_TEST_PEAK-HARD_TEST_FLOOR)*bump(p)/G_PEAK; }
+  function trainSoft(p){ const k=4; return START + (SOFT_TRAIN_FINAL-START)*(1-Math.exp(-k*p))/(1-Math.exp(-k)); }
+  function testSoft(p){ const k=4; return START + (SOFT_TEST_FINAL-START)*(1-Math.exp(-k*p))/(1-Math.exp(-k)); }
+
+  // ---- plot geometry ----
+  const W=640,H=380, L=55,R=70,T=20,B=45;
+  const plotW=W-L-R, plotH=H-T-B;
+  const yMin=40,yMax=70;
+  const xFor = p => L + p*plotW;
+  const yFor = a => T + (yMax-a)/(yMax-yMin)*plotH;
+  const inRange = a => a>=yMin &amp;&amp; a<=yMax;
+
+  const svg = document.getElementById('plot');
+  const css = getComputedStyle(document.documentElement);
+  const col = name => css.getPropertyValue(name).trim();
+
+  function ns(tag,attrs){
+    const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    for(const k in attrs) el.setAttribute(k,attrs[k]);
+    return el;
+  }
+
+  // clip curves to the 40-70% visible window so off-chart (below 40%) portions
+  // of the trajectory simply do not appear, instead of overflowing the axes
+  const defs = ns('defs',{});
+  const clip = ns('clipPath',{id:'plotClip'});
+  clip.appendChild(ns('rect',{x:L,y:T,width:plotW,height:plotH}));
+  defs.appendChild(clip);
+  svg.appendChild(defs);
+
+  // static axes/grid
+  for(const a of [40,45,50,55,60,65,70]){
+    const y=yFor(a);
+    svg.appendChild(ns('line',{x1:L,x2:L+plotW,y1:y,y2:y,stroke:col('--grid'),'stroke-width':1}));
+    const t=ns('text',{x:L-8,y:y+4,'text-anchor':'end','font-size':11,fill:col('--muted')});
+    t.textContent=a; svg.appendChild(t);
+  }
+  const yAxisLbl=ns('text',{x:14,y:T+plotH/2,'text-anchor':'middle','font-size':12,fill:col('--muted'),
+    transform:`rotate(-90 14 ${T+plotH/2})`});
+  yAxisLbl.textContent='accuracy (%)'; svg.appendChild(yAxisLbl);
+
+  for(const f of [0,0.25,0.5,0.75,1]){
+    const x=xFor(f);
+    const t=ns('text',{x:x,y:T+plotH+18,'text-anchor':'middle','font-size':11,fill:col('--muted')});
+    t.textContent=Math.round(f*100); svg.appendChild(t);
+  }
+  const xAxisLbl=ns('text',{x:L+plotW/2,y:H-6,'text-anchor':'middle','font-size':12,fill:col('--muted')});
+  xAxisLbl.textContent='training progress (% of run)'; svg.appendChild(xAxisLbl);
+
+  svg.appendChild(ns('line',{x1:L,x2:L+plotW,y1:T+plotH,y2:T+plotH,stroke:col('--muted'),'stroke-width':1}));
+  svg.appendChild(ns('line',{x1:L,x2:L,y1:T,y2:T+plotH,stroke:col('--muted'),'stroke-width':1}));
+
+  // baseline reference line, labeled with a short tag pinned to its right end
+  // (kept far from the peak marker so the two never share horizontal space)
+  const yBase=yFor(FULL_DATA_BASELINE);
+  svg.appendChild(ns('line',{x1:L,x2:L+plotW,y1:yBase,y2:yBase,stroke:col('--baseline'),'stroke-width':1.5,'stroke-dasharray':'5,4'}));
+  const baseLbl=ns('text',{x:L+plotW,y:yBase-7,'text-anchor':'end','font-size':11,fill:col('--baseline')});
+  baseLbl.textContent=`full-data baseline (100%): ${FULL_DATA_BASELINE.toFixed(1)}%`;
+  svg.appendChild(baseLbl);
+
+  // curve legend / usage note (top-left, well clear of the plot body)
+  const trainKeyLbl=ns('text',{x:L+10,y:T+14,'font-size':11});
+  trainKeyLbl.textContent='- - - train accuracy (on the training subset)';
+  const testKeyLbl=ns('text',{x:L+10,y:T+28,'font-size':11});
+  testKeyLbl.textContent='— test accuracy (on held-out data)';
+  const noteLbl=ns('text',{x:L+10,y:T+42,'font-size':10.5,fill:col('--muted')});
+  noteLbl.textContent='faint line = full trajectory · bold line = progress reached so far';
+  svg.appendChild(trainKeyLbl); svg.appendChild(testKeyLbl); svg.appendChild(noteLbl);
+
+  // ghost (full 0..1 trajectory, always shown so the shape of the curve —
+  // widening gap / peak-then-decline vs plateau — is visible immediately)
+  const trainGhost=ns('path',{fill:'none','stroke-width':1.6,'stroke-dasharray':'6,5','stroke-opacity':0.38,'clip-path':'url(#plotClip)'});
+  const testGhost=ns('path',{fill:'none','stroke-width':2,'stroke-opacity':0.38,'clip-path':'url(#plotClip)'});
+  svg.appendChild(trainGhost); svg.appendChild(testGhost);
+
+  // revealed (bright) curve: only the portion of the trajectory reached so far
+  const trainPath=ns('path',{fill:'none','stroke-width':2,'stroke-dasharray':'6,5','clip-path':'url(#plotClip)'});
+  const testPath=ns('path',{fill:'none','stroke-width':2.5,'clip-path':'url(#plotClip)'});
+  svg.appendChild(trainPath); svg.appendChild(testPath);
+
+  // current-position markers (only shown while their value is on-chart)
+  const trainDot=ns('circle',{r:3.5,'visibility':'hidden'});
+  const testDot=ns('circle',{r:4,'visibility':'hidden'});
+  svg.appendChild(trainDot); svg.appendChild(testDot);
+
+  const peakDot=ns('circle',{r:4,fill:col('--hard'),visibility:'hidden'});
+  const peakLbl=ns('text',{'font-size':11,fill:col('--hard'),visibility:'hidden','text-anchor':'middle'});
+  peakLbl.textContent='early stopping required';
+  svg.appendChild(peakDot); svg.appendChild(peakLbl);
+
+  const trainEndLbl=ns('text',{'font-size':12,'font-weight':'700',visibility:'hidden'});
+  const testEndLbl=ns('text',{'font-size':12,'font-weight':'700',visibility:'hidden'});
+  svg.appendChild(trainEndLbl); svg.appendChild(testEndLbl);
+
+  // ---- state ----
+  let regime='hard';   // 'hard' or 'soft'
+  let p=0;              // training progress, 0..1
+  let playing=false;
+  const DURATION=6000;  // ms for a full training run
+
+  function pathD(fn,pStart,pEnd){
+    const steps=60; let d='';
+    for(let i=0;i<=steps;i++){
+      const pp = pStart + (pEnd-pStart)*i/steps;
+      const x=xFor(pp), y=yFor(fn(pp));
+      d += (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    }
+    return d;
+  }
+
+  function redraw(){
+    const hard = regime==='hard';
+    const trainFn = hard?trainHard:trainSoft;
+    const testFn  = hard?testHard:testSoft;
+    const curveColor = hard?col('--hard'):col('--soft');
+
+    trainGhost.setAttribute('d', pathD(trainFn,0,1));
+    trainGhost.setAttribute('stroke', curveColor);
+    testGhost.setAttribute('d', pathD(testFn,0,1));
+    testGhost.setAttribute('stroke', curveColor);
+
+    trainPath.setAttribute('d', pathD(trainFn,0,p));
+    trainPath.setAttribute('stroke', curveColor);
+    testPath.setAttribute('d', pathD(testFn,0,p));
+    testPath.setAttribute('stroke', curveColor);
+    trainKeyLbl.setAttribute('fill',curveColor);
+    testKeyLbl.setAttribute('fill',curveColor);
+
+    const tv0=trainFn(p), sv0=testFn(p);
+    if(inRange(tv0)){
+      trainDot.setAttribute('cx',xFor(p)); trainDot.setAttribute('cy',yFor(tv0));
+      trainDot.setAttribute('fill',curveColor); trainDot.setAttribute('visibility','visible');
+    } else { trainDot.setAttribute('visibility','hidden'); }
+    if(inRange(sv0)){
+      testDot.setAttribute('cx',xFor(p)); testDot.setAttribute('cy',yFor(sv0));
+      testDot.setAttribute('fill',curveColor); testDot.setAttribute('visibility','visible');
+    } else { testDot.setAttribute('visibility','hidden'); }
+
+    if(hard){
+      const px=xFor(T_PEAK), py=yFor(HARD_TEST_PEAK);
+      peakDot.setAttribute('cx',px); peakDot.setAttribute('cy',py);
+      peakDot.setAttribute('visibility','visible');
+      peakLbl.setAttribute('x',px); peakLbl.setAttribute('y',py-12);
+      peakLbl.setAttribute('visibility','visible');
+    } else {
+      peakDot.setAttribute('visibility','hidden');
+      peakLbl.setAttribute('visibility','hidden');
+    }
+
+    const done = p>=0.999;
+    trainEndLbl.setAttribute('visibility', done?'visible':'hidden');
+    testEndLbl.setAttribute('visibility', done?'visible':'hidden');
+    if(done){
+      const tv=trainFn(1), sv=testFn(1);
+      trainEndLbl.setAttribute('x',L+plotW+6);
+      trainEndLbl.setAttribute('y',yFor(tv)+4);
+      trainEndLbl.setAttribute('fill',curveColor);
+      trainEndLbl.textContent=tv.toFixed(1)+'%';
+      testEndLbl.setAttribute('x',L+plotW+6);
+      testEndLbl.setAttribute('y',yFor(sv)+4);
+      testEndLbl.setAttribute('fill',curveColor);
+      testEndLbl.textContent=sv.toFixed(1)+'%';
+    }
+
+    document.getElementById('rRegime').textContent = hard?'hard targets, 3% data':'soft targets, 3% data';
+    document.getElementById('rProgress').textContent = Math.round(p*100)+'%';
+    document.getElementById('rTrain').textContent = trainFn(p).toFixed(1)+'%';
+    document.getElementById('rTest').textContent = testFn(p).toFixed(1)+'%';
+  }
+
+  const toggleBtn=document.getElementById('toggleBtn');
+  const playBtn=document.getElementById('playBtn');
+  toggleBtn.addEventListener('click',()=>{
+    regime = regime==='hard'?'soft':'hard';
+    toggleBtn.textContent = regime==='hard' ? 'Switch to soft targets (3% data)' : 'Switch to hard targets (3% data)';
+    p=0; playing=false; playBtn.textContent='Play training';
+    redraw();
+  });
+  playBtn.addEventListener('click',()=>{
+    if(p>=0.999) p=0;
+    playing=!playing;
+    playBtn.textContent = playing?'Pause training':'Play training';
+    if(playing) requestAnimationFrame(step);
+  });
+
+  let lastT=null;
+  function step(ts){
+    if(!playing) return;
+    if(lastT===null) lastT=ts;
+    const dt=ts-lastT; lastT=ts;
+    p=Math.min(1, p + dt/DURATION);
+    redraw();
+    if(p>=1){ playing=false; lastT=null; playBtn.textContent='Play training'; return; }
+    requestAnimationFrame(step);
+  }
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceMotion){ playing=false; }
+
+  redraw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;three-percent-data&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="With soft targets, 3% of the data buys almost all of the performance"
+  ></iframe>
+</section>
+
+<section class="scene" id="missing-three">
+  <h3>A student that has never seen a 3 learns to recognize 3s</h3>
+  <div class="caption">Here is the sharpest proof that soft targets transfer structure, not just labels. Delete every 3 from the student's training set, so it never sees a single positive example — you would expect the 3-class to be unlearnable, its probability pinned near zero for every input. But every 2, 5, and 8 in the training set arrives with the teacher's soft target attached, and each one carries a small, structured probability for '3', quietly mapping out where 3s live in output space; the student ends up making only 206 test errors in total, 133 of them on the 1,010 test 3s. Its one systematic defect is a bias — a constant added to the 3-class logit — that sits too low, since training never rewarded saying '3'. Drag that single number up by 3.5 and total errors fall to 109, with the student now getting 98.6% of the 3s it never saw correct; even a training set containing only 7s and 8s yields just 13.2% test error after bias correction.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="missing-three"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>A student that has never seen a 3 learns to recognize 3s</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#ffffff; --fg:#1a1a1a; --muted:#5b5b5b;
+    --accent:#2255cc; --green:#2e9e4f; --red:#cc4433; --grid-empty:#d8d8d4;
+    --border:#d0d0cc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171a; --panel:#1e2125; --fg:#e8e8e6; --muted:#a3a7ab;
+      --accent:#6699ff; --green:#4cc774; --red:#e2685a; --grid-empty:#33363a;
+      --border:#33363a;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px;}
+  .banner{background:var(--accent);color:#fff;font-weight:600;
+    padding:8px 12px;border-radius:6px;text-align:center;font-size:14px;margin-bottom:10px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:12px;margin-bottom:10px;}
+  canvas{display:block;width:100%;height:auto;max-width:100%;}
+  .legend{font-size:12px;color:var(--muted);margin-top:6px;}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0;}
+  .controls label{font-size:13px;flex:1 1 260px;}
+  input[type=range]{width:100%;}
+  button{font-size:13px;padding:6px 14px;border-radius:5px;border:1px solid var(--border);
+    background:var(--panel);color:var(--fg);cursor:pointer;flex:0 0 auto;}
+  button:hover{border-color:var(--accent);}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;font-size:14px;margin-top:6px;}
+  .readouts div{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+    padding:6px 10px;}
+  .readouts b{color:var(--accent);}
+  math{font-size:16px;}
+  .eqwrap{margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;banner&quot;>Training set contains zero 3s — the student never saw a single positive example</div>
+
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;grid&quot; width=&quot;640&quot; height=&quot;300&quot;></canvas>
+    <div class=&quot;legend&quot;>Each square is one of the 1,010 test images that are actually a 3, never used to compute the loss.
+      Green = the student now calls it a 3. Red = it still misses. Colors are ranked, so raising the bias only ever flips red to green.</div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;controls&quot;>
+      <label for=&quot;biasSlider&quot;>Bias added to the student's 3-class logit (0 to 5): <b id=&quot;biasVal&quot;>0.0</b></label>
+      <button id=&quot;playBtn&quot;>Play</button>
+    </div>
+    <input type=&quot;range&quot; id=&quot;biasSlider&quot; min=&quot;0&quot; max=&quot;5&quot; step=&quot;0.1&quot; value=&quot;0&quot;>
+    <div class=&quot;readouts&quot;>
+      <div>Total test errors: <b id=&quot;totalErrors&quot;>206</b></div>
+      <div>Test 3s correct: <b id=&quot;threesCorrect&quot;>877</b> / 1010</div>
+      <div>3s correct rate: <b id=&quot;threesPct&quot;>86.8</b>%</div>
+    </div>
+  </div>
+
+  <div class=&quot;panel eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>N</mi><mtext>miss</mtext></msub>
+      <mo>=</mo>
+      <mfrac>
+        <msub><mi>N</mi><mtext>3</mtext></msub>
+        <mrow><mn>1</mn><mo>+</mo>
+          <msup><mi>e</mi><mrow><mo>(</mo><mi>b</mi><mo>&amp;#8722;</mo><mi>&amp;#956;</mi><mo>)</mo><mo>/</mo><mi>s</mi></mrow></msup>
+        </mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      N<sub></sub>miss — number of held-out 3s the student still misses (count) &amp;middot;
+      N&amp;#8323; = 1010 — total held-out images that are 3s &amp;middot;
+      b — bias added to the 3-class logit (logit units, same slider above) &amp;middot;
+      &amp;mu;, s — fitted center and spread of the per-image bias needed to flip its answer (logit units), fit so the curve matches the reported 133-miss and 14-miss data points.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const N_THREES = 1010;               // total held-out test images that are 3s
+  const MU = -2.7752;                  // logistic location (logit units), fit to anchors
+  const S  = 1.47121;                  // logistic scale (logit units), fit to anchors
+  const FP_BASE = 73;                  // non-3 test errors already present at bias = 0
+  const FP_GROWTH = 1.79592;           // growth of &quot;called-3&quot; false positives per bias^2
+
+  function missedExact(bias){ return N_THREES/(1+Math.exp((bias-MU)/S)); }
+  function fpExact(bias){ return FP_BASE + FP_GROWTH*bias*bias; }
+
+  // deterministic per-thumbnail difficulty ranking (visual variety only)
+  let seed = 42;
+  function rnd(){ seed = (seed*1103515245+12345)>>>0; return (seed>>>8)/16777216; }
+  const thresholds = new Array(N_THREES);
+  for(let i=0;i<N_THREES;i++){
+    let u = Math.min(0.9995, Math.max(0.0005, rnd()));
+    thresholds[i] = MU + S*Math.log(u/(1-u));
+  }
+  const order = thresholds.map((t,i)=>i).sort((a,b)=>thresholds[b]-thresholds[a]);
+  const rank = new Array(N_THREES);
+  order.forEach((idx,pos)=>{ rank[idx]=pos; });
+
+  const canvas = document.getElementById('grid');
+  const ctx = canvas.getContext('2d');
+  const COLS = 46, ROWS = 22; // 1012 cells, 1010 used
+  const cell = 12.6, gap = 1.3;
+  const originX = (canvas.width - COLS*cell)/2;
+  const originY = 4;
+
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function drawGrid(missedRounded){
+    const green = cssVar('--green'), red = cssVar('--red'), empty = cssVar('--grid-empty');
+    ctx.fillStyle = cssVar('--panel'); ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let i=0;i<COLS*ROWS;i++){
+      const col = i%COLS, row = Math.floor(i/COLS);
+      const x = originX+col*cell, y = originY+row*cell;
+      if(i>=N_THREES){ ctx.fillStyle = empty; ctx.fillRect(x,y,cell-gap,cell-gap); continue; }
+      ctx.fillStyle = (rank[i] < missedRounded) ? red : green;
+      ctx.fillRect(x,y,cell-gap,cell-gap);
+    }
+  }
+
+  const slider = document.getElementById('biasSlider');
+  const biasVal = document.getElementById('biasVal');
+  const totalErrorsEl = document.getElementById('totalErrors');
+  const threesCorrectEl = document.getElementById('threesCorrect');
+  const threesPctEl = document.getElementById('threesPct');
+
+  function update(){
+    const bias = parseFloat(slider.value);
+    biasVal.textContent = bias.toFixed(1);
+    const missedRounded = Math.round(missedExact(bias));
+    const fpRounded = Math.round(fpExact(bias));
+    const total = missedRounded + fpRounded;
+    const correct = N_THREES - missedRounded;
+    const pct = (correct/N_THREES*100);
+    totalErrorsEl.textContent = total;
+    threesCorrectEl.textContent = correct;
+    threesPctEl.textContent = pct.toFixed(1);
+    drawGrid(missedRounded);
+  }
+  slider.addEventListener('input', update);
+
+  // optional auto-sweep demo, never starts on its own
+  const playBtn = document.getElementById('playBtn');
+  let playing = false, dir = 1, lastT = null;
+  function step(t){
+    if(!playing) return;
+    if(lastT===null) lastT = t;
+    const dt = (t-lastT)/1000; lastT = t;
+    let b = parseFloat(slider.value) + dir*dt*1.3;
+    if(b>=5){ b=5; dir=-1; }
+    if(b<=0){ b=0; dir=1; }
+    slider.value = b.toFixed(2);
+    update();
+    requestAnimationFrame(step);
+  }
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    if(playing){ lastT=null; requestAnimationFrame(step); }
+  });
+
+  update();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;missing-three&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A student that has never seen a 3 learns to recognize 3s"
+  ></iframe>
+</section>
+
+<section class="scene" id="speech-distillation">
+  <h3>One distilled network keeps the 10-model ensemble's gains at a tenth of the cost</h3>
+  <div class="caption">Now the industrial test, on the acoustic model behind Android voice search: an 8-layer, 85-million-parameter network classifying each audio frame into one of 14,000 speech-sound states. Ten copies trained from different random seeds and averaged — the cumbersome ensemble from Part 1 — lift frame accuracy from 58.9% to 61.1% and cut word error rate (the fraction of words the full speech system transcribes wrongly) from 10.9% to 10.7%. Press the third button: a single network of the same size, distilled from the ensemble's averaged soft targets at <math><mi>T</mi><mo>=</mo><mn>2</mn></math> with a hard-target weight of 0.5, reaches 60.8% frame accuracy and the very same 10.7% word error rate. That is over 80% of the ensemble's accuracy gain and 100% of its word-error gain, delivered at one-tenth the cost per prediction. The knowledge of ten networks now fits in one — this is the paper's motivating problem, solved.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="speech-distillation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Distillation vs. Ensemble — Speech Acoustic Model</title>
+<style>
+  :root{
+    --bg:#f7f7fa; --panel:#ffffff; --ink:#1a1a22; --muted:#5b5b68;
+    --accent:#2563eb; --accent2:#059669; --track:#e2e2ea; --dim:#c7c7d4;
+    --border:#d7d7e0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14141c; --panel:#1d1d28; --ink:#eceef4; --muted:#a3a3b5;
+      --accent:#60a5fa; --accent2:#34d399; --track:#33333f; --dim:#3a3a48;
+      --border:#33333f;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+  .scene{max-width:700px;margin:0 auto;padding:14px 12px 20px;}
+  h2{font-size:15px;margin:2px 0 10px;font-weight:600;}
+  .controlLabel{font-size:13px;color:var(--muted);margin:4px 0 6px;}
+  .buttons{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  button{
+    font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);
+    background:var(--panel);color:var(--ink);cursor:pointer;flex:1 1 150px;
+  }
+  button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px;}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .stat{flex:1 1 130px;background:var(--panel);border:1px solid var(--border);
+        border-radius:8px;padding:8px 10px;}
+  .stat .k{font-size:11px;color:var(--muted);}
+  .stat .v{font-size:18px;font-weight:600;}
+  math{font-size:16px;}
+  .legend{font-size:12px;color:var(--muted);margin:4px 0 14px;line-height:1.5;}
+  .capline{font-size:13px;color:var(--muted);margin:6px 0 2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Which system serves the prediction?</h2>
+  <div class=&quot;controlLabel&quot;>Choose the system — this changes what accuracy, error rate, and cost you get per prediction:</div>
+  <div class=&quot;buttons&quot;>
+    <button data-i=&quot;0&quot;>Single baseline</button>
+    <button data-i=&quot;1&quot;>10-model ensemble</button>
+    <button data-i=&quot;2&quot;>Distilled single model</button>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <svg viewBox=&quot;0 0 680 390&quot; id=&quot;svg&quot;></svg>
+  </div>
+
+  <div class=&quot;stats&quot;>
+    <div class=&quot;stat&quot;><div class=&quot;k&quot;>Frame accuracy (%)</div><div class=&quot;v&quot; id=&quot;accReadout&quot;>–</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;k&quot;>Word error rate (%)</div><div class=&quot;v&quot; id=&quot;werReadout&quot;>–</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;k&quot;>Compute cost (× baseline)</div><div class=&quot;v&quot; id=&quot;costReadout&quot;>–</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;k&quot;>Ensemble gain retained (%)</div><div class=&quot;v&quot; id=&quot;gainReadout&quot;>–</div></div>
+  </div>
+
+  <div class=&quot;capline&quot;>Gain-retained formula</div>
+  <math display=&quot;block&quot;>
+    <mi>G</mi><mo>=</mo>
+    <mfrac>
+      <mrow><msub><mi>A</mi><mtext>system</mtext></msub><mo>−</mo><msub><mi>A</mi><mtext>base</mtext></msub></mrow>
+      <mrow><msub><mi>A</mi><mtext>ens</mtext></msub><mo>−</mo><msub><mi>A</mi><mtext>base</mtext></msub></mrow>
+    </mfrac>
+    <mo>×</mo><mn>100</mn><mo>%</mo>
+  </math>
+  <div class=&quot;legend&quot;>
+    G — fraction of the ensemble's frame-accuracy gain the active system captures (%) ·
+    A<sub>system</sub> — frame accuracy of the currently selected system (%) ·
+    A<sub>base</sub> — single baseline network accuracy, 58.9% ·
+    A<sub>ens</sub> — 10-model ensemble accuracy, 61.1%
+  </div>
+</div>
+
+<script>
+const systems=[
+  {name:&quot;Baseline (1 net)&quot;, count:1, acc:58.9, wer:10.9, cost:1},
+  {name:&quot;Ensemble (10 nets)&quot;, count:10, acc:61.1, wer:10.7, cost:10},
+  {name:&quot;Distilled (1 net)&quot;, count:1, acc:60.8, wer:10.7, cost:1}
+];
+const A_BASE=systems[0].acc, A_ENS=systems[1].acc;
+function gainRetained(acc){ return (acc-A_BASE)/(A_ENS-A_BASE)*100; }
+
+const colX=[20,240,460], colW=200;
+const svgNS=&quot;http://www.w3.org/2000/svg&quot;;
+const svg=document.getElementById(&quot;svg&quot;);
+
+function accY(v){ return 200-(v-50)/15*90; }   // domain 50..65 -> y 200..110
+function costY(v){ return 300-(v/10)*65; }      // domain 0..10 -> y 300..235
+
+function el(tag,attrs,text){
+  const e=document.createElementNS(svgNS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  if(text!==undefined) e.textContent=text;
+  return e;
+}
+
+const colGroups=[], accBarEls=[], costBarEls=[];
+let highlight;
+
+function build(){
+  // section titles
+  svg.appendChild(el(&quot;text&quot;,{x:340,y:83,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:12,fill:&quot;var(--muted)&quot;},&quot;Frame accuracy (%)&quot;));
+  svg.appendChild(el(&quot;text&quot;,{x:340,y:222,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:12,fill:&quot;var(--muted)&quot;},&quot;Compute cost per prediction (×)&quot;));
+
+  // gridlines accuracy
+  [50,55,60,65].forEach(v=>{
+    const y=accY(v);
+    svg.appendChild(el(&quot;line&quot;,{x1:15,x2:665,y1:y,y2:y,stroke:&quot;var(--border)&quot;,&quot;stroke-width&quot;:1}));
+    svg.appendChild(el(&quot;text&quot;,{x:12,y:y+4,&quot;text-anchor&quot;:&quot;end&quot;,&quot;font-size&quot;:10,fill:&quot;var(--muted)&quot;},v));
+  });
+  // gridlines cost
+  [0,5,10].forEach(v=>{
+    const y=costY(v);
+    svg.appendChild(el(&quot;line&quot;,{x1:15,x2:665,y1:y,y2:y,stroke:&quot;var(--border)&quot;,&quot;stroke-width&quot;:1}));
+    svg.appendChild(el(&quot;text&quot;,{x:12,y:y+4,&quot;text-anchor&quot;:&quot;end&quot;,&quot;font-size&quot;:10,fill:&quot;var(--muted)&quot;},v));
+  });
+
+  systems.forEach((s,i)=>{
+    const g=el(&quot;g&quot;,{opacity:0.35});
+    const cx=colX[i]+colW/2;
+
+    // icons
+    if(s.count===1){
+      g.appendChild(el(&quot;rect&quot;,{x:cx-10,y:22,width:20,height:20,rx:4,fill:&quot;var(--accent)&quot;}));
+    } else {
+      let n=0;
+      for(let r=0;r<2;r++) for(let c=0;c<5;c++){
+        if(n>=s.count) break;
+        g.appendChild(el(&quot;rect&quot;,{x:cx-48+c*20,y:15+r*20,width:16,height:16,rx:3,fill:&quot;var(--accent)&quot;}));
+        n++;
+      }
+    }
+    g.appendChild(el(&quot;text&quot;,{x:cx,y:70,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:13,fill:&quot;var(--ink)&quot;},s.name));
+
+    // accuracy bar
+    const ay=accY(s.acc), ah=200-ay;
+    const abar=el(&quot;rect&quot;,{x:cx-25,y:ay,width:50,height:ah,fill:&quot;var(--accent)&quot;});
+    g.appendChild(abar); accBarEls.push(abar);
+    g.appendChild(el(&quot;text&quot;,{x:cx,y:ay-6,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:12,fill:&quot;var(--ink)&quot;},s.acc.toFixed(1)+&quot;%&quot;));
+
+    // cost bar
+    const cy=costY(s.cost), ch=300-cy;
+    const cbar=el(&quot;rect&quot;,{x:cx-20,y:cy,width:40,height:ch,fill:&quot;var(--accent2)&quot;});
+    g.appendChild(cbar); costBarEls.push(cbar);
+    g.appendChild(el(&quot;text&quot;,{x:cx,y:cy-6,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:12,fill:&quot;var(--ink)&quot;},s.cost+&quot;×&quot;));
+
+    // WER
+    g.appendChild(el(&quot;text&quot;,{x:cx,y:318,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:13,fill:&quot;var(--ink)&quot;},&quot;WER &quot;+s.wer.toFixed(1)+&quot;%&quot;));
+
+    svg.appendChild(g);
+    colGroups.push(g);
+  });
+
+  // gain-retained meter
+  svg.appendChild(el(&quot;text&quot;,{x:340,y:333,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:12,fill:&quot;var(--muted)&quot;},
+    &quot;Fraction of ensemble's accuracy gain retained (%)&quot;));
+  svg.appendChild(el(&quot;rect&quot;,{x:20,y:340,width:640,height:18,rx:6,fill:&quot;var(--track)&quot;}));
+  const meterFill=el(&quot;rect&quot;,{x:20,y:340,width:0,height:18,rx:6,fill:&quot;var(--accent2)&quot;});
+  svg.appendChild(meterFill);
+  const refX=20+0.8*640;
+  svg.appendChild(el(&quot;line&quot;,{x1:refX,x2:refX,y1:337,y2:361,stroke:&quot;var(--muted)&quot;,&quot;stroke-dasharray&quot;:&quot;3,3&quot;}));
+  svg.appendChild(el(&quot;text&quot;,{x:refX,y:372,&quot;text-anchor&quot;:&quot;middle&quot;,&quot;font-size&quot;:10,fill:&quot;var(--muted)&quot;},&quot;80% threshold&quot;));
+  const meterVal=el(&quot;text&quot;,{x:650,y:353,&quot;text-anchor&quot;:&quot;end&quot;,&quot;font-size&quot;:12,fill:&quot;#fff&quot;},&quot;0%&quot;);
+  svg.appendChild(meterVal);
+
+  highlight=el(&quot;rect&quot;,{x:colX[0]-6,y:8,width:colW+12,height:320,rx:10,fill:&quot;none&quot;,
+    stroke:&quot;var(--accent)&quot;,&quot;stroke-width&quot;:3});
+  svg.appendChild(highlight);
+
+  return {meterFill,meterVal};
+}
+const {meterFill,meterVal}=build();
+
+// ---- interaction &amp; animation ----
+let selected=0;
+const opacities=[0.35,0.35,0.35];
+let highlightX=colX[0]-6;
+let meterW=0;
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;).matches;
+
+const buttons=[...document.querySelectorAll(&quot;.buttons button&quot;)];
+function updateReadouts(){
+  const s=systems[selected];
+  document.getElementById(&quot;accReadout&quot;).textContent=s.acc.toFixed(1);
+  document.getElementById(&quot;werReadout&quot;).textContent=s.wer.toFixed(1);
+  document.getElementById(&quot;costReadout&quot;).textContent=s.cost+&quot;×&quot;;
+  document.getElementById(&quot;gainReadout&quot;).textContent=Math.round(gainRetained(s.acc))+&quot;%&quot;;
+  buttons.forEach((b,i)=>b.classList.toggle(&quot;active&quot;,i===selected));
+}
+function select(i){
+  selected=i;
+  updateReadouts();
+  if(reduceMotion) applyInstant();
+  else running=true;
+}
+buttons.forEach((b,i)=>b.addEventListener(&quot;click&quot;,()=>select(i)));
+
+function applyInstant(){
+  opacities.forEach((_,i)=>opacities[i]=(i===selected)?1:0.35);
+  colGroups.forEach((g,i)=>g.setAttribute(&quot;opacity&quot;,opacities[i]));
+  highlightX=colX[selected]-6;
+  highlight.setAttribute(&quot;x&quot;,highlightX);
+  const g=gainRetained(systems[selected].acc);
+  meterW=Math.max(0,Math.min(100,g))/100*640;
+  meterFill.setAttribute(&quot;width&quot;,meterW);
+  meterVal.textContent=Math.round(g)+&quot;%&quot;;
+}
+
+let running=false;
+function tick(){
+  let stillMoving=false;
+  for(let i=0;i<3;i++){
+    const target=(i===selected)?1:0.35;
+    const d=target-opacities[i];
+    if(Math.abs(d)>0.002){opacities[i]+=d*0.18; stillMoving=true;} else opacities[i]=target;
+    colGroups[i].setAttribute(&quot;opacity&quot;,opacities[i]);
+  }
+  const targetX=colX[selected]-6;
+  const dx=targetX-highlightX;
+  if(Math.abs(dx)>0.2){highlightX+=dx*0.18; stillMoving=true;} else highlightX=targetX;
+  highlight.setAttribute(&quot;x&quot;,highlightX);
+
+  const gTarget=Math.max(0,Math.min(100,gainRetained(systems[selected].acc)))/100*640;
+  const dw=gTarget-meterW;
+  if(Math.abs(dw)>0.3){meterW+=dw*0.18; stillMoving=true;} else meterW=gTarget;
+  meterFill.setAttribute(&quot;width&quot;,meterW);
+  meterVal.textContent=Math.round(meterW/640*100)+&quot;%&quot;;
+
+  if(stillMoving) requestAnimationFrame(tick);
+  else running=false;
+}
+function frameLoop(){ if(running) tick(); requestAnimationFrame(frameLoop); }
+requestAnimationFrame(frameLoop);
+
+// init
+if(reduceMotion){ applyInstant(); updateReadouts(); }
+else { select(0); }
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;speech-distillation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One distilled network keeps the 10-model ensemble's gains at a tenth of the cost"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now: past the committee entirely</h2>
+  <div class="part-lede">Distillation solves deployment, but at Google scale even training the committee became infeasible — one baseline took six months. The same soft-target ideas yield a parallel army of specialist networks that trains in days, pointing at where this line of work goes next.</div>
+</header>
+<section class="scene" id="specialist-training">
+  <h3>When labels number in the thousands, train one generalist plus many independent specialists</h3>
+  <div class="caption">Distillation fixed serving cost, but at Google's scale even training became the wall: on JFT, an internal dataset of 100 million images spanning 15,000 classes, the single baseline network took six months, so a 10-copy ensemble would take years. The paper's answer: train one broad model — the generalist — and then 61 specialists, each responsible for roughly 300 classes the generalist tends to confuse (mushroom species, say, or sports cars); a standard clustering procedure called K-means, applied to the covariance of the generalist's predictions, finds these confusable groups without needing any true labels, and we will treat it as a well-tested black box. Each specialist starts from a copy of the generalist's weights — inheriting its low-level features and resisting overfitting — trains on a half-and-half mix of its own classes and random data, and lumps all other classes into a single 'dustbin' output. Crucially, this is not a jointly trained committee with a gating network: assignments are fixed up front, so every specialist trains completely independently, in parallel, in a few days. Slide the coverage: overall top-1 accuracy (the single best guess being correct) rises from 25.0% to 26.1%, and for test classes covered by nine or more specialists the gain reaches +14–17%.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="specialist-training"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Generalist + Specialists</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --ink:#1b1e24; --muted:#5a6070;
+  --line:#c7cbd4; --dot:#9aa1b2; --accent:#2b6cb0; --accent2:#d97706;
+  --spec:#2f9e6e; --dustbin:#b13b3b; --grid:#e3e6ec;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161b; --panel:#1c1f26; --ink:#e8eaef; --muted:#9aa1b2;
+    --line:#3a3f4b; --dot:#5f6b7d; --accent:#5b9bd8; --accent2:#e8a33d;
+    --spec:#4fbf8e; --dustbin:#e06060; --grid:#2a2e37;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+canvas{width:100%;max-width:100%;display:block;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;}
+.controls{margin-top:10px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:13px;min-width:220px;flex:1;}
+.ctrl label{color:var(--muted);}
+input[type=range]{width:100%;}
+button{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;}
+.readouts{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;font-size:13px;flex:1;min-width:150px;}
+.card b{display:block;font-size:16px;margin-top:2px;}
+.eqwrap{margin-top:14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:8px 10px;overflow-x:auto;}
+.legend{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4;}
+math{font-size:16px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<canvas id=&quot;c&quot; width=&quot;640&quot; height=&quot;360&quot; role=&quot;img&quot;
+ aria-label=&quot;Generalist network with specialist models attaching to a highlighted class cluster&quot;></canvas>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrl&quot;>
+    <label for=&quot;n&quot;>Number of specialists covering the highlighted test class (n): <b id=&quot;nval&quot;>0</b></label>
+    <input type=&quot;range&quot; id=&quot;n&quot; min=&quot;0&quot; max=&quot;10&quot; step=&quot;1&quot; value=&quot;0&quot;>
+  </div>
+  <button id=&quot;playBtn&quot; style=&quot;display:none;&quot;>Play animation</button>
+</div>
+
+<div class=&quot;readouts&quot;>
+  <div class=&quot;card&quot;>Per-class top-1 gain at this n<b id=&quot;gainOut&quot;>+0.0%</b></div>
+  <div class=&quot;card&quot;>Overall top-1 accuracy<b id=&quot;accOut&quot;>25.0% → 26.1%</b></div>
+  <div class=&quot;card&quot;>Training time: full 10-copy ensemble<b id=&quot;fullOut&quot;>~730 days</b></div>
+  <div class=&quot;card&quot;>Training time: generalist + 61 specialists (parallel)<b id=&quot;specOut&quot;>~4 days</b></div>
+</div>
+
+<div class=&quot;eqwrap&quot;>
+<math display=&quot;block&quot;>
+  <mi>gain</mi><mo>(</mo><mi>n</mi><mo>)</mo><mo>=</mo>
+  <msub><mi>G</mi><mtext>sat</mtext></msub>
+  <mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo>
+  <msup><mi>e</mi><mrow><mo>&amp;#8722;</mo><mi>n</mi><mo>/</mo><mi>&amp;#964;</mi></mrow></msup>
+  <mo>)</mo>
+</math>
+<div class=&quot;legend&quot;>
+n — number of specialists that include this class in their ~300-class group (0–10) ·
+G<sub style=&quot;font-size:10px&quot;>sat</sub> — saturation gain, 18.5%, fit so the curve matches the paper's +14–17% ceiling ·
+&amp;#964; — decay constant, 4.9, fit so gain(1) = +3.4% as reported in Table 4.
+</div>
+</div>
+</div>
+
+<script>
+(function(){
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const nSlider=document.getElementById('n'), nVal=document.getElementById('nval');
+const gainOut=document.getElementById('gainOut'), accOut=document.getElementById('accOut');
+const fullOut=document.getElementById('fullOut'), specOut=document.getElementById('specOut');
+const playBtn=document.getElementById('playBtn');
+
+// ---- named physical/model constants (auditable) ----
+const G_SAT = 18.48;      // % — saturation gain, fit to reach ~+14-17% by n=9-10
+const TAU   = 4.92;       // specialists — decay constant, fit so gain(1)=+3.4%
+const BASE_ACC = 25.0;    // % overall top-1, baseline generalist only (Table 3)
+const SPEC_ACC = 26.1;    // % overall top-1, generalist + 61 specialists (Table 3)
+const FULL_ENSEMBLE_DAYS = 730;   // ~2 years for a 10-copy full ensemble
+const SPECIALIST_SCHEME_DAYS = 4; // days, specialists trained independently in parallel
+
+function gain(n){ return G_SAT*(1-Math.exp(-n/TAU)); }
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// ---- static scatter of class-dots (seeded pseudo-random) ----
+let dots=[];
+function seedDots(){
+  let s=12345;
+  const rnd=()=>{ s=(s*1103515245+12345)%2147483648; return s/2147483648; };
+  dots=[];
+  for(let i=0;i<140;i++){
+    dots.push({x:0.06+rnd()*0.55, y:0.16+rnd()*0.66, r:1.1+rnd()*1.1});
+  }
+}
+seedDots();
+const blob={x:0.74,y:0.55,r:0.10};
+
+function resize(){
+  const w=cv.clientWidth||640;
+  const scale = w/640;
+  cv.width = Math.round(640*scale*devicePixelRatio);
+  cv.height= Math.round(360*scale*devicePixelRatio);
+  ctx.setTransform(scale*devicePixelRatio,0,0,scale*devicePixelRatio,0,0);
+  draw(nSlider.value|0, animPhase);
+}
+
+let animPhase=0, animating=false, rafId=null;
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function draw(n, phase){
+  const W=640,H=360;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=css('--panel'); ctx.fillRect(0,0,W,H);
+
+  // scatter dots
+  ctx.fillStyle=css('--dot');
+  dots.forEach(d=>{
+    ctx.beginPath();
+    ctx.arc(d.x*W, d.y*H, d.r, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // highlighted cluster blob
+  const bx=blob.x*W, by=blob.y*H, br=blob.r*Math.min(W,H);
+  ctx.beginPath();
+  ctx.fillStyle = css('--accent2')+'33';
+  ctx.arc(bx,by,br,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=css('--accent2'); ctx.lineWidth=1.5;
+  ctx.stroke();
+  ctx.fillStyle=css('--accent2');
+  ctx.beginPath(); ctx.arc(bx,by,3.5,0,Math.PI*2); ctx.fill();
+
+  // generalist icon
+  const gx=W*0.30, gy=H*0.16;
+  ctx.fillStyle=css('--panel'); ctx.strokeStyle=css('--accent'); ctx.lineWidth=2;
+  ctx.beginPath();
+  const rr=8, bw=118, bh=34;
+  ctx.moveTo(gx-bw/2+rr,gy-bh/2);
+  ctx.arcTo(gx+bw/2,gy-bh/2,gx+bw/2,gy+bh/2,rr);
+  ctx.arcTo(gx+bw/2,gy+bh/2,gx-bw/2,gy+bh/2,rr);
+  ctx.arcTo(gx-bw/2,gy+bh/2,gx-bw/2,gy-bh/2,rr);
+  ctx.arcTo(gx-bw/2,gy-bh/2,gx+bw/2,gy-bh/2,rr);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=css('--ink'); ctx.font='12px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Generalist',gx,gy+4);
+
+  // pulsing halo around generalist (respecting reduced motion) —
+  // represents its always-on coverage of every class, explained in the legend below
+  const pulse = 1 + 0.06*Math.sin(phase);
+  ctx.beginPath();
+  ctx.strokeStyle = css('--accent')+'55';
+  ctx.lineWidth=1;
+  ctx.arc(gx,gy,bw*0.62*pulse,0,Math.PI*2);
+  ctx.stroke();
+
+  // specialist icons around the blob, count = n.
+  // A wedge centered on the downward direction (toward the class label) is
+  // left empty so icons never encroach on the fixed annotation text below.
+  const R = br+34;
+  const gapCenter = Math.PI/2;       // straight down, where the label sits
+  const gapHalf   = Math.PI*0.24;    // reserved empty wedge half-width
+  const arc = Math.PI*2 - gapHalf*2;
+  const maxSlots = 10;                // matches slider max, keeps spacing stable
+  const startAngle = gapCenter + gapHalf;
+  for(let i=0;i<n;i++){
+    const ang = startAngle + i*(arc/(maxSlots-1));
+    const sx = bx + R*Math.cos(ang);
+    const sy = by + R*Math.sin(ang);
+    // line from generalist to specialist
+    ctx.beginPath();
+    ctx.strokeStyle=css('--line'); ctx.lineWidth=1;
+    ctx.moveTo(gx,gy+bh/2); ctx.lineTo(sx,sy);
+    ctx.stroke();
+    // specialist icon
+    ctx.beginPath();
+    ctx.fillStyle=css('--spec')+'cc';
+    ctx.arc(sx,sy,9,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=css('--spec'); ctx.stroke();
+    ctx.fillStyle='#ffffff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('S', sx, sy+3);
+    // tiny dustbin marker
+    ctx.beginPath();
+    ctx.strokeStyle=css('--dustbin'); ctx.lineWidth=1.2;
+    ctx.rect(sx+8,sy+6,6,6);
+    ctx.stroke();
+  }
+
+  // class-cluster label, drawn last with an opaque backing plate so it is
+  // always fully legible even if a specialist icon sits nearby
+  ctx.font='12px sans-serif'; ctx.textAlign='center';
+  const labelText='highlighted test class';
+  const labelX=bx, labelY=by+br+16;
+  const tw=ctx.measureText(labelText).width;
+  ctx.fillStyle=css('--panel');
+  ctx.fillRect(labelX-tw/2-6, labelY-12, tw+12, 18);
+  ctx.fillStyle=css('--ink');
+  ctx.fillText(labelText, labelX, labelY);
+
+  // legend text, only if at least 1 specialist for the S/dustbin line
+  ctx.textAlign='left'; ctx.font='11px sans-serif'; ctx.fillStyle=css('--muted');
+  ctx.fillText('Blue halo on Generalist = its always-on coverage of every class (pulses; size does not depend on n)', 10, H-44);
+  if(n>0){
+    ctx.fillText('S = one specialist (~300 classes)  \u25A2 = its &quot;dustbin&quot; output for all other classes', 10, H-28);
+  } else {
+    ctx.fillText('No specialist yet assigned to this class — only the generalist sees it.', 10, H-28);
+  }
+  ctx.fillText('Lines = copies of generalist weights used to initialize each specialist', 10, H-12);
+}
+
+function update(){
+  const n = nSlider.value|0;
+  nVal.textContent = n;
+  const g = gain(n);
+  gainOut.textContent = (n===0 ? '+0.0%' : '+'+g.toFixed(1)+'%');
+  accOut.textContent = BASE_ACC.toFixed(1)+'% \u2192 '+SPEC_ACC.toFixed(1)+'%';
+  fullOut.textContent = '~'+Math.round(FULL_ENSEMBLE_DAYS)+' days ('+(FULL_ENSEMBLE_DAYS/365).toFixed(1)+' yr)';
+  specOut.textContent = '~'+Math.round(SPECIALIST_SCHEME_DAYS)+' days';
+  draw(n, animPhase);
+}
+
+nSlider.addEventListener('input', update);
+
+function loop(){
+  animPhase += 0.03;
+  draw(nSlider.value|0, animPhase);
+  rafId = requestAnimationFrame(loop);
+}
+
+if(reduceMotion){
+  playBtn.style.display='inline-block';
+  playBtn.textContent='Play animation';
+  playBtn.addEventListener('click',()=>{
+    if(!animating){ animating=true; playBtn.textContent='Pause animation'; loop(); }
+    else { animating=false; playBtn.textContent='Play animation'; cancelAnimationFrame(rafId); }
+  });
+} else {
+  animating=true;
+  loop();
+}
+
+window.addEventListener('resize', resize);
+resize();
+update();
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;specialist-training&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="When labels number in the thousands, train one generalist plus many independent specialists"
+  ></iframe>
+</section>
+
+<section class="scene" id="specialist-fusion">
+  <h3>At test time, one distribution is fitted to agree with the generalist and every active specialist</h3>
+  <div class="caption">One puzzle remains: each specialist only speaks about its ~300 classes plus a dustbin, so how do their voices combine into one answer over all 15,000 classes? For each image, the generalist proposes its top classes, which wakes every specialist whose subset overlaps them; then we search for the single full distribution <math><mi>q</mi><mo>=</mo><mtext>softmax</mtext><mo>(</mo><mi>z</mi><mo>)</mo></math> that is simultaneously closest to the generalist's opinion and to every awake specialist's. 'Closest' means minimizing KL divergence — a standard measure of the gap between two probability distributions, zero when they match — so the objective is <math><msub><mi>min</mi><mi>q</mi></msub><mi>K</mi><mi>L</mi><mo>(</mo><msup><mi>p</mi><mi>g</mi></msup><mo>,</mo><mi>q</mi><mo>)</mo><mo>+</mo><msub><mi>sum</mi><mi>m</mi></msub><mi>K</mi><mi>L</mi><mo>(</mo><msup><mi>p</mi><mi>m</mi></msup><mo>,</mo><mi>q</mi><mo>)</mo></math>; when comparing <math><mi>q</mi></math> against a specialist, all of <math><mi>q</mi></math>'s mass on that specialist's non-special classes is summed into its dustbin slot. There is no closed-form answer in general, so press play and watch gradient descent run on the logits of <math><mi>q</mi></math> for this one image, the KL total falling until the curves settle. In the special case of a single shared probability per class, the solution reduces to a simple arithmetic or geometric mean of the models — reassurance that this machinery is the principled generalization of plain averaging, which is where this whole story began.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="specialist-fusion"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Fusing a generalist and its specialists at test time</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --fg:#1a1a1a; --muted:#5b6067; --panel:#ffffff; --border:#c9ccd1;
+    --generalist:#3b6ea5; --spec1:#1f9c8a; --spec2:#c9701f; --q:#7b4fa3; --grid:#d3d6db; --accent:#2563eb;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#131519; --fg:#e9eaec; --muted:#9aa1a8; --panel:#1b1e23; --border:#3a3f47;
+      --generalist:#7fb0e0; --spec1:#3ecab0; --spec2:#f0a25c; --q:#c199e6; --grid:#3a3f47; --accent:#6fa1ff;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+  .eqbox{padding:6px 2px 10px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+  .eqbox math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:2px;}
+  svg{width:100%;height:auto;max-width:100%;display:block;}
+  svg .morph{transition:y .3s ease, height .3s ease;}
+  svg.no-anim .morph{transition:none;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  button{font:inherit;font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--fg);cursor:pointer;}
+  button:hover{border-color:var(--accent);}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:10px;font-size:12.5px;color:var(--muted);}
+  .readouts b{color:var(--fg);font-weight:600;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <munder><mo>min</mo><mi>q</mi></munder>
+        <mo>[</mo>
+        <mi>KL</mi><mo>(</mo><msup><mi>p</mi><mi>g</mi></msup><mo>,</mo><mi>q</mi><mo>)</mo>
+        <mo>+</mo>
+        <munder><mo>∑</mo><mi>m</mi></munder>
+        <mi>KL</mi><mo>(</mo><msup><mi>p</mi><mi>m</mi></msup><mo>,</mo><msub><mi>q</mi><mi>m</mi></msub><mo>)</mo>
+        <mo>]</mo>
+      </mrow>
+    </math>
+    <div class=&quot;legend&quot;>
+      q — candidate fused distribution over all classes, adjusted by gradient descent on its logits z (q = softmax(z)) &amp;middot;
+      p<sup style=&quot;font-size:9px&quot;>g</sup> — generalist's distribution &amp;middot;
+      p<sup style=&quot;font-size:9px&quot;>m</sup> — distribution from each awake specialist m &amp;middot;
+      q<sub style=&quot;font-size:9px&quot;>m</sub> — q's mass on specialist m's classes, with all other classes summed into m's dustbin slot &amp;middot;
+      KL(a,b) — Kullback-Leibler divergence between distributions a and b (0 when they match exactly)
+    </div>
+  </div>
+
+  <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 560&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;playBtn&quot;>Play</button>
+    <button id=&quot;specBtn&quot;>Deactivate specialist 2</button>
+  </div>
+  <div class=&quot;readouts&quot;>
+    <span>Iteration: <b id=&quot;roIter&quot;>0</b></span>
+    <span>Total KL: <b id=&quot;roKL&quot;>-</b></span>
+    <span>&amp;Sigma; q = <b id=&quot;roSum&quot;>1.000</b></span>
+    <span>Specialist 2: <b id=&quot;roSpec2&quot;>active</b></span>
+  </div>
+</div>
+
+<script>
+const NS=&quot;http://www.w3.org/2000/svg&quot;;
+const EPS=1e-9;
+function el(tag,attrs,parent,text){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  if(text!==undefined) e.textContent=text;
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function softmax(zArr){
+  const m=Math.max(...zArr);
+  const ex=zArr.map(v=>Math.exp(v-m));
+  const s=ex.reduce((a,b)=>a+b,0);
+  return ex.map(v=>v/s);
+}
+function klTerm(p,q){
+  let s=0;
+  for(let i=0;i<p.length;i++) if(p[i]>0) s+=p[i]*Math.log((p[i]+EPS)/(q[i]+EPS));
+  return s;
+}
+
+// ---- toy problem: 8 classes ----
+const zg=[0.5,1.0,1.5,2.2,1.8,0.9,0.3,0.1];           // generalist logits (fixed toy example)
+const pg=softmax(zg);
+const idx1=[0,1,2];                                    // specialist 1: classes 1-3
+const p1=[0.55,0.25,0.12,0.08];                        // class1,class2,class3,dustbin
+const idx2=[2,3,4];                                    // specialist 2: classes 3-5
+const p2=[0.10,0.20,0.62,0.08];                        // class3,class4,class5,dustbin
+
+const LR=0.25, MAXITER=150;
+let z=zg.slice(), iteration=0, history=[], converged=false, spec2Active=true, lastQ=pg.slice(), plotMax=0.2;
+
+function klAndGradSpecialist(q,idxSet,pvec){
+  const inSet=new Set(idxSet);
+  let qDust=0;
+  for(let i=0;i<8;i++) if(!inSet.has(i)) qDust+=q[i];
+  let kl=0;
+  idxSet.forEach((idx,li)=>{ const pi=pvec[li]; if(pi>0) kl+=pi*Math.log((pi+EPS)/(q[idx]+EPS)); });
+  const pDust=pvec[pvec.length-1];
+  if(pDust>0) kl+=pDust*Math.log((pDust+EPS)/(qDust+EPS));
+  const grad=new Array(8).fill(0);
+  idxSet.forEach((idx,li)=>{ grad[idx]+= -pvec[li]/(q[idx]+EPS); });
+  for(let i=0;i<8;i++) if(!inSet.has(i)) grad[i]+= -pDust/(qDust+EPS);
+  return {kl,grad};
+}
+function computeAll(zArr){
+  const q=softmax(zArr);
+  let loss=klTerm(pg,q);
+  const g=new Array(8).fill(0);
+  for(let i=0;i<8;i++) g[i]+= -pg[i]/(q[i]+EPS);
+  const r1=klAndGradSpecialist(q,idx1,p1);
+  loss+=r1.kl; for(let i=0;i<8;i++) g[i]+=r1.grad[i];
+  if(spec2Active){
+    const r2=klAndGradSpecialist(q,idx2,p2);
+    loss+=r2.kl; for(let i=0;i<8;i++) g[i]+=r2.grad[i];
+  }
+  return {q,loss,g};
+}
+function stepOnce(){
+  const s0=computeAll(z);
+  const dot=s0.q.reduce((sum,qi,i)=>sum+qi*s0.g[i],0);
+  z=z.map((zi,k)=>zi-LR*(s0.q[k]*(s0.g[k]-dot)));
+  iteration++;
+  const s1=computeAll(z);
+  lastQ=s1.q;
+  history.push(s1.loss);
+  if(iteration>=MAXITER) converged=true;
+  else if(history.length>6 &amp;&amp; Math.abs(history[history.length-1]-history[history.length-2])<1e-5) converged=true;
+}
+function runToConvergence(){
+  // gradient descent is cheap (8 classes) — run every remaining iteration synchronously
+  // so the readouts and plot always reflect the true converged state right after a click.
+  while(!converged) stepOnce();
+}
+function resetOptimization(){
+  z=zg.slice(); iteration=0; history=[]; converged=false;
+  const s=computeAll(z);
+  lastQ=s.q; history.push(s.loss);
+  plotMax=Math.max(0.05,s.loss*1.25);
+  yTopTick.textContent=plotMax.toFixed(2);
+}
+
+// ---- layout constants ----
+const xPos=[40,96,152,208,264,320,376,432], BARW=50;
+const GEN_BASE=64, GEN_MAXH=44;
+const SBARX=[40,114,188,262], SBARW=60;
+const S1_BASE=146, S1_MAXH=34;
+const S2_BASE=228, S2_MAXH=34;
+const Q_BASE=372, Q_MAXH=94;
+const DUST1_X=498, DUST2_X=562, DUSTW=56;
+const PX0=56, PX1=600, PY0=426, PY1=522;
+
+const svg=document.getElementById('svg');
+let qBarRects=[], dust1Rect, dust2Rect, klPolyline, spec2Border, spec2Bars=[], yTopTick;
+
+function labelRow(y,txt){ el('text',{x:10,y,'font-size':13,fill:'var(--fg)'},svg,txt); }
+function smallTick(x,y,txt,anchor){ el('text',{x,y,'font-size':10,'text-anchor':anchor||'middle',fill:'var(--muted)'},svg,txt); }
+
+function build(){
+  // --- Generalist row ---
+  labelRow(14,'Generalist \u2014 distribution over all 8 classes');
+  for(let i=0;i<8;i++){
+    const h=pg[i]*GEN_MAXH;
+    el('rect',{x:xPos[i],y:GEN_BASE-h,width:BARW,height:h,fill:'var(--generalist)'},svg);
+    smallTick(xPos[i]+BARW/2,76,String(i+1));
+  }
+
+  // --- Specialist 1 row (always active) ---
+  labelRow(100,'Specialist 1 \u2014 classes 1\u20133 + dustbin (always active here)');
+  el('rect',{x:30,y:108,width:302,height:44,fill:'none',stroke:'var(--spec1)','stroke-width':2},svg);
+  const s1labels=['class 1','class 2','class 3','dustbin'];
+  for(let i=0;i<4;i++){
+    const h=p1[i]*S1_MAXH;
+    el('rect',{x:SBARX[i],y:S1_BASE-h,width:SBARW,height:h,fill:'var(--spec1)'},svg);
+    smallTick(SBARX[i]+SBARW/2,158,s1labels[i]);
+  }
+
+  // --- Specialist 2 row (toggleable) ---
+  labelRow(182,'Specialist 2 \u2014 classes 3\u20135 + dustbin');
+  spec2Border=el('rect',{x:30,y:190,width:302,height:44,fill:'none',stroke:'var(--spec2)','stroke-width':2},svg);
+  const s2labels=['class 3','class 4','class 5','dustbin'];
+  for(let i=0;i<4;i++){
+    const h=p2[i]*S2_MAXH;
+    const r=el('rect',{x:SBARX[i],y:S2_BASE-h,width:SBARW,height:h,fill:'var(--spec2)'},svg);
+    spec2Bars.push(r);
+    smallTick(SBARX[i]+SBARW/2,240,s2labels[i]);
+  }
+
+  // --- q row (animated) ---
+  labelRow(264,'q = softmax(z) \u2014 fused output (same 8 classes as generalist)');
+  el('line',{x1:34,x2:34,y1:Q_BASE-Q_MAXH,y2:Q_BASE,stroke:'var(--grid)'},svg);
+  el('line',{x1:34,y1:Q_BASE-0.5*Q_MAXH,x2:632,y2:Q_BASE-0.5*Q_MAXH,stroke:'var(--grid)','stroke-dasharray':'3 3'},svg);
+  smallTick(30,Q_BASE-0.5*Q_MAXH+3,'0.5','end');
+  smallTick(30,Q_BASE+4,'0','end');
+  for(let i=0;i<8;i++){
+    const h=lastQ[i]*Q_MAXH;
+    const r=el('rect',{x:xPos[i],y:Q_BASE-h,width:BARW,height:h,fill:'var(--q)','class':'morph'},svg);
+    qBarRects.push(r);
+    smallTick(xPos[i]+BARW/2,Q_BASE+14,String(i+1));
+  }
+  dust1Rect=el('rect',{x:DUST1_X,y:Q_BASE,width:DUSTW,height:0,fill:'var(--panel)',stroke:'var(--spec1)','stroke-width':2,'class':'morph'},svg);
+  dust2Rect=el('rect',{x:DUST2_X,y:Q_BASE,width:DUSTW,height:0,fill:'var(--panel)',stroke:'var(--spec2)','stroke-width':2,'class':'morph'},svg);
+  el('text',{x:DUST1_X+DUSTW/2,y:Q_BASE+14,'font-size':9,'text-anchor':'middle',fill:'var(--muted)'},svg,'q \u2192 spec.1');
+  el('text',{x:DUST1_X+DUSTW/2,y:Q_BASE+25,'font-size':9,'text-anchor':'middle',fill:'var(--muted)'},svg,'dustbin');
+  el('text',{x:DUST2_X+DUSTW/2,y:Q_BASE+14,'font-size':9,'text-anchor':'middle',fill:'var(--muted)'},svg,'q \u2192 spec.2');
+  el('text',{x:DUST2_X+DUSTW/2,y:Q_BASE+25,'font-size':9,'text-anchor':'middle',fill:'var(--muted)'},svg,'dustbin');
+
+  // --- KL plot ---
+  el('text',{x:10,y:414,'font-size':13,fill:'var(--fg)'},svg,'Total KL objective (natural-log units) vs. iteration k');
+  el('line',{x1:PX0,y1:PY0,x2:PX0,y2:PY1,stroke:'var(--grid)'},svg);
+  el('line',{x1:PX0,y1:PY1,x2:PX1,y2:PY1,stroke:'var(--grid)'},svg);
+  yTopTick=el('text',{x:48,y:PY0+4,'font-size':10,'text-anchor':'end',fill:'var(--muted)'},svg,'0.20');
+  el('text',{x:48,y:PY1+4,'font-size':10,'text-anchor':'end',fill:'var(--muted)'},svg,'0');
+  el('text',{x:PX0,y:536,'font-size':10,fill:'var(--muted)'},svg,'0');
+  el('text',{x:PX1,y:536,'font-size':10,'text-anchor':'end',fill:'var(--muted)'},svg,String(MAXITER));
+  el('text',{x:(PX0+PX1)/2,y:552,'font-size':11,'text-anchor':'middle',fill:'var(--muted)'},svg,'iteration k (gradient-descent step)');
+  klPolyline=el('polyline',{points:'',fill:'none',stroke:'var(--accent)','stroke-width':2},svg);
+}
+
+function render(){
+  for(let i=0;i<8;i++){
+    const h=Math.max(0,lastQ[i])*Q_MAXH;
+    qBarRects[i].setAttribute('y',Q_BASE-h);
+    qBarRects[i].setAttribute('height',h);
+  }
+  let qDust1=0; for(let i=0;i<8;i++) if(!idx1.includes(i)) qDust1+=lastQ[i];
+  let qDust2=0; for(let i=0;i<8;i++) if(!idx2.includes(i)) qDust2+=lastQ[i];
+  const h1=qDust1*Q_MAXH, h2=qDust2*Q_MAXH;
+  dust1Rect.setAttribute('y',Q_BASE-h1); dust1Rect.setAttribute('height',h1);
+  dust2Rect.setAttribute('y',Q_BASE-h2); dust2Rect.setAttribute('height',h2);
+  dust2Rect.setAttribute('opacity',spec2Active?1:0.3);
+
+  spec2Border.setAttribute('stroke',spec2Active?'var(--spec2)':'var(--muted)');
+  spec2Border.setAttribute('stroke-dasharray',spec2Active?'0':'4 3');
+  spec2Bars.forEach(r=>r.setAttribute('opacity',spec2Active?1:0.35));
+
+  const pts=history.map((l,i)=>{
+    const px=PX0+(i/MAXITER)*(PX1-PX0);
+    const py=PY1-Math.max(0,Math.min(1,l/plotMax))*(PY1-PY0);
+    return px.toFixed(1)+','+py.toFixed(1);
+  }).join(' ');
+  klPolyline.setAttribute('points',pts);
+
+  document.getElementById('roIter').textContent=iteration+(converged?' (converged)':'');
+  document.getElementById('roKL').textContent=history[history.length-1].toFixed(3);
+  document.getElementById('roSum').textContent=lastQ.reduce((a,b)=>a+b,0).toFixed(3);
+  document.getElementById('roSpec2').textContent=spec2Active?'active':'inactive';
+}
+
+// ---- controls ----
+// Play/Pause runs gradient descent on q's logits (z) for this image, from iteration 0 to
+// convergence, minimizing the KL objective above. Deactivating specialist 2 removes its
+// KL term and re-optimizes q from scratch, so q's mass on classes 3-5 relaxes toward the
+// generalist's shape instead of specialist 2's.
+const playBtn=document.getElementById('playBtn');
+const specBtn=document.getElementById('specBtn');
+
+playBtn.addEventListener('click',()=>{
+  if(converged) resetOptimization();
+  playBtn.textContent='Pause';
+  runToConvergence();
+  playBtn.textContent='Play';
+  render();
+});
+specBtn.addEventListener('click',()=>{
+  spec2Active=!spec2Active;
+  specBtn.textContent=spec2Active?'Deactivate specialist 2':'Activate specialist 2';
+  playBtn.textContent='Pause';
+  resetOptimization();
+  runToConvergence();
+  playBtn.textContent='Play';
+  render();
+});
+
+// ---- reduced-motion handling ----
+const reduceMotion=window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduceMotion) svg.classList.add('no-anim');
+
+// ---- render loop (kept for continuous, offline-safe redraw via rAF) ----
+function frame(){
+  render();
+  requestAnimationFrame(frame);
+}
+
+build();
+resetOptimization();
+render();
+window.__sceneReady=true;
+requestAnimationFrame(frame);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;specialist-fusion&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="At test time, one distribution is fitted to agree with the generalist and every active specialist"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Distilling the Knowledge in a Neural Network</em> — Geoffrey Hinton, Oriol Vinyals, Jeff Dean. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

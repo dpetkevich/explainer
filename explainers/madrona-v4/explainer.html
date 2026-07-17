@@ -1,0 +1,2646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Run 16,000 Game Worlds at Once on One Graphics Card</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How to Run 16,000 Game Worlds at Once on One Graphics Card</h1>
+  <p class="hook">Training an AI agent to play hide-and-seek took OpenAI 115 billion simulated practice steps. The expensive part wasn't the neural network — it was running the game itself. This paper stops simulating worlds one at a time and instead lays out every world's state in shared tables. That layout — not faster hardware — lets a single consumer GPU advance tens of thousands of worlds together at 1.9 million steps per second.</p>
+  <p class="page-links"><a href="https://madrona-engine.github.io/shacklett_siggraph23.pdf" target="_blank" rel="noopener noreferrer">An Extensible, Data-Oriented Architecture for High-Performance, Many-World Simulation</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.0.0 · One insight + one running example carried through connected scenes (story-discovery methodology)</span></p>
+
+
+<header class="part">
+  <h2>The bottleneck is the simulator</h2>
+  <div class="part-lede">Before any clever engineering, we need the problem: AI agents learn by trial and error inside simulated worlds, and the simulator's speed sets the wall-clock cost of every experiment. We'll meet the hardware that could fix this — and see why the obvious way to use it fails.</div>
+</header>
+<section class="scene" id="steps-budget">
+  <h3>Simulator speed, not learning math, sets the training clock</h3>
+  <div class="caption">Hide-and-seek needed 115 billion simulated steps for tool use to emerge. Drag the simulator speed and watch months collapse into hours.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="steps-budget"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Simulator speed sets the training clock</title>
+<style>
+  :root{
+    --bg:#f7f7f9;
+    --panel:#ffffff;
+    --text:#1a1a1f;
+    --muted:#5a5a66;
+    --accent:#1e6fd9;
+    --accent2:#d94e1e;
+    --track:#dfe3ea;
+    --bar:#3d8bfd;
+    --marker:#d94e1e;
+    --border:#d5d8e0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161c;
+      --panel:#1e2027;
+      --text:#eceef2;
+      --muted:#a1a4b0;
+      --accent:#6fa8ff;
+      --accent2:#ff9466;
+      --track:#33363f;
+      --bar:#5aa0ff;
+      --marker:#ff9466;
+      --border:#3a3d47;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px;}
+  h1{font-size:15px;margin:0 0 10px;font-weight:600;}
+  .panels{display:flex;flex-wrap:wrap;gap:12px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:10px;flex:1 1 260px;min-width:220px;max-width:100%;}
+  .panel h2{font-size:12px;margin:0 0 6px;color:var(--muted);font-weight:600;
+    text-transform:uppercase;letter-spacing:.03em;}
+  svg{width:100%;height:auto;max-width:100%;display:block;}
+  .controls{margin-top:10px;}
+  label{display:block;font-size:12.5px;margin-bottom:4px;color:var(--text);}
+  input[type=range]{width:100%;}
+  button{font-size:12px;padding:5px 9px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;margin-top:6px;}
+  button:hover{border-color:var(--accent);}
+  .readout{font-size:13px;margin-top:6px;}
+  .readout b{font-variant-numeric:tabular-nums;}
+  .note{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.4;}
+  .definition{font-size:11.5px;color:var(--muted);margin:0 0 8px;line-height:1.4;
+    border-left:2px solid var(--accent);padding-left:7px;}
+  math{font-size:14px;}
+  .legend{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4;}
+  .predict{font-size:11.5px;color:var(--muted);font-style:italic;margin:2px 0 8px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Simulator speed, not learning math, sets the training clock</h1>
+  <div class=&quot;panels&quot;>
+
+    <div class=&quot;panel&quot;>
+      <h2>One RL step in hide-and-seek</h2>
+      <div class=&quot;definition&quot;>Hide-and-seek: a multi-agent benchmark task where &quot;hider&quot; agents learn to barricade themselves using movable boxes and &quot;seeker&quot; agents learn to use ramps to find them. Reaching tool-use behavior took about 115×10⁹ simulated steps of play.</div>
+      <svg viewBox=&quot;0 0 280 210&quot; id=&quot;loopSvg&quot; aria-label=&quot;loop diagram of one reinforcement learning step&quot;>
+        <path id=&quot;loopPath&quot; d=&quot;M60,42 L220,42 L140,178 Z&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;2&quot;/>
+        <g id=&quot;arrowsG&quot;></g>
+        <rect x=&quot;15&quot; y=&quot;20&quot; width=&quot;90&quot; height=&quot;44&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;/>
+        <text x=&quot;60&quot; y=&quot;38&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot;>Agent chooses</text>
+        <text x=&quot;60&quot; y=&quot;50&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot;>an action</text>
+
+        <rect x=&quot;175&quot; y=&quot;20&quot; width=&quot;90&quot; height=&quot;44&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent2)&quot;/>
+        <text x=&quot;220&quot; y=&quot;36&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot;>Physics steps</text>
+        <text x=&quot;220&quot; y=&quot;48&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot;>forward (simulator)</text>
+        <text x=&quot;220&quot; y=&quot;60&quot; font-size=&quot;8.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--accent2)&quot;>← rate set here</text>
+
+        <rect x=&quot;95&quot; y=&quot;156&quot; width=&quot;90&quot; height=&quot;44&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;/>
+        <text x=&quot;140&quot; y=&quot;174&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot;>Observation +</text>
+        <text x=&quot;140&quot; y=&quot;186&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot;>reward returned</text>
+
+        <circle id=&quot;dot&quot; r=&quot;4.5&quot; fill=&quot;var(--marker)&quot;/>
+      </svg>
+      <div class=&quot;note&quot;>One pass around this loop = one simulated step. The middle box (physics) is the slow one — that rate is the bottleneck. The learning update (gradient math) runs on the GPU in parallel and is not shown here because it is not the limiting step.</div>
+    </div>
+
+    <div class=&quot;panel&quot;>
+      <h2>Wall-clock time to reach 115×10⁹ steps</h2>
+      <div class=&quot;predict&quot;>Predict first: a typical open-source simulator manages a few thousand steps/s. Guess the wall-clock time, then drag the slider.</div>
+
+      <svg viewBox=&quot;0 0 300 60&quot; id=&quot;barSvg&quot; aria-label=&quot;wall clock time bar&quot;>
+        <rect x=&quot;2&quot; y=&quot;18&quot; width=&quot;296&quot; height=&quot;22&quot; rx=&quot;4&quot; fill=&quot;var(--track)&quot;/>
+        <rect id=&quot;barFill&quot; x=&quot;2&quot; y=&quot;18&quot; width=&quot;0&quot; height=&quot;22&quot; rx=&quot;4&quot; fill=&quot;var(--bar)&quot;/>
+        <line id=&quot;markerLine&quot; x1=&quot;0&quot; y1=&quot;14&quot; x2=&quot;0&quot; y2=&quot;44&quot; stroke=&quot;var(--marker)&quot; stroke-width=&quot;2&quot;/>
+        <text id=&quot;markerLabel&quot; x=&quot;0&quot; y=&quot;12&quot; font-size=&quot;8.5&quot; fill=&quot;var(--marker)&quot; text-anchor=&quot;middle&quot;>paper: 1.9M/s</text>
+      </svg>
+
+      <div class=&quot;readout&quot;>Simulator throughput: <b id=&quot;rateOut&quot;>—</b> steps/s</div>
+      <div class=&quot;readout&quot;>Time to simulate 115×10⁹ steps: <b id=&quot;timeOut&quot;>—</b></div>
+
+      <div class=&quot;controls&quot;>
+        <label for=&quot;rateSlider&quot;>Drag: simulator throughput (steps/s, log scale, 2,000 – 2,000,000)</label>
+        <input type=&quot;range&quot; id=&quot;rateSlider&quot; min=&quot;3.30103&quot; max=&quot;6.30103&quot; step=&quot;0.002&quot; value=&quot;3.69897&quot;>
+        <button id=&quot;jumpBtn&quot;>Jump to paper's measured speed (1.9M steps/s)</button>
+      </div>
+
+      <math display=&quot;block&quot;>
+        <mi>t</mi><mo>=</mo>
+        <mfrac><mi>N</mi><mi>R</mi></mfrac>
+      </math>
+      <div class=&quot;legend&quot;>t — wall-clock time (s) · N — total steps needed, fixed at 115×10⁹ · R — simulator throughput (steps/s), set by the slider</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const N = 115e9; // total simulated steps needed for tool use to emerge (fixed)
+  const RMIN = 2000, RMAX = 2000000;
+  const PAPER_R = 1.9e6; // measured throughput in the paper
+
+  const slider = document.getElementById('rateSlider');
+  const rateOut = document.getElementById('rateOut');
+  const timeOut = document.getElementById('timeOut');
+  const barFill = document.getElementById('barFill');
+  const markerLine = document.getElementById('markerLine');
+  const markerLabel = document.getElementById('markerLabel');
+  const jumpBtn = document.getElementById('jumpBtn');
+
+  const trackX = 2, trackW = 296;
+  const tMaxSeconds = N / RMIN; // longest time shown, at slowest speed -> full bar
+
+  function fmtInt(n){
+    return Math.round(n).toLocaleString('en-US');
+  }
+
+  function fmtTime(sec){
+    const hours = sec/3600;
+    if (hours < 48) return hours.toFixed(1) + ' hours';
+    const days = sec/86400;
+    return days.toFixed(1) + ' days';
+  }
+
+  function update(){
+    const R = Math.pow(10, parseFloat(slider.value));
+    const t = N / R; // seconds
+    rateOut.textContent = fmtInt(R);
+    timeOut.textContent = fmtTime(t);
+
+    const frac = Math.min(1, t / tMaxSeconds);
+    barFill.setAttribute('width', Math.max(2, trackW*frac));
+
+    // marker position for paper's measured speed, mapped along same log slider axis
+    const logMin = Math.log10(RMIN), logMax = Math.log10(RMAX);
+    const markerFrac = (Math.log10(PAPER_R) - logMin)/(logMax-logMin);
+    const mx = trackX + markerFrac*trackW;
+    markerLine.setAttribute('x1', mx); markerLine.setAttribute('x2', mx);
+
+    // Keep the marker label fully inside the 0-300 viewBox by switching
+    // its text-anchor near the edges instead of always centering on mx.
+    let anchor = 'middle', lx = mx;
+    const EDGE = 40;
+    if (mx > 300 - EDGE){ anchor = 'end'; lx = Math.min(298, mx + 3); }
+    else if (mx < EDGE){ anchor = 'start'; lx = Math.max(2, mx - 3); }
+    markerLabel.setAttribute('text-anchor', anchor);
+    markerLabel.setAttribute('x', lx);
+
+    dotSpeed = 0.3 + 1.7*((parseFloat(slider.value)-logMin)/(logMax-logMin));
+  }
+
+  slider.addEventListener('input', update);
+  jumpBtn.addEventListener('click', function(){
+    slider.value = Math.log10(PAPER_R);
+    update();
+  });
+
+  // decorative loop-dot animation, speed loosely tied to slider position
+  const path = document.getElementById('loopPath');
+  const dot = document.getElementById('dot');
+  const len = path.getTotalLength();
+  let dotT = 0, dotSpeed = 0.6, lastTs = null;
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function frame(ts){
+    if (!reduceMotion){
+      if (lastTs===null) lastTs = ts;
+      const dt = (ts-lastTs)/1000; lastTs = ts;
+      dotT = (dotT + dt*dotSpeed*0.15) % 1;
+      const p = path.getPointAtLength(dotT*len);
+      dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
+      requestAnimationFrame(frame);
+    }
+  }
+  if (reduceMotion){
+    const p = path.getPointAtLength(0);
+    dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
+  } else {
+    requestAnimationFrame(frame);
+  }
+
+  update();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;steps-budget&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Simulator speed, not learning math, sets the training clock"
+  ></iframe>
+</section>
+
+<section class="scene" id="warp-lockstep">
+  <h3>A GPU runs 32 threads in lockstep — divergence idles the hardware</h3>
+  <div class="caption">An RTX 4090 keeps 30,000+ threads resident so that while some wait on memory, others swap in and keep the cores busy. But threads run in groups of 32 sharing one instruction stream — toggle the branch and watch half the lanes go dark.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="warp-lockstep"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Warp Lockstep Execution</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#eef1f4; --text:#1a1d21; --muted:#5b6470;
+    --lane-active:#3b7ddb; --lane-idle:#c7ccd1; --accent:#e0912b;
+    --mem-cell:#d7dde3; --mem-hit:#2fa876; --mem-scatter:#c9524a;
+    --border:#8892a0; --btn-bg:#ffffff; --btn-active:#3b7ddb; --btn-active-text:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --panel:#1d2128; --text:#e8ebef; --muted:#9aa3af;
+      --lane-active:#5b9cf0; --lane-idle:#3a3f47; --accent:#f0a94a;
+      --mem-cell:#33383f; --mem-hit:#3ec78f; --mem-scatter:#e07068;
+      --border:#565f6a; --btn-bg:#242830; --btn-active:#5b9cf0; --btn-active-text:#10141a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:14px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
+  }
+  .scene{max-width:680px; margin:0 auto;}
+  h2{font-size:15px; margin:0 0 10px; font-weight:600;}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;}
+  button{
+    font:inherit; font-size:12.5px; padding:7px 10px; border-radius:7px;
+    border:1px solid var(--border); background:var(--btn-bg); color:var(--text); cursor:pointer;
+  }
+  button.on{background:var(--btn-active); color:var(--btn-active-text); border-color:var(--btn-active);}
+  #playBtn{display:none;}
+  canvas{width:100%; max-width:100%; display:block; background:var(--panel); border-radius:10px;}
+  .eq-block{margin-top:12px; font-size:14px;}
+  .legend{font-size:11.5px; color:var(--muted); margin:2px 0 10px; line-height:1.5;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Warp execution: 32 threads, one shared instruction pointer</h2>
+  <div class=&quot;controls&quot;>
+    <button id=&quot;branchBtn&quot;>Branch: Coherent (click → diverge lanes 0–15 vs 16–31)</button>
+    <button id=&quot;memBtn&quot;>Memory: Contiguous (click → scatter across memory)</button>
+    <button id=&quot;playBtn&quot;>▶ Play</button>
+  </div>
+  <canvas id=&quot;c&quot; width=&quot;620&quot; height=&quot;500&quot;></canvas>
+
+  <div class=&quot;eq-block&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>T</mi><mtext>warp</mtext></msub><mo>=</mo>
+      <msub><mi>n</mi><mtext>passes</mtext></msub><mo>&amp;#8901;</mo><msub><mi>T</mi><mtext>pass</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>T<sub></sub>warp — total cycles for the whole warp to finish · n_passes — serialized passes (1 if all 32 lanes agree, 2 if they diverge into two groups) · T_pass — cycles one branch takes (fixed at 20 here).</div>
+    <math display=&quot;block&quot;>
+      <msub><mi>C</mi><mtext>idle</mtext></msub><mo>=</mo><mo>(</mo><mn>32</mn><mo>-</mo><msub><mi>n</mi><mtext>active</mtext></msub><mo>)</mo><mo>&amp;#8901;</mo><msub><mi>T</mi><mtext>pass</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>C_idle — lane-cycles wasted each pass while the other half sits idle · n_active — lanes doing useful work in that pass (16 when diverged, 32 when coherent) · T_pass — cycles per pass (20).</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const LOGICAL_W = 620, LOGICAL_H = 500;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width = LOGICAL_W * dpr;
+  canvas.height = LOGICAL_H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const cs = getComputedStyle(document.documentElement);
+  const col = name => cs.getPropertyValue(name).trim();
+
+  // ---- physical constants of the simulated warp ----
+  const LANES = 32;          // threads per warp
+  const T_PASS = 20;         // cycles one branch takes
+  const SM_COUNT = 128;      // RTX 4090 streaming multiprocessors
+  const THREADS_RESIDENT = 30000; // concurrent resident threads (approx)
+  const PASS_DUR = 1.4;      // seconds of animation per pass
+
+  let divergent = false, scattered = false;
+  let simTime = 0, idleAccum = 0, lastT = null;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let running = !reduced;
+
+  const branchBtn = document.getElementById('branchBtn');
+  const memBtn = document.getElementById('memBtn');
+  const playBtn = document.getElementById('playBtn');
+  if (reduced) playBtn.style.display = 'inline-block';
+
+  branchBtn.addEventListener('click', () => {
+    divergent = !divergent;
+    simTime = 0; idleAccum = 0;
+    branchBtn.classList.toggle('on', divergent);
+    branchBtn.textContent = divergent
+      ? 'Branch: Divergent (click → back to coherent)'
+      : 'Branch: Coherent (click → diverge lanes 0–15 vs 16–31)';
+    draw();
+  });
+  memBtn.addEventListener('click', () => {
+    scattered = !scattered;
+    memBtn.classList.toggle('on', scattered);
+    memBtn.textContent = scattered
+      ? 'Memory: Scattered (click → back to contiguous)'
+      : 'Memory: Contiguous (click → scatter across memory)';
+    draw();
+  });
+  playBtn.addEventListener('click', () => {
+    running = !running;
+    playBtn.textContent = running ? '⏸ Pause' : '▶ Play';
+    lastT = null;
+  });
+
+  function laneActive(i, phase){
+    if (!divergent) return true;
+    return phase === 0 ? i < 16 : i >= 16;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,LOGICAL_W,LOGICAL_H);
+    ctx.fillStyle = col('--panel'); ctx.fillRect(0,0,LOGICAL_W,LOGICAL_H);
+
+    const totalDur = divergent ? PASS_DUR*2 : PASS_DUR;
+    const t = simTime % totalDur;
+    const phase = divergent &amp;&amp; t >= PASS_DUR ? 1 : 0;
+    const passProg = divergent ? (t % PASS_DUR)/PASS_DUR : t/PASS_DUR;
+
+    // ---- lanes ----
+    const laneX = 30, laneY = 34, laneW = 560, laneH = 64;
+    const step = laneW/LANES;
+    ctx.font = '11px sans-serif'; ctx.fillStyle = col('--muted');
+    ctx.fillText(divergent
+      ? (phase===0 ? 'Pass 1 of 2 — lanes 0–15 run IF branch, 16–31 idle'
+                   : 'Pass 2 of 2 — lanes 16–31 run ELSE branch, 0–15 idle')
+      : 'All 32 lanes execute the same instruction together', laneX, 22);
+
+    for(let i=0;i<LANES;i++){
+      const active = laneActive(i, phase);
+      ctx.fillStyle = active ? col('--lane-active') : col('--lane-idle');
+      ctx.globalAlpha = active ? 1 : 0.55;
+      ctx.fillRect(laneX + i*step, laneY, step-2, laneH);
+      ctx.globalAlpha = 1;
+    }
+    if (divergent){
+      ctx.strokeStyle = col('--border'); ctx.setLineDash([4,3]);
+      const midX = laneX + 16*step;
+      ctx.beginPath(); ctx.moveTo(midX, laneY-4); ctx.lineTo(midX, laneY+laneH+4); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle = col('--muted'); ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('lane 0', laneX, laneY+laneH+16);
+    ctx.textAlign = 'center';
+    ctx.fillText('lane 16', laneX + 16*step, laneY+laneH+16);
+    ctx.textAlign = 'right';
+    ctx.fillText('lane 31', laneX + laneW, laneY+laneH+16);
+    ctx.textAlign = 'left';
+
+    // ---- timeline ----
+    const tlX = 30, tlY = 148, tlW = 560, tlH = 22, halfW = tlW/2;
+    ctx.strokeStyle = col('--border'); ctx.strokeRect(tlX, tlY, tlW, tlH);
+    ctx.fillStyle = col('--muted'); ctx.font='11px sans-serif';
+    ctx.fillText('Timeline (worst case shown at full width = 2 serial passes)', tlX, tlY-6);
+
+    function drawPass(px, active, prog, label){
+      ctx.fillStyle = active ? col('--lane-active') : col('--lane-idle');
+      ctx.globalAlpha = active ? 1 : 0.4;
+      ctx.fillRect(px, tlY, halfW*prog, tlH);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = col('--border'); ctx.strokeRect(px, tlY, halfW, tlH);
+      ctx.fillStyle = col('--text'); ctx.font='10.5px sans-serif';
+      ctx.fillText(label, px+4, tlY+tlH+13);
+    }
+    if (divergent){
+      drawPass(tlX, phase===0, phase===0?passProg:1, 'Pass 1: lanes 0–15');
+      drawPass(tlX+halfW, phase===1, phase===1?passProg:0, 'Pass 2: lanes 16–31');
+    } else {
+      drawPass(tlX, true, passProg, 'Single pass: all 32 lanes');
+      ctx.fillStyle = col('--muted'); ctx.font='10px sans-serif';
+      ctx.fillText('(no 2nd pass needed)', tlX+halfW+6, tlY+tlH-6);
+    }
+    const totalCycles = divergent ? 2*T_PASS : T_PASS;
+    ctx.fillStyle = col('--text'); ctx.font='12px sans-serif';
+    ctx.fillText('Total warp time: ' + totalCycles + ' cycles ('+(divergent?'2 × 20, serialized':'1 × 20')+')', tlX, tlY+tlH+32);
+    ctx.fillStyle = col('--muted'); ctx.font='11px sans-serif';
+    ctx.fillText('Useful work done: 32 × 20 = 640 lane-cycles — identical in both modes', tlX, tlY+tlH+48);
+    ctx.fillStyle = col('--accent'); ctx.font='12px sans-serif';
+    ctx.fillText('Idle lane-cycles wasted: ' + Math.round(idleAccum), tlX, tlY+tlH+66);
+
+    // ---- memory panel ----
+    const memY = 288;
+    ctx.fillStyle = col('--muted'); ctx.font='11px sans-serif';
+    ctx.fillText('Memory fetch for this warp — 64 adjacent addresses shown', tlX, memY-8);
+
+    const cols=16, rows=4, cell=20, gap=4;
+    const gridX = tlX, gridY = memY;
+    const N = cols*rows; // 64 cells
+    const hit = new Array(N).fill(false);
+    let txCount;
+    if (!scattered){
+      for(let i=16;i<48;i++) hit[i]=true;
+      txCount = 1;
+    } else {
+      for(let i=0;i<N;i+=2) hit[i]=true; // 32 scattered cells
+      txCount = 32;
+    }
+    for(let i=0;i<N;i++){
+      const cx = i%cols, ry = Math.floor(i/cols);
+      const x = gridX + cx*(cell+gap), y = gridY + ry*(cell+gap);
+      ctx.fillStyle = hit[i] ? (scattered? col('--mem-scatter') : col('--mem-hit')) : col('--mem-cell');
+      ctx.fillRect(x,y,cell,cell);
+    }
+    ctx.fillStyle = col('--text'); ctx.font='12px sans-serif';
+    ctx.fillText('Memory transactions: ' + txCount, gridX, gridY + rows*(cell+gap) + 16);
+    ctx.fillStyle = col('--muted'); ctx.font='11px sans-serif';
+    ctx.fillText(scattered
+      ? '32 lanes → 32 addresses spread out → 32 separate slow round-trips'
+      : '32 lanes → 32 adjacent addresses → 1 wide round-trip fetch',
+      gridX, gridY + rows*(cell+gap) + 32);
+
+    // quantitative anchor (static)
+    ctx.fillStyle = col('--muted'); ctx.font='10.5px sans-serif';
+    ctx.fillText('1 warp = 32 threads · RTX 4090: '+SM_COUNT+' SMs hosting '+THREADS_RESIDENT.toLocaleString()+'+ concurrent threads',
+      gridX, gridY + rows*(cell+gap) + 50);
+  }
+
+  function frame(now){
+    if (lastT === null) lastT = now;
+    const dt = Math.min(0.1,(now-lastT)/1000);
+    lastT = now;
+    if (running){
+      simTime += dt;
+      const idleLanes = divergent ? 16 : 0;
+      idleAccum += idleLanes * (T_PASS/PASS_DUR) * dt;
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  draw();
+  window.__sceneReady = true;
+  requestAnimationFrame(frame);
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;warp-lockstep&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A GPU runs 32 threads in lockstep — divergence idles the hardware"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Flip the loop: step every world's entities together</h2>
+  <div class="part-lede">The GPU wants thousands of threads doing the same operation on adjacent data. Madrona delivers exactly that by borrowing a game-industry pattern — state as tables, logic as per-row functions — and merging every world into the same tables.</div>
+</header>
+<section class="scene" id="shared-table">
+  <h3>One table holds an archetype from every world — and warps love it</h3>
+  <div class="caption">Each world has only 5 agents — never enough for a warp of 32. Slide the world count up and watch one shared Agent table feed every lane contiguous work.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="shared-table"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Shared Agent Table Across Worlds</title>
+<style>
+:root{
+  --c-bg:#f7f7f9;--c-panel:#ffffff;--c-text:#1a1a1a;--c-muted:#5c6068;
+  --c-accent:#1d4ed8;--c-idle:#d9d9df;--c-grid:#c9ccd2;
+  --w0:#e63946;--w1:#f4a261;--w2:#2a9d8f;--w3:#457b9d;--w4:#e9c46a;--w5:#3a86ff;--w6:#9d4edd;--w7:#ff70a6;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --c-bg:#0f1115;--c-panel:#1a1d24;--c-text:#e9e9ee;--c-muted:#9aa0ac;
+    --c-accent:#7db4ff;--c-idle:#33363f;--c-grid:#3a3d46;
+    --w0:#ff6b6b;--w1:#ffb26b;--w2:#4ecdc4;--w3:#6a89cc;--w4:#f7d794;--w5:#74c0fc;--w6:#c77dff;--w7:#ff8fab;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--c-bg);color:var(--c-text);font-family:system-ui,Arial,sans-serif;padding:12px}
+.wrap{max-width:680px;margin:0 auto}
+.panel{background:var(--c-panel);border-radius:10px;padding:10px;max-width:100%}
+canvas{width:100%;max-width:100%;display:block;border-radius:8px}
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px}
+.ctrl{display:flex;flex-direction:column;gap:4px;flex:1;min-width:220px}
+.ctrl label{font-size:12.5px;color:var(--c-muted)}
+input[type=range]{width:100%}
+button{padding:7px 10px;border-radius:6px;border:1px solid var(--c-grid);background:var(--c-panel);color:var(--c-text);cursor:pointer;font-size:12.5px;white-space:nowrap}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.stat{background:var(--c-panel);border-radius:8px;padding:6px 10px;font-size:12px;min-width:110px;color:var(--c-muted)}
+.stat b{display:block;font-size:16px;color:var(--c-text);font-weight:600}
+.legend{font-size:11.3px;color:var(--c-muted);margin-top:6px;line-height:1.4}
+math{font-size:15px}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;scene&quot;></canvas>
+  </div>
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;worldSlider&quot;>Number of worlds run in parallel (each has 5 agents) — slider is log-scaled, 1 to 16,384</label>
+      <input type=&quot;range&quot; id=&quot;worldSlider&quot; min=&quot;0&quot; max=&quot;14&quot; step=&quot;0.05&quot; value=&quot;0&quot;>
+    </div>
+    <button id=&quot;playBtn&quot; title=&quot;Toggle the lane-lighting pulse animation (visual only, does not change any data)&quot;>Pause pulse animation</button>
+  </div>
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;stat&quot;>Worlds<b id=&quot;rWorlds&quot;>1</b></div>
+    <div class=&quot;stat&quot;>Total agent rows<b id=&quot;rRows&quot;>5</b></div>
+    <div class=&quot;stat&quot;>Active warp lanes<b id=&quot;rLanes&quot;>5 / 32</b></div>
+    <div class=&quot;stat&quot;>Memory transactions per read<b id=&quot;rTx&quot;>1</b></div>
+  </div>
+  <math display=&quot;block&quot;>
+    <mi>N</mi><mo>=</mo><mi>W</mi><mo>&amp;#183;</mo><mi>a</mi>
+  </math>
+  <div class=&quot;legend&quot;>N — total rows in the one shared Agent table &amp;middot; W — number of worlds (slider) &amp;middot; a — agents per world, fixed at 5. A warp of 32 GPU threads reads any 32 consecutive rows of this array in one coalesced memory transaction, no matter how many worlds those rows belong to.</div>
+</div>
+<script>
+const AGENTS_PER_WORLD = 5;
+const WARP_SIZE = 32;
+const MAX_WORLDS = 16384;
+
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+const slider = document.getElementById('worldSlider');
+const playBtn = document.getElementById('playBtn');
+const rWorlds = document.getElementById('rWorlds');
+const rRows = document.getElementById('rRows');
+const rLanes = document.getElementById('rLanes');
+const rTx = document.getElementById('rTx');
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+let cw = 640, ch = 380;
+let pulseVal = 1;
+let playing = true;
+let rafId = null;
+
+function computeWorlds(){
+  const v = parseFloat(slider.value);
+  let w = Math.round(Math.pow(2, v));
+  return Math.min(MAX_WORLDS, Math.max(1, w));
+}
+
+function resize(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  cw = Math.max(300, rect.width - 20);
+  ch = cw < 480 ? 470 : 400;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.height = ch + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+function worldColor(w, palette){ return palette[w % palette.length]; }
+
+function draw(){
+  const palette = [cssVar('--w0'),cssVar('--w1'),cssVar('--w2'),cssVar('--w3'),
+                    cssVar('--w4'),cssVar('--w5'),cssVar('--w6'),cssVar('--w7')];
+  const muted = cssVar('--c-muted');
+  const text = cssVar('--c-text');
+  const grid = cssVar('--c-grid');
+  const idle = cssVar('--c-idle');
+  const accent = cssVar('--c-accent');
+
+  const worlds = computeWorlds();
+  const totalRows = worlds * AGENTS_PER_WORLD;
+  const activeLanes = Math.min(WARP_SIZE, totalRows);
+  const worldsSpanned = Math.ceil(activeLanes / AGENTS_PER_WORLD);
+
+  rWorlds.textContent = worlds.toLocaleString();
+  rRows.textContent = totalRows.toLocaleString();
+  rLanes.textContent = activeLanes + ' / ' + WARP_SIZE;
+  rTx.textContent = '1';
+
+  ctx.clearRect(0, 0, cw, ch);
+
+  const barX = 16, barY = 34, barW = cw - 32, barH = 32;
+  ctx.font = '13px system-ui,Arial'; ctx.fillStyle = text;
+  ctx.fillText('Shared Agent table (rows tagged by EnvID = world index)', barX, 20);
+
+  const bandW = barW / worlds;
+  for(let i = 0; i < worlds; i++){
+    ctx.fillStyle = worldColor(i, palette);
+    const x = barX + i * bandW;
+    ctx.fillRect(x, barY, Math.max(bandW, 0.5), barH);
+  }
+  ctx.strokeStyle = grid; ctx.strokeRect(barX, barY, barW, barH);
+  if(bandW > 15){
+    ctx.textAlign = 'center'; ctx.font = '9px system-ui,Arial'; ctx.lineWidth = 2;
+    for(let i = 0; i < worlds; i++){
+      const x = barX + i * bandW + bandW/2, y = barY + barH/2 + 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.strokeText('W'+i, x, y);
+      ctx.fillStyle = '#111'; ctx.fillText('W'+i, x, y);
+    }
+    ctx.textAlign = 'left';
+  }
+
+  let y2 = barY + barH + 16;
+  ctx.strokeStyle = muted; ctx.beginPath();
+  ctx.moveTo(barX, y2); ctx.lineTo(barX + barW, y2); ctx.stroke();
+  ctx.fillStyle = muted; ctx.font = '11.3px system-ui,Arial';
+  ctx.fillText(totalRows.toLocaleString() + ' agent rows — one contiguous array', barX, y2 + 14);
+
+  let y3 = y2 + 30;
+  ctx.strokeStyle = accent; ctx.beginPath();
+  ctx.moveTo(barX, y3); ctx.lineTo(barX + barW, y3); ctx.stroke();
+  ctx.fillStyle = accent; ctx.font = '11.3px system-ui,Arial';
+  ctx.fillText('Reward column -> PyTorch tensor (0 copies)', barX, y3 + 14);
+
+  let wwY = y3 + 34;
+  ctx.fillStyle = text; ctx.font = '13px system-ui,Arial';
+  ctx.fillText('Warp of 32 threads: rows 0-31 (spans ' + worldsSpanned + (worldsSpanned>1?' worlds)':' world)'), barX, wwY);
+
+  const cols = cw < 480 ? 16 : 32;
+  const rows = WARP_SIZE / cols;
+  const gap = 2;
+  const cellW = (barW - (cols - 1) * gap) / cols;
+  const cellH = 28;
+  const gridTop = wwY + 12;
+
+  for(let r = 0; r < rows; r++){
+    for(let c = 0; c < cols; c++){
+      const idx = r * cols + c;
+      const x = barX + c * (cellW + gap);
+      const y = gridTop + r * (cellH + gap);
+      if(idx < activeLanes){
+        const w = Math.floor(idx / AGENTS_PER_WORLD);
+        ctx.globalAlpha = 0.55 + 0.45 * pulseVal;
+        ctx.fillStyle = worldColor(w, palette);
+        ctx.fillRect(x, y, cellW, cellH);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = idle;
+        ctx.fillRect(x, y, cellW, cellH);
+      }
+      ctx.strokeStyle = grid; ctx.strokeRect(x, y, cellW, cellH);
+    }
+  }
+  const gridBottom = gridTop + rows * (cellH + gap);
+
+  ctx.fillStyle = muted; ctx.font = '11px system-ui,Arial';
+  ctx.fillText('lit = active lane (running TimeIntegrate)', barX, gridBottom + 14);
+  ctx.fillText('gray = idle lane (fewer than 32 agents total)', barX, gridBottom + 28);
+  ctx.fillStyle = text; ctx.font = '11.5px system-ui,Arial';
+  ctx.fillText('active lanes ' + activeLanes + '/32  ·  memory transactions: 1', barX, gridBottom + 44);
+}
+
+function tick(t){
+  pulseVal = 0.5 + 0.5 * Math.sin(t / 500);
+  draw();
+  rafId = requestAnimationFrame(tick);
+}
+function startAnim(){ playing = true; playBtn.textContent = 'Pause pulse animation'; rafId = requestAnimationFrame(tick); }
+function stopAnim(){ playing = false; playBtn.textContent = 'Play pulse animation'; if(rafId) cancelAnimationFrame(rafId); }
+
+playBtn.addEventListener('click', () => { playing ? stopAnim() : startAnim(); });
+slider.addEventListener('input', () => { if(!playing) draw(); });
+window.addEventListener('resize', resize);
+
+resize();
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduced){ stopAnim(); } else { startAnim(); }
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;shared-table&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One table holds an archetype from every world — and warps love it"
+  ></iframe>
+</section>
+
+<section class="scene" id="step-graph">
+  <h3>The entire step is declared up front as a dependency graph</h3>
+  <div class="caption">Hide-and-seek's step is ~200 system nodes wired by dependencies, known before the step begins. That foreknowledge is what lets the GPU run everything without asking the CPU for instructions.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="step-graph"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Step graph: the whole step as a dependency graph</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1a1c20; --panel:#f4f5f8; --edge:#7c8290;
+  --dev-fill:#e9eefc; --dev-stroke:#3355aa; --engine-fill:#fdf0dc; --engine-stroke:#b3690a;
+  --accent:#c23652; --read-color:#2f6fed; --write-color:#c9711f; --both-color:#7b3fbf; --muted:#5a5f68;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121317; --fg:#e7e8ec; --panel:#1d2027; --edge:#9aa0aa;
+    --dev-fill:#1c2740; --dev-stroke:#8bb0f2; --engine-fill:#3a2b14; --engine-stroke:#f0ac57;
+    --accent:#ff7d92; --read-color:#6fa8ff; --write-color:#ffb066; --both-color:#c9a1ff; --muted:#a7abb5;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+h1{font-size:14px;font-weight:600;margin:0 0 4px;}
+.sub{font-size:12px;color:var(--muted);margin:0 0 10px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:10px;}
+.ctrl-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.ctrl-label{font-size:12px;color:var(--muted);}
+button{font:inherit;font-size:12.5px;padding:5px 10px;border-radius:6px;border:1px solid var(--edge);background:var(--panel);color:var(--fg);cursor:pointer;}
+button:hover{filter:brightness(1.08);}
+.readouts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-bottom:8px;}
+.readouts b{color:var(--fg);}
+.readouts span.val{font-weight:600;}
+.legend-line{font-size:11px;color:var(--muted);margin:2px 0 8px;}
+.diagram-wrap,.tables-wrap{overflow:hidden;max-width:100%;border:1px solid var(--edge);border-radius:8px;background:var(--panel);margin-bottom:10px;}
+svg{display:block;width:100%;height:auto;max-width:100%;}
+.node rect{fill:var(--dev-fill);stroke:var(--dev-stroke);stroke-width:1.5;}
+.node.engine rect{fill:var(--engine-fill);stroke:var(--engine-stroke);stroke-dasharray:4 3;}
+.node.selected rect{stroke:var(--accent);stroke-width:3;}
+.node text{fill:var(--fg);font-size:10px;text-anchor:middle;pointer-events:none;}
+.node{cursor:pointer;}
+.node.pulse rect{animation:pulseGlow 1.8s ease-in-out infinite;}
+@keyframes pulseGlow{0%,100%{stroke-width:1.5;} 50%{stroke-width:3.2;}}
+@media (prefers-reduced-motion: reduce){ .node.pulse rect{animation:none;stroke-width:2.6;} }
+line{stroke:var(--edge);stroke-width:1.6;}
+.concur-line{stroke:var(--accent);stroke-width:2.4;stroke-dasharray:5 3;}
+.concur-label{fill:var(--accent);font-size:9px;}
+.tables-row{display:flex;flex-wrap:wrap;gap:8px;padding:10px;}
+.col{flex:1 1 68px;min-width:64px;max-width:110px;padding:6px 4px;border:2px solid var(--edge);border-radius:6px;text-align:center;font-size:11px;background:var(--bg);}
+.col.read{border-color:var(--read-color);box-shadow:0 0 0 2px var(--read-color) inset;}
+.col.write{border-color:var(--write-color);box-shadow:0 0 0 2px var(--write-color) inset;}
+.col.both{border-color:var(--both-color);box-shadow:0 0 0 2px var(--both-color) inset;}
+.eq-wrap{border-top:1px solid var(--edge);padding-top:8px;}
+math{font-size:14px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>The whole step, declared up front as one dependency graph</h1>
+  <p class=&quot;sub&quot;>Hide-and-seek is a multi-agent RL benchmark: simulated robots move boxes and ramps to hide from or chase each other in a physics sandbox. Shown: 10 of the ≈200 nodes in one step of that simulation. Click a node, or step through with the buttons.</p>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl-group&quot;>
+      <span class=&quot;ctrl-label&quot;>Step through the graph:</span>
+      <button id=&quot;prevBtn&quot; aria-label=&quot;Select previous system in the graph&quot;>◀ Prev</button>
+      <button id=&quot;nextBtn&quot; aria-label=&quot;Select next system in the graph&quot;>Next ▶</button>
+    </div>
+    <div class=&quot;ctrl-group&quot;>
+      <button id=&quot;engineToggle&quot; aria-label=&quot;Show or hide the systems the engine inserts on its own&quot;>Hide engine-inserted nodes</button>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div><b>Selected system:</b> <span class=&quot;val&quot; id=&quot;roName&quot;>–</span></div>
+    <div><b>Reads:</b> <span class=&quot;val&quot; id=&quot;roReads&quot;>–</span></div>
+    <div><b>Writes:</b> <span class=&quot;val&quot; id=&quot;roWrites&quot;>–</span></div>
+    <div><b>Position:</b> <span class=&quot;val&quot; id=&quot;roCount&quot;>–</span></div>
+  </div>
+  <p class=&quot;legend-line&quot;>Solid outline = system the developer wrote · dashed outline = inserted by the engine (table sorts, query re-evaluation).</p>
+
+  <div class=&quot;diagram-wrap&quot;>
+  <svg id=&quot;graphSvg&quot; viewBox=&quot;0 0 800 235&quot; role=&quot;img&quot; aria-label=&quot;Directed acyclic graph of the hide-and-seek step&quot;>
+    <text x=&quot;88&quot; y=&quot;16&quot; class=&quot;concur-label&quot;>Movement Actions &amp;amp; Broad Phase:</text>
+    <text x=&quot;88&quot; y=&quot;27&quot; class=&quot;concur-label&quot;>share no read/write column</text>
+    <text x=&quot;52&quot; y=&quot;88&quot; class=&quot;concur-label&quot;>safe to run</text>
+    <text x=&quot;52&quot; y=&quot;98&quot; class=&quot;concur-label&quot;>concurrently</text>
+    <line class=&quot;concur-line&quot; x1=&quot;45&quot; y1=&quot;70&quot; x2=&quot;45&quot; y2=&quot;100&quot;></line>
+
+    <!-- edges -->
+    <line id=&quot;edge-n0-n3&quot; x1=&quot;80&quot; y1=&quot;50&quot; x2=&quot;265&quot; y2=&quot;120&quot;></line>
+    <line id=&quot;edge-n1-n2&quot; x1=&quot;80&quot; y1=&quot;120&quot; x2=&quot;95&quot; y2=&quot;120&quot;></line>
+    <line id=&quot;edge-n2-n2_5&quot; x1=&quot;165&quot; y1=&quot;120&quot; x2=&quot;180&quot; y2=&quot;185&quot;></line>
+    <line id=&quot;edge-n2_5-n3&quot; x1=&quot;250&quot; y1=&quot;185&quot; x2=&quot;265&quot; y2=&quot;120&quot;></line>
+    <line id=&quot;edge-n2-n3&quot; x1=&quot;165&quot; y1=&quot;120&quot; x2=&quot;265&quot; y2=&quot;120&quot; style=&quot;display:none&quot;></line>
+    <line id=&quot;edge-n3-n4&quot; x1=&quot;335&quot; y1=&quot;120&quot; x2=&quot;350&quot; y2=&quot;120&quot;></line>
+    <line id=&quot;edge-n4-n5_5&quot; x1=&quot;420&quot; y1=&quot;120&quot; x2=&quot;435&quot; y2=&quot;185&quot;></line>
+    <line id=&quot;edge-n5_5-n5&quot; x1=&quot;505&quot; y1=&quot;185&quot; x2=&quot;520&quot; y2=&quot;120&quot;></line>
+    <line id=&quot;edge-n4-n5&quot; x1=&quot;420&quot; y1=&quot;120&quot; x2=&quot;520&quot; y2=&quot;120&quot; style=&quot;display:none&quot;></line>
+    <line id=&quot;edge-n5-n6&quot; x1=&quot;590&quot; y1=&quot;120&quot; x2=&quot;605&quot; y2=&quot;120&quot;></line>
+    <line id=&quot;edge-n6-n7&quot; x1=&quot;675&quot; y1=&quot;120&quot; x2=&quot;690&quot; y2=&quot;120&quot;></line>
+
+    <!-- nodes -->
+    <g id=&quot;node-n0&quot; class=&quot;node dev pulse&quot; data-id=&quot;n0&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Movement Actions&quot;>
+      <rect x=&quot;10&quot; y=&quot;30&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;45&quot; y=&quot;47&quot;><tspan x=&quot;45&quot; dy=&quot;0&quot;>Movement</tspan><tspan x=&quot;45&quot; dy=&quot;12&quot;>Actions</tspan></text>
+    </g>
+    <g id=&quot;node-n1&quot; class=&quot;node dev pulse&quot; data-id=&quot;n1&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Broad Phase, find overlaps&quot;>
+      <rect x=&quot;10&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;45&quot; y=&quot;117&quot;><tspan x=&quot;45&quot; dy=&quot;0&quot;>Broad Phase</tspan><tspan x=&quot;45&quot; dy=&quot;12&quot;>(Overlaps)</tspan></text>
+    </g>
+    <g id=&quot;node-n2&quot; class=&quot;node dev&quot; data-id=&quot;n2&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Narrow Phase&quot;>
+      <rect x=&quot;95&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;130&quot; y=&quot;117&quot;><tspan x=&quot;130&quot; dy=&quot;0&quot;>Narrow</tspan><tspan x=&quot;130&quot; dy=&quot;12&quot;>Phase</tspan></text>
+    </g>
+    <g id=&quot;node-n2_5&quot; class=&quot;node engine&quot; data-id=&quot;n2_5&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Sort Contacts, inserted by engine&quot;>
+      <rect x=&quot;180&quot; y=&quot;165&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;215&quot; y=&quot;182&quot;><tspan x=&quot;215&quot; dy=&quot;0&quot;>Sort</tspan><tspan x=&quot;215&quot; dy=&quot;12&quot;>Contacts</tspan></text>
+    </g>
+    <g id=&quot;node-n3&quot; class=&quot;node dev&quot; data-id=&quot;n3&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Constraint Solve&quot;>
+      <rect x=&quot;265&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;300&quot; y=&quot;117&quot;><tspan x=&quot;300&quot; dy=&quot;0&quot;>Constraint</tspan><tspan x=&quot;300&quot; dy=&quot;12&quot;>Solve</tspan></text>
+    </g>
+    <g id=&quot;node-n4&quot; class=&quot;node dev&quot; data-id=&quot;n4&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Time Integrate&quot;>
+      <rect x=&quot;350&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;385&quot; y=&quot;117&quot;><tspan x=&quot;385&quot; dy=&quot;0&quot;>Time</tspan><tspan x=&quot;385&quot; dy=&quot;12&quot;>Integrate</tspan></text>
+    </g>
+    <g id=&quot;node-n5_5&quot; class=&quot;node engine&quot; data-id=&quot;n5_5&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Query Re-evaluate, inserted by engine&quot;>
+      <rect x=&quot;435&quot; y=&quot;165&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;470&quot; y=&quot;182&quot;><tspan x=&quot;470&quot; dy=&quot;0&quot;>Query</tspan><tspan x=&quot;470&quot; dy=&quot;12&quot;>Re-eval</tspan></text>
+    </g>
+    <g id=&quot;node-n5&quot; class=&quot;node dev&quot; data-id=&quot;n5&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;LIDAR and Observations&quot;>
+      <rect x=&quot;520&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;555&quot; y=&quot;117&quot;><tspan x=&quot;555&quot; dy=&quot;0&quot;>LIDAR /</tspan><tspan x=&quot;555&quot; dy=&quot;12&quot;>Observe</tspan></text>
+    </g>
+    <g id=&quot;node-n6&quot; class=&quot;node dev&quot; data-id=&quot;n6&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Reward&quot;>
+      <rect x=&quot;605&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;640&quot; y=&quot;124&quot;>Reward</text>
+    </g>
+    <g id=&quot;node-n7&quot; class=&quot;node dev&quot; data-id=&quot;n7&quot; tabindex=&quot;0&quot; role=&quot;button&quot; aria-label=&quot;Episode Reset&quot;>
+      <rect x=&quot;690&quot; y=&quot;100&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+      <text x=&quot;725&quot; y=&quot;117&quot;><tspan x=&quot;725&quot; dy=&quot;0&quot;>Episode</tspan><tspan x=&quot;725&quot; dy=&quot;12&quot;>Reset</tspan></text>
+    </g>
+  </svg>
+  </div>
+  <p class=&quot;legend-line&quot;>Magenta dashed line = two nodes proven to share no read/write column (they pulse together and can run concurrently) · thin gray lines = sequential dependencies, one node's output feeds the next node's input.</p>
+
+  <div class=&quot;tables-wrap&quot;>
+    <div class=&quot;tables-row&quot; id=&quot;tablesRow&quot;>
+      <div class=&quot;col&quot; data-name=&quot;Action&quot;>Action</div>
+      <div class=&quot;col&quot; data-name=&quot;Velocity&quot;>Velocity</div>
+      <div class=&quot;col&quot; data-name=&quot;Position&quot;>Position</div>
+      <div class=&quot;col&quot; data-name=&quot;OverlapPairs&quot;>OverlapPairs</div>
+      <div class=&quot;col&quot; data-name=&quot;Contact&quot;>Contact</div>
+      <div class=&quot;col&quot; data-name=&quot;QueryCache&quot;>QueryCache</div>
+      <div class=&quot;col&quot; data-name=&quot;Observation&quot;>Observation</div>
+      <div class=&quot;col&quot; data-name=&quot;Reward&quot;>Reward</div>
+      <div class=&quot;col&quot; data-name=&quot;Done&quot;>Done</div>
+    </div>
+  </div>
+  <p class=&quot;legend-line&quot;>Columns above = shared component tables. Blue border = read by the selected node · orange = written · purple = both.</p>
+
+  <div class=&quot;eq-wrap&quot;>
+    <math display=&quot;block&quot;>
+      <mtext>safe</mtext><mo>(</mo><mi>A</mi><mo>,</mo><mi>B</mi><mo>)</mo><mo>&amp;#8660;</mo>
+      <mo>(</mo><msub><mi>W</mi><mi>A</mi></msub><mo>&amp;#8745;</mo><mo>(</mo><msub><mi>R</mi><mi>B</mi></msub><mo>&amp;#8746;</mo><msub><mi>W</mi><mi>B</mi></msub><mo>)</mo><mo>)</mo>
+      <mo>&amp;#8746;</mo>
+      <mo>(</mo><msub><mi>W</mi><mi>B</mi></msub><mo>&amp;#8745;</mo><mo>(</mo><msub><mi>R</mi><mi>A</mi></msub><mo>&amp;#8746;</mo><msub><mi>W</mi><mi>A</mi></msub><mo>)</mo><mo>)</mo>
+      <mo>=</mo><mi>&amp;#8709;</mi>
+    </math>
+    <p class=&quot;legend-line&quot;>safe(A,B) — nodes A, B can run in parallel with no data race · R<sub>A</sub>, W<sub>A</sub> — columns node A reads / writes · R<sub>B</sub>, W<sub>B</sub> — same for node B · ∅ — empty set, no shared column.</p>
+  </div>
+</div>
+
+<script>
+const nodeData = {
+  n0:{reads:['Action'],writes:['Velocity']},
+  n1:{reads:['Position'],writes:['OverlapPairs']},
+  n2:{reads:['Position','OverlapPairs'],writes:['Contact']},
+  n2_5:{reads:['Contact'],writes:['Contact']},
+  n3:{reads:['Contact','Velocity'],writes:['Velocity']},
+  n4:{reads:['Velocity'],writes:['Position']},
+  n5_5:{reads:['Position'],writes:['QueryCache']},
+  n5:{reads:['Position','QueryCache'],writes:['Observation']},
+  n6:{reads:['Observation'],writes:['Reward']},
+  n7:{reads:['Reward'],writes:['Position','Velocity','Done']}
+};
+const nodeNames = {
+  n0:'Movement Actions', n1:'Broad Phase (Find Overlaps)', n2:'Narrow Phase',
+  n2_5:'Sort Contacts (engine-inserted)', n3:'Constraint Solve', n4:'Time Integrate',
+  n5_5:'Query Re-evaluate (engine-inserted)', n5:'LIDAR / Observations', n6:'Reward', n7:'Episode Reset'
+};
+const fullOrder = ['n0','n1','n2','n2_5','n3','n4','n5_5','n5','n6','n7'];
+const engineIds = new Set(['n2_5','n5_5']);
+let showEngine = true;
+let selected = 'n0';
+
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const engineToggle = document.getElementById('engineToggle');
+const roName = document.getElementById('roName');
+const roReads = document.getElementById('roReads');
+const roWrites = document.getElementById('roWrites');
+const roCount = document.getElementById('roCount');
+
+function visibleOrder(){ return fullOrder.filter(id => showEngine || !engineIds.has(id)); }
+
+function step(dir){
+  const order = visibleOrder();
+  let idx = order.indexOf(selected);
+  if (idx === -1) idx = 0;
+  idx = (idx + dir + order.length) % order.length;
+  selected = order[idx];
+  render();
+}
+
+function setSelected(id){ selected = id; render(); }
+
+function render(){
+  engineToggle.textContent = showEngine ? 'Hide engine-inserted nodes' : 'Show engine-inserted nodes';
+
+  fullOrder.forEach(id=>{
+    const g = document.getElementById('node-'+id);
+    const hidden = engineIds.has(id) &amp;&amp; !showEngine;
+    g.style.display = hidden ? 'none' : '';
+    g.classList.toggle('selected', id === selected);
+  });
+
+  ['edge-n2-n2_5','edge-n2_5-n3','edge-n4-n5_5','edge-n5_5-n5'].forEach(id=>{
+    document.getElementById(id).style.display = showEngine ? '' : 'none';
+  });
+  ['edge-n2-n3','edge-n4-n5'].forEach(id=>{
+    document.getElementById(id).style.display = showEngine ? 'none' : '';
+  });
+
+  document.querySelectorAll('.col').forEach(c=>c.classList.remove('read','write','both'));
+  const d = nodeData[selected];
+  d.reads.forEach(name=>{
+    const el = document.querySelector('.col[data-name=&quot;'+name+'&quot;]');
+    if (el) el.classList.add(d.writes.includes(name) ? 'both' : 'read');
+  });
+  d.writes.forEach(name=>{
+    if (d.reads.includes(name)) return;
+    const el = document.querySelector('.col[data-name=&quot;'+name+'&quot;]');
+    if (el) el.classList.add('write');
+  });
+
+  roName.textContent = nodeNames[selected];
+  roReads.textContent = d.reads.join(', ');
+  roWrites.textContent = d.writes.join(', ');
+  const order = visibleOrder();
+  roCount.textContent = (order.indexOf(selected)+1) + ' of ' + order.length + ' shown (hide-and-seek\u2019s full step \u2248 200 nodes)';
+}
+
+prevBtn.addEventListener('click', ()=>step(-1));
+nextBtn.addEventListener('click', ()=>step(1));
+engineToggle.addEventListener('click', ()=>{
+  showEngine = !showEngine;
+  if (engineIds.has(selected) &amp;&amp; !showEngine){
+    selected = selected === 'n2_5' ? 'n3' : 'n5';
+  }
+  render();
+});
+fullOrder.forEach(id=>{
+  const g = document.getElementById('node-'+id);
+  g.addEventListener('click', ()=>setSelected(id));
+  g.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); setSelected(id); } });
+});
+
+requestAnimationFrame(()=>{
+  render();
+  window.__sceneReady = true;
+});
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;step-graph&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The entire step is declared up front as a dependency graph"
+  ></iframe>
+</section>
+
+<section class="scene" id="megakernel">
+  <h3>One giant kernel: the GPU schedules all 200 nodes itself</h3>
+  <div class="caption">A kernel is a program the CPU launches onto the GPU, and each launch costs fixed time. Launching 200 of them drowns tiny nodes in that overhead, and the collision step can't even launch until the CPU reads back how many collision pairs exist. One launch of self-scheduling warps removes both taxes.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="megakernel"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Megakernel execution</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --text:#1a1d23; --muted:#5b6270;
+    --gap:#e2734d; --work:#3f7fbf; --heavy:#3f9d6b; --cpu:#c0455c;
+    --grid:#c7ccd4; --accentline:#1a1d23;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --panel:#1c2028; --text:#e8eaed; --muted:#9aa2b1;
+      --gap:#ea8a63; --work:#6ba3e0; --heavy:#57c48a; --cpu:#e06478;
+      --grid:#3a4150; --accentline:#e8eaed;
+    }
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:0;}
+  .scene{max-width:700px;margin:0 auto;padding:14px;box-sizing:border-box;}
+  h2{font-size:15px;margin:0 0 8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:8px;}
+  .ctrl{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px;}
+  .ctrl input[type=range]{width:180px;}
+  button{font-size:13px;padding:7px 12px;border-radius:6px;border:1px solid var(--grid);background:var(--panel);color:var(--text);cursor:pointer;}
+  button:hover{filter:brightness(1.08);}
+  .hint{font-size:11px;color:var(--muted);max-width:220px;}
+  canvas{display:block;width:100%;max-width:680px;height:auto;background:var(--panel);border-radius:8px;border:1px solid var(--grid);}
+  .readouts{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;margin:10px 0 4px;color:var(--muted);}
+  .readouts b{color:var(--text);}
+  .eq{margin-top:10px;padding-top:6px;border-top:1px solid var(--grid);}
+  .legend{font-size:11px;color:var(--muted);margin:2px 0 10px;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>One giant kernel: the GPU schedules all 200 nodes itself</h2>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <button id=&quot;modeBtn&quot;>Execution mode: Kernel-per-node</button>
+      <span class=&quot;hint&quot;>Click to flip between launching one kernel per graph node and compiling all nodes into one persistent megakernel.</span>
+    </div>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;nSlider&quot;>Graph nodes per step, N: <span id=&quot;nVal&quot;>200</span></label>
+      <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;20&quot; max=&quot;200&quot; step=&quot;10&quot; value=&quot;200&quot;>
+      <span class=&quot;hint&quot;>Sets how many entity-systems (nodes) must run this step.</span>
+    </div>
+  </div>
+
+  <canvas id=&quot;cv&quot;></canvas>
+
+  <div class=&quot;readouts&quot;>
+    <span>Naive total step time: <b id=&quot;tNaive&quot;>–</b> µs</span>
+    <span>Megakernel total step time: <b id=&quot;tMega&quot;>–</b> µs</span>
+    <span>Speedup: <b id=&quot;speedup&quot;>–</b>×</span>
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>T</mi><mtext>naive</mtext></msub><mo>=</mo>
+      <mi>N</mi><mo>·</mo><msub><mi>t</mi><mtext>launch</mtext></msub><mo>+</mo>
+      <munderover><mo>&amp;#8721;</mo><mi>i</mi><mi>N</mi></munderover><msub><mi>w</mi><mi>i</mi></msub><mo>+</mo>
+      <msub><mi>t</mi><mtext>CPU</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>N — graph nodes this step · t_launch — fixed per-kernel launch overhead (µs) · w_i — compute work of node i (µs) · t_CPU — one-time CPU stall to read a dynamically-sized count (µs)</div>
+    <math display=&quot;block&quot;>
+      <msub><mi>T</mi><mtext>mega</mtext></msub><mo>=</mo>
+      <msub><mi>t</mi><mtext>launch</mtext></msub><mo>+</mo>
+      <munderover><mo>&amp;#8721;</mo><mi>i</mi><mi>N</mi></munderover><msub><mi>w</mi><mi>i</mi></msub>
+    </math>
+    <div class=&quot;legend&quot;>Same w_i as above; t_launch is paid once, and t_CPU is eliminated because counts stay on the GPU.</div>
+  </div>
+</div>
+
+<script>
+const LAUNCH_OVERHEAD_US = 5;     // fixed cost per kernel launch, microseconds
+const LIGHT_WORK_US = 0.3;        // compute work of a small generic node
+const CPU_ROUNDTRIP_US = 60;      // CPU readback stall for dynamic sizing
+const NAMED = [
+  {name:'FindOverlaps', work:4},
+  {name:'NarrowPhase',  work:8},
+  {name:'Physics',      work:40},
+  {name:'RayTracing',   work:40}
+];
+const NAMED_WORK = NAMED.reduce((s,n)=>s+n.work,0);
+
+function computeNaive(N){
+  const light = Math.max(0, N - NAMED.length);
+  const total = N*LAUNCH_OVERHEAD_US + light*LIGHT_WORK_US + NAMED_WORK + CPU_ROUNDTRIP_US;
+  return {total, light};
+}
+function computeMega(N){
+  const light = Math.max(0, N - NAMED.length);
+  const total = LAUNCH_OVERHEAD_US + light*LIGHT_WORK_US + NAMED_WORK;
+  return {total, light};
+}
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const modeBtn = document.getElementById('modeBtn');
+const nSlider = document.getElementById('nSlider');
+const nVal = document.getElementById('nVal');
+const tNaiveEl = document.getElementById('tNaive');
+const tMegaEl = document.getElementById('tMega');
+const speedupEl = document.getElementById('speedup');
+
+const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let state = {N:200, mode:'naive', animFrom:0, animTo:0, animT:0, animStart:0};
+const DUR = reduced ? 1 : 650;
+
+let logicalW=680, logicalH=370;
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function resizeCanvas(){
+  const rect = cv.getBoundingClientRect();
+  const w = Math.max(300, Math.min(rect.width, 680));
+  const h = 370;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+  cv.style.height = h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  logicalW = w; logicalH = h;
+}
+
+function niceStep(total){
+  const cands=[10,20,25,50,100,150,200,250,500,1000];
+  for(const c of cands){ if(total/c<=8) return c; }
+  return 1000;
+}
+
+function draw(){
+  const now = performance.now();
+  let p = (now - state.animStart)/DUR; if(p>1)p=1; if(p<0)p=0;
+  const ease = p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
+  state.animT = state.animFrom + (state.animTo-state.animFrom)*ease;
+  const animT = state.animT;
+
+  const N = state.N;
+  const naive = computeNaive(N);
+  const mega = computeMega(N);
+
+  ctx.clearRect(0,0,logicalW,logicalH);
+  ctx.fillStyle = css('--panel'); ctx.fillRect(0,0,logicalW,logicalH);
+
+  const marginLeft=48, marginRight=72;
+  const timelineW = logicalW - marginLeft - marginRight;
+  const scale = timelineW / naive.total; // fixed px-per-microsecond axis
+
+  const barY=120, barH=40;
+  const rowLaunchY = 38;            // launch-boundary annotation row
+  const rowYs = [46, 64, 82, 100];  // 4 distinct rows for the 4 named labels — never share a row
+  const cpuY = barY+barH+30, cpuH=24;
+  const axisY = cpuY+cpuH+28;
+  const legendY = axisY+30;
+  const glossY1 = legendY+16;
+  const glossY2 = glossY1+13;
+  const glossY3 = glossY2+13;
+  const glossY4 = glossY3+13;
+  const counterY = glossY4+18;
+
+  ctx.textBaseline='alphabetic';
+  ctx.textAlign='left';
+
+  // mode label
+  ctx.fillStyle = css('--text'); ctx.font='12px sans-serif';
+  ctx.fillText('Mode: ' + (animT<0.5?'Kernel-per-node (many launches)':'Megakernel (one launch)'), marginLeft, 16);
+
+  // single launch boundary marker (always exactly one)
+  ctx.strokeStyle = css('--accentline'); ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(marginLeft, barY-8); ctx.lineTo(marginLeft, barY+barH+8); ctx.stroke();
+  ctx.fillStyle = css('--muted'); ctx.font='10px sans-serif';
+  ctx.fillText(animT<0.5?'launch #1 of '+N:'1 launch boundary', marginLeft, rowLaunchY);
+
+  let x = marginLeft;
+  function seg(w, color){ ctx.fillStyle=color; ctx.fillRect(x, barY, Math.max(w,0), barH); x += Math.max(w,0); }
+
+  // light nodes
+  for(let i=0;i<naive.light;i++){
+    seg(LAUNCH_OVERHEAD_US*scale*(1-animT), css('--gap'));
+    seg(LIGHT_WORK_US*scale, css('--work'));
+  }
+  ctx.fillStyle=css('--muted'); ctx.font='10px sans-serif';
+  ctx.fillText(naive.light+' small nodes', marginLeft+4, barY+barH+14);
+
+  // FindOverlaps
+  seg(LAUNCH_OVERHEAD_US*scale*(1-animT), css('--gap'));
+  const findX0=x;
+  seg(NAMED[0].work*scale, css('--work'));
+
+  // CPU round trip
+  const cpuW = CPU_ROUNDTRIP_US*scale*(1-animT);
+  if(cpuW>1){
+    const cx = x;
+    ctx.globalAlpha = 1-animT*0.2;
+    ctx.strokeStyle=css('--cpu'); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(cx,barY+barH); ctx.lineTo(cx,cpuY); ctx.lineTo(cx+cpuW,cpuY); ctx.lineTo(cx+cpuW,barY+barH); ctx.stroke();
+    ctx.fillStyle=css('--cpu'); ctx.globalAlpha=1;
+    ctx.fillRect(cx,cpuY,cpuW,cpuH);
+    ctx.fillStyle=css('--text'); ctx.font='9.5px sans-serif';
+    ctx.fillText('CPU reads pair count', cx, cpuY+cpuH+13);
+    x += cpuW;
+  } else if(animT>0.5) {
+    ctx.globalAlpha = animT;
+    ctx.fillStyle=css('--muted'); ctx.font='9.5px sans-serif';
+    ctx.fillText('count read straight from GPU memory — no CPU detour', x+2, cpuY+16);
+    ctx.globalAlpha=1;
+  }
+
+  // NarrowPhase
+  seg(LAUNCH_OVERHEAD_US*scale*(1-animT), css('--gap'));
+  const narX0=x;
+  seg(NAMED[1].work*scale, css('--work'));
+
+  // Physics
+  seg(LAUNCH_OVERHEAD_US*scale*(1-animT), css('--gap'));
+  const phX0=x;
+  seg(NAMED[2].work*scale, css('--heavy'));
+
+  // RayTracing
+  seg(LAUNCH_OVERHEAD_US*scale*(1-animT), css('--gap'));
+  const rtX0=x;
+  seg(NAMED[3].work*scale, css('--heavy'));
+
+  // Non-overlapping name labels: each of the 4 gets its OWN row, so no two
+  // labels ever share a horizontal line, however close their segments are.
+  ctx.font='10.5px sans-serif';
+  ctx.strokeStyle=css('--grid'); ctx.lineWidth=1;
+  function nameLabel(x0, text, rowY){
+    const w = ctx.measureText(text).width;
+    let drawX = x0;
+    let leaderX = x0;
+    if (drawX + w > logicalW - 4) {
+      // keep text fully on-canvas; leader line still points at the true segment start
+      drawX = logicalW - 4 - w;
+    }
+    ctx.fillStyle=css('--text');
+    ctx.fillText(text, drawX, rowY);
+    ctx.beginPath(); ctx.moveTo(leaderX, rowY+2); ctx.lineTo(leaderX, barY-2); ctx.stroke();
+  }
+  nameLabel(findX0, 'FindOverlaps', rowYs[0]);
+  nameLabel(narX0,  'NarrowPhase',  rowYs[1]);
+  nameLabel(phX0,   'Physics',      rowYs[2]);
+  nameLabel(rtX0,   'RayTracing',   rowYs[3]);
+
+  // end marker + time label (inside bar band, well clear of the name labels above)
+  const drawnUS = (x-marginLeft)/scale + LAUNCH_OVERHEAD_US*animT;
+  ctx.strokeStyle=css('--accentline'); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(x,barY-4); ctx.lineTo(x,barY+barH+4); ctx.stroke();
+  ctx.fillStyle=css('--text'); ctx.font='11px sans-serif';
+  const tLabel = 'T = '+drawnUS.toFixed(1)+' µs';
+  const tLabelW = ctx.measureText(tLabel).width;
+  if (x + 6 + tLabelW <= logicalW - 4) {
+    ctx.fillText(tLabel, x+6, barY+barH/2+4);
+  } else {
+    ctx.textAlign='right';
+    ctx.fillText(tLabel, x-6, barY+barH/2+4);
+    ctx.textAlign='left';
+  }
+
+  // axis
+  ctx.strokeStyle=css('--grid'); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(marginLeft,axisY); ctx.lineTo(marginLeft+timelineW,axisY); ctx.stroke();
+  const step = niceStep(naive.total);
+  ctx.fillStyle=css('--muted'); ctx.font='9.5px sans-serif';
+  for(let t=0; t<=naive.total+1; t+=step){
+    const tx = marginLeft + t*scale;
+    ctx.beginPath(); ctx.moveTo(tx,axisY); ctx.lineTo(tx,axisY+4); ctx.stroke();
+    ctx.fillText(Math.round(t)+'', tx-6, axisY+15);
+  }
+  ctx.fillText('time (µs)', marginLeft+timelineW-52, axisY+15);
+
+  // legend
+  const items=[['--gap','launch gap'],['--work','node compute'],['--heavy','physics &amp; ray-tracing work'],['--cpu','CPU stall']];
+  let lx = marginLeft;
+  ctx.font='10px sans-serif';
+  items.forEach(([c,label])=>{
+    ctx.fillStyle=css(c); ctx.fillRect(lx,legendY-8,10,10);
+    ctx.fillStyle=css('--muted'); ctx.fillText(label, lx+14, legendY);
+    lx += 14+ctx.measureText(label).width+16;
+  });
+
+  // gloss: define every named stage for readers new to the subfield
+  ctx.fillStyle=css('--muted'); ctx.font='9.5px sans-serif';
+  ctx.fillText('FindOverlaps — broad-phase pair detection (cheap, fixed size)', marginLeft, glossY1);
+  ctx.fillText('NarrowPhase — exact collision test; naive mode stalls here for a CPU readback of the pair count', marginLeft, glossY2);
+  ctx.fillText('Physics — collision response &amp; motion integration (dominates frame time)', marginLeft, glossY3);
+  ctx.fillText('RayTracing — updates ray-traced sensor/observation data (dominates frame time)', marginLeft, glossY4);
+
+  // worker/counter flavor text when megakernel settled
+  if(animT>0.85){
+    const idx = reduced ? 0 : Math.floor(now/120) % (naive.light+5);
+    const remaining = Math.max(0, naive.light+4-idx);
+    ctx.fillStyle=css('--muted'); ctx.font='10px sans-serif';
+    ctx.fillText('persistent warps pull work items from a shared counter — items left: '+remaining+' — no idling between nodes', marginLeft, counterY);
+  }
+
+  tNaiveEl.textContent = naive.total.toFixed(1);
+  tMegaEl.textContent = mega.total.toFixed(1);
+  speedupEl.textContent = (naive.total/mega.total).toFixed(2);
+
+  requestAnimationFrame(draw);
+}
+
+function setMode(mode, animate){
+  state.mode = mode;
+  state.animFrom = state.animT;
+  state.animTo = mode==='mega' ? 1 : 0;
+  state.animStart = performance.now() - (animate ? 0 : DUR);
+  modeBtn.textContent = 'Execution mode: ' + (mode==='mega' ? 'Megakernel' : 'Kernel-per-node');
+}
+
+modeBtn.addEventListener('click', ()=>{
+  setMode(state.mode==='mega' ? 'naive' : 'mega', !reduced);
+});
+nSlider.addEventListener('input', ()=>{
+  state.N = parseInt(nSlider.value,10);
+  nVal.textContent = state.N;
+});
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+setMode('naive', false);
+requestAnimationFrame(draw);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;megakernel&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One giant kernel: the GPU schedules all 200 nodes itself"
+  ></iframe>
+</section>
+
+<section class="scene" id="lifecycle-sort">
+  <h3>Delete by marking, clean up by sorting</h3>
+  <div class="caption">Every step, FindOverlaps spawns thousands of CollisionPair rows that die within that same step — a GPU memory allocator would choke. Watch deletion become a −1 tag and garbage collection become a sort.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="lifecycle-sort"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Delete by marking, clean up by sorting</title>
+<style>
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --text:#1a1c22; --muted:#6b7280;
+  --accent:#2b6cb0; --border:#cbd2de; --reserved:#eef1f7;
+  --world-0:#e63946; --world-1:#2a9d8f; --world-2:#e0a325; --world-3:#6a4c93;
+  --dead:#a3a7ae;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --panel:#1c1f28; --text:#e7e9ee; --muted:#9aa1ad;
+    --accent:#6fa8dc; --border:#3a3f4b; --reserved:#20232c;
+    --world-0:#f2545b; --world-1:#3fc1ac; --world-2:#f0bf50; --world-3:#9a7dc9;
+    --dead:#5b5f68;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.4 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:10px;}
+canvas{width:100%;max-width:100%;height:auto;display:block;border-radius:6px;}
+.legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:12px;color:var(--muted);}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;font-size:13px;}
+.readouts div{background:var(--reserved);border:1px solid var(--border);
+  border-radius:6px;padding:4px 8px;}
+.readouts span{font-weight:600;color:var(--accent);}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+button{font:inherit;padding:7px 12px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+button:disabled{opacity:0.5;cursor:default;}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.eqbox{margin-top:12px;padding:8px 10px;background:var(--reserved);
+  border:1px solid var(--border);border-radius:8px;}
+.eqlegend{font-size:11.5px;color:var(--muted);margin:2px 0 8px 2px;}
+math{font-size:15px;}
+h2{font-size:14px;margin:2px 0 6px;color:var(--text);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>CollisionPair table — before/after one sort-and-trim</h2>
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;190&quot; aria-label=&quot;CollisionPair table diagram, before and after sorting&quot;></canvas>
+    <div class=&quot;legend-row&quot; id=&quot;legend&quot;></div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Phase: <span id=&quot;phaseLabel&quot;>—</span></div>
+    <div>Rows before sort: <span id=&quot;beforeCount&quot;>0</span></div>
+    <div>Dead marked (EnvID=−1): <span id=&quot;deadCount&quot;>0</span></div>
+    <div>Rows after trim: <span id=&quot;afterCount&quot;>0</span></div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;nextBtn&quot; class=&quot;primary&quot;></button>
+    <button id=&quot;resetBtn&quot;>Reset step (new random spawn/kill pattern)</button>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mtext>EnvID</mtext><mi>i</mi></msub>
+      <mo>&amp;#8592;</mo><mrow><mo>&amp;#8722;</mo><mn>1</mn></mrow>
+    </math>
+    <div class=&quot;eqlegend&quot;>EnvID<sub></sub> — world id stored in row i (−1 marks a dead row) · i — row index; each thread writes only its own row i, so no lock is needed even though thousands of threads write in the same instant.</div>
+    <math display=&quot;block&quot;>
+      <msub><mtext>key</mtext><mi>i</mi></msub><mo>=</mo>
+      <mtext>EnvID</mtext><mo>=</mo><mo>&amp;#8722;</mo><mn>1</mn><mo>?</mo>
+      <mi>W</mi><mo>:</mo><msub><mtext>EnvID</mtext><mi>i</mi></msub>
+    </math>
+    <div class=&quot;eqlegend&quot;>key<sub></sub> — value the sort uses to place row i · W — number of worlds sharing the table (dead rows get key W, larger than any real world id 0..W−1, so a plain ascending sort pushes every dead row to the tail).</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const WORLDS = 4, CAPACITY = 48, INIT_PER_WORLD = 6, SPAWN_COUNT = 10, DEATH_PROB = 0.45;
+  const DESIGN_H = 180; // fixed logical height, independent of width, avoids clipping at narrow widths
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ANIM_MS = reduced ? 0 : 700;
+
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const cs = getComputedStyle(document.documentElement);
+  const col = n => cs.getPropertyValue(n).trim();
+  const worldColor = w => col('--world-'+w);
+
+  let rows = [], phase = 'start', animStart = 0, pendingLive = 0;
+  let logicalW = 640, logicalH = DESIGN_H;
+
+  function seed(){
+    rows = [];
+    for(let w=0; w<WORLDS; w++)
+      for(let k=0; k<INIT_PER_WORLD; k++)
+        rows.push({world:w, dead:false});
+    phase = 'start';
+  }
+
+  // Phase A: FindOverlaps appends new rows, then NarrowPhase marks misses dead in place.
+  function spawnAndMark(){
+    if(phase!=='start') return;
+    const offset = Math.floor(Math.random()*WORLDS);
+    for(let i=0;i<SPAWN_COUNT;i++){
+      const w = (i+offset) % WORLDS; // interleaved by construction
+      rows.push({world:w, dead:false, isNew:true});
+    }
+    rows.forEach(r=>{ if(!r.dead &amp;&amp; Math.random() < DEATH_PROB){ r.dead = true; r.world = -1; } });
+    phase = 'ready';
+  }
+
+  // Phase B: counting/radix sort by key = dead ? W : world, animate migration, then trim.
+  function startSort(){
+    if(phase!=='ready') return;
+    const key = r => r.dead ? WORLDS : r.world;
+    const counts = new Array(WORLDS+1).fill(0);
+    rows.forEach(r => counts[key(r)]++);
+    const cursor = new Array(WORLDS+1).fill(0);
+    for(let k=1;k<=WORLDS;k++) cursor[k] = cursor[k-1] + counts[k-1];
+    rows.forEach(r=>{ const k = key(r); r.tx = cursor[k]++; });
+    pendingLive = rows.length - counts[WORLDS];
+    phase = 'sorting';
+    animStart = performance.now();
+  }
+
+  const nextBtn = document.getElementById('nextBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  function labelFor(){
+    if(phase==='start') return 'Spawn + resolve collisions — append pairs, mark misses dead (EnvID = \u22121)';
+    if(phase==='ready') return 'Sort &amp; trim — compact table, drop dead rows';
+    return 'Sorting\u2026';
+  }
+  nextBtn.addEventListener('click', ()=>{
+    if(phase==='start') spawnAndMark();
+    else if(phase==='ready') startSort();
+    nextBtn.textContent = labelFor();
+    nextBtn.disabled = phase==='sorting';
+  });
+  resetBtn.addEventListener('click', ()=>{ seed(); nextBtn.textContent = labelFor(); nextBtn.disabled = false; });
+
+  function ease(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+
+  function updateReadouts(){
+    const dead = rows.filter(r=>r.dead).length;
+    document.getElementById('phaseLabel').textContent =
+      phase==='start' ? 'ready to spawn' :
+      phase==='ready' ? 'spawned + marked dead (before sort)' : 'sorting &amp; trimming\u2026';
+    document.getElementById('beforeCount').textContent = rows.length;
+    document.getElementById('deadCount').textContent = dead;
+    document.getElementById('afterCount').textContent = phase==='sorting' ? pendingLive : (rows.length - dead);
+  }
+
+  function drawTick(x, yTop, h, text){
+    ctx.strokeStyle = col('--text');
+    ctx.beginPath();
+    ctx.moveTo(x, yTop-4); ctx.lineTo(x, yTop+h+4);
+    ctx.stroke();
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px sans-serif';
+    const tx = Math.min(x+4, logicalW-92);
+    ctx.fillText(text, tx, yTop+h+14);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,logicalW,logicalH);
+    const marginX = 14, cellW = (logicalW - 2*marginX) / CAPACITY;
+    const topY = 24, bottomY = 102, rowH = 26;
+
+    let t = 1;
+    if(phase==='sorting'){
+      t = ANIM_MS===0 ? 1 : Math.min(1, (performance.now()-animStart)/ANIM_MS);
+    }
+    const e = ease(t);
+
+    // reserved capacity strip behind the top (pre-sort) band
+    ctx.strokeStyle = col('--border');
+    ctx.fillStyle = col('--reserved');
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    ctx.rect(marginX, topY, cellW*CAPACITY, rowH);
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px sans-serif';
+    ctx.fillText('table (dashed = reserved capacity)', marginX, topY-8);
+
+    // draw every row: pre-sort position, or tweened toward its sorted slot
+    rows.forEach((r,i)=>{
+      let x, y, alpha = 1;
+      if(phase==='sorting'){
+        x = marginX + (i + (r.tx-i)*e)*cellW;
+        y = topY + (bottomY-topY)*e;
+        alpha = r.dead ? (1-e) : 1; // dead rows fade out as they reach the tail
+      } else {
+        x = marginX + i*cellW;
+        y = topY;
+      }
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = r.dead ? col('--dead') : worldColor(r.world);
+      ctx.fillRect(x+1, y+2, cellW-2, rowH-4);
+      ctx.globalAlpha = 1;
+    });
+
+    drawTick(marginX + rows.length*cellW, topY, rowH, 'length = '+rows.length);
+
+    ctx.fillStyle = col('--text');
+    ctx.font = '12px sans-serif';
+    ctx.fillText('\u2193 sort by key: dead \u2192 tail, then trimmed', marginX, 80);
+
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px sans-serif';
+    ctx.fillText('after sort &amp; trim (preview)', marginX, bottomY-8);
+
+    if(phase!=='sorting'){
+      // live, always-on preview of what sorting+trimming would produce right now
+      const alive = rows.filter(r=>!r.dead).map(r=>r.world).sort((a,b)=>a-b);
+      alive.forEach((w,i)=>{
+        ctx.fillStyle = worldColor(w);
+        ctx.fillRect(marginX + i*cellW+1, bottomY+2, cellW-2, rowH-4);
+      });
+      drawTick(marginX + alive.length*cellW, bottomY, rowH, 'length = '+alive.length);
+    } else {
+      drawTick(marginX + pendingLive*cellW, bottomY, rowH, 'length = '+pendingLive);
+    }
+
+    ctx.fillStyle = col('--text');
+    ctx.font = '12px sans-serif';
+    ctx.fillText('same-world rows adjacent \u2192 cache-friendly', marginX, bottomY+rowH+18);
+
+    // commit the sort once the tween finishes
+    if(phase==='sorting' &amp;&amp; e>=1){
+      const newRows = new Array(pendingLive);
+      rows.forEach(r=>{ if(!r.dead) newRows[r.tx] = { world:r.world, dead:false }; });
+      rows = newRows;
+      phase = 'start';
+      nextBtn.textContent = labelFor();
+      nextBtn.disabled = false;
+    }
+    updateReadouts();
+  }
+
+  function loop(){ draw(); requestAnimationFrame(loop); }
+
+  function resize(){
+    const rect = cv.getBoundingClientRect();
+    const w = rect.width || 640;
+    const h = DESIGN_H;
+    cv.style.height = h+'px';
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(w*dpr);
+    cv.height = Math.round(h*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    logicalW = w; logicalH = h;
+  }
+  window.addEventListener('resize', resize);
+
+  // legend
+  const legend = document.getElementById('legend');
+  for(let w=0; w<WORLDS; w++){
+    const s = document.createElement('span');
+    s.innerHTML = '<span class=&quot;swatch&quot; style=&quot;background:'+worldColor(w)+'&quot;></span>world '+w;
+    legend.appendChild(s);
+  }
+  const deadSpan = document.createElement('span');
+  deadSpan.innerHTML = '<span class=&quot;swatch&quot; style=&quot;background:'+col('--dead')+'&quot;></span>dead (EnvID = \u22121)';
+  legend.appendChild(deadSpan);
+
+  seed();
+  resize();
+  nextBtn.textContent = labelFor();
+  loop();
+
+  window.__sceneReady = true;
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;lifecycle-sort&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Delete by marking, clean up by sorting"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The receipts</h2>
+  <div class="part-lede">Same game logic, four ways of running it. The head-to-head numbers isolate which design choices actually buy the speed — and one final compiler trick squeezes out the last 35%.</div>
+</header>
+<section class="scene" id="world-scaling">
+  <h3>Parallelism inside each world means you don't need millions of them</h3>
+  <div class="caption">30,000 threads to feed, but each hide-and-seek world already contains hundreds of work items — collision pairs, 5 agents' observations, individual LIDAR rays. Slide the batch size and find the crossover yourself.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="world-scaling"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Parallelism inside each world</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f4f5f8; --text:#161821; --muted:#5b5f6b;
+    --grid:#dcdfe6; --curve:#2563eb; --baseline:#dc2626; --marker:#0d9488;
+    --accent:#7c3aed; --idle:#c7cad1; --active:#059669;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14151b; --panel:#1d1f28; --text:#eef0f4; --muted:#9aa0ad;
+      --grid:#333744; --curve:#60a5fa; --baseline:#f87171; --marker:#2dd4bf;
+      --accent:#a78bfa; --idle:#3a3e4b; --active:#34d399;
+    }
+  }
+  html,body{background:var(--bg);color:var(--text);margin:0;padding:0;
+    font-family:system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;box-sizing:border-box;}
+  svg{width:100%;max-width:100%;height:auto;display:block;}
+  .intro{font-size:12px;color:var(--muted);margin:0 0 8px;line-height:1.4;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:6px;}
+  .ctrl{display:flex;flex-direction:column;gap:4px;flex:1 1 260px;min-width:200px;}
+  .ctrl label{font-size:12.5px;color:var(--muted);}
+  input[type=range]{width:100%;}
+  button{font-size:12.5px;padding:5px 12px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button:hover{filter:brightness(1.08);}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;
+    background:var(--panel);border-radius:8px;padding:8px 12px;}
+  .ro{font-size:12.5px;color:var(--muted);}
+  .ro b{color:var(--text);font-size:13.5px;}
+  math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 8px;}
+  .eqbox{margin-top:8px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <p class=&quot;intro&quot;><b>Setup:</b> a &quot;world&quot; is one instance of a multi-agent reinforcement-learning environment — e.g. hide-and-seek, where a few agent bodies push boxes and ramps around a simulated arena. Madrona runs thousands of these worlds side by side on one GPU. This scene asks: how many worlds does it take before that beats a 32-core CPU running the same simulation?</p>
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 700 430&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;wslider&quot;>Number of simultaneous worlds (batch size, log scale): <b id=&quot;wlabel&quot;>500</b></label>
+      <input id=&quot;wslider&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;15&quot; step=&quot;0.02&quot; value=&quot;8.97&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>▶ Play: sweep worlds 1 → 32,768</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;>Worlds (W): <b id=&quot;roW&quot;>500</b></div>
+    <div class=&quot;ro&quot;>GPU throughput: <b id=&quot;roT&quot;>—</b> steps/s</div>
+    <div class=&quot;ro&quot;>vs. 32-core CPU baseline: <b id=&quot;roCmp&quot;>—</b></div>
+    <div class=&quot;ro&quot;>% of GPU peak: <b id=&quot;roPeak&quot;>—</b></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+  <math display=&quot;block&quot;>
+    <mi>T</mi><mo>(</mo><mi>W</mi><mo>)</mo><mo>=</mo>
+    <msub><mi>T</mi><mtext>max</mtext></msub><mo>&amp;#183;</mo>
+    <mfrac><mi>W</mi><mrow><mi>W</mi><mo>+</mo><msub><mi>W</mi><mtext>half</mtext></msub></mrow></mfrac>
+  </math>
+  <div class=&quot;legend&quot;>T(W) — steady-state throughput at W worlds (steps/s) &amp;middot; T<sub>max</sub> — plateau throughput as W&amp;rarr;&amp;infin; (steps/s) &amp;middot; W — number of simultaneous worlds (each running one hide-and-seek episode) &amp;middot; W<sub>half</sub> — worlds needed to reach half of T<sub>max</sub> (here &amp;asymp;2,667, set by per-world work: collision pairs, agent observations, LIDAR rays)</div>
+  </div>
+</div>
+
+<script>
+const NS = &quot;http://www.w3.org/2000/svg&quot;;
+// ---- named physical constants (auditable) ----
+const T_MAX = 200000;      // steps/s, aggregate GPU plateau throughput
+const W_HALF = 2667;       // worlds at half-max throughput (set by intra-world parallel work)
+const CPU_BASELINE = 31500;// steps/s, fixed 32-thread ECS-CPU throughput
+const W_MIN = 1, W_MAX_DOMAIN = 32768;
+const Y_MIN = 10, Y_MAX = 300000;
+
+function throughput(W){ return T_MAX * W / (W + W_HALF); }
+
+// plot geometry
+const PX0 = 60, PY0 = 24, PW = 340, PH = 296;
+function xPix(w){ return PX0 + (Math.log10(w)-Math.log10(W_MIN))/(Math.log10(W_MAX_DOMAIN)-Math.log10(W_MIN))*PW; }
+function yPix(t){ return PY0 + PH - (Math.log10(t)-Math.log10(Y_MIN))/(Math.log10(Y_MAX)-Math.log10(Y_MIN))*PH; }
+
+function el(tag, attrs, txt){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(txt !== undefined) e.textContent = txt;
+  return e;
+}
+
+const svg = document.getElementById('chart');
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function buildChart(){
+  const grid = cssVar('--grid'), muted = cssVar('--muted'), text = cssVar('--text');
+  const curveCol = cssVar('--curve'), baseCol = cssVar('--baseline'), markCol = cssVar('--marker');
+  const idleCol = cssVar('--idle'), activeCol = cssVar('--active'), accent = cssVar('--accent');
+
+  // axis frame
+  svg.appendChild(el('rect',{x:PX0,y:PY0,width:PW,height:PH,fill:'none',stroke:grid}));
+
+  // x ticks (worlds)
+  [1,10,100,1000,10000,32768].forEach(w=>{
+    const x = xPix(w);
+    svg.appendChild(el('line',{x1:x,y1:PY0,x2:x,y2:PY0+PH,stroke:grid,'stroke-width':1}));
+    svg.appendChild(el('text',{x:x,y:PY0+PH+16,'font-size':10.5,fill:muted,'text-anchor':'middle'}, w>=1000? (w/1000)+'k' : String(w)));
+  });
+  svg.appendChild(el('text',{x:PX0+PW/2,y:PY0+PH+34,'font-size':11.5,fill:text,'text-anchor':'middle'},'Number of worlds (log scale)'));
+
+  // y ticks (throughput)
+  [10,100,1000,10000,100000].forEach(t=>{
+    const y = yPix(t);
+    svg.appendChild(el('line',{x1:PX0,y1:y,x2:PX0+PW,y2:y,stroke:grid,'stroke-width':1}));
+    const lbl = t>=1000 ? (t/1000)+'k' : String(t);
+    svg.appendChild(el('text',{x:PX0-8,y:y+3,'font-size':10.5,fill:muted,'text-anchor':'end'}, lbl));
+  });
+  const yTitle = el('text',{x:14,y:PY0+PH/2,'font-size':11.5,fill:text,'text-anchor':'middle',
+    transform:`rotate(-90 14 ${PY0+PH/2})`},'Throughput (steps/s, log scale)');
+  svg.appendChild(yTitle);
+
+  // throughput curve
+  let d = '';
+  const N = 120;
+  for(let i=0;i<=N;i++){
+    const lw = Math.log10(W_MIN) + (Math.log10(W_MAX_DOMAIN)-Math.log10(W_MIN))*(i/N);
+    const w = Math.pow(10, lw);
+    const t = throughput(w);
+    const x = xPix(w), y = yPix(t);
+    d += (i===0? 'M':'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+  }
+  svg.appendChild(el('path',{d, fill:'none', stroke:curveCol, 'stroke-width':2.4}));
+  svg.appendChild(el('text',{x:PX0+PW-4,y:yPix(throughput(32768))-8,'font-size':10.5,fill:curveCol,'text-anchor':'end'},'GPU throughput'));
+
+  // CPU baseline
+  const yb = yPix(CPU_BASELINE);
+  svg.appendChild(el('line',{x1:PX0,y1:yb,x2:PX0+PW,y2:yb,stroke:baseCol,'stroke-width':1.6,'stroke-dasharray':'6,4'}));
+  svg.appendChild(el('text',{x:PX0+4,y:yb-6,'font-size':10.5,fill:baseCol},'32-core CPU baseline (~31,500 steps/s)'));
+
+  // crossover marker (~500 worlds)
+  const xc = xPix(500);
+  svg.appendChild(el('line',{x1:xc,y1:PY0,x2:xc,y2:PY0+PH,stroke:accent,'stroke-width':1.2,'stroke-dasharray':'3,3'}));
+  svg.appendChild(el('text',{x:xc+4,y:PY0+12,'font-size':10.5,fill:accent},'~500 worlds:'));
+  svg.appendChild(el('text',{x:xc+4,y:PY0+24,'font-size':10.5,fill:accent},'GPU overtakes CPU'));
+
+  // 8k plateau marker
+  const x8 = xPix(8000);
+  svg.appendChild(el('line',{x1:x8,y1:PY0,x2:x8,y2:PY0+PH,stroke:muted,'stroke-width':1,'stroke-dasharray':'2,4'}));
+  svg.appendChild(el('text',{x:x8+4,y:PY0+40,'font-size':10.5,fill:muted},'8k worlds:'));
+  svg.appendChild(el('text',{x:x8+4,y:PY0+52,'font-size':10.5,fill:muted},'>75% of peak'));
+
+  // marker (dynamic)
+  const mv = el('line',{id:'mvLine',x1:0,y1:0,x2:0,y2:PY0+PH,stroke:markCol,'stroke-width':1,'stroke-dasharray':'2,3'});
+  svg.appendChild(mv);
+  const mc = el('circle',{id:'marker',r:5.5,fill:markCol,stroke:text,'stroke-width':1});
+  svg.appendChild(mc);
+
+  // ---- inset: one world's work items ----
+  const IX = 430, IY = 24, IW = 260, IH = 170;
+  svg.appendChild(el('rect',{x:IX,y:IY,width:IW,height:IH,fill:cssVar('--panel'),stroke:grid,rx:6}));
+  svg.appendChild(el('text',{x:IX+8,y:IY+14,'font-size':11.5,fill:text,'font-weight':'bold'},'Inside one hide-and-seek world'));
+  svg.appendChild(el('text',{x:IX+8,y:IY+25,'font-size':9.5,fill:muted},'(agents + boxes, one RL episode)'));
+  // collision pair dots
+  svg.appendChild(el('text',{x:IX+8,y:IY+40,'font-size':10,fill:muted},'~120 collision pairs:'));
+  for(let r=0;r<3;r++) for(let c=0;c<12;c++){
+    svg.appendChild(el('circle',{cx:IX+10+c*8, cy:IY+48+r*7, r:1.7, fill:curveCol}));
+  }
+  // agent observation squares
+  svg.appendChild(el('text',{x:IX+8,y:IY+80,'font-size':10,fill:muted},'5 agent observation jobs:'));
+  for(let i=0;i<5;i++){
+    svg.appendChild(el('rect',{x:IX+10+i*16,y:IY+86,width:11,height:11,fill:accent}));
+  }
+  // lidar rays fan (with plain-language definition of &quot;warp&quot; inline)
+  svg.appendChild(el('text',{x:IX+8,y:IY+112,'font-size':10,fill:muted},'LIDAR: 32 rays -'));
+  svg.appendChild(el('text',{x:IX+8,y:IY+124,'font-size':9,fill:muted},'1 warp (32 co-scheduled threads) runs them all'));
+  const cx0 = IX+30, cy0 = IY+156;
+  for(let i=0;i<16;i++){
+    svg.appendChild(el('line',{x1:cx0,y1:cy0,x2:cx0+ (i-7.5)*7 ,y2:cy0-24,stroke:markCol,'stroke-width':1,opacity:0.7}));
+  }
+
+  // ---- counterexample: constraint solver, one job per world ----
+  const CX = 430, CY = 210, CW = 260, CH = 130;
+  svg.appendChild(el('rect',{x:CX,y:CY,width:CW,height:CH,fill:cssVar('--panel'),stroke:grid,rx:6}));
+  svg.appendChild(el('text',{x:CX+8,y:CY+16,'font-size':11.5,fill:text,'font-weight':'bold'},'Counterexample: constraint solver'));
+  svg.appendChild(el('text',{x:CX+8,y:CY+30,'font-size':10,fill:muted},'1 invocation per world -> most SMs idle'));
+  const cols=8, rows=2, cs=20, gap=6;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const active = (r===0 &amp;&amp; c===0);
+    svg.appendChild(el('rect',{x:CX+10+c*(cs+gap), y:CY+42+r*(cs+gap), width:cs, height:cs,
+      fill: active? activeCol : idleCol, stroke:grid}));
+  }
+  svg.appendChild(el('text',{x:CX+10,y:CY+42+2*(cs+gap)+10,'font-size':9.5,fill:muted},'squares = multiprocessors (SMs); grey = idle this step'));
+}
+
+function update(logW){
+  const W = Math.max(W_MIN, Math.min(W_MAX_DOMAIN, Math.round(Math.pow(2, logW))));
+  const T = throughput(W);
+  const x = xPix(W), y = yPix(T);
+  document.getElementById('marker').setAttribute('cx', x);
+  document.getElementById('marker').setAttribute('cy', y);
+  const mv = document.getElementById('mvLine');
+  mv.setAttribute('x1', x); mv.setAttribute('x2', x); mv.setAttribute('y1', y);
+
+  document.getElementById('wlabel').textContent = W.toLocaleString();
+  document.getElementById('roW').textContent = W.toLocaleString();
+  document.getElementById('roT').textContent = Math.round(T).toLocaleString();
+  const cmp = T / CPU_BASELINE;
+  document.getElementById('roCmp').textContent = cmp>=1 ? (cmp.toFixed(2)+'x faster') : (Math.round(cmp*100)+'% of it');
+  document.getElementById('roPeak').textContent = Math.round((T/T_MAX)*100) + '%';
+}
+
+buildChart();
+
+const slider = document.getElementById('wslider');
+slider.addEventListener('input', ()=> update(parseFloat(slider.value)));
+update(parseFloat(slider.value));
+
+// autoplay sweep
+const prefersReducedMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = false, raf = null, t0 = null;
+const playBtn = document.getElementById('playBtn');
+function frame(ts){
+  if(!playing) return;
+  if(t0===null) t0 = ts;
+  const dur = 6000; // ms for full sweep
+  let prog = ((ts - t0) % dur) / dur;
+  const lw = prog * 15;
+  slider.value = lw;
+  update(lw);
+  raf = requestAnimationFrame(frame);
+}
+playBtn.addEventListener('click', ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸ Pause sweep' : '▶ Play: sweep worlds 1 → 32,768';
+  if(playing){ t0 = null; raf = requestAnimationFrame(frame); }
+  else if(raf) cancelAnimationFrame(raf);
+});
+if(prefersReducedMotion){
+  playing = false;
+  playBtn.textContent = '▶ Play: sweep worlds 1 → 32,768';
+}
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;world-scaling&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Parallelism inside each world means you don't need millions of them"
+  ></iframe>
+</section>
+
+<section class="scene" id="register-pgo">
+  <h3>The last 35%: trading registers per thread for threads in flight</h3>
+  <div class="caption">Registers come from a fixed pool per multiprocessor. More registers per thread means fewer threads resident to cover memory waits. One megakernel forces one budget on all 200 systems: the collision solver wants 255 registers; simple systems want 64 and 4× the threads. Move the budget and watch which systems win and lose.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="register-pgo"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Register occupancy vs. threads in flight</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1b1e24; --muted:#5b6270;
+  --accent-ti:#1f7a5c; --accent-cs:#a8481a; --track:#dfe3ea;
+  --meter-bg:#e4e7ee; --slot-ti:#3fae82; --slot-cs:#d9723a;
+  --good:#2e7d32; --border:#c9cdd6;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --panel:#1c1f27; --text:#e7e9ee; --muted:#9aa2b1;
+    --accent-ti:#4fd3a3; --accent-cs:#f0955a; --track:#333947;
+    --meter-bg:#2a2f3b; --slot-ti:#39a97c; --slot-cs:#c9722f;
+    --good:#66bb6a; --border:#3a4050;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:14px;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h2{font-size:15px;margin:2px 0 8px;font-weight:600;}
+svg{width:100%;height:auto;display:block;max-width:100%;}
+.slot{fill:var(--slot-ti);stroke:var(--panel);stroke-width:1;
+  transition:x .4s ease,width .4s ease;}
+.slot.cs{fill:var(--slot-cs);}
+.reduced .slot,.reduced .bar,.reduced .meterFill{transition:none!important;}
+.bar{transition:height .4s ease,y .4s ease;}
+.meterFill{transition:width .4s ease;}
+.lbl{fill:var(--text);font-size:11px;}
+.lblMuted{fill:var(--muted);font-size:10px;}
+.panelTitle{fill:var(--text);font-size:12px;font-weight:600;}
+.axisLbl{fill:var(--muted);font-size:10px;}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:10px;}
+.controls label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:230px;flex:1;}
+input[type=range]{width:100%;}
+.ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);}
+button{background:var(--panel);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;}
+button.on{background:var(--good);color:#fff;border-color:var(--good);}
+.dashboard{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;flex:1;min-width:130px;}
+.card .v{font-size:16px;font-weight:700;}
+.card .l{font-size:10.5px;color:var(--muted);}
+.eq{margin-top:12px;font-size:14px;}
+.legend{font-size:11px;color:var(--muted);margin-top:2px;}
+.predict{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h2>Registers per thread vs. threads resident on the multiprocessor</h2>
+
+<svg id=&quot;svg&quot; viewBox=&quot;0 0 640 300&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+  <!-- TimeIntegrate panel -->
+  <text class=&quot;panelTitle&quot; x=&quot;10&quot; y=&quot;14&quot;>TimeIntegrate kernel</text>
+  <rect x=&quot;10&quot; y=&quot;22&quot; width=&quot;180&quot; height=&quot;90&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot;/>
+  <g id=&quot;slotsTI&quot;></g>
+  <text class=&quot;lbl&quot; id=&quot;regsTI&quot; x=&quot;10&quot; y=&quot;128&quot;></text>
+  <text class=&quot;lbl&quot; id=&quot;residTI&quot; x=&quot;10&quot; y=&quot;141&quot;></text>
+  <rect x=&quot;10&quot; y=&quot;147&quot; width=&quot;180&quot; height=&quot;10&quot; class=&quot;meterBg&quot; fill=&quot;var(--meter-bg)&quot;/>
+  <rect id=&quot;meterFillTI&quot; class=&quot;meterFill&quot; x=&quot;10&quot; y=&quot;147&quot; width=&quot;0&quot; height=&quot;10&quot; fill=&quot;var(--accent-ti)&quot;/>
+  <text class=&quot;lblMuted&quot; x=&quot;10&quot; y=&quot;168&quot;>latency-hiding capacity</text>
+
+  <!-- ConstraintSolve panel -->
+  <text class=&quot;panelTitle&quot; x=&quot;210&quot; y=&quot;14&quot;>ConstraintSolve kernel</text>
+  <rect x=&quot;210&quot; y=&quot;22&quot; width=&quot;180&quot; height=&quot;90&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot;/>
+  <g id=&quot;slotsCS&quot;></g>
+  <text class=&quot;lbl&quot; id=&quot;regsCS&quot; x=&quot;210&quot; y=&quot;128&quot;></text>
+  <text class=&quot;lbl&quot; id=&quot;residCS&quot; x=&quot;210&quot; y=&quot;141&quot;></text>
+  <rect x=&quot;210&quot; y=&quot;147&quot; width=&quot;180&quot; height=&quot;10&quot; class=&quot;meterBg&quot; fill=&quot;var(--meter-bg)&quot;/>
+  <rect id=&quot;meterFillCS&quot; class=&quot;meterFill&quot; x=&quot;210&quot; y=&quot;147&quot; width=&quot;0&quot; height=&quot;10&quot; fill=&quot;var(--accent-cs)&quot;/>
+  <text class=&quot;lblMuted&quot; x=&quot;210&quot; y=&quot;168&quot;>latency-hiding capacity</text>
+
+  <!-- Bars -->
+  <text class=&quot;panelTitle&quot; x=&quot;440&quot; y=&quot;14&quot;>relative kernel speed</text>
+  <line x1=&quot;430&quot; y1=&quot;230&quot; x2=&quot;620&quot; y2=&quot;230&quot; stroke=&quot;var(--border)&quot;/>
+  <line x1=&quot;430&quot; y1=&quot;30&quot; x2=&quot;620&quot; y2=&quot;30&quot; stroke=&quot;var(--border)&quot; stroke-dasharray=&quot;2,3&quot;/>
+  <text class=&quot;axisLbl&quot; x=&quot;592&quot; y=&quot;27&quot;>100%</text>
+  <text class=&quot;axisLbl&quot; x=&quot;600&quot; y=&quot;243&quot;>0%</text>
+
+  <rect id=&quot;barTI&quot; class=&quot;bar&quot; x=&quot;465&quot; y=&quot;230&quot; width=&quot;46&quot; height=&quot;0&quot; fill=&quot;var(--accent-ti)&quot;/>
+  <text id=&quot;barTIval&quot; class=&quot;lbl&quot; x=&quot;488&quot; y=&quot;0&quot; text-anchor=&quot;middle&quot;></text>
+  <text class=&quot;lblMuted&quot; x=&quot;488&quot; y=&quot;248&quot; text-anchor=&quot;middle&quot;>TimeIntegrate</text>
+  <text class=&quot;lblMuted&quot; x=&quot;488&quot; y=&quot;260&quot; text-anchor=&quot;middle&quot;>best at 64 regs</text>
+
+  <rect id=&quot;barCS&quot; class=&quot;bar&quot; x=&quot;545&quot; y=&quot;230&quot; width=&quot;46&quot; height=&quot;0&quot; fill=&quot;var(--accent-cs)&quot;/>
+  <text id=&quot;barCSval&quot; class=&quot;lbl&quot; x=&quot;568&quot; y=&quot;0&quot; text-anchor=&quot;middle&quot;></text>
+  <text class=&quot;lblMuted&quot; x=&quot;568&quot; y=&quot;248&quot; text-anchor=&quot;middle&quot;>ConstraintSolve</text>
+  <text class=&quot;lblMuted&quot; x=&quot;568&quot; y=&quot;260&quot; text-anchor=&quot;middle&quot;>best at 255 regs</text>
+</svg>
+
+<div class=&quot;predict&quot;>Predict: can one register budget make both bars tall at once? Slide it and check — then flip the split toggle.</div>
+
+<div class=&quot;controls&quot;>
+  <label>Registers per thread (r<tspan>thread</tspan>) — one shared budget for both kernels
+    <input type=&quot;range&quot; id=&quot;regsSlider&quot; min=&quot;0&quot; max=&quot;2&quot; step=&quot;1&quot; value=&quot;0&quot;>
+    <span class=&quot;ticks&quot;><span>64</span><span>128</span><span>255</span></span>
+  </label>
+  <button id=&quot;splitBtn&quot;>Apply profile-guided split (5 kernels)</button>
+</div>
+
+<div class=&quot;dashboard&quot;>
+  <div class=&quot;card&quot;><div class=&quot;v&quot; id=&quot;throughput&quot;>–</div><div class=&quot;l&quot;>throughput (steps/s)</div></div>
+  <div class=&quot;card&quot;><div class=&quot;v&quot; id=&quot;computeUtil&quot;>–</div><div class=&quot;l&quot;>compute utilization (%)</div></div>
+  <div class=&quot;card&quot;><div class=&quot;v&quot; id=&quot;bwUtil&quot;>–</div><div class=&quot;l&quot;>memory bandwidth utilization (%)</div></div>
+  <div class=&quot;card&quot;><div class=&quot;v&quot; id=&quot;residCombo&quot;>–</div><div class=&quot;l&quot;>resident threads (TimeIntegrate · ConstraintSolve)</div></div>
+</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+  <mi>N</mi><mo>=</mo>
+  <mfrac><msub><mi>R</mi><mtext>pool</mtext></msub><msub><mi>r</mi><mtext>thread</mtext></msub></mfrac>
+</math>
+<div class=&quot;legend&quot;>N — resident threads on the multiprocessor · R<sub>pool</sub> — total registers per multiprocessor, fixed at 65536 · r<sub>thread</sub> — registers allocated per thread (64–255, set by the slider)</div>
+</div>
+
+</div>
+
+<script>
+const svgNS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('svg');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reducedMotion) svg.classList.add('reduced');
+
+// ---- physical constants (auditable) ----
+const REG_POOL = 65536;      // registers per multiprocessor (fixed pool, e.g. one Ampere SM)
+const MAX_THREADS_SM = 2048; // hardware cap on resident threads per multiprocessor
+const OCC_TARGET = 0.5;      // occupancy fraction that fully hides memory latency (rule of thumb)
+const SPILL_COEFF = 5;       // strength of the register-spill slowdown when regs < ideal
+const W_TI = 0.6, W_CS = 0.4; // share of a step's compute time spent in each kernel
+
+const REG_OPTIONS = [64, 128, 255];
+
+function residentThreads(r){ return Math.min(Math.floor(REG_POOL / r), MAX_THREADS_SM); }
+function occupancy(r){ return residentThreads(r) / MAX_THREADS_SM; }
+function latencyHiding(r){ return Math.min(1, occupancy(r) / OCC_TARGET); }
+function spillFactor(r, rIdeal){
+  if (r >= rIdeal) return 1;
+  const deficit = (rIdeal - r) / rIdeal;
+  return 1 / (1 + SPILL_COEFF * deficit);
+}
+function speedTI(r){ return latencyHiding(r); } // simple kernel: only occupancy matters
+function speedCSraw(r){ return spillFactor(r, 255) * (0.5 + 0.5 * latencyHiding(r)); }
+const csPeak = speedCSraw(255);
+function speedCS(r){ return speedCSraw(r) / csPeak; }
+
+function aggregate(r){ return W_TI * speedTI(r) + W_CS * speedCS(r); }
+const singleMax = Math.max(...REG_OPTIONS.map(aggregate));      // best a single shared budget can do
+const splitAgg = W_TI * speedTI(64) + W_CS * speedCS(255);      // each kernel at its own optimum
+const THROUGHPUT_SCALE = 1.4e6 / singleMax;                    // calibrates best single budget to 1.4M steps/s
+
+function stepsPerSec(r){ return r * THROUGHPUT_SCALE; }
+function computeUtil(r){ return Math.max(3, 22 + (r - singleMax) / (splitAgg - singleMax) * (33 - 22)); }
+function bandwidthUtil(r){ return Math.max(5, 46 + (r - singleMax) / (splitAgg - singleMax) * (69 - 46)); }
+
+// ---- DOM refs ----
+const slider = document.getElementById('regsSlider');
+const splitBtn = document.getElementById('splitBtn');
+const el = id => document.getElementById(id);
+
+function makeSlots(gId, regs, panelX, panelW, panelH, cls){
+  const g = el(gId);
+  while (g.firstChild) g.removeChild(g.firstChild);
+  const resident = residentThreads(regs);
+  const warps = Math.max(1, Math.round(resident / 32));
+  const gap = 2;
+  const sliceW = (panelW - gap * (warps - 1)) / warps;
+  for (let i = 0; i < warps; i++){
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', panelX + i * (sliceW + gap));
+    rect.setAttribute('y', 22);
+    rect.setAttribute('width', Math.max(1, sliceW));
+    rect.setAttribute('height', panelH);
+    rect.setAttribute('class', 'slot' + (cls ? ' ' + cls : ''));
+    g.appendChild(rect);
+  }
+  return { resident, warps };
+}
+
+function render(){
+  const splitOn = splitBtn.classList.contains('on');
+  slider.disabled = splitOn;
+  const idx = +slider.value;
+  const sharedRegs = REG_OPTIONS[idx];
+  el('regsSlider').nextElementSibling; // no-op keep
+
+  const regsTI = splitOn ? 64 : sharedRegs;
+  const regsCS = splitOn ? 255 : sharedRegs;
+
+  const rTI = makeSlots('slotsTI', regsTI, 10, 180, 90, null);
+  const rCS = makeSlots('slotsCS', regsCS, 210, 180, 90, 'cs');
+
+  el('regsTI').textContent = 'registers/thread: ' + regsTI;
+  el('residTI').textContent = 'resident threads: ' + rTI.resident + ' (' + rTI.warps + ' warps)';
+  el('regsCS').textContent = 'registers/thread: ' + regsCS;
+  el('residCS').textContent = 'resident threads: ' + rCS.resident + ' (' + rCS.warps + ' warps)';
+
+  const lhTI = latencyHiding(regsTI), lhCS = latencyHiding(regsCS);
+  el('meterFillTI').setAttribute('width', 180 * lhTI);
+  el('meterFillCS').setAttribute('width', 180 * lhCS);
+
+  const sTI = speedTI(regsTI), sCS = speedCS(regsCS);
+  const barTI = el('barTI'), barCS = el('barCS');
+  const hTI = 200 * sTI, hCS = 200 * sCS;
+  barTI.setAttribute('height', hTI); barTI.setAttribute('y', 230 - hTI);
+  barCS.setAttribute('height', hCS); barCS.setAttribute('y', 230 - hCS);
+  el('barTIval').setAttribute('y', 230 - hTI - 6);
+  el('barCSval').setAttribute('y', 230 - hCS - 6);
+  el('barTIval').textContent = Math.round(sTI * 100) + '%';
+  el('barCSval').textContent = Math.round(sCS * 100) + '%';
+
+  const r = splitOn ? splitAgg : aggregate(sharedRegs);
+  el('throughput').textContent = (stepsPerSec(r) / 1e6).toFixed(1) + 'M';
+  el('computeUtil').textContent = Math.round(computeUtil(r));
+  el('bwUtil').textContent = Math.round(bandwidthUtil(r));
+  el('residCombo').textContent = rTI.resident + ' · ' + rCS.resident;
+
+  splitBtn.textContent = splitOn
+    ? 'Split ON — each kernel uses its own register budget'
+    : 'Apply profile-guided split (5 kernels)';
+}
+
+slider.addEventListener('input', render);
+splitBtn.addEventListener('click', () => {
+  splitBtn.classList.toggle('on');
+  render();
+});
+
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;register-pgo&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The last 35%: trading registers per thread for threads in flight"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>What this unlocks</h2>
+  <div class="part-lede">A 100× faster simulator doesn't just save money — it moves a supercomputer-scale experiment onto a desk, without asking the developer to write a single line of GPU code.</div>
+</header>
+<section class="scene" id="desk-not-datacenter">
+  <h3>115 billion steps on the GPU under your desk — in ordinary sequential code</h3>
+  <div class="caption">The old choice was flexible engines that step one world at a time, or hand-tuned GPU simulators frozen to one task. Flip the toggle: same experiment, 40 days of CPU time versus 1.5 days on a single RTX 4090.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="desk-not-datacenter"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Desk, not datacenter</title>
+<style>
+:root{
+  --bg:#f6f5f1; --panel:#ffffff; --ink:#1b1d1f; --muted:#6a6f76;
+  --grid:#d8d6ce; --cpu:#c2603f; --gpu:#2f7d63; --track:#e7e5dd;
+  --code-bg:#141618; --code-ink:#d7dadd; --code-comment:#7fae8c; --border:#cfccc2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a; --panel:#1d2024; --ink:#e8e9ea; --muted:#9a9fa6;
+    --grid:#33373c; --cpu:#e08a63; --gpu:#5fbf9c; --track:#2a2d31;
+    --code-bg:#0d0f11; --code-ink:#dfe3e6; --code-comment:#8fd0a4; --border:#3a3e44;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.4 -apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h2{font-size:15px;margin:2px 0 8px;}
+.code-panel{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:10px 12px;font:12px/1.55 &quot;SF Mono&quot;,Menlo,Consolas,monospace;overflow-x:auto;}
+.code-panel .c{color:var(--code-comment);}
+.escape-note{font-size:11.5px;color:var(--muted);margin:6px 2px 0;}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0 6px;}
+.controls label{font-size:12.5px;}
+input[type=range]{width:200px;vertical-align:middle;}
+button{font:12.5px sans-serif;padding:5px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--ink);cursor:pointer;}
+button:active{transform:translateY(1px);}
+canvas{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;margin:8px 2px 4px;font-size:12.5px;}
+.readouts b{color:var(--ink);}
+.eqbox{margin:10px 0 2px;}
+.legend{font-size:11px;color:var(--muted);margin:0 0 8px;}
+.env-strip{margin-top:10px;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;}
+.env-strip h3{font-size:11.5px;margin:0 0 6px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.02em;}
+.env-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.env-item{flex:1 1 140px;background:var(--track);border-radius:6px;padding:6px 8px;font-size:12px;}
+.env-item b{display:block;font-size:13px;}
+.env-item .def{display:block;color:var(--muted);font-size:10.5px;margin-top:1px;}
+math{font-size:14px;}
+@media (max-width:420px){ input[type=range]{width:150px;} }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>The code never changes — only the wall clock does</h2>
+
+  <div class=&quot;code-panel&quot;><span class=&quot;c&quot;>// TimeIntegrate — one ordinary C++ system, per entity</span>
+void TimeIntegrate(Position&amp;amp; p, Velocity&amp;amp; v,
+                    const Mass&amp;amp; m, float dt) {
+  v.linear += (Force(m) / m.value) * dt;  <span class=&quot;c&quot;>// no threads</span>
+  p.value  += v.linear * dt;              <span class=&quot;c&quot;>// no GPU code</span>
+}                                          <span class=&quot;c&quot;>// no manual memory layout</span></div>
+  <div class=&quot;escape-note&quot;>Escapes both prior camps: flexible engines (Unity/Unreal — scriptable, one world stepped at a time) and fast-but-frozen batch simulators (hand-tuned to a single task). This same code panel is identical no matter which hardware is selected below — only the calendar changes.</div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;hw&quot;>Hardware for the full run — flip to switch which calendar is highlighted:
+      <input id=&quot;hw&quot; type=&quot;range&quot; min=&quot;0&quot; max=&quot;1&quot; step=&quot;1&quot; value=&quot;0&quot;>
+      <span id=&quot;hwLabel&quot;><b></b></span>
+    </label>
+    <button id=&quot;playBtn&quot; type=&quot;button&quot;>Pause</button>
+  </div>
+
+  <canvas id=&quot;cal&quot; width=&quot;640&quot; height=&quot;248&quot;></canvas>
+
+  <div class=&quot;readouts&quot;>
+    <span>Elapsed (selected hardware): <b id=&quot;dEl&quot;>0</b> days</span>
+    <span>Progress: <b id=&quot;pEl&quot;>0</b>%</span>
+    <span>Target for this run: <b id=&quot;tEl&quot;>—</b></span>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>speedup</mi><mo>=</mo>
+      <mfrac><msub><mi>t</mi><mtext>CPU</mtext></msub><msub><mi>t</mi><mtext>GPU</mtext></msub></mfrac>
+      <mo>=</mo><mn id=&quot;spval&quot;>26.7</mn>
+    </math>
+  </div>
+  <div class=&quot;legend&quot;>t<sub>CPU</sub> — wall-clock days for a 32-thread CPU to reach the first learning milestone · t<sub>GPU</sub> — wall-clock days for one RTX 4090 to finish the full 115-billion-step run · speedup — ratio t<sub>CPU</sub>/t<sub>GPU</sub> (dimensionless).</div>
+
+  <div class=&quot;env-strip&quot;>
+    <h3>Same authoring model, different tasks — measured on one RTX 4090</h3>
+    <div class=&quot;env-grid&quot;>
+      <div class=&quot;env-item&quot;><b>1.9M steps/s</b>hide-and-seek<span class=&quot;def&quot;>(agents build forts &amp;amp; hide from seekers)</span></div>
+      <div class=&quot;env-item&quot;><b>40M steps/s</b>Overcooked<span class=&quot;def&quot;>(two agents cook a meal together)</span></div>
+      <div class=&quot;env-item&quot;><b>21M steps/s</b>Hanabi<span class=&quot;def&quot;>(cooperative card game, hidden info)</span></div>
+      <div class=&quot;env-item&quot;><b>3.4B steps/s</b>Cartpole<span class=&quot;def&quot;>(classic control: balance a pole)</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOTAL_STEPS = 115e9;   // full hide-and-seek training run, steps
+const CPU_DAYS = 40;         // wall-clock days: 32-thread CPU to first milestone
+const GPU_DAYS = 1.5;        // wall-clock days: single RTX 4090, full run
+document.getElementById('spval').textContent = (CPU_DAYS/GPU_DAYS).toFixed(1);
+
+const cv = document.getElementById('cal');
+const ctx = cv.getContext('2d');
+const hwInput = document.getElementById('hw');
+const hwLabelB = document.querySelector('#hwLabel b');
+const playBtn = document.getElementById('playBtn');
+const dEl = document.getElementById('dEl');
+const pEl = document.getElementById('pEl');
+const tEl = document.getElementById('tEl');
+
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = !reduceMotion;
+playBtn.textContent = playing ? 'Pause' : 'Play';
+
+let startTime = performance.now();
+let frozenFrac = 0; // used while paused
+const ANIM_MS = 5200; // wall-clock ms per loop = one normalized traversal (0 -> 100% progress)
+
+function isGPU(){ return hwInput.value === '1'; }
+function selectedDays(){ return isGPU() ? GPU_DAYS : CPU_DAYS; }
+
+function updateLabel(){
+  hwLabelB.textContent = isGPU() ? 'RTX 4090 (GPU) — selected' : '32-thread CPU — selected';
+}
+hwInput.addEventListener('input', updateLabel);
+updateLabel();
+
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? 'Pause' : 'Play';
+  if (playing) startTime = performance.now() - frozenFrac * ANIM_MS;
+});
+
+// shared log scale: 0.1 day .. 100 days, so both 1.5d and 40d sit clearly apart
+const MIN_D = 0.1, MAX_D = 100;
+function xPos(day, bx, bw){
+  const d = Math.max(day, MIN_D);
+  return bx + bw * (Math.log10(d/MIN_D) / Math.log10(MAX_D/MIN_D));
+}
+
+function draw(now){
+  let frac;
+  if (playing){
+    frac = ((now - startTime) % ANIM_MS) / ANIM_MS;
+    frozenFrac = frac;
+  } else {
+    frac = frozenFrac;
+  }
+
+  const ink = cssVar('--ink'), muted = cssVar('--muted'), grid = cssVar('--grid');
+  const track = cssVar('--track'), cpuColor = cssVar('--cpu'), gpuColor = cssVar('--gpu');
+  const gpuSel = isGPU();
+
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  ctx.fillStyle = ink;
+  ctx.font = '13px sans-serif';
+  ctx.fillText('Wall-clock calendars for the SAME 115-billion-step experiment', 14, 20);
+
+  const bx = 20, bw = W - 40;
+
+  // ---- CPU row ----
+  const cpuBarY = 52, barH = 26;
+  ctx.font = (gpuSel ? '12px' : 'bold 12px') + ' sans-serif';
+  ctx.fillStyle = ink;
+  ctx.fillText('32-thread CPU \u2014 ' + CPU_DAYS + ' days to first learning milestone', bx, cpuBarY - 8);
+
+  ctx.fillStyle = track;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(bx, cpuBarY, bw, barH, 6) : ctx.rect(bx, cpuBarY, bw, barH);
+  ctx.fill();
+  ctx.lineWidth = gpuSel ? 1 : 2.5;
+  ctx.strokeStyle = gpuSel ? grid : cpuColor;
+  ctx.stroke();
+
+  const cpuElapsed = frac * CPU_DAYS;
+  const cpuFillEnd = xPos(cpuElapsed, bx, bw);
+  ctx.fillStyle = cpuColor;
+  ctx.beginPath();
+  const cpuFillW = Math.max(cpuFillEnd - bx, 2);
+  ctx.roundRect ? ctx.roundRect(bx, cpuBarY, cpuFillW, barH, 6) : ctx.rect(bx, cpuBarY, cpuFillW, barH);
+  ctx.fill();
+
+  // ---- GPU row ----
+  const gpuBarY = 132;
+  ctx.font = (gpuSel ? 'bold 12px' : '12px') + ' sans-serif';
+  ctx.fillStyle = ink;
+  ctx.fillText('RTX 4090 (GPU) \u2014 ' + GPU_DAYS.toFixed(1) + ' days for the full 115B-step run', bx, gpuBarY - 8);
+
+  ctx.fillStyle = track;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(bx, gpuBarY, bw, barH, 6) : ctx.rect(bx, gpuBarY, bw, barH);
+  ctx.fill();
+  ctx.lineWidth = gpuSel ? 2.5 : 1;
+  ctx.strokeStyle = gpuSel ? gpuColor : grid;
+  ctx.stroke();
+
+  const gpuElapsed = frac * GPU_DAYS;
+  const gpuFillEnd = xPos(gpuElapsed, bx, bw);
+  ctx.fillStyle = gpuColor;
+  ctx.beginPath();
+  const gpuFillW = Math.max(gpuFillEnd - bx, 2);
+  ctx.roundRect ? ctx.roundRect(bx, gpuBarY, gpuFillW, barH, 6) : ctx.rect(bx, gpuBarY, gpuFillW, barH);
+  ctx.fill();
+
+  // ---- shared log-scale axis with highlighted target ticks ----
+  const axisY = 176;
+  ctx.strokeStyle = grid;
+  ctx.fillStyle = muted;
+  ctx.font = '10px sans-serif';
+  [0.1, 1, 10, 100].forEach(d => {
+    const x = xPos(d, bx, bw);
+    ctx.beginPath();
+    ctx.moveTo(x, axisY); ctx.lineTo(x, axisY + 6);
+    ctx.stroke();
+    ctx.textAlign = (d === 0.1 ? 'left' : d === 100 ? 'right' : 'center');
+    ctx.fillText((d < 1 ? d.toFixed(1) : d) + 'd', x, axisY + 18);
+  });
+
+  // highlighted target markers spanning both bars
+  function guide(day, color, label, above){
+    const x = xPos(day, bx, bw);
+    ctx.setLineDash([3,3]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, cpuBarY); ctx.lineTo(x, gpuBarY + barH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 10.5px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, above);
+  }
+  guide(CPU_DAYS, cpuColor, CPU_DAYS + 'd', 42);
+  guide(GPU_DAYS, gpuColor, GPU_DAYS.toFixed(1) + 'd', 200);
+  ctx.textAlign = 'left';
+
+  ctx.fillStyle = muted;
+  ctx.font = '10.5px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('days elapsed (log scale)', bx + bw/2, axisY + 32);
+  ctx.textAlign = 'left';
+
+  // footer step-progress note — expressed in billions of steps so it
+  // reads consistently with the Progress % readout below (both derive
+  // from the same fraction of the GPU's full 115B-step schedule).
+  ctx.fillStyle = muted;
+  ctx.font = '11px sans-serif';
+  const gpuStepsBillions = (gpuElapsed / GPU_DAYS) * (TOTAL_STEPS / 1e9); // billions of steps
+  const gpuPct = (gpuElapsed / GPU_DAYS) * 100;
+  ctx.fillText(
+    'GPU steps completed so far: ' + gpuStepsBillions.toFixed(1) + 'B / 115B steps (' +
+    Math.round(gpuPct) + '% of full run) \u2014 CPU has not attempted the full schedule',
+    bx, H - 8
+  );
+
+  // readouts reflect currently selected hardware
+  const selDays = selectedDays();
+  const selElapsed = gpuSel ? gpuElapsed : cpuElapsed;
+  dEl.textContent = selElapsed.toFixed(2);
+  pEl.textContent = Math.round(frac*100);
+  tEl.textContent = (selDays < 5 ? selDays.toFixed(1) : Math.round(selDays)) + ' days (' + (gpuSel ? 'RTX 4090' : '32-thread CPU') + ')';
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;desk-not-datacenter&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="115 billion steps on the GPU under your desk — in ordinary sequential code"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>An Extensible, Data-Oriented Architecture for High-Performance, Many-World Simulation</em> — Brennan Shacklett, Luc Guy Rosenzweig, Zhiqiang Xie, Bidipta Sarkar, Andrew Szot, Erik Wijmans, Vladlen Koltun, Dhruv Batra, Kayvon Fatahalian. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

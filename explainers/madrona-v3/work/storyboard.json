@@ -1,0 +1,420 @@
+{
+  "title": "How Madrona Makes One GPU Run Thousands of Simulated Worlds at Once",
+  "hook": "Teaching a simulated agent to play hide-and-seek — well enough to build forts and use tools — took about 115 billion separate tries. At a typical CPU simulator's speed of 1.6×10^5 steps per second, generating those tries takes about 40 days of nonstop computation. Every one of those tries has to come from a simulator, a program that computes what happens next when an agent acts. If that simulator is slow, the world's fastest neural-network hardware just sits idle waiting for data. This explainer shows how one research team rebuilt the simulator itself, not the learning algorithm, to run a million simulated steps a second on a single GPU. What does a training loop actually repeat? And what does a graphics chip really do when it claims to run things 'in parallel'?",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Before we can see why a simulator becomes the bottleneck, we need two pieces of vocabulary: what an RL training loop repeats, and what a GPU can and cannot do fast. This part ends by watching the obvious 'just put it on the GPU' idea fail — which is exactly the problem the paper solves."
+    },
+    {
+      "title": "How Madrona actually works",
+      "lede": "With the ground rules in hand — training needs enormous step counts, and GPUs punish incoherent execution — we build up, piece by piece, the architecture that keeps thousands of simulated environments coherent on one chip."
+    },
+    {
+      "title": "Why it's a breakthrough vs existing tech",
+      "lede": "Every design choice in part 2 was justified by a number. Now we look at the real workload — hide-and-seek with physics and ray-traced vision — and see exactly what those choices are worth against the naive GPU approach and against strong CPU engines."
+    },
+    {
+      "title": "Why now, and what it unlocks",
+      "lede": "The payoff isn't just a faster benchmark: it changes what experiments fit inside a single afternoon, and the same engine core already runs many different simulated worlds, not just one."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "rl-agent-environment-loop",
+      "conceptId": "rl-sample-hunger",
+      "part": "The basic building blocks",
+      "title": "Reinforcement learning is a loop: act, observe, update, repeat",
+      "teaches": "An RL agent improves by repeatedly acting in an environment and updating its policy (its rule for choosing actions) from the resulting state and reward.",
+      "requires": [],
+      "caption": "An agent acts, then the environment returns a new state and a reward. Repeated forever, that loop is reinforcement learning — watch the agent's reward climb, step by step.",
+      "visualMetaphor": "A four-box cycle diagram: Agent (policy π) → Action a_t → Environment (state s_t) → new state s_{t+1} + reward r_t → back to Agent. Each box highlights in sequence as the loop advances. Beside it, a small live chart plots reward vs. step number for a toy task (e.g., a cart trying to stay balanced), accumulating a noisy upward trend as steps tick by.",
+      "animatedVariable": {
+        "name": "environment steps executed (t)",
+        "control": "play-pause",
+        "range": "t = 0 to 1,000 steps",
+        "whatChangesOnScreen": "Each of the four loop stages highlights in order per step; the reward-vs-steps chart gains one new point per step and trends upward as the toy policy improves."
+      },
+      "physicsChecks": [
+        "All four loop stages (agent, action, environment, reward/next-state) are visibly distinct and cycle in fixed order",
+        "The step counter and the chart's x-axis stay synchronized",
+        "The reward curve is noisy but net upward, never decreasing on average as steps accumulate",
+        "Pausing freezes both the loop highlight and the chart at the same step"
+      ]
+    },
+    {
+      "id": "billions-of-steps-bottleneck",
+      "conceptId": "rl-sample-hunger",
+      "part": "The basic building blocks",
+      "title": "Complex behavior needs billions of repetitions, not thousands",
+      "teaches": "Complex learned behavior (like coordinated tool use) only emerges after an enormous number of environment steps, so the rate at which steps can be generated — not the learning algorithm — limits how fast training can go.",
+      "requires": [
+        "rl-agent-environment-loop"
+      ],
+      "caption": "Simple behavior shows up after millions of steps; hide-and-seek's tool use and shelter-building only emerged after \\(1.15×10^{11}\\) steps. Drag the slider — each behavior icon unlocks only once real training data crossed that many steps.",
+      "visualMetaphor": "A horizontal log-scale axis from \\(10^3\\) to \\(1.15×10^{11}\\) steps, with milestone icons placed at their reported step counts (e.g., 'moves around' ~\\(10^7\\), 'hides behind boxes' ~\\(10^9\\), 'uses ramps as tools' ~\\(10^{10}\\), 'blocks ramps / surprising counter-strategies' ~\\(1.15×10^{11}\\)). A draggable cursor moves along the axis; icons past the cursor are grayed out, icons the cursor has reached light up.",
+      "animatedVariable": {
+        "name": "environment steps generated so far (log scale)",
+        "control": "slider",
+        "range": "\\(10^3\\) to \\(1.15×10^{11}\\) steps",
+        "whatChangesOnScreen": "As the cursor moves right, milestone icons light up one at a time in order, each only once the cursor passes its recorded step threshold."
+      },
+      "quantitativeAnchor": "115 billion (\\(1.15×10^{11}\\)) environment steps needed for hide-and-seek's full emergent tool use.",
+      "physicsChecks": [
+        "Icons unlock strictly in increasing order of their step threshold as the slider increases",
+        "The axis is logarithmic, so equal pixel distances represent equal multiplicative jumps, not equal additive ones",
+        "The slider's maximum reads \\(1.15×10^{11}\\), matching the quantitative anchor",
+        "No icon is lit at the slider's minimum position"
+      ]
+    },
+    {
+      "id": "gpu-warp-lockstep-divergence",
+      "conceptId": "gpu-simt-coherence",
+      "part": "The basic building blocks",
+      "title": "GPU threads run in fixed groups of 32 and must all take the same branch",
+      "teaches": "A GPU executes threads in groups of 32 called a warp that must all run the same instruction at once; when threads in a warp take different branches, the warp serializes and effective throughput collapses.",
+      "requires": [],
+      "caption": "A GPU doesn't run 32 threads independently — it runs them in lockstep as one warp. Drag the divergence slider and watch the warp's effective speed collapse as threads are forced to take turns instead of moving together.",
+      "visualMetaphor": "A row of 32 small squares labeled 'warp,' each colored by which code branch it is currently executing (blue = branch A, orange = branch B). A slider sets what fraction of the 32 squares are on branch B. Beside the row, a horizontal execution-time bar shows how long the warp takes: at 0% divergence the bar is short (one pass); as divergence rises the bar grows because the warp must run branch A, then branch B, one after another, with idle (grayed) lanes shown waiting during each pass.",
+      "animatedVariable": {
+        "name": "fraction of the warp's 32 threads taking the divergent branch",
+        "control": "slider",
+        "range": "0% to 100%",
+        "whatChangesOnScreen": "Squares recolor to show the split; the execution-time bar lengthens and a 'warp utilization' readout drops as more threads sit idle waiting for the other branch to finish."
+      },
+      "physicsChecks": [
+        "At 0% and 100% divergence, utilization reads 100% and the execution-time bar is at its shortest",
+        "At 50% divergence, the execution-time bar is roughly twice as long as at 0%, and utilization reads about 50%",
+        "The warp always contains exactly 32 squares regardless of slider position",
+        "Idle (grayed) lanes are only shown during the pass they are not executing"
+      ]
+    },
+    {
+      "id": "naive-mapping-diverges",
+      "conceptId": "naive-gpu-parallelization-fails",
+      "part": "The basic building blocks",
+      "title": "One environment per thread makes every warp diverge",
+      "teaches": "Assigning one whole simulated environment to one GPU thread seems natural, but different environments are doing different things at any instant (one agent collides, another doesn't), so warps diverge constantly and the GPU's parallelism goes to waste.",
+      "requires": [
+        "rl-agent-environment-loop",
+        "gpu-warp-lockstep-divergence"
+      ],
+      "caption": "It seems natural to give each simulated environment its own GPU thread. But real environments don't stay in sync — one agent bumps a wall while another glides freely. Turn up diversity and watch warp utilization crater, for the same reason as the last scene.",
+      "visualMetaphor": "32 tiny environment icons (each a small 2D scene with one agent and a wall), one per GPU thread in a warp, reusing the branch-coloring from the previous scene (blue = 'moving freely,' orange = 'handling a collision'). A slider sets how independent the environments' random starting conditions are. A 'step simulation' control advances all 32 by one tick; the warp-utilization readout (borrowed from the prior scene) updates each tick.",
+      "animatedVariable": {
+        "name": "diversity of environment initial conditions (random seed variety)",
+        "control": "slider",
+        "range": "0 (all environments synced) to 1 (fully independent, realistic)",
+        "whatChangesOnScreen": "As diversity rises, fewer of the 32 environment icons share the same branch color at each step, and the warp-utilization readout falls from 100% toward single digits."
+      },
+      "physicsChecks": [
+        "At diversity = 0, all 32 icons share one color and utilization reads 100%",
+        "As diversity increases, the fraction of icons sharing the majority color decreases monotonically",
+        "Utilization at diversity = 1 is far below 50%, foreshadowing the real system's measured 1.9%",
+        "The warp always shows exactly 32 icons, matching the prior scene's warp size"
+      ]
+    },
+    {
+      "id": "batch-simulation-one-engine",
+      "conceptId": "batch-simulation",
+      "part": "How Madrona actually works",
+      "title": "Running all environments inside one program beats running many separate copies",
+      "teaches": "Instead of launching N separate simulator processes that a scheduler distributes independently, one engine can step all N environments together inside a single program, giving it visibility to lay out memory and dispatch work coherently.",
+      "requires": [
+        "naive-mapping-diverges"
+      ],
+      "caption": "Don't launch N separate simulators and hope the scheduler cooperates. Instead, run all N environments inside one program that sees them all at once — watch memory go from scattered to unified.",
+      "visualMetaphor": "Two side-by-side diagrams. Left, 'N separate simulators': N independent boxes, each with its own private memory blob scattered across the screen, dashed arrows showing an OS/driver scheduling them onto cores independently. Right, 'one batched engine': a single program box containing all N environment slots inside one contiguous memory strip, with one dispatcher arrow feeding GPU threads uniformly.",
+      "animatedVariable": {
+        "name": "engine architecture (separate simulators vs. single batched engine)",
+        "control": "toggle",
+        "range": "two states: N separate processes ↔ one batched engine",
+        "whatChangesOnScreen": "Memory blocks reorganize from scattered independent boxes into one contiguous shared region; the scheduling arrows change from independent per-process dispatch to one uniform dispatch feeding all threads."
+      },
+      "physicsChecks": [
+        "The number of environment boxes (N) is identical in both modes",
+        "In separate mode, memory blobs are drawn at non-adjacent screen positions with gaps",
+        "In batched mode, all environment slots sit inside one continuous strip with no gaps",
+        "Only the layout changes on toggle — no numeric performance readout appears yet (that comes later)"
+      ]
+    },
+    {
+      "id": "ecs-entities-components-systems",
+      "conceptId": "ecs-pattern",
+      "part": "How Madrona actually works",
+      "title": "Entity-Component-System splits state into tables and logic into automatic per-row functions",
+      "teaches": "Madrona organizes each environment's state as entities (like Agent, Obstacle) holding components (like position, velocity), grouped into archetype tables, with systems as plain per-entity functions a query auto-applies to every matching row.",
+      "requires": [
+        "batch-simulation-one-engine"
+      ],
+      "caption": "Entities like Agent and Obstacle hold components — position, velocity, team. Entities with matching components collect into archetype tables. A system is one plain function that runs automatically on every matching row. Spawn entities and watch the tables and the system's sweep grow, with no new loop code written.",
+      "visualMetaphor": "Left: entity icons (Agent1, Agent2, Obstacle1) each tagged with small component icons (position, velocity, team). Middle: two column tables — an 'Agent table' (columns: position, velocity, team) and an 'Obstacle table' (columns: position, size) — entities group into the table matching their component set (their archetype). Right: a system box, e.g. 'integrate(position, velocity),' with an arrow labeled 'query' sweeping down both tables' matching columns, highlighting every row in turn.",
+      "animatedVariable": {
+        "name": "entity type spawned",
+        "control": "buttons",
+        "range": "'+Agent' / '+Obstacle', 0 to 10 entities",
+        "whatChangesOnScreen": "Pressing a button adds a new row to the matching archetype table only; the system's next sweep automatically highlights the new row too, with no code change shown."
+      },
+      "physicsChecks": [
+        "Spawning an Agent adds a row only to the Agent table, never the Obstacle table",
+        "The system's highlight sweep always covers every existing row of a matching table, old and new",
+        "Different archetypes (Agent vs Obstacle) have visibly different column sets",
+        "No explicit per-entity loop is shown to the reader — only the automatic sweep"
+      ]
+    },
+    {
+      "id": "column-store-memory-layout",
+      "conceptId": "column-store-storage",
+      "part": "How Madrona actually works",
+      "title": "Packing each field into its own array lines up memory for parallel reads",
+      "teaches": "Storing each component field as its own contiguous array (column-major / structure-of-arrays) instead of bundling each entity's fields together (row-major / array-of-structs) makes neighboring GPU threads fetch adjacent memory addresses instead of scattered ones.",
+      "requires": [
+        "ecs-entities-components-systems"
+      ],
+      "caption": "Bundling one entity's fields together scatters memory when a system reads just one field across many entities. Packing each field into its own array lines those reads up — flip the toggle and watch addresses snap from scattered to contiguous.",
+      "visualMetaphor": "A memory-address strip for 8 entities, each with fields position.x, position.y, velocity.x, velocity.y. In row-major mode, each entity's 4 fields sit together, then the next entity's 4, so 8 threads reading position.x each hit addresses 4 apart (marked with gaps and 'strided' label). In column-major mode, all 8 position.x values sit contiguously first, so the same 8 threads hit one unbroken block (marked 'coalesced').",
+      "animatedVariable": {
+        "name": "memory layout mode",
+        "control": "toggle",
+        "range": "row-major (array-of-structs) ↔ column-major (structure-of-arrays)",
+        "whatChangesOnScreen": "The addresses read by 8 parallel threads fetching the same field switch from scattered/strided (row-major) to one contiguous block (column-major); a 'coalesced?' readout flips between No and Yes."
+      },
+      "physicsChecks": [
+        "Row-major mode shows a stride of 4 addresses between consecutive same-field reads (matching 4 fields per entity)",
+        "Column-major mode shows a stride of 1 address between consecutive same-field reads",
+        "The 'coalesced?' readout reads No in row-major and Yes in column-major",
+        "Exactly 8 entities are shown and countable in both modes"
+      ]
+    },
+    {
+      "id": "single-shared-table-per-archetype",
+      "conceptId": "single-table-per-archetype",
+      "part": "How Madrona actually works",
+      "title": "One shared table across all environments beats one table per environment",
+      "teaches": "Storing every environment's entities of a given archetype in one shared table tagged by environment ID keeps neighboring GPU threads reading neighboring rows, even across environments — splitting into one table per environment scatters memory instead.",
+      "requires": [
+        "column-store-memory-layout",
+        "batch-simulation-one-engine"
+      ],
+      "caption": "Put every environment's same-type entities into one shared table, tagged by environment ID, instead of giving each environment its own. The same read becomes one contiguous sweep — toggle it and watch the jumps disappear.",
+      "visualMetaphor": "4 toy environments, each with a different number of Obstacle entities (2, 5, 3, 4). In 'per-environment tables' mode, 4 separate small tables sit at different memory locations with padding gaps; a query sweeping all Obstacles must jump across all 4 regions (drawn as arrows crossing gaps). In 'single shared table' mode, one long table holds all 18 obstacles back-to-back, each row tagged with an EnvID column; the same query is one contiguous sweep (one arrow, no jumps).",
+      "animatedVariable": {
+        "name": "table organization",
+        "control": "toggle",
+        "range": "per-environment tables ↔ single shared table (tagged by EnvID)",
+        "whatChangesOnScreen": "Reading all Obstacle entities switches from 4 scattered jumps across separate memory blocks to one contiguous sweep across a single table."
+      },
+      "quantitativeAnchor": "Toy example: 4 environments × up to 5 obstacles each = 18 entities in one contiguous table vs. 4 separately padded tables.",
+      "physicsChecks": [
+        "Per-environment mode shows exactly 4 distinct memory regions touched by the query",
+        "Shared-table mode shows exactly 1 contiguous region touched",
+        "Entity counts per environment differ (2, 5, 3, 4) and remain visible as different row-counts in both modes",
+        "The EnvID tag column is visible only in the shared-table view"
+      ]
+    },
+    {
+      "id": "lock-free-deletion-radix-sort",
+      "conceptId": "dynamic-entity-management",
+      "part": "How Madrona actually works",
+      "title": "Deleting entities needs no locks; a periodic sort reclaims the space",
+      "teaches": "Deleting an entity just sets its row's environment tag to -1 with no locking between threads; a periodic parallel radix sort then pushes all -1 rows to the end so the table can be truncated and the memory reclaimed.",
+      "requires": [
+        "single-shared-table-per-archetype"
+      ],
+      "caption": "Hide-and-seek spawns and kills entities — like collision-pair candidates — every step, and deletion just flags a row's environment ID as -1, no locking needed. A periodic parallel radix sort then pushes all flagged rows to the end so the table can be truncated; delete a few rows, then trigger the sort to see it happen.",
+      "visualMetaphor": "A shared table (from the prior scene) with 12 rows, each tagged with an EnvID. Pressing 'delete entity' instantly recolors a random row's EnvID to \\(-1\\) (red), with no pause or wait animation, and can be pressed repeatedly in a row. Pressing 'compact (radix sort)' animates the rows sorting by EnvID — red \\(-1\\) rows sink to the bottom, live rows re-group by ascending EnvID — then the table visibly truncates below the last live row, shrinking.",
+      "animatedVariable": {
+        "name": "deletions applied vs. compaction triggered",
+        "control": "buttons",
+        "range": "'delete entity' (0–12 uses), 'compact via radix sort' (on demand)",
+        "whatChangesOnScreen": "Deleted rows turn red immediately without blocking further deletions; pressing compact sorts all rows by EnvID, truncates the dead tail, and shrinks the table."
+      },
+      "physicsChecks": [
+        "Multiple 'delete entity' presses in a row never show any waiting/locking animation",
+        "Before compaction, dead (red) rows can appear anywhere in the table, interleaved with live rows",
+        "After compaction, all red rows are contiguous at the end and then removed, shrinking the table length",
+        "After compaction, remaining live rows are grouped in ascending EnvID order"
+      ]
+    },
+    {
+      "id": "megakernel-vs-many-kernels",
+      "conceptId": "megakernel-design",
+      "part": "How Madrona actually works",
+      "title": "One persistent GPU kernel beats hundreds of small kernel launches",
+      "teaches": "Launching a separate GPU kernel per system pays fixed launch overhead and a CPU checkpoint whenever a later system's thread count depends on an earlier one's output; compiling all systems into one persistent kernel lets warps pull the next task directly, with no CPU involvement.",
+      "requires": [
+        "single-shared-table-per-archetype"
+      ],
+      "caption": "Launching a separate GPU kernel — one program launched onto the GPU — for each of hide-and-seek's ≈200 systems means ≈200 doses of launch overhead and CPU synchronization every step. Compile them all into one persistent kernel instead, and warps grab the next task the instant they finish. Slide the system count up and watch the gap between the two timelines grow.",
+      "visualMetaphor": "A wall-clock timeline with two rows. Row 1, 'many small kernels': several thin blocks (actual compute per system) each separated by a wider gray block labeled 'launch overhead / CPU sync.' Row 2, 'megakernel': the same thin compute blocks packed back-to-back with no gray gaps, with small arrows showing warps immediately grabbing the next task-graph node's work.",
+      "animatedVariable": {
+        "name": "number of systems (task-graph nodes) per simulation step",
+        "control": "slider",
+        "range": "4 to 20 (the real engine runs ≈200 per hide-and-seek step)",
+        "whatChangesOnScreen": "Row 1's total timeline length grows steeply as overhead accumulates per system; row 2's length grows only with actual compute and stays nearly flat."
+      },
+      "quantitativeAnchor": "≈200 systems (task-graph nodes) execute per hide-and-seek simulation step in the real engine.",
+      "physicsChecks": [
+        "Row 1's total time grows faster than row 2's as the slider increases",
+        "At the slider's minimum, the two rows' total times are close together",
+        "At the slider's maximum, row 1 is visibly much longer than row 2",
+        "Row 2 never displays a gray 'overhead' block between compute blocks"
+      ]
+    },
+    {
+      "id": "profiled-register-splitting",
+      "conceptId": "profile-guided-register-allocation",
+      "part": "How Madrona actually works",
+      "title": "Splitting the kernel by register needs recovers lost GPU occupancy",
+      "teaches": "Every system sharing one megakernel is forced onto the same per-thread register count; profiling each system and splitting the kernel into pieces with different register budgets lets simple systems keep more warps resident (higher occupancy) instead of being starved by a complex system's needs.",
+      "requires": [
+        "megakernel-vs-many-kernels"
+      ],
+      "caption": "One shared register budget — the register allocation given to every thread — means a heavy system (narrow-phase collision, up to 255 registers per thread) starves lighter ones of occupancy, the fraction of the GPU's thread slots actually filled. Profiling and splitting into separate sub-kernels fixes it — toggle it on and watch occupancy and throughput jump.",
+      "visualMetaphor": "A curve plotting 'resident warps per SM (one of the GPU's processing cores)' against 'registers allocated per thread' (64 to 255) — a decreasing curve, since more registers per thread leaves room for fewer simultaneous warps. Two markers sit on the curve: 'narrow-phase collision (needs 255)' and 'simple system (needs 64).' In 'shared' mode, both markers are forced to the 255-register point (low occupancy for the simple system too). In 'split' mode, each marker sits at its own optimal point (the simple system jumps to high occupancy at 64 registers), and a total-throughput readout below the chart updates.",
+      "animatedVariable": {
+        "name": "profile-guided register splitting",
+        "control": "toggle",
+        "range": "off (one shared 255-register kernel) ↔ on (profiled split, 64–255 registers)",
+        "whatChangesOnScreen": "The simple system's occupancy marker jumps from the low value forced by 255 registers up to its own high-occupancy point at 64 registers; the total-throughput readout rises."
+      },
+      "quantitativeAnchor": "Splitting raises measured throughput from 1.4M to 1.9M steps/sec (35% faster), compute utilization from 22% to 33%, and memory-bandwidth utilization from 46% to 69% on one profiled hide-and-seek step.",
+      "physicsChecks": [
+        "The occupancy-vs-registers curve is monotonically decreasing across its full range",
+        "In 'off' mode, both markers sit at the same (255-register) point on the curve",
+        "In 'on' mode, the simple-system marker sits at a visibly higher occupancy than the complex-system marker",
+        "Toggling to 'on' moves the throughput readout from about 1.4M to about 1.9M steps/sec"
+      ]
+    },
+    {
+      "id": "intra-environment-parallelism-scaling",
+      "conceptId": "intra-environment-parallelism",
+      "part": "How Madrona actually works",
+      "title": "Parallelism inside one environment matters as much as parallelism across environments",
+      "teaches": "When only a few environments are running, the GPU can still be kept full if each environment itself has many parallel units (agents, collision pairs, rays); tasks with little internal parallelism need far more concurrent environments to reach peak throughput.",
+      "requires": [
+        "single-shared-table-per-archetype"
+      ],
+      "caption": "Cross-environment parallelism isn't the whole story. Cartpole needs hundreds of thousands of environments to fill the GPU. Hide-and-seek's richer per-environment work — about 5 agents and 30 obstacles — fills the GPU at just a few thousand. Slide the batch size to compare the curves.",
+      "visualMetaphor": "A chart with x-axis 'number of environments' (log scale, \\(10^3\\) to \\(10^6\\)) and y-axis '% of peak throughput.' Three labeled curves: 'Hide-and-Seek / Overcooked' (rises steeply, reaching ~75%+ by 8K environments), 'Cartpole' (rises slowly, needing ~512K environments to reach peak), and 'Hanabi' (rises then plateaus early around 32K, labeled 'memory-bandwidth-bound' rather than parallelism-bound). A vertical cursor line, moved by a slider, reads each curve's value at that batch size.",
+      "animatedVariable": {
+        "name": "batch size (number of environments)",
+        "control": "slider",
+        "range": "\\(10^3\\) to \\(10^6\\) environments",
+        "whatChangesOnScreen": "The cursor moves along the log-x axis; the readout for each curve's %-of-peak value at that batch size updates live."
+      },
+      "quantitativeAnchor": "Hide-and-seek exceeds 75% of peak throughput at 8,000 environments; Cartpole needs ≈512,000; Hanabi is bandwidth-bound already at 32,000.",
+      "physicsChecks": [
+        "At cursor = 8K, the Hide-and-Seek/Overcooked curve reads ≥75% while the Cartpole curve reads much lower",
+        "At cursor = 512K, the Cartpole curve reads close to 100%",
+        "The Hanabi curve flattens near 32K and does not keep rising as the cursor moves further right",
+        "All three curves are non-decreasing as batch size increases"
+      ]
+    },
+    {
+      "id": "naive-gpu-fails-real-numbers",
+      "conceptId": "naive-gpu-parallelization-fails",
+      "part": "Why it's a breakthrough vs existing tech",
+      "title": "Just using a GPU isn't enough — batching is what makes it fast",
+      "teaches": "On the real hide-and-seek workload, one-environment-per-thread (ECS-GPU) reaches only 1.9% of peak compute and memory-bandwidth utilization and is even slower than a strong CPU baseline, while the fully batched design reaches 33%/69% utilization and is far faster.",
+      "requires": [
+        "naive-mapping-diverges",
+        "single-shared-table-per-archetype",
+        "megakernel-vs-many-kernels"
+      ],
+      "caption": "Just moving the naive one-thread-per-environment design onto a GPU doesn't help. On real hide-and-seek it hits only 1.9% of peak compute and bandwidth — slower than a CPU baseline. The fully batched design hits 33%/69% and is 42× faster. Select each architecture and compare the bars.",
+      "visualMetaphor": "A grouped bar chart with three architecture buttons: ECS-CPU, ECS-GPU (naive one-thread-per-environment), BATCH-ECS-GPU. Selecting one highlights its three bars: 'steps/sec' (log scale), 'compute utilization %,' 'memory-bandwidth utilization %.' Numeric readouts appear above the selected bars.",
+      "animatedVariable": {
+        "name": "architecture selected",
+        "control": "buttons",
+        "range": "ECS-CPU / ECS-GPU (naive) / BATCH-ECS-GPU",
+        "whatChangesOnScreen": "Selecting an architecture highlights and labels its steps/sec, compute-utilization, and memory-bandwidth bars with their measured values."
+      },
+      "quantitativeAnchor": "ECS-GPU: 1.9% compute and 1.9% memory-bandwidth utilization, capped at ~8K environments by memory fragmentation, 3x slower than ECS-CPU and 42x slower than BATCH-ECS-GPU on hide-and-seek (Table 2). BATCH-ECS-GPU: 33% compute / 69% memory-bandwidth utilization.",
+      "physicsChecks": [
+        "BATCH-ECS-GPU's steps/sec bar is the tallest of the three",
+        "ECS-GPU's steps/sec bar is the shortest of the three, shorter than ECS-CPU's",
+        "BATCH-ECS-GPU's utilization bars read 33% (compute) and 69% (memory), far above ECS-GPU's 1.9%/1.9%",
+        "The ordering BATCH-ECS-GPU > ECS-CPU > ECS-GPU holds for steps/sec in every view"
+      ]
+    },
+    {
+      "id": "headline-throughput-comparison",
+      "conceptId": "headline-performance-numbers",
+      "part": "Why it's a breakthrough vs existing tech",
+      "title": "Madrona hits 1.9 million simulated steps per second on one GPU",
+      "teaches": "On the full hide-and-seek simulation (physics, collision, ray-traced vision, rewards), Madrona's batched engine reaches 1.9 million environment steps per second on one GPU — 11x a strong 32-thread CPU baseline and 270x the original open-source implementation.",
+      "requires": [
+        "naive-gpu-fails-real-numbers"
+      ],
+      "caption": "Put it all together on the real workload: 1.9 million environment steps per second on one GPU. Select a task and compare against a strong 32-thread CPU baseline and the original open-source simulator.",
+      "visualMetaphor": "A horizontal bar chart, log-scale x-axis 'steps/sec,' with three bars: 'Madrona (GPU, batched),' 'strong CPU baseline (32 threads),' 'original open-source implementation.' Task-selection buttons (Hide-and-Seek, Overcooked) swap the bar values and the speedup-factor readouts shown beside each bar (e.g., '11x' between Madrona and the CPU baseline for Hide-and-Seek).",
+      "animatedVariable": {
+        "name": "task selected",
+        "control": "buttons",
+        "range": "Hide-and-Seek / Overcooked",
+        "whatChangesOnScreen": "Bar heights and the speedup-factor annotations update to that task's measured numbers."
+      },
+      "quantitativeAnchor": "Hide-and-Seek at batch size 32K: Madrona 1.9×10^6 steps/sec vs. 1.6×10^5 steps/sec strong CPU baseline (11x) vs. 6.9×10^3 steps/sec original open-source MuJoCo/Python (270x). Overcooked: 33x over CPU baseline.",
+      "physicsChecks": [
+        "For Hide-and-Seek, bars are ordered Madrona > CPU baseline > open-source with roughly two orders of magnitude between Madrona and open-source",
+        "The x-axis spans at least \\(10^3\\) to \\(10^7\\) on a log scale",
+        "Switching to Overcooked changes the CPU-baseline speedup readout to about 33x",
+        "Madrona's bar value stays within about 10% of \\(1.9×10^6\\) steps/sec for Hide-and-Seek"
+      ]
+    },
+    {
+      "id": "wall-clock-training-payoff",
+      "conceptId": "headline-performance-numbers",
+      "part": "Why now, and what it unlocks",
+      "title": "Faster simulation turns 40 days of training into a day and a half",
+      "teaches": "Dividing the 115-billion-step requirement for hide-and-seek's full behavior by a simulator's steps/sec gives the wall-clock training time directly, so the simulator speedup from earlier scenes becomes research iteration speed.",
+      "requires": [
+        "billions-of-steps-bottleneck",
+        "headline-throughput-comparison"
+      ],
+      "caption": "Simulator speed converts directly into research time. At \\(1.6×10^5\\) steps/sec, the 115-billion-step run needed for hide-and-seek's full behavior takes about 40 days. At Madrona's \\(1.9×10^6\\) steps/sec, the same run takes about 1.5 days. Drag the throughput slider along the same curve.",
+      "visualMetaphor": "A chart with x-axis 'simulator throughput (steps/sec, log scale)' from \\(10^4\\) to \\(10^7\\), y-axis 'days to reach \\(1.15×10^{11}\\) steps (log scale),' plotting the curve \\(\\text{days} = \\frac{1.15×10^{11}}{\\text{steps/sec}·86400}\\). Two labeled reference points sit on the curve: 'CPU baseline' at \\(1.6×10^5\\) steps/sec and 'Madrona' at \\(1.9×10^6\\) steps/sec. A slider moves a cursor along the x-axis, snapping near the two reference points, with a live days-readout.",
+      "animatedVariable": {
+        "name": "simulator throughput (steps/sec)",
+        "control": "slider",
+        "range": "\\(1.6×10^5\\) to \\(1.9×10^6\\) steps/sec",
+        "whatChangesOnScreen": "The cursor moves along the same decreasing curve; the days-to-115-billion-steps readout updates continuously, landing on ≈40 days and ≈1.5 days at the two reference points."
+      },
+      "quantitativeAnchor": "115 billion steps ÷ 1.9×10^6 steps/sec ≈ 1.5 days on Madrona; ÷ 1.6×10^5 steps/sec ≈ 40 days on the CPU baseline.",
+      "physicsChecks": [
+        "The days-readout is strictly decreasing as the throughput slider increases",
+        "At the CPU-baseline point, the readout is within 10% of 40 days",
+        "At the Madrona point, the readout is within 10% of 1.5 days",
+        "Both reference points lie exactly on the single plotted curve, not on separate hardcoded markers"
+      ]
+    },
+    {
+      "id": "one-engine-many-worlds",
+      "conceptId": "ecs-pattern",
+      "part": "Why now, and what it unlocks",
+      "title": "One engine architecture already runs many different simulated worlds",
+      "teaches": "Because task-specific logic is just entities, components, and systems plugged into the same batched-ECS engine core, the same architecture and speedup already generalizes across many different simulated worlds, not just hide-and-seek.",
+      "requires": [
+        "ecs-entities-components-systems",
+        "intra-environment-parallelism-scaling",
+        "wall-clock-training-payoff"
+      ],
+      "caption": "The engine itself never changes — only the entities, components, and systems plugged into it do. The same batched-ECS core already runs hide-and-seek, Overcooked, Hanabi, and robotics tasks, each hitting peak throughput at a different batch size. Pick a task and watch the core stay fixed while the workload swaps in.",
+      "visualMetaphor": "A fixed central box labeled 'Madrona batched-ECS engine core' containing the same archetype-table-and-system diagram from the ECS scene, drawn in gray as unchanging. Around it, four task buttons (Hide-and-Seek, Overcooked, Hanabi, Cartpole/robotics); selecting one swaps in that task's entity/component icons into the same table slots (e.g., Hanabi: Card entities with hand/hint components) and displays that task's measured peak-throughput batch size below.",
+      "animatedVariable": {
+        "name": "task module plugged into the engine",
+        "control": "buttons",
+        "range": "Hide-and-Seek / Overcooked / Hanabi / Cartpole",
+        "whatChangesOnScreen": "The entity/component icons inside the archetype tables change to match the selected task, while the surrounding engine-core diagram stays visually identical; the peak-throughput batch-size readout updates per task."
+      },
+      "quantitativeAnchor": "Same engine core reaches peak throughput at 8K environments for Hide-and-Seek, 32K for Hanabi (bandwidth-bound), and ≈512K for Cartpole.",
+      "physicsChecks": [
+        "The gray engine-core diagram is pixel-identical across all four task selections",
+        "Only the entity/component icons inside the tables change between tasks",
+        "Each task's displayed peak-throughput batch size matches the earlier intra-environment-parallelism scene's numbers",
+        "At least 3 distinct tasks are selectable and show distinct readouts"
+      ]
+    }
+  ]
+}

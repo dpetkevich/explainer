@@ -1,0 +1,510 @@
+{
+  "title": "ParallelKittens: closing the gap between how fast GPUs compute and how fast they can talk to each other",
+  "hook": "Training and running large AI models increasingly means splitting the work across many GPUs — but the wires connecting those chips have not kept pace with how fast the chips themselves compute. In real training runs today, GPUs can sit idle, waiting on each other, for over half the wall-clock time. This explainer walks through why that gap opened up, and how a small set of reusable code patterns closes it — turning a task that used to take thousands of lines of hand-tuned code into fewer than 50 lines, while matching or beating the best existing systems. To understand it honestly, we have to begin at the beginning: what a GPU actually looks like on the inside.",
+  "parts": [
+    {
+      "title": "The GPU's building blocks",
+      "lede": "Before we can talk about splitting work across GPUs, we need the vocabulary for what's inside one — its threads, its memory tiers, its specialized circuits — and the historical trend that turned talking between GPUs into the slow part."
+    },
+    {
+      "title": "How ParallelKittens actually works",
+      "lede": "With the hardware vocabulary in hand, we can follow the paper's three empirical findings — which transfer mechanism to use, how to split the chip's processors, and how much synchronization overhead is avoidable — and see how they're packaged into one small abstraction."
+    },
+    {
+      "title": "Why it beats the status quo",
+      "lede": "Now that we know how it works, we can put it head-to-head against the libraries and hand-tuned kernels everyone currently uses, with the paper's own numbers."
+    },
+    {
+      "title": "Why now, and what's next",
+      "lede": "The hardware trend that created this problem is not slowing down — it's accelerating — and the same abstraction that works today is built to carry forward."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "gpu-thread-hierarchy",
+      "conceptId": "gpu-execution-hierarchy",
+      "part": "The GPU's building blocks",
+      "title": "A GPU splits work across roughly 130 independent processors, not one big chip",
+      "teaches": "A GPU kernel's threads are grouped into blocks pinned to streaming multiprocessors (SMs); blocks on the same SM share fast on-chip memory, blocks on different SMs cannot.",
+      "requires": [],
+      "caption": "A GPU kernel spreads its threads across about 130 independent streaming multiprocessors (SMs). Slide the block count and watch SMs fill up one by one, then double up.",
+      "visualMetaphor": "A GPU chip outline containing 132 numbered rectangular SM tiles in a grid. A slider sets the number of thread blocks launched; colored dots (threads) group into blocks that fill SM tiles one per SM until all 132 are used, then a second wave stacks a second block onto already-filled SMs. A zoomed inset on one selected SM shows its threads sharing a small 'shared memory' pool and each thread owning its own tiny register box.",
+      "animatedVariable": {
+        "name": "number of thread blocks launched",
+        "control": "slider",
+        "range": "1 to 264 blocks (0.5x to 2x the 132 SMs)",
+        "whatChangesOnScreen": "blocks fill SMs one per SM until all 132 SMs are used, then a second wave stacks a second block on top of already-occupied SMs"
+      },
+      "quantitativeAnchor": "~132 SMs per GPU (H100), 64 KB of private registers per SM",
+      "physicsChecks": [
+        "At 132 blocks, every SM shows exactly 1 block",
+        "At 264 blocks, every SM shows 2 stacked blocks",
+        "The shared-memory pool in the zoomed inset connects only threads within that one SM; no line connects two different SMs directly"
+      ]
+    },
+    {
+      "id": "memory-hierarchy-ladder",
+      "conceptId": "memory-hierarchy-tradeoff",
+      "part": "The GPU's building blocks",
+      "title": "Faster memory means less of it, and reaching another GPU is the slowest, biggest step of all",
+      "teaches": "Moving data from registers to shared memory to L2 cache to local HBM to a peer GPU's HBM trades increasing capacity for increasing latency and, past a point, falling bandwidth.",
+      "requires": [
+        "gpu-thread-hierarchy"
+      ],
+      "caption": "Every step down this ladder buys more storage at the cost of speed. Move the marker down and watch bandwidth fall as capacity grows — the last rung leaves the chip entirely.",
+      "visualMetaphor": "A 5-rung ladder diagram (Registers, SMEM, L2 cache, local HBM, peer GPU HBM over NVLink), each rung a rectangle whose width encodes capacity and color intensity encodes bandwidth. A slider selects a rung; readouts show capacity, bandwidth, and a relative latency bar.",
+      "animatedVariable": {
+        "name": "memory tier selected",
+        "control": "slider",
+        "range": "Registers → SMEM → L2 → local HBM → peer GPU HBM (5 discrete steps)",
+        "whatChangesOnScreen": "capacity readout grows (64 KB → 227 KB → 50 MB → 80 GB → reachable peer pool), bandwidth readout falls (every cycle → 33 TB/s → 12 TB/s → 3 TB/s → 450/900 GB/s), latency bar grows"
+      },
+      "quantitativeAnchor": "Registers 64 KB every cycle; SMEM 227 KB at 33 TB/s; L2 50 MB at ~12 TB/s; local HBM 80 GB at 3 TB/s; peer GPU HBM over NVLink 450 GB/s (H100) / 900 GB/s (B200)",
+      "physicsChecks": [
+        "Bandwidth readout decreases monotonically from registers to peer HBM",
+        "Capacity readout increases monotonically in the same direction",
+        "The peer-GPU rung is the widest bar and has the dimmest bandwidth color"
+      ]
+    },
+    {
+      "id": "gpu-execution-units",
+      "conceptId": "specialized-execution-units",
+      "part": "The GPU's building blocks",
+      "title": "Different jobs on a GPU run on different specialized circuits",
+      "teaches": "Tensor Cores do matrix math, CUDA Cores do general arithmetic, and two separate engines — TMA (triggered by a single thread, asynchronous) and the copy engine (triggered by the CPU, independent of any SM) — move bulk data without tying up compute threads.",
+      "requires": [
+        "gpu-thread-hierarchy"
+      ],
+      "caption": "Not every job goes through the same circuit. Pick a task and see which unit runs it, and whether it's an SM thread or the CPU host that's allowed to trigger it.",
+      "visualMetaphor": "A labeled block diagram of one SM containing a Tensor Core icon, CUDA Core icons, and a TMA icon with an arrow labeled '1 thread triggers, transfer runs async' pointing off-chip. Separate from the SM, a Copy Engine icon sits outside all SMs with an arrow from a CPU host icon. Buttons pick a task; the corresponding unit and trigger source highlight.",
+      "animatedVariable": {
+        "name": "task type selected",
+        "control": "buttons",
+        "range": "matrix multiply / elementwise add / thread-triggered bulk transfer / host-triggered bulk transfer",
+        "whatChangesOnScreen": "the matching unit (Tensor Core / CUDA Core / TMA / Copy Engine) highlights and an arrow shows whether an SM thread or the CPU issued it"
+      },
+      "physicsChecks": [
+        "Elementwise add highlights CUDA Cores, not Tensor Cores",
+        "Thread-triggered transfer highlights TMA with only 1 thread marked busy; other threads on that SM stay free",
+        "Host-triggered transfer highlights the Copy Engine, with its trigger arrow originating from the CPU icon, not from any SM"
+      ]
+    },
+    {
+      "id": "saturating-a-link",
+      "conceptId": "bandwidth-saturation-occupancy",
+      "part": "The GPU's building blocks",
+      "title": "A link only reaches full speed when enough requests are in flight at once",
+      "teaches": "Below some number of concurrent issuers, a link is limited by latency, not bandwidth; how many issuers it takes to hit peak throughput depends heavily on which unit issues the transfer.",
+      "requires": [
+        "gpu-execution-units",
+        "memory-hierarchy-ladder"
+      ],
+      "caption": "A link only hits full bandwidth once enough requests are flying at once. Slide the number of issuing SMs and watch TMA saturate NVLink far earlier than plain register instructions.",
+      "visualMetaphor": "A chart with x-axis = number of concurrent issuers (SMs), y-axis = % of peak NVLink bandwidth achieved. Two curves — TMA-issued and register-instruction-issued transfers — both rise and saturate near 100%, but TMA's curve saturates much earlier. A slider moves a vertical marker; readouts show each curve's bandwidth % at that SM count, with dashed reference lines at 15 and 76 SMs.",
+      "animatedVariable": {
+        "name": "number of SMs issuing the transfer concurrently",
+        "control": "slider",
+        "range": "1 to 132 SMs",
+        "whatChangesOnScreen": "both curves' bandwidth % readouts update; at 15 SMs TMA is already above 70% of peak while register instructions lag far behind, only crossing 70% near 76 SMs"
+      },
+      "quantitativeAnchor": "TMA reaches >70% of peak NVLink bandwidth at ~15 SMs on H100; register load/store instructions need ~76 SMs (3.2–5.1x more) for comparable utilization",
+      "physicsChecks": [
+        "At SM count = 15, TMA readout ≥70%, register readout well below 70%",
+        "At SM count = 76, register readout crosses ~70%",
+        "Both curves are non-decreasing as SM count increases"
+      ]
+    },
+    {
+      "id": "four-parallelism-flavors",
+      "conceptId": "parallelism-strategies-and-collectives",
+      "part": "The GPU's building blocks",
+      "title": "Splitting a model across GPUs comes in four types, each needing its own data exchange",
+      "teaches": "Data, tensor, sequence, and expert parallelism split a model or workload along different axes, and each requires a different collective communication pattern to reassemble a correct result.",
+      "requires": [
+        "gpu-thread-hierarchy"
+      ],
+      "caption": "Splitting a model across GPUs comes in four flavors. Pick one and watch what's split and which collective operation — a coordinated exchange across all the GPUs — fires.",
+      "visualMetaphor": "Four selectable diagrams, each with 4 GPU boxes and arrows. Data Parallelism: identical full model in each box, arrows converging into an 'all-reduce' icon. Tensor Parallelism: one weight matrix sliced into 4 strips, arrows show 'all-gather' before the matmul and 'reduce-scatter' after. Sequence Parallelism: one long token sequence split into 4 chunks, ring arrows between neighboring GPUs. Expert Parallelism: 4 experts on 4 GPUs, arrows connecting every pair (all-to-all) as tokens scatter and gather back.",
+      "animatedVariable": {
+        "name": "parallelism strategy selected",
+        "control": "buttons",
+        "range": "Data / Tensor / Sequence / Expert",
+        "whatChangesOnScreen": "the diagram redraws to show what's split (batch/weight/sequence/experts) and which collective operation fires"
+      },
+      "physicsChecks": [
+        "Data parallelism shows an identical full model copy in each of the 4 boxes",
+        "Tensor parallelism shows one matrix divided across the 4 boxes",
+        "Sequence parallelism arrows only connect neighboring GPUs; expert parallelism arrows connect all pairs"
+      ]
+    },
+    {
+      "id": "the-widening-gap",
+      "conceptId": "interconnect-bottleneck",
+      "part": "The GPU's building blocks",
+      "title": "GPUs got much faster at computing than at talking to each other",
+      "teaches": "From A100 to B200, compute and local memory bandwidth grew 5-7x while the links between GPUs grew only 2-3x, so communication now idles the compute units unless it's explicitly overlapped with useful work.",
+      "requires": [
+        "memory-hierarchy-ladder"
+      ],
+      "caption": "Step through GPU generations: compute and local memory got 5-7x faster, but the links between GPUs only got 2-3x faster. That gap is why over half of some real training runs now goes to waiting.",
+      "visualMetaphor": "A grouped bar chart with 3 bars per generation (A100, H100, B200): BF16 tensor-core throughput, HBM bandwidth, interconnect bandwidth, all normalized to A100=1x. A slider steps through generations; growth-factor readouts appear next to each bar. A fixed readout below shows '% of wall-clock time lost to unhidden communication in real LLM workloads: >50%'.",
+      "animatedVariable": {
+        "name": "GPU generation",
+        "control": "slider",
+        "range": "A100 → H100 → B200",
+        "whatChangesOnScreen": "compute and HBM bars grow quickly (up to 7.2x and 5.1x by B200) while the interconnect bar grows only slightly (up to 3x intra-node, 2x inter-node)"
+      },
+      "quantitativeAnchor": "BF16 tensor-core throughput up 7.2x, HBM bandwidth up 5.1x, intra-node NVLink up only 3x, inter-node PCIe/InfiniBand up only 2x (A100→B200); >50% of wall-clock time lost to communication in real LLM workloads",
+      "physicsChecks": [
+        "At B200, compute bar height ≈7.2x, HBM bar ≈5.1x, NVLink bar ≈3x, all relative to A100=1x",
+        "The gap between compute bar and interconnect bar visibly widens with each generation step",
+        "The >50% readout stays fixed regardless of slider position"
+      ]
+    },
+    {
+      "id": "the-overlap-equation",
+      "conceptId": "overlap-cost-model",
+      "part": "How ParallelKittens actually works",
+      "title": "Total kernel time is the max of three costs, not their sum, once truly overlapped",
+      "teaches": "Total kernel time equals launch overhead plus the max of compute, memory, and communication time (if they run truly concurrently) plus leftover non-overlapped work plus synchronization overhead.",
+      "requires": [
+        "the-widening-gap",
+        "gpu-execution-units"
+      ],
+      "caption": "Toggle from doing things one after another to doing them at once: total kernel time collapses from a sum of three costs to just their maximum, plus whatever leaks around the edges.",
+      "visualMetaphor": "A stacked timeline labeled with the terms of \\(T_{kernel}=T_{launch}+\\max(T_{comp},T_{mem},T_{comm})+T_{non-overlap}+T_{sync}\\). Three colored tracks (compute, memory, communication) are drawn as horizontal bars. A toggle switches between 'sequential' (bars end-to-end) and 'concurrent' (bars stacked in parallel), with small residual bars for \\(T_{non-overlap}\\) and \\(T_{sync}\\).",
+      "animatedVariable": {
+        "name": "overlap mode",
+        "control": "toggle",
+        "range": "sequential (not overlapped) vs. concurrent (overlapped)",
+        "whatChangesOnScreen": "in sequential mode the total-time readout equals the sum of all three tracks; in concurrent mode it drops to just their max, plus the small leftover bars"
+      },
+      "quantitativeAnchor": "\\(T_{kernel}=T_{launch}+\\max(T_{comp},T_{mem},T_{comm})+T_{non-overlap}+T_{sync}\\)",
+      "physicsChecks": [
+        "Sequential-mode total readout equals the sum of the three track lengths",
+        "Concurrent-mode total readout equals the max of the three tracks plus the two residual bars",
+        "Shrinking the residual bars to zero in concurrent mode makes total ≈ max(comp, mem, comm)"
+      ]
+    },
+    {
+      "id": "mechanism-vs-message-size",
+      "conceptId": "transfer-mechanism-tradeoff",
+      "part": "How ParallelKittens actually works",
+      "title": "The best way to move data between GPUs depends on the message size",
+      "teaches": "Copy engine, TMA, and register instructions have different bandwidth-efficiency-versus-message-size curves, so no single mechanism is best for every workload.",
+      "requires": [
+        "gpu-execution-units",
+        "saturating-a-link"
+      ],
+      "caption": "Slide the message size and watch which mechanism actually wins — the copy engine needs huge messages (≥256 MB) to hit its 82% peak, while TMA is already near peak at 2 KB.",
+      "visualMetaphor": "A log-x chart, x-axis = message size (1 KB to 1 GB), y-axis = % of theoretical peak bandwidth achieved. Three curves (copy engine, TMA, register instructions) rise and level at their peak efficiencies. Buttons highlight a mechanism; a slider on message size moves a vertical marker showing each curve's current efficiency.",
+      "animatedVariable": {
+        "name": "message size",
+        "control": "slider",
+        "range": "1 KB to 1 GB (log scale)",
+        "whatChangesOnScreen": "readouts show copy engine near 0% below ~1 MB, climbing to 82%/81% only past 256 MB; TMA near 78%/74% already by 2 KB; register instructions plateau lowest at 76%/70%"
+      },
+      "quantitativeAnchor": "Copy engine 82%/81% peak (H100/B200) but only above 256 MB messages; TMA 78%/74% peak reachable at message sizes as small as 2 KB; register instructions 76%/70% peak, worst of the three",
+      "physicsChecks": [
+        "At message size = 2 KB, TMA readout ≥70%, copy engine readout near 0%",
+        "At message size = 256 MB, copy engine readout reaches ~82%",
+        "The register-instruction plateau is the lowest of the three at every message size beyond saturation"
+      ]
+    },
+    {
+      "id": "two-ways-to-split-sms",
+      "conceptId": "intra-vs-inter-sm-scheduling",
+      "part": "How ParallelKittens actually works",
+      "title": "Compute and communication can share one SM or split across separate SMs",
+      "teaches": "Intra-SM overlap assigns some threads within every SM to communication while others compute, keeping cheap on-chip synchronization; inter-SM overlap dedicates whole SMs to communication and others purely to compute, paying a much larger cross-chip synchronization cost.",
+      "requires": [
+        "gpu-thread-hierarchy",
+        "mechanism-vs-message-size"
+      ],
+      "caption": "Communication and compute can share threads inside one SM, or live on entirely separate SMs. Toggle the split and watch the synchronization cost jump from 64 ns on-chip to 832 ns through HBM.",
+      "visualMetaphor": "Two side-by-side chip diagrams with the same 8 SM tiles. Left ('intra-SM'): every tile is split internally into a compute-colored region and a comm-colored region, with a small arrow labeled 'on-chip mbarrier sync' inside each tile. Right ('inter-SM'): whole tiles are colored solid compute or solid comm, with a long looping arrow through an 'HBM' box labeled 'cross-chip sync' connecting a comm tile to a compute tile. A toggle switches views; a readout shows the sync-latency number.",
+      "animatedVariable": {
+        "name": "scheduling strategy",
+        "control": "toggle",
+        "range": "intra-SM vs inter-SM",
+        "whatChangesOnScreen": "the tile coloring switches between mixed-per-tile and whole-tile, and the sync-latency readout switches between 64 ns (intra) and 832 ns (inter)"
+      },
+      "quantitativeAnchor": "on-chip mbarrier synchronization ≈64 ns (intra-SM) vs HBM-mediated cross-SM synchronization ≈832 ns (inter-SM), about 13x slower",
+      "physicsChecks": [
+        "Intra-SM view: every tile shows both colors present inside it",
+        "Inter-SM view: every tile is a single solid color",
+        "Sync-latency readout is ~13x larger in inter-SM mode than intra-SM mode"
+      ]
+    },
+    {
+      "id": "reduction-inside-the-switch",
+      "conceptId": "in-network-reduction",
+      "part": "How ParallelKittens actually works",
+      "title": "The GPU network fabric can add numbers together as data passes through",
+      "teaches": "NVSwitch, the fabric connecting all the GPUs, can sum data in transit (in-network reduction), cutting effective communication volume by roughly the GPU count — but only register-level instructions can trigger it, and it needs a dedicated SM to avoid stealing registers from compute.",
+      "requires": [
+        "two-ways-to-split-sms"
+      ],
+      "caption": "The switch fabric between GPUs can sum data in transit instead of just moving it. Toggle to in-network reduction and watch the traffic — and the effective volume — collapse by roughly the GPU count.",
+      "visualMetaphor": "N GPU boxes connected to a central NVSwitch hub. Toggle A ('pairwise atomic writes'): N separate arrows carrying full data packets into every other GPU (N² lines), each capped at a '450 GB/s port' bottleneck icon. Toggle B ('in-network reduction'): N arrows into the switch, one summation icon inside it, then one broadcast arrow out. A readout shows 'effective communication volume' for each mode.",
+      "animatedVariable": {
+        "name": "reduction mode",
+        "control": "toggle",
+        "range": "pairwise atomic writes vs in-network reduction",
+        "whatChangesOnScreen": "the number of arrows drawn and the effective-volume readout drop from O(N²) full-size messages to O(N) with a single fold-in at the switch"
+      },
+      "quantitativeAnchor": "effective communication volume drops by roughly a factor of N (GPU count) when reduction happens once in the fabric instead of via N-way pairwise writes each bottlenecked at 450 GB/s per port",
+      "physicsChecks": [
+        "Pairwise mode draws visibly more total arrows than in-network mode for the same N",
+        "Effective-volume readout in in-network mode is about 1/N of the pairwise-mode readout",
+        "The summation icon only appears inside the switch box in in-network mode"
+      ]
+    },
+    {
+      "id": "which-scheduling-wins-per-workload",
+      "conceptId": "intra-vs-inter-sm-scheduling",
+      "part": "How ParallelKittens actually works",
+      "title": "Which scheduling strategy wins depends entirely on the workload",
+      "teaches": "Intra-SM overlap wins for GEMM+reduce-scatter because the data pattern matches the GEMM's output tiling, while inter-SM overlap wins by over 3x for GEMM+all-reduce because only inter-SM can exploit in-network reduction — so hard-wiring one strategy is wrong.",
+      "requires": [
+        "two-ways-to-split-sms",
+        "reduction-inside-the-switch"
+      ],
+      "caption": "Pick the workload: for reduce-scatter, sharing an SM wins by 1.2x; for all-reduce, dedicating whole SMs wins by 3.6x. There's no single right answer.",
+      "visualMetaphor": "A bar chart with buttons to select workload (GEMM+reduce-scatter or GEMM+all-reduce). For the selected workload, two bars show achieved TFLOP/s for intra-SM vs inter-SM scheduling, with a checkmark on the taller bar.",
+      "animatedVariable": {
+        "name": "workload selected",
+        "control": "buttons",
+        "range": "GEMM+reduce-scatter / GEMM+all-reduce",
+        "whatChangesOnScreen": "the two bars swap which is taller: reduce-scatter shows intra-SM (743.7 TFLOP/s) beating inter-SM (618.1 TFLOP/s); all-reduce shows inter-SM (623.9 TFLOP/s) beating intra-SM (172.3 TFLOP/s)"
+      },
+      "quantitativeAnchor": "GEMM+reduce-scatter: intra-SM 743.7 vs inter-SM 618.1 TFLOP/s (1.2x); GEMM+all-reduce: inter-SM 623.9 vs intra-SM 172.3 TFLOP/s (3.62x)",
+      "physicsChecks": [
+        "Reduce-scatter view: intra-SM bar is taller than inter-SM bar",
+        "All-reduce view: inter-SM bar is taller than intra-SM bar by roughly 3.6x",
+        "Switching workload flips which bar is winner-marked"
+      ]
+    },
+    {
+      "id": "tuning-the-sm-split",
+      "conceptId": "sm-partitioning-knob",
+      "part": "How ParallelKittens actually works",
+      "title": "The best split between compute and communication SMs shifts with problem size",
+      "teaches": "In inter-SM overlap, the optimal number of communication-dedicated SMs versus compute SMs is not fixed — small matrices need proportionally more communication SMs, large matrices need fewer.",
+      "requires": [
+        "two-ways-to-split-sms"
+      ],
+      "caption": "Slide the matrix size and watch the best number of dedicated communication SMs shift — small matrices want more of them, huge ones want fewer.",
+      "visualMetaphor": "A chart with x-axis = matrix size N (log scale, 8192 to 65536), y-axis = throughput; several curves, each for a fixed number of communication SMs (e.g. 8, 16, 32, 64). A slider on N sweeps a vertical marker; the currently best-performing curve is highlighted with a readout of its comm-SM count.",
+      "animatedVariable": {
+        "name": "matrix size N",
+        "control": "slider",
+        "range": "N = 8192 to 65536",
+        "whatChangesOnScreen": "the highlighted best-performing curve shifts from a higher comm-SM-count curve at small N to a lower comm-SM-count curve at large N"
+      },
+      "quantitativeAnchor": "optimal number of communication SMs for an all-gather GEMM visibly shifts across matrix sizes from N=8192 to N=65536",
+      "physicsChecks": [
+        "At N=8192, the highlighted best curve is a higher comm-SM-count curve",
+        "At N=65536, the highlighted best curve is a lower comm-SM-count curve",
+        "No single curve is best across the entire N range"
+      ]
+    },
+    {
+      "id": "burying-communication-in-compute",
+      "conceptId": "comm-hiding-threshold",
+      "part": "How ParallelKittens actually works",
+      "title": "Past a threshold reduction depth, communication is completely hidden behind compute",
+      "teaches": "In GEMM+reduce-scatter fused via intra-SM overlap, compute time per tile grows linearly with the reduction dimension \\(K\\) while communication time per tile stays fixed, so past a computable threshold \\(K\\), communication is fully hidden.",
+      "requires": [
+        "the-overlap-equation",
+        "mechanism-vs-message-size"
+      ],
+      "caption": "Compute time per tile grows with \\(K\\); communication time per tile doesn't. Slide \\(K\\) past \\(K≈2197\\) and watch unhidden communication collapse from 68% to under 1%.",
+      "visualMetaphor": "A chart with x-axis = K (log scale, 256 to 8192); a rising line for compute time per tile \\(2mnK/R\\) and a flat line for fixed communication time per tile \\(smn/B\\). A dashed vertical threshold line marks where they cross (K≈2197). Below, a readout shows '% of communication left un-hidden' collapsing as K increases past the threshold.",
+      "animatedVariable": {
+        "name": "reduction dimension K",
+        "control": "slider",
+        "range": "K = 256 to 8192",
+        "whatChangesOnScreen": "the rising compute-time line grows with K; once it crosses the flat communication line (~K=2197), the non-overlapped communication % readout collapses from 68% (K=512) toward <1% (K=4096)"
+      },
+      "quantitativeAnchor": "\\(K \\geq \\frac{sR}{2B} \\approx 2197\\) for BF16 on H100 (R=989 TFLOP/s, B=450 GB/s); measured non-overlapped fraction drops from 68% at K=512 to <1% at K=4096",
+      "physicsChecks": [
+        "At K=512, readout ≈68% non-overlapped",
+        "At K=4096, readout <1% non-overlapped",
+        "The compute-time line crosses the flat communication line at K≈2197, matching the threshold marker"
+      ]
+    },
+    {
+      "id": "the-caching-trap",
+      "conceptId": "far-sided-l2-cache",
+      "part": "How ParallelKittens actually works",
+      "title": "Reading a peer GPU's memory caches the data on the peer, not on you",
+      "teaches": "An L2 cache line fetched over NVLink from a peer GPU's HBM is cached on the source device, so many thread blocks each re-fetching the same remote block re-saturate the link instead of hitting a local cache; a single dedicated bulk prefetch into local HBM fixes this.",
+      "requires": [
+        "memory-hierarchy-ladder",
+        "two-ways-to-split-sms"
+      ],
+      "caption": "Reading a peer GPU's memory caches the data on the peer, not on you. Toggle from many redundant remote reads to one dedicated bulk prefetch and watch NVLink traffic drop to a single crossing.",
+      "visualMetaphor": "Two GPU boxes (Requester, Peer) connected by NVLink. Toggle A ('naive per-block fetch'): many thread-block icons on the Requester each independently send an arrow across NVLink to the Peer's HBM for the identical data block (red, redundant). Toggle B ('bulk prefetch'): one dedicated comm-SM sends a single arrow across NVLink into the Requester's own local HBM, then many thread-block icons read locally (green, cheap).",
+      "animatedVariable": {
+        "name": "fetch strategy",
+        "control": "toggle",
+        "range": "naive per-block fetch vs. dedicated bulk prefetch",
+        "whatChangesOnScreen": "the number of NVLink-crossing arrows drops from one-per-thread-block to exactly one, with remaining reads redrawn as cheap local-HBM reads"
+      },
+      "physicsChecks": [
+        "Naive mode: number of NVLink-crossing arrows equals the number of thread blocks",
+        "Bulk-prefetch mode: exactly 1 NVLink-crossing arrow regardless of thread-block count",
+        "In bulk-prefetch mode all read arrows after the prefetch stay within the Requester box"
+      ]
+    },
+    {
+      "id": "the-pgl-abstraction",
+      "conceptId": "pgl-tile-abstraction",
+      "part": "How ParallelKittens actually works",
+      "title": "One memory layout mirrored across all GPUs lets tile-based code reach across devices",
+      "teaches": "PK's Parallel Global Layout is an identically-shaped memory region mirrored across all devices, plus tile-granular async load/store-with-reduction primitives, so communication composes directly with existing tile-based tensor-core code in under 50 added lines.",
+      "requires": [
+        "gpu-execution-units",
+        "two-ways-to-split-sms"
+      ],
+      "caption": "One identically-shaped memory region, mirrored across every GPU and indexed by tile, is the handle for peer loads, stores, and reductions. Pick a collective and watch the added code stay under 50 lines.",
+      "visualMetaphor": "4 GPU boxes each holding an identically-shaped grid of labeled tiles (the Parallel Global Layout), aligned so tile (i,j) lines up across all devices. A code panel shows a short single-GPU GEMM kernel with a highlighted diff of a few added lines for a peer tile load/store-with-reduce. Buttons select which collective op is fused; the diff size and the tile-to-tile arrow pattern across the 4 GPU grids update.",
+      "animatedVariable": {
+        "name": "collective operation fused into the base kernel",
+        "control": "buttons",
+        "range": "all-gather / reduce-scatter / all-reduce / all-to-all",
+        "whatChangesOnScreen": "the added-lines-of-code count updates (staying well under 50) and the tile-to-tile arrow pattern across the 4 GPU grids redraws to match the selected collective"
+      },
+      "quantitativeAnchor": "fusing communication into an existing single-GPU kernel takes under 50 lines of additional code",
+      "physicsChecks": [
+        "Added-lines-of-code readout never exceeds 50 for any of the 4 collectives",
+        "Tile grids across all 4 GPU boxes are always drawn identically shaped and aligned",
+        "All-to-all's arrow pattern connects all pairs of GPUs, unlike all-gather's single-destination pattern"
+      ]
+    },
+    {
+      "id": "paying-for-safety-you-dont-need",
+      "conceptId": "library-design-overhead",
+      "part": "Why it beats the status quo",
+      "title": "Standard communication libraries add handshakes and buffer copies that most transfers don't need",
+      "teaches": "NCCL's two-way handshake and staging through intermediate buffers, plus NVSHMEM's repeated address re-fetch and synchronization on every remote access, are safety defaults that PK strips for direct one-way transfer with cached addresses, regaining throughput and latency.",
+      "requires": [
+        "the-pgl-abstraction"
+      ],
+      "caption": "Standard libraries add a round-trip handshake and an extra buffer copy on every transfer. Strip them for a direct one-way write and throughput rises 1.79x while access latency falls 4.5x.",
+      "visualMetaphor": "A step-by-step arrow diagram comparing 'standard library path' (Sender → wait for acknowledgment from Receiver → write to intermediate channel buffer → Receiver copies out) against 'direct path' (Sender → write straight into Receiver's final destination, address cached in a register, no acknowledgment). A toggle switches paths; readouts show relative throughput and latency.",
+      "animatedVariable": {
+        "name": "transfer path",
+        "control": "toggle",
+        "range": "standard library (handshake + buffer) vs. direct (PK)",
+        "whatChangesOnScreen": "the extra steps (acknowledgment round-trip, buffer copy, address re-fetch) appear or disappear, and throughput/latency readouts change from 1x to 1.79x and from 1x down to 1/4.5x"
+      },
+      "quantitativeAnchor": "up to 1.79x higher all-reduce throughput, 4.5x lower elementwise access latency",
+      "physicsChecks": [
+        "Standard-path diagram shows 4 sequential steps; direct-path diagram shows 2",
+        "Throughput readout in direct mode is 1.79x the standard-mode readout",
+        "Latency readout in direct mode is 1/4.5 of the standard-mode readout"
+      ]
+    },
+    {
+      "id": "hardwired-mechanism-backfires",
+      "conceptId": "transfer-mechanism-tradeoff",
+      "part": "Why it beats the status quo",
+      "title": "Locking in one transfer mechanism can be slower than not overlapping at all",
+      "teaches": "A system hard-wired to always use the copy engine for communication becomes slower than a non-overlapped baseline at small problem sizes, because the copy engine's per-invocation overhead outweighs its bandwidth advantage below its ~256 MB efficiency threshold.",
+      "requires": [
+        "mechanism-vs-message-size"
+      ],
+      "caption": "Lock a system into always using the copy engine, and small problems get slower than doing nothing at all. Slide the problem size and watch the hardwired curve dip below the no-overlap baseline.",
+      "visualMetaphor": "A chart with x-axis = problem/message size (log scale), y-axis = kernel speed relative to a flat no-overlap baseline drawn at 1.0. A curve for a 'copy-engine-hardwired system' dips below 1.0 at small sizes and rises above 1.0 at large sizes. A slider moves a marker along the x-axis.",
+      "animatedVariable": {
+        "name": "problem size (message size)",
+        "control": "slider",
+        "range": "small (~1 MB) to huge (~1 GB)",
+        "whatChangesOnScreen": "the hardwired-system curve crosses below the baseline=1.0 line at small sizes (worse than doing nothing) and above it at large sizes"
+      },
+      "quantitativeAnchor": "prior systems hard-wired to the copy engine become slower than doing nothing at small problem sizes (Fig. 7)",
+      "physicsChecks": [
+        "At small message size, the hardwired-system curve reads below 1.0",
+        "At large message size (≥256 MB), the hardwired-system curve reads above 1.0",
+        "The baseline line stays flat at 1.0 across the whole slider range"
+      ]
+    },
+    {
+      "id": "matching-hand-tuned-kernels",
+      "conceptId": "pgl-tile-abstraction",
+      "part": "Why it beats the status quo",
+      "title": "A 50-line kernel matches or beats hand-tuned code across every parallelism type and both GPU generations",
+      "teaches": "Across data/tensor/sequence/expert parallelism benchmarks, PK's short kernels match or exceed the throughput of existing hand-tuned and library-based baselines, on both Hopper and Blackwell.",
+      "requires": [
+        "the-pgl-abstraction",
+        "paying-for-safety-you-dont-need",
+        "which-scheduling-wins-per-workload"
+      ],
+      "caption": "Across all four parallelism types and two GPU generations, PK's under-50-line kernels sit at or above the hand-tuned baseline. Toggle hardware generation and check every bar.",
+      "visualMetaphor": "A grouped bar chart, x-axis = the 4 parallelism types, y-axis = normalized throughput relative to baseline (=1.0). Each group has 2 bars: baseline and PK. A toggle switches GPU generation (H100/Hopper vs B200/Blackwell), redrawing bar heights.",
+      "animatedVariable": {
+        "name": "GPU generation",
+        "control": "toggle",
+        "range": "H100 (Hopper) vs B200 (Blackwell)",
+        "whatChangesOnScreen": "bar heights update per generation; PK bars stay at or above 1.0x across all 4 parallelism types in both generations"
+      },
+      "quantitativeAnchor": "PK matches or beats hand-tuned multi-GPU kernels across data-, tensor-, sequence-, and expert-parallel workloads on both Hopper and Blackwell",
+      "physicsChecks": [
+        "In every group and both generations, the PK bar height ≥ the baseline bar height",
+        "Switching generation redraws all 8 bars without any PK bar falling below its baseline pair",
+        "No parallelism type shows PK below 1.0x normalized throughput"
+      ]
+    },
+    {
+      "id": "the-gap-keeps-growing",
+      "conceptId": "interconnect-bottleneck",
+      "part": "Why now, and what's next",
+      "title": "The compute-to-interconnect gap keeps widening every hardware generation",
+      "teaches": "Extrapolating the historical trend (7.2x compute vs 3x/2x interconnect growth) shows the ratio of compute speed to interconnect speed increasing each generation, meaning unhidden communication will cost proportionally more, not less, in the future.",
+      "requires": [
+        "the-widening-gap"
+      ],
+      "caption": "The compute-to-interconnect ratio isn't stabilizing. Extend the timeline one generation further and watch it keep climbing.",
+      "visualMetaphor": "A line chart, x-axis = GPU generation timeline (A100, H100, B200, projected next-gen), y-axis = ratio of compute/HBM growth to interconnect growth (indexed to A100=1). One steeply rising line for compute/HBM, one flatter line for interconnect. A slider extends the timeline to a projected next generation using historical average growth rates.",
+      "animatedVariable": {
+        "name": "generation slider extended to a projected next generation",
+        "control": "slider",
+        "range": "A100 → H100 → B200 → projected next-gen",
+        "whatChangesOnScreen": "the compute/HBM line keeps outpacing the interconnect line, and the 'ratio of compute speed to interconnect speed' readout climbs at each step"
+      },
+      "quantitativeAnchor": "historical growth: compute 7.2x, HBM 5.1x vs NVLink 3x, PCIe/InfiniBand 2x (A100→B200) — ratio already >2x and widening",
+      "physicsChecks": [
+        "The compute/HBM line is strictly above the interconnect line at every generation step",
+        "The ratio readout at B200 is larger than at H100, which is larger than at A100",
+        "The projected next-gen point continues the same widening direction, not a reversal"
+      ]
+    },
+    {
+      "id": "one-abstraction-for-whats-next",
+      "conceptId": "pgl-tile-abstraction",
+      "part": "Why now, and what's next",
+      "title": "The same short kernel pattern already works on both current and next-generation GPUs",
+      "teaches": "Because PK's primitives are defined relative to the memory-hierarchy tiers and execution units that persist across GPU generations rather than hand-tuned per chip, the same under-50-line kernel pattern ports across Hopper and Blackwell and is positioned to absorb whatever parallelism pattern comes next.",
+      "requires": [
+        "the-gap-keeps-growing",
+        "the-pgl-abstraction"
+      ],
+      "caption": "The identical short kernel snippet runs on Hopper and Blackwell alike, hitting each generation's own peak numbers without a rewrite. Toggle hardware and check the code never changes.",
+      "visualMetaphor": "Two GPU-generation icons (H100, B200) each running the identical short PK code snippet from the earlier tile-abstraction scene, with efficiency readouts matching that scene's numbers displayed side by side. Below, a third 'next generation' placeholder icon with a question mark shows the same code snippet with dashed styling implying continuity.",
+      "animatedVariable": {
+        "name": "GPU generation selected",
+        "control": "toggle",
+        "range": "H100 (Hopper) / B200 (Blackwell) / next-gen (placeholder)",
+        "whatChangesOnScreen": "efficiency readouts update to match the selected generation's numbers while the code snippet stays pixel-identical across all three"
+      },
+      "quantitativeAnchor": "same <50-line kernel extension pattern achieves 82%/81%, 78%/74%, 76%/70% mechanism efficiencies on H100/B200 respectively without code changes",
+      "physicsChecks": [
+        "Code snippet is pixel-identical across all three toggle states",
+        "Efficiency readouts differ numerically between H100 and B200, matching the earlier mechanism-efficiency scene's numbers",
+        "The next-gen placeholder is visually marked as unconfirmed/dashed, distinct from the two confirmed generations"
+      ]
+    }
+  ]
+}

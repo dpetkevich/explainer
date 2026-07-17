@@ -1,0 +1,115 @@
+{
+  "paper": {
+    "title": "Distilling the Knowledge in a Neural Network",
+    "authors": [
+      "Geoffrey Hinton",
+      "Oriol Vinyals",
+      "Jeff Dean"
+    ],
+    "oneSentenceClaim": "The generalization ability of a large model or ensemble lives in its full output probability distribution — including the tiny probabilities it assigns to wrong answers — and you can transfer nearly all of it into a much smaller model by training that model to match a temperature-softened version of those probabilities."
+  },
+  "prerequisites": [
+    "calculus (gradients, Taylor expansion of e^x)",
+    "linear algebra basics (vectors, matrices, dot products)",
+    "probability basics (probability distributions, means, variance)",
+    "Boltzmann factor e^{-E/kT} from thermodynamics",
+    "the general idea that a neural network is a parameterized function trained by gradient descent"
+  ],
+  "concepts": [
+    {
+      "id": "logits-and-softmax",
+      "name": "Logits and the softmax as a Boltzmann distribution",
+      "whyItMatters": "Every mechanism in the paper — soft targets, temperature, logit matching — is an operation on the softmax layer, so you need to see it as a physicist would: a Boltzmann distribution over classes.",
+      "coreMechanism": "A classifier's last layer produces one real number per class, the logit z_i, which acts like a negative energy. The softmax converts logits to probabilities q_i = e^{z_i}/Σ_j e^{z_j}, exactly the Boltzmann distribution at T = 1: higher logit → exponentially more probability, and all probabilities sum to 1. The network never outputs a single answer; it outputs an entire distribution, and the shape of that distribution is where the paper's action is.",
+      "keyEquation": "q_i = \\frac{e^{z_i/T}}{\\sum_j e^{z_j/T}}",
+      "foundational": true
+    },
+    {
+      "id": "hard-target-training",
+      "name": "Standard training: cross-entropy against hard targets",
+      "whyItMatters": "Distillation is defined by what it changes about this baseline: it replaces the one-hot target with a rich distribution from another model.",
+      "coreMechanism": "Normal training uses 'hard targets': the correct class gets probability 1, everything else 0. The loss is the cross-entropy C = -Σ_i p_i log q_i, which for a one-hot p reduces to -log(probability assigned to the correct class). Gradient descent pushes the correct logit up and all others down. Each training example therefore delivers essentially one bit-like piece of information: 'the answer is class k' — nothing about how the wrong classes relate to each other.",
+      "keyEquation": "C = -\\sum_i p_i \\log q_i",
+      "foundational": true
+    },
+    {
+      "id": "ensembles-generalize",
+      "name": "Why averaging many models generalizes better",
+      "whyItMatters": "The whole point of distillation is to capture the ensemble's superior generalization in one deployable net, so you need the mechanism by which ensembles win in the first place.",
+      "coreMechanism": "Train N copies of the same architecture from different random initializations and average their predicted distributions. Each model makes partly independent errors (different random minima), so averaging cancels idiosyncratic mistakes while reinforcing the shared, correct structure — the same variance-reduction logic as averaging N noisy measurements. In the paper's speech experiment, 10 identically-trained nets averaged together raise frame accuracy from 58.9% to 61.1%. The catch: serving 10 nets costs 10× the compute per prediction, which is why the ensemble is called 'cumbersome'.",
+      "foundational": true
+    },
+    {
+      "id": "dark-knowledge",
+      "name": "Wrong-answer probabilities encode the similarity structure of the data",
+      "whyItMatters": "This is the paper's central conceptual move: the 'knowledge' worth transferring is not the parameters, it is the learned mapping from inputs to full output distributions — especially the ratios among the small probabilities.",
+      "coreMechanism": "A trained model assigns tiny but wildly non-uniform probabilities to incorrect classes: an image of a BMW might get 10^{-4} probability of being a garbage truck but 10^{-8} of being a carrot. Those ratios reveal how the model has organized the class space — which things it considers similar. One handwritten 2 might get 10^{-6} probability of being a 3 and 10^{-9} of being a 7; a differently-written 2 the reverse. That relational information defines how the model generalizes, and a student trained to reproduce it inherits the generalization, not just the answers.",
+      "misconception": "The natural assumption is that a model's knowledge is its weights, making transfer between different architectures seem impossible. The paper's reframing — knowledge as the input→distribution mapping — is what makes cross-architecture transfer well-defined."
+    },
+    {
+      "id": "temperature-softening",
+      "name": "Raising softmax temperature to expose the small probabilities",
+      "whyItMatters": "Dark knowledge is useless if it sits at 10^{-6} where cross-entropy can't feel it; temperature is the knob that amplifies it into a trainable signal.",
+      "coreMechanism": "Probabilities near zero contribute almost nothing to the cross-entropy gradient, so at T = 1 the similarity structure is numerically invisible. Dividing all logits by a temperature T > 1 before the softmax flattens the distribution — exactly like heating a physical system populates excited states. At T = 20 (used on MNIST), the 10^{-6}-scale probabilities become large enough to shape the loss. Both teacher and student use the same high T during training; at deployment the student runs at T = 1, recovering a sharp, confident classifier.",
+      "keyEquation": "q_i = \\frac{e^{z_i/T}}{\\sum_j e^{z_j/T}}, \\quad T > 1 \\text{ during transfer}",
+      "misconception": "Temperature does not add information or randomness at training time — it's a deterministic rescaling that redistributes the loss's sensitivity toward the low-probability tail where the dark knowledge lives."
+    },
+    {
+      "id": "distillation-recipe",
+      "name": "The distillation loss: soft targets plus down-weighted hard targets, with T² rescaling",
+      "whyItMatters": "This is the actual algorithm that delivers the paper's headline results; the T² factor is the non-obvious detail that makes temperature a tunable hyperparameter rather than a trade-off against the true labels.",
+      "coreMechanism": "The student minimizes a weighted sum of two cross-entropies computed from the same logits: one against the teacher's soft targets at temperature T, one against the true hard labels at T = 1 (given a considerably smaller weight). Because the gradient from the soft-target term scales as 1/T² (each softmax division by T contributes a 1/T), it must be multiplied by T² so the soft/hard balance stays fixed when you tune T. On MNIST: teacher (2×1200 units, dropout, jitter) makes 67 test errors; a 2×800 student trained normally makes 146; the same student trained with the teacher's T = 20 soft targets makes 74 — with no other regularization.",
+      "misconception": "Distillation is not just 'train on the teacher's predicted labels' — the argmax throws away exactly the ratio information that carries the knowledge. Matching the full softened distribution is essential."
+    },
+    {
+      "id": "logit-matching-limit",
+      "name": "Matching logits is the high-temperature limit of distillation",
+      "whyItMatters": "It unifies the prior art (Caruana's squared-error logit matching) as a special case and explains why intermediate T can beat both extremes.",
+      "coreMechanism": "The gradient of the soft-target cross-entropy with respect to a student logit is ∂C/∂z_i = (q_i − p_i)/T. When T ≫ |z|, expand e^{z/T} ≈ 1 + z/T; with logits zero-meaned per example the gradient collapses to (z_i − v_i)/(NT²), i.e. gradient descent on ½(z_i − v_i)² — pure squared-error logit matching. At lower T, distillation systematically pays less attention to logits far below the mean. Those very negative logits are nearly unconstrained by the teacher's own training, hence noisy — which explains empirically why small students (30 hidden units/layer) do best at intermediate T ≈ 2.5–4, while larger students are insensitive for T > 8.",
+      "keyEquation": "\\frac{\\partial C}{\\partial z_i} = \\frac{1}{T}(q_i - p_i) \\;\\xrightarrow{T \\to \\infty}\\; \\frac{1}{NT^2}(z_i - v_i)"
+    },
+    {
+      "id": "information-per-example",
+      "name": "Soft targets carry more information and less gradient noise per example",
+      "whyItMatters": "This explains quantitatively why distilled students train on less data with higher learning rates — and it powers the regularization results.",
+      "coreMechanism": "A hard target constrains one number per example (which class); a high-entropy soft target constrains the entire distribution — thousands of real-valued ratios per example on a 14,000- or 15,000-class problem. Soft targets are also smooth functions of the input, so the gradient varies less between training cases than the noisy one-hot signal does. More information per case plus lower gradient variance means the student needs far fewer examples to pin down its parameters.",
+      "misconception": "It's tempting to think each labeled image is worth 'one data point' regardless of the target format; distillation shows the target's information content, not the input count, is what limits learning."
+    },
+    {
+      "id": "soft-targets-regularize",
+      "name": "Soft targets as a regularizer: 3% of the data, almost all of the performance",
+      "whyItMatters": "This is the paper's most dramatic quantitative demonstration that soft targets transmit the teacher's generalization behavior, not just its labels.",
+      "coreMechanism": "The 85M-parameter speech model trained on 100% of the data (700M examples) reaches 58.9% test frame accuracy. Trained with hard targets on only 3% (~20M examples), it overfits badly: 67.3% train accuracy but only 44.5% test, requiring early stopping. Trained with soft targets on the same 3%, it reaches 57.0% test accuracy — within 2 points of the full-data model — and simply converges without early stopping. The soft targets act as a per-example constraint on the whole output distribution, forbidding the pathological solutions that memorize the small training set.",
+      "keyFigureRef": "Table 5"
+    },
+    {
+      "id": "mnist-missing-class",
+      "name": "The missing-digit experiment: learning a class you've never seen",
+      "whyItMatters": "It's the sharpest existence proof that soft targets transfer relational structure: the student learns what a 3 is purely from how 3-like other digits are.",
+      "coreMechanism": "Remove every 3 from the transfer set, so the student never sees one. It still makes only 206 total test errors (133 of them on the 1,010 test 3s), because the teacher's soft targets on 2s, 5s, 8s etc. leak the 3-class's location in output space. The student's only systematic defect is a bias: its 3-logit baseline is too low since it never saw a positive example. Raising that single bias by 3.5 drops errors to 109, with the student getting 98.6% of test 3s correct. Even a transfer set of only 7s and 8s yields 13.2% error after bias correction — the distribution over ten classes was learned from two.",
+      "misconception": "One would expect a class absent from training to be unlearnable (probability pinned near zero everywhere). The soft targets break that intuition because every training example carries a nonzero, structured probability for class 3."
+    },
+    {
+      "id": "speech-ensemble-distillation",
+      "name": "Production-scale validation: distilling a 10-model acoustic ensemble into one net",
+      "whyItMatters": "It shows the method works at industrial scale on the paper's motivating problem: ensemble-quality accuracy at single-model deployment cost.",
+      "coreMechanism": "Ten copies of an 85M-parameter, 8-layer, 14,000-class acoustic model (an Android voice search baseline) are trained from different random seeds; their averaged predictions raise frame accuracy 58.9% → 61.1% and cut word error rate 10.9% → 10.7%. Distilling those averaged predictions into a single same-size net (T = 2, hard-target weight 0.5) yields 60.8% frame accuracy and the same 10.7% WER — over 80% of the ensemble's accuracy gain and all of its WER gain, at one-tenth the inference cost.",
+      "keyFigureRef": "Table 1"
+    },
+    {
+      "id": "specialist-ensembles",
+      "name": "Specialist models: a parallelizable ensemble for huge label spaces",
+      "whyItMatters": "It extends the paper's claim to the regime where even training a conventional ensemble is infeasible (the JFT baseline took six months), by exploiting soft-target ideas to keep specialists from overfitting.",
+      "coreMechanism": "For JFT (100M images, 15,000 classes), instead of N full replicas, train one generalist plus 61 'specialists', each handling ~300 classes the generalist confuses (found by K-means clustering the columns of the generalist's prediction covariance matrix — no true labels needed). Each specialist starts from the generalist's weights (sharing low-level features, resisting overfitting), trains on 50% special-class / 50% random data, and lumps all other classes into one 'dustbin' output whose logit is later corrected by the log of the oversampling ratio. Specialists train in a few days, fully in parallel, versus years for a full ensemble — and deliver a 4.4% relative top-1 accuracy gain (25.0% → 26.1%), with per-class gains growing from +3.4% (one covering specialist) to +14–17% (nine or more).",
+      "keyFigureRef": "Tables 3–4",
+      "misconception": "This is not a mixture of experts: there is no jointly-trained gating network coupling all the experts. Class assignments are fixed up front from the generalist's confusions, so every specialist trains completely independently — that decoupling is the entire point."
+    },
+    {
+      "id": "specialist-inference",
+      "name": "Combining generalist and specialists at test time by KL minimization",
+      "whyItMatters": "Specialists only see partial label spaces, so a principled fusion rule is needed to produce one distribution over all 15,000 classes; this is how the reported JFT gains are actually computed.",
+      "coreMechanism": "Given an image, the generalist proposes its top class(es), which activates every specialist whose class subset intersects them. The final prediction q = softmax(z) is found by gradient descent on the logits z to minimize KL(p^g, q) + Σ_m KL(p^m, q) — i.e., find the single full distribution closest, in KL divergence, to the generalist and all active specialists simultaneously. When comparing against a specialist, all of q's probability mass on that specialist's non-special classes is summed into its dustbin class. There's no closed form in general (per-image optimization is required), but with a single shared probability per class the solution reduces to an arithmetic or geometric mean of the models.",
+      "keyEquation": "\\min_{\\mathbf{q}} \\; KL(\\mathbf{p}^g, \\mathbf{q}) + \\sum_{m \\in A_k} KL(\\mathbf{p}^m, \\mathbf{q})"
+    }
+  ]
+}

@@ -1,0 +1,3238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Simulate a Million Reinforcement-Learning Environments on One GPU</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How to Simulate a Million Reinforcement-Learning Environments on One GPU</h1>
+  <p class="hook">A reinforcement learning agent that discovers a genuinely new strategy — like building a fort out of movable boxes — needed on the order of 100 billion tries before that behavior showed up. If each try takes even a millisecond of simulated physics, that's years of wall-clock time no matter how good your learning algorithm is. This explainer builds up, from the ground rules of GPU hardware, the design that turns those hundred billion tries into a day and a half on a single consumer graphics card. To understand it honestly, we start with why simulators are slow, why GPUs are fussy about how they're used, and only then turn to the paper's actual machine.</p>
+  <p class="page-links"><a href="https://madrona-engine.github.io/shacklett_siggraph23.pdf" target="_blank" rel="noopener noreferrer">An Extensible, Data-Oriented Architecture for High-Performance, Many-World Simulation</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v2.0.0 · Visuals carry the load; minimal captions</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Before judging any speedup we need the ground rules: how many tries reinforcement learning actually needs, how a GPU is willing to be used, and what it costs just to talk to one. These four facts explain why almost every existing simulator leaves nearly all of a GPU's power on the table.</div>
+</header>
+<section class="scene" id="rl-needs-billions-of-steps">
+  <h3>Training complex behavior takes on the order of 100 billion tries</h3>
+  <div class="caption">Complex behavior can take <math><mn>1.15</mn><mo>×</mo><msup><mn>10</mn><mrow><mn>11</mn></mrow></msup></math> environment steps to emerge. Drag the simulator's speed and watch training time collapse from decades down to about a day.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="rl-needs-billions-of-steps"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>RL needs ~10^11 steps</title>
+<style>
+  :root{
+    --bg: #ffffff;
+    --fg: #1b1e24;
+    --muted: #5a6270;
+    --grid: #b8bfc9;
+    --axis: #33384a;
+    --milestone: #4472c4;
+    --target: #d1495b;
+    --accent: #2a9d8f;
+    --panel: #f3f5f8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #14161c;
+      --fg: #e8eaf0;
+      --muted: #9aa2b1;
+      --grid: #454b58;
+      --axis: #c7cbd6;
+      --milestone: #7fa6e8;
+      --target: #ff8b93;
+      --accent: #5fd0c1;
+      --panel: #1e212a;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  h2.stitle{font-size:15px;margin:0 0 8px;font-weight:600;color:var(--fg);}
+  svg{width:100%;height:auto;max-width:100%;display:block;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+    background:var(--panel);border-radius:8px;padding:12px;margin-top:10px;}
+  .ctrl{display:flex;flex-direction:column;gap:4px;min-width:230px;flex:1;}
+  .ctrl label{font-size:12.5px;color:var(--muted);}
+  .ctrl input[type=range]{width:100%;}
+  .valrow{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;}
+  .valbox{background:var(--panel);border-radius:6px;padding:6px 10px;min-width:150px;}
+  .valbox .num{font-size:16px;font-weight:600;color:var(--accent);}
+  .valbox .lab{color:var(--muted);font-size:11.5px;}
+  math{color:var(--fg);}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 8px;line-height:1.5;}
+  .eqwrap{margin-top:16px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2 class=&quot;stitle&quot;>Steps needed before complex behavior emerges</h2>
+  <svg id=&quot;axisSvg&quot; viewBox=&quot;0 0 680 170&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot; aria-label=&quot;log scale axis of environment steps with milestones&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;speedSlider&quot;>Simulator throughput — steps simulated per second (10³ to 10⁶ steps/sec)</label>
+      <input id=&quot;speedSlider&quot; type=&quot;range&quot; min=&quot;3&quot; max=&quot;6&quot; step=&quot;0.01&quot; value=&quot;4&quot;>
+    </div>
+  </div>
+
+  <div class=&quot;valrow&quot;>
+    <div class=&quot;valbox&quot;><div class=&quot;num&quot; id=&quot;speedVal&quot;>—</div><div class=&quot;lab&quot;>simulator throughput (steps/sec)</div></div>
+    <div class=&quot;valbox&quot;><div class=&quot;num&quot; id=&quot;daysVal&quot;>—</div><div class=&quot;lab&quot;>wall-clock time to reach target (days)</div></div>
+    <div class=&quot;valbox&quot;><div class=&quot;num&quot; id=&quot;yearsVal&quot;>—</div><div class=&quot;lab&quot;>same time in years</div></div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>t</mi><mo>=</mo><mfrac><mi>N</mi><mi>s</mi></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      t — wall-clock training time (s) &amp;middot; N — environment steps needed for the target behavior, fixed at 1.15&amp;times;10¹¹ &amp;middot; s — simulator throughput (steps/sec), set by the slider above
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STEPS_NEEDED = 1.15e11;      // steps needed for coordinated fort-building (hide-and-seek emergent tool use)
+  const SEC_PER_DAY = 86400;
+  const DAYS_PER_YEAR = 365.25;
+
+  const AX_MIN_EXP = 6;    // 10^6 steps
+  const AX_MAX_EXP = 11.301; // slightly beyond 10^11 so target marker has room
+  const X0 = 60, X1 = 620, Y_AXIS = 110;
+
+  function xPos(steps){
+    const e = Math.log10(steps);
+    const frac = (e - AX_MIN_EXP) / (AX_MAX_EXP - AX_MIN_EXP);
+    return X0 + frac * (X1 - X0);
+  }
+
+  function sup(n){
+    const map={'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+    return String(n).split('').map(c=>map[c]||c).join('');
+  }
+  function formatSci(x){
+    if(x<=0) return '0';
+    const exp = Math.floor(Math.log10(x));
+    const mant = x/Math.pow(10,exp);
+    return mant.toFixed(1) + ' \u00d7 10' + sup(exp);
+  }
+
+  const svg = document.getElementById('axisSvg');
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const cs = getComputedStyle(document.documentElement);
+  const col = {
+    axis: cs.getPropertyValue('--axis').trim(),
+    grid: cs.getPropertyValue('--grid').trim(),
+    muted: cs.getPropertyValue('--muted').trim(),
+    milestone: cs.getPropertyValue('--milestone').trim(),
+    target: cs.getPropertyValue('--target').trim(),
+    fg: cs.getPropertyValue('--fg').trim()
+  };
+
+  function drawAxis(){
+    // axis line
+    svg.appendChild(el('line',{x1:X0,y1:Y_AXIS,x2:X1,y2:Y_AXIS,stroke:col.axis,'stroke-width':2}));
+
+    // ticks 10^6 .. 10^10
+    for(let e=6; e<=10; e++){
+      const x = xPos(Math.pow(10,e));
+      svg.appendChild(el('line',{x1:x,y1:Y_AXIS-5,x2:x,y2:Y_AXIS+5,stroke:col.axis,'stroke-width':1.5}));
+      const t = el('text',{x:x,y:Y_AXIS+22,'text-anchor':'middle','font-size':11,fill:col.muted});
+      t.textContent = '10' + sup(e);
+      svg.appendChild(t);
+    }
+    const axLab = el('text',{x:(X0+X1)/2,y:Y_AXIS+42,'text-anchor':'middle','font-size':12,fill:col.muted});
+    axLab.textContent = 'environment steps taken so far (log scale)';
+    svg.appendChild(axLab);
+
+    // milestones
+    const milestones = [
+      {steps:1e7, label:'random flailing', dy:-14},
+      {steps:1e9, label:'basic tool use', dy:-14}
+    ];
+    milestones.forEach(m=>{
+      const x = xPos(m.steps);
+      svg.appendChild(el('circle',{cx:x,cy:Y_AXIS,r:5,fill:col.milestone}));
+      svg.appendChild(el('line',{x1:x,y1:Y_AXIS-5,x2:x,y2:Y_AXIS+m.dy+6,stroke:col.milestone,'stroke-width':1}));
+      const t = el('text',{x:x,y:Y_AXIS+m.dy,'text-anchor':'middle','font-size':11.5,fill:col.fg});
+      t.textContent = m.label;
+      svg.appendChild(t);
+      const s = el('text',{x:x,y:Y_AXIS+m.dy+13,'text-anchor':'middle','font-size':10,fill:col.muted});
+      s.textContent = '~' + formatSci(m.steps) + ' steps';
+      svg.appendChild(s);
+    });
+
+    // target marker
+    const tx = xPos(STEPS_NEEDED);
+    svg.appendChild(el('circle',{cx:tx,cy:Y_AXIS,r:6.5,fill:col.target}));
+    svg.appendChild(el('line',{x1:tx,y1:Y_AXIS-6.5,x2:tx,y2:44,stroke:col.target,'stroke-width':1}));
+    const l1 = el('text',{x:tx,y:32,'text-anchor':'middle','font-size':11.5,'font-weight':600,fill:col.target});
+    l1.textContent = 'coordinated fort-building';
+    svg.appendChild(l1);
+    const l2 = el('text',{x:tx,y:45,'text-anchor':'middle','font-size':10.5,fill:col.muted});
+    l2.textContent = 'target: 1.15\u00d710\u00b9\u00b9 steps';
+    svg.appendChild(l2);
+  }
+
+  drawAxis();
+
+  // ---- readouts with smooth (rAF) transitions ----
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const speedValEl = document.getElementById('speedVal');
+  const daysValEl  = document.getElementById('daysVal');
+  const yearsValEl = document.getElementById('yearsVal');
+  const slider = document.getElementById('speedSlider');
+
+  let displayedDays = null, targetDays = null;
+  let rafId = null;
+
+  function renderNumbers(speed, days, years){
+    speedValEl.textContent = formatSci(speed) + ' steps/s';
+    daysValEl.textContent = days < 1000 ? days.toFixed(1) + ' d' : Math.round(days).toLocaleString() + ' d';
+    yearsValEl.textContent = years.toFixed(2) + ' yr';
+  }
+
+  function tick(){
+    const diff = targetDays - displayedDays;
+    if (Math.abs(diff) < Math.max(0.01, targetDays*0.001)) {
+      displayedDays = targetDays;
+    } else {
+      displayedDays += diff * 0.22;
+    }
+    const speed = Math.pow(10, parseFloat(slider.value));
+    renderNumbers(speed, displayedDays, displayedDays/DAYS_PER_YEAR);
+    if (displayedDays !== targetDays){
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+
+  function update(){
+    const exponent = parseFloat(slider.value);
+    const speed = Math.pow(10, exponent);      // steps/sec
+    const seconds = STEPS_NEEDED / speed;       // s
+    const days = seconds / SEC_PER_DAY;
+    targetDays = days;
+    if (displayedDays === null || prefersReduced){
+      displayedDays = days;
+      renderNumbers(speed, days, days/DAYS_PER_YEAR);
+    } else {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+
+  slider.addEventListener('input', update);
+  update();
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;rl-needs-billions-of-steps&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Training complex behavior takes on the order of 100 billion tries"
+  ></iframe>
+</section>
+
+<section class="scene" id="kernel-launch-overhead-and-cpu-sync">
+  <h3>Every GPU launch carries a fixed tax, however small the job</h3>
+  <div class="caption">Every kernel launch costs the CPU a fixed microsecond-scale tax to launch and to wait for. Slide the step count up and watch that tax swallow the actual work.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="kernel-launch-overhead-and-cpu-sync"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Kernel Launch Overhead</title>
+<style>
+:root{
+  --bg:#f5f6f8;
+  --panel:#ffffff;
+  --text:#1b1e23;
+  --muted:#5a6472;
+  --overhead:#d94f45;
+  --compute:#3d7dd8;
+  --grid:#d8dce2;
+  --border:#c9cfd8;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15181d;
+    --panel:#1e2228;
+    --text:#e8eaed;
+    --muted:#9aa4b2;
+    --overhead:#ef6b62;
+    --compute:#6fa3ee;
+    --grid:#33383f;
+    --border:#3a4048;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+h1{font-size:15px;font-weight:600;margin:0 0 10px;}
+canvas{width:100%;max-width:100%;height:auto;display:block;
+  background:var(--panel);border:1px solid var(--border);border-radius:6px;}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0 6px;}
+.controls label{font-size:13px;color:var(--muted);flex:0 0 auto;}
+input[type=range]{flex:1 1 200px;min-width:140px;}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 14px;font-size:13px;}
+.readouts .card{background:var(--panel);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;min-width:100px;}
+.readouts .card b{display:block;font-size:16px;color:var(--text);}
+.readouts .card span{color:var(--muted);font-size:11px;}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin:6px 0 12px;}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+math{font-size:15px;}
+.eqlegend{font-size:11.5px;color:var(--muted);margin:2px 0 14px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+<h1>Fixed launch overhead vs. splitting work into many small kernels</h1>
+
+<canvas id=&quot;c&quot; width=&quot;640&quot; height=&quot;230&quot; role=&quot;img&quot; aria-label=&quot;Two timelines comparing one big kernel launch to many small kernel launches&quot;></canvas>
+
+<div class=&quot;legend&quot;>
+  <span><i class=&quot;sw&quot; style=&quot;background:var(--overhead)&quot;></i>overhead (launch + CPU sync)</span>
+  <span><i class=&quot;sw&quot; style=&quot;background:var(--compute)&quot;></i>useful compute</span>
+</div>
+
+<div class=&quot;controls&quot;>
+  <label for=&quot;nSlider&quot;>Number of separate kernel launches per simulation step, N:</label>
+  <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;1&quot; max=&quot;200&quot; step=&quot;1&quot; value=&quot;1&quot;>
+</div>
+
+<div class=&quot;readouts&quot;>
+  <div class=&quot;card&quot;><b id=&quot;rN&quot;>1</b><span>N — launches this step</span></div>
+  <div class=&quot;card&quot;><b id=&quot;rOver&quot;>5</b><span>total overhead (µs)</span></div>
+  <div class=&quot;card&quot;><b id=&quot;rTot&quot;>200</b><span>total step time (µs)</span></div>
+  <div class=&quot;card&quot;><b id=&quot;rPct&quot;>2.5%</b><span>overhead share of step time</span></div>
+</div>
+
+<math display=&quot;block&quot;>
+  <msub><mi>T</mi><mtext>total</mtext></msub><mo>=</mo>
+  <mi>N</mi><mo>&amp;#8901;</mo><msub><mi>t</mi><mtext>launch</mtext></msub>
+  <mo>+</mo><msub><mi>T</mi><mtext>work</mtext></msub>
+</math>
+<div class=&quot;eqlegend&quot;>
+  N — number of kernel launches per step (dimensionless) &amp;middot;
+  t<sub>launch</sub> — fixed overhead per launch, launch call + CPU&amp;ndash;GPU sync (&amp;micro;s) &amp;middot;
+  T<sub>work</sub> — total useful compute time for the step, unchanged no matter how it's split (&amp;micro;s)
+</div>
+
+<script>
+// ---- physics constants (auditable) ----
+const TOTAL_WORK_US = 195;   // fixed useful compute per simulation step (microseconds)
+const OVERHEAD_US   = 5;     // fixed overhead per kernel launch: launch call + CPU sync (microseconds)
+const N_MAX = 200;
+const maxTotalUs = TOTAL_WORK_US + N_MAX * OVERHEAD_US; // pixel-scale reference so bar can only grow
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const slider = document.getElementById('nSlider');
+
+function colors(){
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  return {
+    panel: g('--panel'), text: g('--text'), muted: g('--muted'),
+    overhead: g('--overhead'), compute: g('--compute'), grid: g('--grid')
+  };
+}
+
+function render(){
+  const N = parseInt(slider.value, 10);
+  const col = colors();
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = col.panel;
+  ctx.fillRect(0,0,W,H);
+
+  const marginL = 18, marginR = 18;
+  const plotW = W - marginL - marginR;
+  const pxPerUs = plotW / maxTotalUs;
+  const barH = 28;
+
+  // --- top bar: 1 big kernel (fixed reference, never changes with N) ---
+  const topY = 42;
+  ctx.fillStyle = col.text;
+  ctx.font = '13px sans-serif';
+  ctx.fillText('1 big kernel — single launch does all the work', marginL, topY - 10);
+
+  let x = marginL;
+  const topOverheadW = OVERHEAD_US * pxPerUs;
+  const topComputeW  = TOTAL_WORK_US * pxPerUs;
+  ctx.fillStyle = col.overhead; ctx.fillRect(x, topY, topOverheadW, barH);
+  x += topOverheadW;
+  ctx.fillStyle = col.compute;  ctx.fillRect(x, topY, topComputeW, barH);
+
+  // captions stacked vertically to avoid overlap (overhead sliver is too narrow for side-by-side text)
+  ctx.fillStyle = col.muted; ctx.font = '11px sans-serif';
+  ctx.fillText('overhead 5 \u00b5s', marginL, topY + barH + 13);
+  ctx.fillText('useful compute 195 \u00b5s', marginL, topY + barH + 27);
+
+  // --- bottom bar: N small kernels, overhead paid N times ---
+  const botY = 138;
+  ctx.fillStyle = col.text; ctx.font = '13px sans-serif';
+  ctx.fillText('N small kernels — one launch per step, N = ' + N, marginL, botY - 10);
+
+  x = marginL;
+  const perOverheadW = OVERHEAD_US * pxPerUs;
+  const perComputeW  = (TOTAL_WORK_US / N) * pxPerUs;
+  for (let i = 0; i < N; i++){
+    ctx.fillStyle = col.overhead; ctx.fillRect(x, botY, perOverheadW, barH);
+    x += perOverheadW;
+    ctx.fillStyle = col.compute;  ctx.fillRect(x, botY, perComputeW, barH);
+    x += perComputeW;
+  }
+
+  const totalOverheadUs = N * OVERHEAD_US;
+  const totalTimeUs = totalOverheadUs + TOTAL_WORK_US;
+  const overheadPct = (totalOverheadUs / totalTimeUs) * 100;
+
+  ctx.fillStyle = col.muted; ctx.font = '11px sans-serif';
+  ctx.fillText(
+    'overhead ' + totalOverheadUs.toFixed(0) + ' \u00b5s of ' + totalTimeUs.toFixed(0) + ' \u00b5s total (bar keeps growing with N)',
+    marginL, botY + barH + 14
+  );
+
+  // readouts
+  document.getElementById('rN').textContent = N;
+  document.getElementById('rOver').textContent = totalOverheadUs.toFixed(0);
+  document.getElementById('rTot').textContent = totalTimeUs.toFixed(0);
+  document.getElementById('rPct').textContent = overheadPct.toFixed(1) + '%';
+}
+
+slider.addEventListener('input', render);
+
+// initial paint (respects prefers-reduced-motion trivially: no continuous animation exists)
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;kernel-launch-overhead-and-cpu-sync&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</div>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Every GPU launch carries a fixed tax, however small the job"
+  ></iframe>
+</section>
+
+<section class="scene" id="batch-vs-scaleout-simulation">
+  <h3>Running many copies is not the same as running them together</h3>
+  <div class="caption">Running N separate simulator copies gives the GPU nothing to coalesce; running all N inside one engine that knows about all of them turns identical operations into one coherent operation. Flip the switch and watch the access pattern turn from scattered red to coherent green.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="batch-vs-scaleout-simulation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Batch vs. scale-out simulation</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --panel-bg:#ffffff; --text:#14161c; --muted:#5b6070;
+    --red:#c8392c; --green:#2f9e56; --accent:#3468c0; --border:#cfd3dc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161c; --panel-bg:#1c1f27; --text:#e8eaef; --muted:#9aa0ad;
+      --red:#ff7a6b; --green:#52d97f; --accent:#84a9ff; --border:#333849;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h1{font-size:15px;margin:0 0 8px;font-weight:600;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+  .controls label{font-size:13px;display:flex;align-items:center;gap:6px;}
+  input[type=range]{width:160px;}
+  button{font:inherit;font-size:13px;padding:6px 10px;border-radius:6px;
+    border:1px solid var(--border);background:var(--panel-bg);color:var(--text);cursor:pointer;}
+  button:hover{border-color:var(--accent);}
+  .readouts{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;margin:6px 0 10px;color:var(--muted);}
+  .readouts b{color:var(--text);}
+  canvas{width:100%;max-width:640px;height:auto;display:block;border:1px solid var(--border);
+    border-radius:8px;background:var(--panel-bg);}
+  .eqs{margin-top:12px;font-size:13px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 10px;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Scale-out (N separate copies) vs. batch (one engine, N environments)</h1>
+
+  <div class=&quot;controls&quot;>
+    <label>Environments N = <output id=&quot;nOut&quot;>4</output>
+      <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;2&quot; max=&quot;15&quot; step=&quot;1&quot; value=&quot;2&quot;>
+    </label>
+    <button id=&quot;modeBtn&quot; type=&quot;button&quot;>Currently: scale-out — click to switch to batch</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>N environments: <b id=&quot;nVal&quot;>4</b></div>
+    <div>Scale-out throughput: <b id=&quot;scaleVal&quot;>–</b></div>
+    <div>Batch throughput: <b id=&quot;batchVal&quot;>–</b></div>
+    <div>Speedup (batch ÷ scale-out): <b id=&quot;speedupVal&quot;>–</b></div>
+  </div>
+
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;330&quot;></canvas>
+
+  <div class=&quot;eqs&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>T</mi><mtext>scale-out</mtext></msub><mo>=</mo>
+      <mi>N</mi><mo>(</mo><msub><mi>t</mi><mtext>mem</mtext></msub><mo>+</mo><msub><mi>t</mi><mtext>launch</mtext></msub><mo>)</mo>
+      <mspace width=&quot;1.2em&quot;/>
+      <msub><mi>T</mi><mtext>batch</mtext></msub><mo>=</mo>
+      <mo>&amp;#8968;</mo><mfrac><mi>N</mi><mi>W</mi></mfrac><mo>&amp;#8969;</mo>
+      <msub><mi>t</mi><mtext>mem</mtext></msub><mo>+</mo><msub><mi>t</mi><mtext>launch</mtext></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      N — number of environments simulated at once · W = 32 — threads coalesced per memory transaction (warp size)
+      · t<sub></sub>mem — time per memory transaction (200 ns) · t_launch — per-step launch/overhead time (5 µs) ·
+      T — total time to advance all N environments one step (s). Speedup = T<sub></sub>scale-out ÷ T<sub></sub>batch.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const nSlider = document.getElementById('nSlider');
+  const nOut = document.getElementById('nOut');
+  const nVal = document.getElementById('nVal');
+  const scaleVal = document.getElementById('scaleVal');
+  const batchVal = document.getElementById('batchVal');
+  const speedupVal = document.getElementById('speedupVal');
+  const modeBtn = document.getElementById('modeBtn');
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // --- real physics / performance model, constants named and visible ---
+  const W = 32;              // warp size: threads coalesced per memory transaction
+  const t_mem = 200e-9;      // s, time per memory transaction (~200 ns DRAM burst)
+  const t_launch = 5e-6;     // s, per-step launch/dispatch overhead
+
+  function computeTimes(N){
+    const Tscale = N * (t_mem + t_launch);
+    const Tbatch = Math.ceil(N / W) * t_mem + t_launch;
+    return {Tscale, Tbatch};
+  }
+  function rates(N){
+    const {Tscale, Tbatch} = computeTimes(N);
+    return { scale: N / Tscale, batch: N / Tbatch, speedup: Tscale / Tbatch };
+  }
+  function fmtRate(x){
+    if (x >= 1e6) return (x/1e6).toFixed(1) + ' M/s';
+    if (x >= 1e3) return (x/1e3).toFixed(1) + ' K/s';
+    return Math.round(x) + '/s';
+  }
+
+  let mode = 'scaleout'; // 'scaleout' | 'batch'
+  let animId = null;
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function currentN(){ return Math.pow(2, +nSlider.value); }
+
+  function updateReadouts(N){
+    const r = rates(N);
+    nVal.textContent = N.toLocaleString();
+    nOut.textContent = N.toLocaleString();
+    scaleVal.textContent = fmtRate(r.scale);
+    batchVal.textContent = fmtRate(r.batch);
+    speedupVal.textContent = (r.speedup >= 10 ? Math.round(r.speedup) : r.speedup.toFixed(1)) + '×';
+  }
+
+  function drawDiagram(N, sweepP){
+    const W_ = cv.width, H_ = cv.height;
+    const panelBg = cssVar('--panel-bg'), text = cssVar('--text'),
+          muted = cssVar('--muted'), red = cssVar('--red'), green = cssVar('--green');
+
+    ctx.clearRect(0,0,W_,H_);
+    ctx.fillStyle = panelBg; ctx.fillRect(0,0,W_,H_);
+
+    // coherence indicator
+    const activeColor = mode === 'batch' ? green : red;
+    const activeLabel = mode === 'batch' ? 'COALESCED — one operation for all N' : 'SCATTERED — N separate operations';
+    ctx.beginPath(); ctx.arc(W_/2 - 110, 20, 7, 0, Math.PI*2); ctx.fillStyle = activeColor; ctx.fill();
+    ctx.fillStyle = text; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(activeLabel, W_/2 - 95, 25);
+
+    const panelY = 42, panelH = 250;
+    const leftX = 16, rightX = 336, panelW = 288;
+
+    // ---- LEFT: scale-out ----
+    ctx.strokeStyle = red; ctx.lineWidth = 2;
+    ctx.strokeRect(leftX, panelY, panelW, panelH);
+    ctx.fillStyle = text; ctx.font = '12.5px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('SCALE-OUT — N independent copies', leftX + 8, panelY + 18);
+
+    const shown = Math.min(N, 49);
+    const cols = Math.ceil(Math.sqrt(shown));
+    const rows = Math.ceil(shown / cols);
+    const gridTop = panelY + 28, gridH = panelH - 76, gridW = panelW - 20;
+    const cellW = gridW / cols, cellH = gridH / rows;
+    const activeBox = Math.min(shown - 1, Math.floor(sweepP * shown));
+
+    for (let i = 0; i < shown; i++){
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = leftX + 10 + col*cellW, y = gridTop + row*cellH;
+      const w = cellW - 3, h = cellH - 3;
+      ctx.strokeStyle = red; ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, w, h);
+      if (mode === 'scaleout' &amp;&amp; i === activeBox){
+        ctx.fillStyle = red; ctx.globalAlpha = 0.5;
+        ctx.fillRect(x, y, w, h);
+        ctx.globalAlpha = 1;
+      }
+      // private, scattered &quot;memory address&quot; mark
+      const dx = ((Math.sin(i*12.9898)*43758.5453) % 1 + 1) % 1;
+      const dy = ((Math.sin(i*7.233)*12543.123) % 1 + 1) % 1;
+      ctx.fillStyle = red;
+      ctx.beginPath();
+      ctx.arc(x + 3 + dx*(w-6), y + 3 + dy*(h-6), 1.6, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = muted; ctx.font = '11.5px sans-serif';
+    wrapText(N.toLocaleString() + ' copies, each own memory + control flow -> every access is separate',
+      leftX + 8, panelY + panelH - 30, panelW - 16, 13);
+
+    // ---- RIGHT: batch ----
+    ctx.strokeStyle = green; ctx.lineWidth = 2;
+    ctx.strokeRect(rightX, panelY, panelW, panelH);
+    ctx.fillStyle = text; ctx.font = '12.5px sans-serif';
+    ctx.fillText('BATCH — one engine, N environments', rightX + 8, panelY + 18);
+
+    const colsShown = Math.min(N, 64);
+    const tableX = rightX + 10, tableY = gridTop, tableW = panelW - 20, tableH = gridH * 0.55;
+    const colW = tableW / colsShown;
+    for (let i = 0; i < colsShown; i++){
+      ctx.strokeStyle = green; ctx.lineWidth = 1;
+      ctx.strokeRect(tableX + i*colW, tableY, colW, tableH);
+    }
+    if (mode === 'batch'){
+      const barW = tableW * 0.16;
+      const barX = tableX + sweepP * (tableW - barW);
+      ctx.fillStyle = green; ctx.globalAlpha = 0.45;
+      ctx.fillRect(barX, tableY, barW, tableH);
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = muted; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('shared state table: rows = variables, columns = environments', rightX + panelW/2, tableY + tableH + 14);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = muted; ctx.font = '11.5px sans-serif';
+    wrapText(N.toLocaleString() + ' environments laid out in one table -> one operation touches all of them together',
+      rightX + 8, panelY + panelH - 30, panelW - 16, 13);
+  }
+
+  function wrapText(str, x, y, maxW, lh){
+    const words = str.split(' ');
+    let line = '', yy = y;
+    for (let i=0;i<words.length;i++){
+      const test = line + words[i] + ' ';
+      if (ctx.measureText(test).width > maxW &amp;&amp; line !== ''){
+        ctx.fillText(line, x, yy); line = words[i] + ' '; yy += lh;
+      } else line = test;
+    }
+    ctx.fillText(line, x, yy);
+  }
+
+  function render(sweepP){
+    const N = currentN();
+    updateReadouts(N);
+    drawDiagram(N, sweepP === undefined ? 1 : sweepP);
+  }
+
+  function triggerSweep(){
+    if (reducedMotion){ render(1); return; }
+    if (animId) cancelAnimationFrame(animId);
+    const start = performance.now(), dur = 800;
+    function step(now){
+      const p = Math.min(1, (now - start) / dur);
+      render(p);
+      if (p < 1) animId = requestAnimationFrame(step);
+    }
+    animId = requestAnimationFrame(step);
+  }
+
+  nSlider.addEventListener('input', () => render(1));
+  modeBtn.addEventListener('click', () => {
+    mode = (mode === 'scaleout') ? 'batch' : 'scaleout';
+    modeBtn.textContent = mode === 'scaleout'
+      ? 'Currently: scale-out — click to switch to batch'
+      : 'Currently: batch — click to switch to scale-out';
+    triggerSweep();
+  });
+
+  render(1);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;batch-vs-scaleout-simulation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Running many copies is not the same as running them together"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">Given those constraints, the paper borrows a pattern from video-game engines — entity-component-system — and reshapes it entirely around the GPU's need for coherent memory and coherent instructions. Each scene below adds one piece of that machine.</div>
+</header>
+<section class="scene" id="ecs-core-abstractions">
+  <h3>Data and behavior are stored separately, and a query connects them</h3>
+  <div class="caption">An entity — like one agent or one obstacle — is just a bundle of components (position, velocity, team). A system is one plain function that a query runs on every entity with the right components. Change the query and watch which rows light up.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="ecs-core-abstractions"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>ECS: entities, components, systems, queries</title>
+<style>
+:root{
+  --bg:#f5f6f8;
+  --panel:#ffffff;
+  --text:#1a1d23;
+  --muted:#5b6270;
+  --agent-bg:#cfe2ff;
+  --obstacle-bg:#ffe3c2;
+  --highlight:#1f9d55;
+  --accent:#4d5df0;
+  --border:#c7cdd8;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161a;
+    --panel:#1b1e25;
+    --text:#e8eaef;
+    --muted:#9aa2b1;
+    --agent-bg:#1f3a63;
+    --obstacle-bg:#5a3a1d;
+    --highlight:#3ddc84;
+    --accent:#9d7bff;
+    --border:#333844;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:14px; background:var(--bg); color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+}
+.wrap{max-width:660px;margin:0 auto;}
+.panel{
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  padding:12px 14px 16px; margin-bottom:12px;
+}
+h2{font-size:14px; margin:0 0 8px; font-weight:600;}
+.controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;}
+button{
+  font:inherit; font-size:13px; padding:6px 10px; border-radius:6px;
+  border:1px solid var(--border); background:var(--panel); color:var(--text); cursor:pointer;
+}
+button.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+.note{font-size:12px; color:var(--muted); margin:2px 0 8px;}
+.readouts{display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:6px;}
+.readouts span b{color:var(--text);}
+svg{width:100%; max-width:100%; height:auto; display:block;}
+.cell{font-size:13px; fill:var(--text); font-family:inherit;}
+.cell.name{font-weight:600;}
+.hdr{font-size:12px; fill:var(--muted); font-weight:600;}
+.grouplabel{font-size:11.5px; fill:var(--muted); font-style:italic;}
+.code{
+  font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px;
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  padding:6px 8px; margin-bottom:8px; color:var(--text);
+}
+.legend{font-size:11.5px; color:var(--muted); margin-top:2px;}
+math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+
+  <div class=&quot;panel&quot;>
+    <h2>Query the entity table</h2>
+    <div class=&quot;controls&quot;>
+      <button id=&quot;btn-pv&quot; class=&quot;active&quot;>Query: Position + Velocity</button>
+      <button id=&quot;btn-pvt&quot;>Query: Position + Velocity + Team</button>
+      <button id=&quot;btn-play&quot; style=&quot;display:none;&quot;>Play</button>
+    </div>
+    <div class=&quot;note&quot;>Green outline = rows the query selects. Only selected rows are advanced each frame by the system below.</div>
+    <div class=&quot;readouts&quot;>
+      <span>Active query: <b id=&quot;ro-query&quot;>(Position, Velocity)</b></span>
+      <span>Entities matched: <b id=&quot;ro-count&quot;>0 / 4</b></span>
+      <span>Sim time: <b id=&quot;ro-time&quot;>0.0 s</b></span>
+    </div>
+    <svg id=&quot;svg&quot; viewBox=&quot;0 0 620 280&quot;></svg>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <h2>System: TimeIntegrate(Position, Velocity)</h2>
+    <div class=&quot;code&quot;>for each entity matched by the query: run TimeIntegrate(pos, vel)</div>
+    <math display=&quot;block&quot;>
+      <msub><mi>v</mi><mtext>new</mtext></msub><mo>=</mo><mi>v</mi><mo>+</mo><mi>a</mi><mi>&amp;#916;t</mi>
+    </math>
+    <math display=&quot;block&quot;>
+      <msub><mi>x</mi><mtext>new</mtext></msub><mo>=</mo><mi>x</mi><mo>+</mo><msub><mi>v</mi><mtext>new</mtext></msub><mi>&amp;#916;t</mi>
+    </math>
+    <div class=&quot;legend&quot;>
+      v — velocity component (m/s) · a — constant acceleration applied by the system (m/s&amp;sup2;) ·
+      &amp;#916;t — timestep (s) · x — position component (m). This one function never changes; only the
+      query above changes which rows it is run on.
+    </div>
+  </div>
+
+</div>
+
+<script>
+const NS = &quot;http://www.w3.org/2000/svg&quot;;
+const svg = document.getElementById('svg');
+
+const entities = [
+  {id:'Agent1',   archetype:'Agent',    components:{Position:true,Velocity:true,Team:true,Action:true},
+   pos:[2.0,1.0],  vel:[0.5,-0.2],  team:'A', action:'Chase'},
+  {id:'Agent2',   archetype:'Agent',    components:{Position:true,Velocity:true,Team:true,Action:true},
+   pos:[-1.0,3.0], vel:[-0.3,0.4],  team:'B', action:'Patrol'},
+  {id:'Obstacle1',archetype:'Obstacle', components:{Position:true,Velocity:true,Team:false,Action:false},
+   pos:[5.0,-2.0], vel:[0.0,0.0]},
+  {id:'Obstacle2',archetype:'Obstacle', components:{Position:true,Velocity:true,Team:false,Action:false},
+   pos:[-4.0,-3.0],vel:[0.1,0.0]}
+];
+
+const queries = {
+  pv:  {label:'(Position, Velocity)',            need:['Position','Velocity']},
+  pvt: {label:'(Position, Velocity, Team)',       need:['Position','Velocity','Team']}
+};
+let currentQuery = 'pv';
+
+function matches(e,qkey){ return queries[qkey].need.every(c => !!e.components[c]); }
+function fmtVec(v){ return v[0].toFixed(2)+&quot;, &quot;+v[1].toFixed(2); }
+function valueFor(e,comp){
+  if(comp==='Position') return e.components.Position ? fmtVec(e.pos) : '\u2014';
+  if(comp==='Velocity') return e.components.Velocity ? fmtVec(e.vel) : '\u2014';
+  if(comp==='Team')     return e.components.Team ? e.team : '\u2014';
+  if(comp==='Action')   return e.components.Action ? e.action : '\u2014';
+}
+
+const cols = [
+  {key:'name',     label:'Entity',              x:16},
+  {key:'Position', label:'Position (x, y) m',   x:136},
+  {key:'Velocity', label:'Velocity (x, y) m/s', x:296},
+  {key:'Team',     label:'Team',                x:456},
+  {key:'Action',   label:'Action',              x:536}
+];
+
+// layout constants: enough vertical room reserved for archetype labels
+// so they never collide with the header row or with adjacent entity rows.
+const headerY   = 24;
+const rowRectH  = 34;  // height of each entity row's background rect
+const rowGap    = 10;  // gap between the bottom of one row and the next element
+const labelGap  = 18;  // gap between an archetype label baseline and the row rect below it
+
+// Precompute the y-position of every element (labels + rows) in one pass.
+const rowLayout = []; // {type:'label'|'row', y, entity?, rectTop?}
+let cursorY = headerY + 30; // start well below the header row
+
+entities.forEach((e,i)=>{
+  const prev = entities[i-1];
+  if(i===0 || e.archetype !== prev.archetype){
+    rowLayout.push({type:'label', y:cursorY, archetype:e.archetype});
+    cursorY += labelGap;
+  }
+  const rectTop = cursorY;
+  const textY = rectTop + Math.round(rowRectH/2) + 5;
+  rowLayout.push({type:'row', entity:e, rectTop:rectTop, textY:textY});
+  cursorY += rowRectH + rowGap;
+});
+
+const svgHeight = cursorY + 4;
+
+function buildSVG(){
+  svg.setAttribute('viewBox', '0 0 620 '+svgHeight);
+  let s = '';
+  cols.forEach(c=>{ s += `<text class=&quot;hdr&quot; x=&quot;${c.x-6}&quot; y=&quot;${headerY}&quot;>${c.label}</text>`; });
+
+  rowLayout.forEach(item=>{
+    if(item.type==='label'){
+      const txt = item.archetype==='Agent'
+        ? 'Archetype: Agent (has Team + Action)'
+        : 'Archetype: Obstacle (no Team / Action)';
+      s += `<text class=&quot;grouplabel&quot; x=&quot;8&quot; y=&quot;${item.y}&quot;>${txt}</text>`;
+      return;
+    }
+    const e = item.entity;
+    const y = item.textY;
+    const rectTop = item.rectTop;
+    const bg = e.archetype==='Agent' ? 'var(--agent-bg)' : 'var(--obstacle-bg)';
+    s += `<g id=&quot;row-${e.id}&quot;>`;
+    s += `<rect x=&quot;8&quot; y=&quot;${rectTop}&quot; width=&quot;604&quot; height=&quot;${rowRectH}&quot; rx=&quot;7&quot; fill=&quot;${bg}&quot; opacity=&quot;0.55&quot;></rect>`;
+    s += `<rect id=&quot;hl-${e.id}&quot; x=&quot;8&quot; y=&quot;${rectTop}&quot; width=&quot;604&quot; height=&quot;${rowRectH}&quot; rx=&quot;7&quot; fill=&quot;none&quot; stroke=&quot;var(--highlight)&quot; stroke-width=&quot;0&quot;></rect>`;
+    s += `<text class=&quot;cell name&quot; x=&quot;16&quot; y=&quot;${y}&quot;>${e.id}</text>`;
+    s += `<text id=&quot;txt-${e.id}-Position&quot; class=&quot;cell&quot; x=&quot;136&quot; y=&quot;${y}&quot;>${valueFor(e,'Position')}</text>`;
+    s += `<text id=&quot;txt-${e.id}-Velocity&quot; class=&quot;cell&quot; x=&quot;296&quot; y=&quot;${y}&quot;>${valueFor(e,'Velocity')}</text>`;
+    s += `<text class=&quot;cell&quot; x=&quot;456&quot; y=&quot;${y}&quot;>${valueFor(e,'Team')}</text>`;
+    s += `<text class=&quot;cell&quot; x=&quot;536&quot; y=&quot;${y}&quot;>${valueFor(e,'Action')}</text>`;
+    s += `</g>`;
+  });
+  svg.innerHTML = s;
+}
+
+function updateHighlights(){
+  let n = 0;
+  entities.forEach(e=>{
+    const m = matches(e,currentQuery);
+    if(m) n++;
+    const hl = document.getElementById('hl-'+e.id);
+    const row = document.getElementById('row-'+e.id);
+    if(hl) hl.setAttribute('stroke-width', m ? '3' : '0');
+    if(row) row.style.opacity = m ? '1' : '0.42';
+  });
+  document.getElementById('ro-count').textContent = n+' / '+entities.length;
+  document.getElementById('ro-query').textContent = queries[currentQuery].label;
+}
+
+function updateDynamicText(){
+  entities.forEach(e=>{
+    const px = document.getElementById('txt-'+e.id+'-Position');
+    const vx = document.getElementById('txt-'+e.id+'-Velocity');
+    if(px) px.textContent = valueFor(e,'Position');
+    if(vx) vx.textContent = valueFor(e,'Velocity');
+  });
+}
+
+document.getElementById('btn-pv').addEventListener('click', ()=>setQuery('pv'));
+document.getElementById('btn-pvt').addEventListener('click', ()=>setQuery('pvt'));
+function setQuery(k){
+  currentQuery = k;
+  document.getElementById('btn-pv').classList.toggle('active', k==='pv');
+  document.getElementById('btn-pvt').classList.toggle('active', k==='pvt');
+  updateHighlights();
+}
+
+// --- physics: the system, TimeIntegrate(pos, vel), run only on matched rows ---
+const ACCEL = [0.04, -0.03]; // m/s^2, constant field the system applies
+let simTime = 0;
+let lastTs = null;
+let paused = false;
+
+const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduced){
+  paused = true;
+  const pb = document.getElementById('btn-play');
+  pb.style.display = 'inline-block';
+  pb.textContent = 'Play';
+  pb.addEventListener('click', ()=>{
+    paused = !paused;
+    pb.textContent = paused ? 'Play' : 'Pause';
+    lastTs = null;
+  });
+}
+
+function frame(ts){
+  if(!paused){
+    if(lastTs === null) lastTs = ts;
+    let dt = (ts - lastTs) / 1000;
+    dt = Math.min(dt, 0.05);
+    lastTs = ts;
+    simTime += dt;
+    entities.forEach(e=>{
+      if(matches(e, currentQuery)){
+        e.vel[0] += ACCEL[0]*dt;
+        e.vel[1] += ACCEL[1]*dt;
+        e.pos[0] += e.vel[0]*dt;
+        e.pos[1] += e.vel[1]*dt;
+      }
+    });
+    updateDynamicText();
+    document.getElementById('ro-time').textContent = simTime.toFixed(1)+' s';
+  } else {
+    lastTs = null;
+  }
+  requestAnimationFrame(frame);
+}
+
+buildSVG();
+updateHighlights();
+requestAnimationFrame(frame);
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;ecs-core-abstractions&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Data and behavior are stored separately, and a query connects them"
+  ></iframe>
+</section>
+
+<section class="scene" id="centralized-table-per-archetype">
+  <h3>One shared table for all environments beats one table per environment</h3>
+  <div class="caption">Give every environment its own memory block and neighboring GPU threads read scattered addresses. Merge everyone's obstacles into one table tagged by environment ID and neighbors become adjacent. Flip the layout and watch the environment-count ceiling jump from about 8,000 to over 32,000.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="centralized-table-per-archetype"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Centralized table per archetype</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel-bg:#f4f6f9;
+  --fg:#1b1e24;
+  --muted:#5b6270;
+  --block-fill:#3b82f6;
+  --block-empty:#d8dce3;
+  --accent-red:#dc2626;
+  --accent-green:#16a34a;
+  --border:#c7cdd6;
+  --pool:#f59e0b;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12151b;
+    --panel-bg:#1b2028;
+    --fg:#e6e9ef;
+    --muted:#9aa3b2;
+    --block-fill:#5b9bff;
+    --block-empty:#2a2f3a;
+    --accent-red:#f87171;
+    --accent-green:#4ade80;
+    --border:#333a46;
+    --pool:#fbbf6a;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h1{font-size:15px;margin:2px 0 10px;font-weight:600;}
+.panel{background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;
+  padding:12px;}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+button{font:inherit;font-size:13px;padding:7px 12px;border-radius:7px;border:1px solid var(--border);
+  background:var(--bg);color:var(--fg);cursor:pointer;}
+button:hover{filter:brightness(1.08);}
+.ctrlLabel{font-size:12px;color:var(--muted);max-width:420px;}
+canvas{width:100%;max-width:100%;height:auto;display:block;border-radius:6px;}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0 4px;font-size:13px;}
+.readouts div{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:6px 10px;}
+.readouts b{font-variant-numeric:tabular-nums;}
+math{font-size:15px;}
+.legend{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+.note{font-size:11px;color:var(--muted);margin-top:2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Obstacle table layout: per-environment vs. centralized</h1>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;controls&quot;>
+      <button id=&quot;toggleBtn&quot;>Switch to centralized table</button>
+      <span class=&quot;ctrlLabel&quot; id=&quot;modeLabel&quot;>Toggle the memory layout: one block per environment (with wasted slack) vs. one shared table tagged by environment ID.</span>
+    </div>
+    <canvas id=&quot;stage&quot; width=&quot;680&quot; height=&quot;250&quot;></canvas>
+    <div class=&quot;readouts&quot;>
+      <div>Layout: <b id=&quot;roMode&quot;>per-environment</b></div>
+      <div>Max concurrent environments: <b id=&quot;roMax&quot;>-</b></div>
+      <div>Memory / environment: <b id=&quot;roBytes&quot;>-</b> B</div>
+      <div>Wasted memory: <b id=&quot;roWaste&quot;>-</b>%</div>
+    </div>
+
+    <math display=&quot;block&quot;>
+      <msub><mi>N</mi><mtext>max</mtext></msub><mo>=</mo>
+      <mo>&amp;#8970;</mo><mfrac><msub><mi>M</mi><mtext>GPU</mtext></msub><msub><mi>B</mi><mtext>env</mtext></msub></mfrac><mo>&amp;#8971;</mo>
+    </math>
+    <div class=&quot;legend&quot;>
+      N<sub>max</sub> — max concurrent environments the GPU memory can hold (count) ·
+      M<sub>GPU</sub> — fixed GPU memory budget, 128 MiB = 134,217,728 B ·
+      B<sub>env</sub> — bytes needed per environment under the current layout (bytes) ·
+      &amp;#8970;&amp;#8971; — round down to a whole environment
+    </div>
+    <div class=&quot;note&quot;>Diagram is schematic: each small cell = one obstacle row. Red/green lines show where a GPU thread must read the first obstacle of the next environment.</div>
+  </div>
+</div>
+
+<script>
+// ---- physics / memory constants (auditable) ----
+const GPU_MEM_BYTES  = 134217728;   // 128 MiB, GPU memory budget for the obstacle table
+const ROW_BYTES       = 128;        // bytes per obstacle row (position, velocity, shape id, padding)
+const SLOT_CAPACITY   = 128;        // obstacles reserved per env slot in naive layout (sized for worst-case env)
+const AVG_OBSTACLES   = 32;         // actual average obstacles stored per environment
+const ENVID_BYTES     = 2;          // bytes for the environment-ID tag appended per row, centralized layout
+
+function bytesPerEnv(mode){
+  return mode==='per' ? SLOT_CAPACITY*ROW_BYTES
+                      : AVG_OBSTACLES*(ROW_BYTES+ENVID_BYTES);
+}
+function maxEnvs(mode){ return Math.floor(GPU_MEM_BYTES/bytesPerEnv(mode)); }
+function wastePct(mode){
+  return mode==='per'
+    ? (SLOT_CAPACITY-AVG_OBSTACLES)/SLOT_CAPACITY*100
+    : ENVID_BYTES/(ROW_BYTES+ENVID_BYTES)*100;
+}
+
+// ---- visual (schematic) data: 6 environments, obstacle counts ----
+const occ = [3,5,2,4,3,5];
+const N = occ.length;
+const SLOT_CELLS = 8; // visual reserved width per env in per-env layout
+
+const cvs = document.getElementById('stage');
+const ctx = cvs.getContext('2d');
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+let dpr = Math.max(1, window.devicePixelRatio||1);
+function fitCanvas(){
+  const rect = cvs.getBoundingClientRect();
+  const w = rect.width || 680, h = 250;
+  cvs.width = Math.round(w*dpr);
+  cvs.height = Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw(state.cur);
+}
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let state = { target: 0, cur: 0 }; // 0 = per-environment, 1 = centralized
+
+function lerp(a,b,t){return a+(b-a)*t;}
+
+function layoutX(t, cellPx){
+  // per-env x positions (with slack gaps baked in)
+  const xPer=[], xCen=[];
+  let acc=0;
+  for(let i=0;i<N;i++){ xPer.push(i*SLOT_CELLS*cellPx); }
+  acc=0;
+  for(let i=0;i<N;i++){ xCen.push(acc*cellPx); acc+=occ[i]; }
+  return xPer.map((xp,i)=>lerp(xp, xCen[i], t));
+}
+
+function draw(t){
+  const W = cvs.getBoundingClientRect().width || 680, H=250;
+  ctx.clearRect(0,0,W,H);
+
+  const fill=cssVar('--block-fill'), empty=cssVar('--block-empty'),
+        red=cssVar('--accent-red'), green=cssVar('--accent-green'),
+        fg=cssVar('--fg'), muted=cssVar('--muted'), border=cssVar('--border'),
+        pool=cssVar('--pool');
+
+  const marginL=20, marginTop=40;
+  const totalCellsPer = N*SLOT_CELLS;
+  const cellPx = Math.min(14, (W-2*marginL)/(totalCellsPer+4));
+  const xs = layoutX(t, cellPx);
+  const rowY = marginTop, rowH = 34;
+
+  // title row label
+  ctx.fillStyle = muted;
+  ctx.font = '11px sans-serif';
+  ctx.fillText('memory address \u2192', marginL, rowY-16);
+
+  const lineColor = t<0.5 ? red : green;
+  const startPts=[];
+
+  for(let i=0;i<N;i++){
+    const x = marginL + xs[i];
+    const occW = occ[i]*cellPx;
+    const slackW = lerp((SLOT_CELLS-occ[i])*cellPx, 0, t);
+
+    // occupied (actual data) block
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, rowY, occW, rowH);
+    ctx.strokeStyle = border;
+    ctx.strokeRect(x, rowY, occW, rowH);
+
+    // slack (wasted / unused reserved slots) shrinking to 0 as t->1
+    if(slackW>0.5){
+      ctx.fillStyle = empty;
+      ctx.fillRect(x+occW, rowY, slackW, rowH);
+      ctx.strokeStyle = border;
+      ctx.strokeRect(x+occW, rowY, slackW, rowH);
+    }
+
+    // env id tag
+    ctx.fillStyle = fg;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('E'+i, x+occW/2, rowY-4);
+    ctx.textAlign='left';
+
+    startPts.push({x:x+2, y:rowY+rowH/2});
+  }
+
+  // pooled slack block (grows as t->1) drawn once, after last env
+  const lastX = marginL + xs[N-1] + occ[N-1]*cellPx;
+  const totalSlackCells = occ.reduce((a,o)=>a+(SLOT_CELLS-o),0);
+  const poolW = lerp(0, totalSlackCells*cellPx*0.35, t); // pooled, shown compactly
+  if(poolW>2){
+    ctx.fillStyle = pool;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(lastX+6, rowY, poolW, rowH);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = fg;
+    ctx.font = '10px sans-serif';
+    ctx.fillText('pooled saved space', lastX+6, rowY-4);
+  }
+
+  // labels: slack legend (only visible strongly at t=0)
+  ctx.fillStyle = muted;
+  ctx.font = '11px sans-serif';
+  if(t<0.85){
+    ctx.fillText('unused slots (waste)', marginL, rowY+rowH+34);
+  }
+  if(t>0.15){
+    ctx.fillText('EnvID tag above each segment \u2192 contiguous table', marginL, rowY+rowH+34);
+  }
+
+  // GPU thread access lines
+  const threadY = rowY + rowH + 54;
+  ctx.font='11px sans-serif';
+  ctx.fillStyle = muted;
+  ctx.fillText('GPU thread reads (first obstacle of each environment):', marginL, threadY-10);
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for(let i=0;i<N;i++){
+    const px = startPts[i].x, py = threadY;
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  for(let i=0;i<N;i++){
+    ctx.beginPath();
+    ctx.fillStyle = lineColor;
+    ctx.arc(startPts[i].x, threadY, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.fillStyle = fg;
+  ctx.font='11px sans-serif';
+  const modeText = t<0.5 ? 'scattered addresses \u2192 warp divergence' : 'consecutive addresses \u2192 coalesced read';
+  ctx.fillText(modeText, marginL, threadY+22);
+}
+
+function animate(){
+  const diff = state.target - state.cur;
+  if(Math.abs(diff) < 0.003 || reduced){
+    state.cur = state.target;
+  } else {
+    state.cur += diff*0.14;
+    requestAnimationFrame(animate);
+  }
+  updateReadouts(state.cur);
+  draw(state.cur);
+}
+
+function updateReadouts(t){
+  document.getElementById('roMode').textContent = t<0.5 ? 'per-environment' : 'centralized';
+  const disp = t<0.5 ? 'per' : 'centralized';
+  document.getElementById('roMax').textContent = maxEnvs(disp).toLocaleString();
+  document.getElementById('roBytes').textContent = bytesPerEnv(disp).toLocaleString();
+  document.getElementById('roWaste').textContent = wastePct(disp).toFixed(1);
+}
+
+const btn = document.getElementById('toggleBtn');
+btn.addEventListener('click', ()=>{
+  state.target = state.target < 0.5 ? 1 : 0;
+  btn.textContent = state.target < 0.5 ? 'Switch to centralized table' : 'Switch to per-environment tables';
+  animate();
+});
+
+// init
+fitCanvas();
+updateReadouts(state.cur);
+draw(state.cur);
+window.addEventListener('resize', fitCanvas);
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;centralized-table-per-archetype&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One shared table for all environments beats one table per environment"
+  ></iframe>
+</section>
+
+<section class="scene" id="envid-dynamic-entities">
+  <h3>Deleting an entity is a tag flip; reclaiming its memory is a sort</h3>
+  <div class="caption">Deleting an entity just overwrites its environment tag with <math><mo>-</mo><mn>1</mn></math> — no locks, no shifting. Periodically a parallel sort shoves every <math><mo>-</mo><mn>1</mn></math> row to the end so the table can be truncated. Click delete, then run the sort, and watch the table shrink.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="envid-dynamic-entities"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Delete = tag flip, reclaim = sort</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f4f5f7;
+  --text:#1a1a1a;
+  --muted:#5b5f66;
+  --grid:#c7ccd1;
+  --live0:#2563eb;
+  --live1:#059669;
+  --live2:#d97706;
+  --live3:#7c3aed;
+  --dead:#9aa0a8;
+  --cell-text:#f8fafc;
+  --dead-text:#3b3f45;
+  --accent:#dc2626;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a;
+    --panel:#1f2226;
+    --text:#e8e9eb;
+    --muted:#9aa0a8;
+    --grid:#3a3f45;
+    --live0:#3b82f6;
+    --live1:#10b981;
+    --live2:#f59e0b;
+    --live3:#a78bfa;
+    --dead:#4b5158;
+    --cell-text:#0e0f11;
+    --dead-text:#c9cdd2;
+    --accent:#f87171;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:12px; background:var(--bg); color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+}
+.scene{max-width:660px;margin:0 auto;}
+h2{font-size:15px;margin:0 0 6px 0;font-weight:600;}
+.hint{font-size:12px;color:var(--muted);margin:4px 0 10px 0;line-height:1.4;}
+canvas{width:100%;max-width:100%;display:block;border-radius:6px;background:var(--panel);}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;margin-top:10px;}
+.ctrl{flex:1 1 260px;min-width:220px;}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+input[type=range]{width:100%;}
+button{
+  padding:8px 14px;font-size:13px;border-radius:6px;border:1px solid var(--grid);
+  background:var(--panel);color:var(--text);cursor:pointer;
+}
+button:disabled{opacity:0.45;cursor:default;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.stat{background:var(--panel);border-radius:6px;padding:6px 10px;font-size:12px;min-width:120px;}
+.stat b{display:block;font-size:15px;margin-top:2px;}
+.legend{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;}
+math{font-size:15px;}
+.eqwrap{margin-top:14px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Deleting an entity: overwrite a tag; reclaiming memory: sort + truncate</h2>
+  <p class=&quot;hint&quot;>Each square is one row of the entity table. The number is its EnvID (which simulated environment owns that row). A grey square marked <b>&amp;minus;1</b> is a dead row: its slot was overwritten, nothing else moved. Compaction sorts dead rows to the tail, then the table is truncated.</p>
+
+  <canvas id=&quot;tableCanvas&quot; width=&quot;640&quot; height=&quot;260&quot;></canvas>
+  <p class=&quot;legend&quot;>Colors group live rows by EnvID (0,1,2,3 &amp;mdash; four simulated environments sharing this table). Grey = EnvID &amp;minus;1 (dead, memory not yet reclaimed).</p>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;delSlider&quot;>Deletions performed before compaction: <span id=&quot;delVal&quot;>8</span> rows (marks that many live rows as EnvID = &amp;minus;1, scattered through the table)</label>
+      <input type=&quot;range&quot; id=&quot;delSlider&quot; min=&quot;0&quot; max=&quot;20&quot; step=&quot;1&quot; value=&quot;8&quot;>
+    </div>
+    <div class=&quot;ctrl&quot; style=&quot;flex:0 0 auto;&quot;>
+      <label>&amp;nbsp;</label>
+      <button id=&quot;compactBtn&quot;>Run compaction sort &amp;rarr; reclaim memory</button>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;stat&quot;>Table size (rows)<b id=&quot;sizeStat&quot;>40</b></div>
+    <div class=&quot;stat&quot;>Live rows<b id=&quot;liveStat&quot;>32</b></div>
+    <div class=&quot;stat&quot;>Dead rows (EnvID = &amp;minus;1)<b id=&quot;deadStat&quot;>8</b></div>
+    <div class=&quot;stat&quot;>Memory reclaimed (last sort)<b id=&quot;reclaimStat&quot;>0.00 KB</b></div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>N</mi><mtext>after</mtext></msub>
+      <mo>=</mo>
+      <msub><mi>N</mi><mtext>before</mtext></msub>
+      <mo>&amp;#8722;</mo>
+      <mi>D</mi>
+    </math>
+    <p class=&quot;legend&quot;>N<sub></sub>before, N<sub></sub>after &amp;mdash; table size in rows just before / just after compaction &amp;middot; D &amp;mdash; number of deletions (EnvID &amp;rarr; &amp;minus;1 flips) accumulated since the last compaction.</p>
+  </div>
+</div>
+
+<script>
+const BYTES_PER_ROW = 64; // assumed bytes per archetype row (illustrative, for the reclaimed-memory readout)
+const COLS = 8;
+const GAP = 4;
+const reduceMotion = window.matchMedia &amp;&amp; matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const canvas = document.getElementById('tableCanvas');
+const ctx = canvas.getContext('2d');
+const slider = document.getElementById('delSlider');
+const delValEl = document.getElementById('delVal');
+const compactBtn = document.getElementById('compactBtn');
+const sizeStat = document.getElementById('sizeStat');
+const liveStat = document.getElementById('liveStat');
+const deadStat = document.getElementById('deadStat');
+const reclaimStat = document.getElementById('reclaimStat');
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function hash(i){ const x = Math.sin(i*12.9898+78.233)*43758.5453; return x - Math.floor(x); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function easeInOut(t){ return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+let TABLE_SIZE = 40;
+let cells = [];        // {envId}
+let deletionCount = 8; // start with some rows already tagged dead so the tag-flip mechanism is visible by default
+let animPositions = null; // interpolated {x,y} keyed by original index, during compaction animation
+let lastReclaimed = 0;
+
+function initCells(n){
+  const arr = [];
+  for(let i=0;i<n;i++){
+    arr.push({ envId: Math.floor(hash(i*97.13+13.7)*4) });
+  }
+  return arr;
+}
+cells = initCells(TABLE_SIZE);
+
+function computeDeadSet(n, dc){
+  const set = new Set();
+  if(dc<=0) return set;
+  const idx = Array.from({length:n},(_,i)=>i);
+  idx.sort((a,b)=> hash(a) - hash(b));
+  const k = Math.min(dc, n);
+  for(let j=0;j<k;j++) set.add(idx[j]);
+  return set;
+}
+
+function cellPos(index, cellSize, widthCss){
+  const col = index % COLS, row = Math.floor(index / COLS);
+  const x = GAP + col*(cellSize+GAP);
+  const y = GAP + row*(cellSize+GAP);
+  return {x,y};
+}
+
+function resizeCanvas(n){
+  const rows = Math.max(1, Math.ceil(n / COLS));
+  const dpr = window.devicePixelRatio || 1;
+  const widthCss = Math.max(240, canvas.clientWidth || 600);
+  const cellSize = Math.floor((widthCss - (COLS+1)*GAP) / COLS);
+  const heightCss = rows*cellSize + (rows+1)*GAP;
+  canvas.width = Math.round(widthCss*dpr);
+  canvas.height = Math.round(heightCss*dpr);
+  canvas.style.height = heightCss + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {rows, cellSize, widthCss, heightCss};
+}
+
+function drawCell(x,y,size,envId,isDead){
+  ctx.fillStyle = isDead ? cssVar('--dead') : cssVar('--live'+envId);
+  ctx.fillRect(x,y,size,size);
+  ctx.strokeStyle = cssVar('--grid');
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x+0.5,y+0.5,size-1,size-1);
+  ctx.fillStyle = isDead ? cssVar('--dead-text') : cssVar('--cell-text');
+  ctx.font = Math.max(9, Math.floor(size*0.4)) + 'px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(isDead ? '\u22121' : String(envId), x+size/2, y+size/2+1);
+}
+
+function draw(){
+  const n = TABLE_SIZE;
+  const {cellSize, widthCss, heightCss} = resizeCanvas(n);
+  ctx.clearRect(0,0,widthCss,heightCss);
+  const dead = computeDeadSet(n, deletionCount);
+  for(let i=0;i<n;i++){
+    const pos = animPositions ? animPositions[i] : cellPos(i, cellSize, widthCss);
+    drawCell(pos.x, pos.y, cellSize, cells[i].envId, dead.has(i));
+  }
+}
+
+function updateReadouts(){
+  sizeStat.textContent = TABLE_SIZE;
+  liveStat.textContent = TABLE_SIZE - deletionCount;
+  deadStat.textContent = deletionCount;
+  reclaimStat.textContent = (lastReclaimed*BYTES_PER_ROW/1024).toFixed(2) + ' KB (' + lastReclaimed + ' rows)';
+}
+
+function updateSliderBounds(){
+  slider.max = Math.min(20, TABLE_SIZE);
+  if(parseInt(slider.value,10) > TABLE_SIZE) slider.value = TABLE_SIZE;
+}
+
+slider.addEventListener('input', ()=>{
+  deletionCount = parseInt(slider.value,10);
+  delValEl.textContent = deletionCount;
+  compactBtn.disabled = (deletionCount === 0);
+  updateReadouts();
+  draw();
+});
+
+function performCompaction(){
+  if(deletionCount === 0) return;
+  const n = TABLE_SIZE;
+  const dc = deletionCount;
+  const deadSet = computeDeadSet(n, dc);
+  const liveIdx = [], deadIdx = [];
+  for(let i=0;i<n;i++){
+    if(deadSet.has(i)) deadIdx.push(i); else liveIdx.push(i);
+  }
+  liveIdx.sort((a,b)=> cells[a].envId - cells[b].envId); // regroup live rows by EnvID
+  const newOrder = liveIdx.concat(deadIdx);              // dead rows pushed to the tail
+  const newPosOfOld = new Array(n);
+  newOrder.forEach((oldIdx,j)=>{ newPosOfOld[oldIdx] = j; });
+
+  const {cellSize, widthCss} = resizeCanvas(n);
+  const fromPos = [], toPos = [];
+  for(let i=0;i<n;i++){
+    fromPos[i] = cellPos(i, cellSize, widthCss);
+    toPos[i]   = cellPos(newPosOfOld[i], cellSize, widthCss);
+  }
+
+  compactBtn.disabled = true;
+  slider.disabled = true;
+  const duration = reduceMotion ? 0 : 650;
+  const start = performance.now();
+
+  function frame(now){
+    const raw = duration === 0 ? 1 : Math.min(1, (now - start)/duration);
+    const e = easeInOut(raw);
+    animPositions = new Array(n);
+    for(let i=0;i<n;i++){
+      animPositions[i] = { x: lerp(fromPos[i].x, toPos[i].x, e), y: lerp(fromPos[i].y, toPos[i].y, e) };
+    }
+    draw();
+    if(raw < 1) requestAnimationFrame(frame);
+    else finishCompaction(newOrder, dc);
+  }
+  requestAnimationFrame(frame);
+}
+
+function finishCompaction(newOrder, dc){
+  const reordered = newOrder.map(idx => cells[idx]);
+  const newSize = TABLE_SIZE - dc; // table shrinks by exactly the deletions since last compaction
+  reordered.length = newSize;
+  cells = reordered;
+  TABLE_SIZE = newSize;
+  lastReclaimed = dc;
+  deletionCount = 0;
+  animPositions = null;
+  slider.value = 0;
+  delValEl.textContent = 0;
+  updateSliderBounds();
+  slider.disabled = false;
+  compactBtn.disabled = true;
+  updateReadouts();
+  draw();
+}
+
+compactBtn.addEventListener('click', performCompaction);
+
+updateSliderBounds();
+compactBtn.disabled = (deletionCount === 0);
+updateReadouts();
+draw();
+window.addEventListener('resize', draw);
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;envid-dynamic-entities&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Deleting an entity is a tag flip; reclaiming its memory is a sort"
+  ></iframe>
+</section>
+
+<section class="scene" id="megakernel-design">
+  <h3>The whole simulation step runs as one self-scheduling kernel</h3>
+  <div class="caption">Instead of ~200 separate kernel launches with a CPU round-trip between each, the whole graph is compiled into one kernel: warps just grab the next ready node from a shared pointer. Step through the graph and watch the launch-overhead slivers from before disappear.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="megakernel-design"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Megakernel design</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --text:#1a1d23; --muted:#5b6270; --grid:#c9ced7;
+    --node-pending:#e2e5ea; --node-pending-b:#9aa1ad;
+    --node-active:#2f6fed; --node-done:#3a9a63; --overhead:#d84a3e;
+    --mega:#2f6fed; --warp:#e2932a;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#14161a; --panel:#1c1f26; --text:#e9ebef; --muted:#9aa1ad; --grid:#3a3f4a;
+      --node-pending:#272b33; --node-pending-b:#4a5162;
+      --node-active:#5b9bf5; --node-done:#49b581; --overhead:#ff6f61;
+      --mega:#5b9bf5; --warp:#ffb84d;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:15px;margin:2px 0 8px;font-weight:600;}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px;}
+  .ctrl-label{font-size:12px;color:var(--muted);flex-basis:100%;}
+  .btnrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  button{font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button:disabled{opacity:.4;cursor:default;}
+  #stepLabel{font-size:13px;font-weight:600;min-width:90px;text-align:center;}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  .readouts{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:10px 0 6px;font-size:12.5px;}
+  .readouts b{color:var(--text);}
+  .readouts span{color:var(--muted);}
+  .eqwrap{margin-top:10px;font-size:14px;}
+  .legend{font-size:11px;color:var(--muted);margin-top:2px;}
+  @media (max-width:420px){ .readouts{grid-template-columns:1fr;} }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>One megakernel, self-scheduling across ~200 graph nodes</h2>
+  <div class=&quot;controls&quot;>
+    <span class=&quot;ctrl-label&quot;>Advance the shared task pointer through the graph (toy: 6 nodes stand in for ~200 real ones)</span>
+    <div class=&quot;btnrow&quot;>
+      <button id=&quot;prev&quot;>◀ Prev node</button>
+      <span id=&quot;stepLabel&quot;>Node 1 / 6</span>
+      <button id=&quot;next&quot;>Next node ▶</button>
+    </div>
+  </div>
+
+  <svg id=&quot;scene&quot; viewBox=&quot;0 0 680 385&quot; role=&quot;img&quot; aria-label=&quot;Megakernel task graph and timeline&quot;></svg>
+
+  <div class=&quot;readouts&quot;>
+    <div><span>current node:</span> <b id=&quot;rNode&quot;>Broadphase</b></div>
+    <div><span>megakernel elapsed:</span> <b id=&quot;rMega&quot;>0 µs</b> (1 launch)</div>
+    <div><span>old design, same progress:</span> <b id=&quot;rMulti&quot;>0 µs</b></div>
+    <div><span>launch overhead avoided:</span> <b id=&quot;rSaved&quot;>0 µs</b></div>
+  </div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <msub><mi>T</mi><mtext>mega</mtext></msub><mo>=</mo>
+        <munderover><mo>&amp;#8721;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+        <msub><mi>t</mi><mi>i</mi></msub>
+      </mrow>
+      <mspace width=&quot;1.2em&quot;/>
+      <mrow>
+        <msub><mi>T</mi><mtext>multi</mtext></msub><mo>=</mo>
+        <munderover><mo>&amp;#8721;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+        <mrow><mo>(</mo><msub><mi>t</mi><mi>i</mi></msub><mo>+</mo><msub><mi>t</mi><mtext>oh</mtext></msub><mo>)</mo></mrow>
+      </mrow>
+    </math>
+    <div class=&quot;legend&quot;>T<sub></sub> — total wall-clock time for the whole step (µs) · t<sub>i</sub> — compute cost of graph node i (µs) · t<sub>oh</sub> — CPU launch + GPU-sync overhead paid once per kernel launch (µs) · N — number of graph nodes (6 here, ~200 in the real kernel)</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- physical / toy parameters, named and visible ----
+  const NODE_NAMES = ['Broadphase','Narrowphase','Solve','Integrate','Render','Export'];
+  const N = NODE_NAMES.length;
+  const DURATIONS = [8,12,10,15,9,7];      // µs, toy per-node compute cost
+  const OVERHEAD_US = 6;                    // µs, CPU dispatch + GPU sync cost paid PER kernel launch in the old design
+
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let step = 1; // current node pointer, 1..N
+
+  // ----- geometry -----
+  const BOX_W=80, BOX_H=36, GAP=24, X0=40, Y0=95;
+  const nodeX = i => X0 + i*(BOX_W+GAP);
+  const nodeCX = i => nodeX(i) + BOX_W/2;
+
+  const PX0=50, PX1=620;                    // plot x-range (pixels)
+  const TMAX=100;                           // axis max, µs
+  const scaleX = (PX1-PX0)/TMAX;
+  const tx = t => PX0 + t*scaleX;
+
+  function megaSegs(upTo){
+    let t=0, segs=[];
+    for(let i=0;i<upTo;i++){ segs.push({start:t,dur:DURATIONS[i],i}); t+=DURATIONS[i]; }
+    return {segs, total:t};
+  }
+  function ghostFull(){
+    let t=0, segs=[], ohs=[];
+    for(let i=0;i<N;i++){
+      ohs.push({start:t,dur:OVERHEAD_US});
+      t+=OVERHEAD_US;
+      segs.push({start:t,dur:DURATIONS[i],i});
+      t+=DURATIONS[i];
+    }
+    return {segs, ohs, total:t};
+  }
+  const ghost = ghostFull();
+
+  const svg = document.getElementById('scene');
+  const cs = getComputedStyle(document.documentElement);
+  const col = name => cs.getPropertyValue(name).trim();
+
+  function nodeFill(n){
+    if(n < step) return col('--node-done');
+    if(n === step) return col('--node-active');
+    return col('--node-pending');
+  }
+  function nodeStroke(n){
+    return (n===step) ? col('--node-active') : col('--node-pending-b');
+  }
+
+  function build(pulse){
+    const mega = megaSegs(step);
+    const megaTotal = Math.round(mega.total);
+    const ghostPartial = Math.round(mega.total + step*OVERHEAD_US);
+    const saved = Math.round(step*OVERHEAD_US);
+    const ghostTotal = Math.round(ghost.total);
+
+    let s = '';
+    // outer box
+    s += `<rect x=&quot;15&quot; y=&quot;15&quot; width=&quot;650&quot; height=&quot;175&quot; rx=&quot;14&quot; fill=&quot;${col('--panel')}&quot; stroke=&quot;${col('--grid')}&quot;/>`;
+    s += `<text x=&quot;30&quot; y=&quot;34&quot; font-size=&quot;12.5&quot; font-weight=&quot;600&quot; fill=&quot;${col('--text')}&quot;>ONE megakernel — launched once per step</text>`;
+
+    // warps above active node
+    const wCx = nodeCX(step-1);
+    const bounce = reduceMotion ? 0 : Math.sin(pulse)*1.5;
+    s += `<text x=&quot;${wCx}&quot; y=&quot;60&quot; font-size=&quot;9&quot; text-anchor=&quot;middle&quot; fill=&quot;${col('--muted')}&quot;>warps</text>`;
+    for(let k=0;k<4;k++){
+      const wx = wCx - 20 + k*13;
+      s += `<rect x=&quot;${wx-4}&quot; y=&quot;${68+bounce}&quot; width=&quot;9&quot; height=&quot;9&quot; rx=&quot;2&quot; fill=&quot;${col('--warp')}&quot;/>`;
+    }
+    // pointer triangle into active node
+    s += `<polygon points=&quot;${wCx-6},88 ${wCx+6},88 ${wCx},96&quot; fill=&quot;${col('--warp')}&quot;/>`;
+
+    // arrows between nodes
+    for(let i=0;i<N-1;i++){
+      const x1=nodeX(i)+BOX_W, x2=nodeX(i+1), y=Y0+BOX_H/2;
+      s += `<line x1=&quot;${x1}&quot; y1=&quot;${y}&quot; x2=&quot;${x2-6}&quot; y2=&quot;${y}&quot; stroke=&quot;${col('--muted')}&quot; stroke-width=&quot;1.5&quot;/>`;
+      s += `<polygon points=&quot;${x2-6},${y-4} ${x2-6},${y+4} ${x2},${y}&quot; fill=&quot;${col('--muted')}&quot;/>`;
+    }
+    // node boxes
+    for(let i=0;i<N;i++){
+      const n=i+1;
+      const sw = (n===step &amp;&amp; !reduceMotion) ? (2+Math.sin(pulse)*1.2) : 2;
+      s += `<rect x=&quot;${nodeX(i)}&quot; y=&quot;${Y0}&quot; width=&quot;${BOX_W}&quot; height=&quot;${BOX_H}&quot; rx=&quot;6&quot; fill=&quot;${nodeFill(n)}&quot; stroke=&quot;${nodeStroke(n)}&quot; stroke-width=&quot;${sw}&quot;/>`;
+      s += `<text x=&quot;${nodeCX(i)}&quot; y=&quot;${Y0+16}&quot; font-size=&quot;9&quot; text-anchor=&quot;middle&quot; fill=&quot;${col('--text')}&quot;>${n}</text>`;
+      s += `<text x=&quot;${nodeCX(i)}&quot; y=&quot;${Y0+28}&quot; font-size=&quot;9&quot; text-anchor=&quot;middle&quot; fill=&quot;${col('--text')}&quot;>${NODE_NAMES[i]}</text>`;
+    }
+
+    s += `<text x=&quot;25&quot; y=&quot;172&quot; font-size=&quot;9&quot; fill=&quot;${col('--muted')}&quot;>warp = GPU thread group &amp;#183; triangle = shared next-node pointer &amp;#183; grey/blue/green = pending/active/done</text>`;
+
+    // ----- timeline -----
+    const mY=228, gY=296, trackH=26;
+
+    // row labels sit ABOVE their bars (not to the left) so they can never be clipped by the canvas edge
+    s += `<text x=&quot;${PX0}&quot; y=&quot;${mY-8}&quot; font-size=&quot;10.5&quot; text-anchor=&quot;start&quot; fill=&quot;${col('--mega')}&quot; font-weight=&quot;600&quot;>Megakernel</text>`;
+    s += `<text x=&quot;${PX0}&quot; y=&quot;${gY-22}&quot; font-size=&quot;10.5&quot; text-anchor=&quot;start&quot; fill=&quot;${col('--muted')}&quot; font-weight=&quot;600&quot;>Old design (one kernel launch per node)</text>`;
+
+    // mega bar: contiguous, no gaps -> physics check 1
+    for(const seg of mega.segs){
+      const shade = 62 - seg.i*5;
+      s += `<rect x=&quot;${tx(seg.start)}&quot; y=&quot;${mY}&quot; width=&quot;${seg.dur*scaleX}&quot; height=&quot;${trackH}&quot; fill=&quot;hsl(217,75%,${shade}%)&quot;/>`;
+    }
+    if(step>0){
+      s += `<text x=&quot;${tx(mega.total)+6}&quot; y=&quot;${mY+trackH/2+4}&quot; font-size=&quot;10.5&quot; font-weight=&quot;600&quot; fill=&quot;${col('--mega')}&quot;>${megaTotal} &amp;#181;s</text>`;
+    }
+
+    // ghost bar: full reference run with overhead slivers
+    for(const seg of ghost.segs){
+      s += `<rect x=&quot;${tx(seg.start)}&quot; y=&quot;${gY}&quot; width=&quot;${seg.dur*scaleX}&quot; height=&quot;${trackH}&quot; fill=&quot;${col('--muted')}&quot; opacity=&quot;0.32&quot;/>`;
+    }
+    for(const oh of ghost.ohs){
+      s += `<rect x=&quot;${tx(oh.start)}&quot; y=&quot;${gY}&quot; width=&quot;${Math.max(oh.dur*scaleX,2)}&quot; height=&quot;${trackH}&quot; fill=&quot;${col('--overhead')}&quot; opacity=&quot;0.9&quot;/>`;
+    }
+    // &quot;launch overhead&quot; annotation placed above a mid-timeline sliver, away from the row label on the left
+    const midOh = ghost.ohs[Math.floor(N/2)];
+    s += `<text x=&quot;${tx(midOh.start)+3}&quot; y=&quot;${gY-6}&quot; font-size=&quot;8.5&quot; text-anchor=&quot;middle&quot; fill=&quot;${col('--overhead')}&quot;>launch overhead</text>`;
+    s += `<text x=&quot;${tx(ghost.total)-4}&quot; y=&quot;${gY+trackH/2+4}&quot; font-size=&quot;10.5&quot; text-anchor=&quot;end&quot; fill=&quot;${col('--muted')}&quot; font-weight=&quot;600&quot;>${ghostTotal} &amp;#181;s (6 launches, reference)</text>`;
+
+    // axis
+    const axY = gY+trackH+18;
+    s += `<line x1=&quot;${PX0}&quot; y1=&quot;${axY}&quot; x2=&quot;${PX1}&quot; y2=&quot;${axY}&quot; stroke=&quot;${col('--grid')}&quot;/>`;
+    for(let t=0;t<=TMAX;t+=20){
+      const x=tx(t);
+      s += `<line x1=&quot;${x}&quot; y1=&quot;${axY}&quot; x2=&quot;${x}&quot; y2=&quot;${axY+4}&quot; stroke=&quot;${col('--grid')}&quot;/>`;
+      s += `<text x=&quot;${x}&quot; y=&quot;${axY+15}&quot; font-size=&quot;9&quot; text-anchor=&quot;middle&quot; fill=&quot;${col('--muted')}&quot;>${t}</text>`;
+    }
+    s += `<text x=&quot;${(PX0+PX1)/2}&quot; y=&quot;${axY+29}&quot; font-size=&quot;10&quot; text-anchor=&quot;middle&quot; fill=&quot;${col('--muted')}&quot;>time (&amp;#181;s) &amp;#8212; length of the whole simulation step</text>`;
+
+    svg.innerHTML = s;
+
+    document.getElementById('rNode').textContent = NODE_NAMES[step-1] + ' (' + step + '/' + N + ')';
+    document.getElementById('rMega').textContent = megaTotal + ' \u00b5s';
+    document.getElementById('rMulti').textContent = ghostPartial + ' \u00b5s (' + step + ' launches)';
+    document.getElementById('rSaved').textContent = saved + ' \u00b5s';
+    document.getElementById('stepLabel').textContent = 'Node ' + step + ' / ' + N;
+    document.getElementById('prev').disabled = step<=1;
+    document.getElementById('next').disabled = step>=N;
+  }
+
+  document.getElementById('prev').addEventListener('click',()=>{ if(step>1){ step--; build(phase); }});
+  document.getElementById('next').addEventListener('click',()=>{ if(step<N){ step++; build(phase); }});
+
+  let phase = 0;
+  function loop(){
+    phase += 0.06;
+    build(phase);
+    if(!reduceMotion) requestAnimationFrame(loop);
+  }
+
+  if(reduceMotion){
+    build(0);
+  } else {
+    requestAnimationFrame(loop);
+  }
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;megakernel-design&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The whole simulation step runs as one self-scheduling kernel"
+  ></iframe>
+</section>
+
+<section class="scene" id="pgo-register-allocation">
+  <h3>Splitting the megakernel's register budget per system raises GPU utilization</h3>
+  <div class="caption">One shared register budget for every system either starves cheap systems of parallelism or starves expensive systems of registers. Slide the budget for the selected system and watch resident-warp count trade off against speed — the paper's split raises compute use from 22% to 33%.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="pgo-register-allocation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Per-system register budgets and GPU occupancy</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1a; --muted:#55575c;
+  --grid:#cfd2d8; --occ:#2563eb; --spd:#d97706; --accent:#16a34a; --border:#dcdfe4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12141a; --panel:#191c22; --text:#e8e9ec; --muted:#9aa0a6;
+    --grid:#3a3e46; --occ:#60a5fa; --spd:#fbbf24; --accent:#34d399; --border:#2c3038;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 16px;}
+h1{font-size:14px;font-weight:600;margin:0 0 8px;}
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;margin-bottom:10px;}
+.controls label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);flex:1 1 220px;}
+select{font-size:13px;padding:4px;}
+input[type=range]{width:100%;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 8px;}
+.readout{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:6px 10px;font-size:12.5px;color:var(--muted);flex:1 1 150px;}
+.readout b{color:var(--text);font-size:14px;}
+canvas{display:block;width:100%;max-width:100%;height:auto;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;}
+.legend{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;}
+math{font-size:14px;}
+@media (max-width:420px){
+  .controls label{flex:1 1 100%;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Per-system register budget vs. occupancy and speed</h1>
+
+  <div class=&quot;controls&quot;>
+    <label>System being tuned — choose which kernel's register budget to view/edit
+      <select id=&quot;sysSel&quot;>
+        <option value=&quot;narrow&quot;>Narrow-phase collision (expensive)</option>
+        <option value=&quot;broad&quot;>Broad-phase collision (cheap)</option>
+      </select>
+    </label>
+    <label>Register budget for the system above: <span id=&quot;rVal&quot;>64</span> registers/thread — drag to change R (each system keeps its own value when you switch systems)
+      <input type=&quot;range&quot; id=&quot;rSlider&quot; min=&quot;64&quot; max=&quot;255&quot; step=&quot;1&quot; value=&quot;64&quot;>
+    </label>
+  </div>
+
+  <canvas id=&quot;chart&quot; width=&quot;680&quot; height=&quot;330&quot; aria-label=&quot;Occupancy and speed vs registers per thread&quot;></canvas>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;readout&quot;>Resident warps (occupancy)<br><b id=&quot;warpVal&quot;>–</b> / 64 max</div>
+    <div class=&quot;readout&quot;>Overall compute utilization<br><b id=&quot;utilVal&quot;>–</b>%</div>
+    <div class=&quot;readout&quot;>Throughput<br><b id=&quot;thrVal&quot;>–</b> steps/sec</div>
+    <div class=&quot;readout&quot;>Memory bandwidth utilization<br><b id=&quot;bwVal&quot;>–</b>%</div>
+  </div>
+
+  <math display=&quot;block&quot;>
+    <mi>W</mi><mo>=</mo><mi>min</mi><mo>(</mo><msub><mi>W</mi><mtext>max</mtext></msub><mo>,</mo>
+    <mo>&amp;#8970;</mo><mfrac><msub><mi>F</mi><mtext>regfile</mtext></msub><mrow><mi>R</mi><mo>&amp;#183;</mo><mi>s</mi></mrow></mfrac><mo>&amp;#8971;</mo><mo>)</mo>
+  </math>
+  <div class=&quot;legend&quot;>
+    W — resident warps on one streaming multiprocessor (SM) · W<sub>max</sub> — hardware cap on resident warps (64) ·
+    F<sub>regfile</sub> — register file size per SM (65536 registers) · R — registers per thread, the slider above ·
+    s — threads per warp (32). More registers per thread &amp;#8594; fewer warps fit &amp;#8594; W falls.
+  </div>
+
+  <div class=&quot;legend&quot;>
+    Blue curve = resident warps (left axis). Orange curve = selected system's speed relative to its own best
+    setting (right axis). Dashed green line = current register budget. Compute-bound systems need many registers
+    (curve peaks high); latency-bound systems need many resident warps instead (curve peaks low).
+  </div>
+  <div class=&quot;legend&quot;>
+    The three readouts above scale linearly with a composite speed metric between the shared-budget baseline
+    (1.4M steps/sec, 46% memory bandwidth, 22% compute) and the paper's optimal per-system split
+    (1.9M steps/sec, 69% memory bandwidth, 33% compute) — set both systems near their individual peaks to approach the split values.
+  </div>
+</div>
+
+<script>
+window.__sceneReady = false;
+
+// ---- physics constants (auditable) ----
+const REG_FILE   = 65536; // registers per SM (register file size)
+const WARP_SIZE  = 32;    // threads per warp
+const MAX_WARPS  = 64;    // max resident warps per SM
+
+// paper-reported anchor values (shared-budget baseline -> optimal per-system split)
+const UTIL_BASE = 22, UTIL_PEAK = 33;         // % compute utilization
+const THR_BASE  = 1.4e6, THR_PEAK = 1.9e6;    // steps/sec
+const BW_BASE   = 46, BW_PEAK = 69;           // % memory-bandwidth utilization
+
+function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+
+function occupancyWarps(R){
+  const byRegs = Math.floor(REG_FILE / (R * WARP_SIZE));
+  return Math.min(MAX_WARPS, byRegs);
+}
+
+// Two megakernel &quot;systems&quot; with different register/latency needs.
+const SYSTEMS = {
+  narrow: { label:&quot;Narrow-phase collision (expensive)&quot;, neededRegs:200, occNeeded:0.08 },
+  broad:  { label:&quot;Broad-phase collision (cheap)&quot;,       neededRegs:40,  occNeeded:0.55 }
+};
+
+function rawSpeed(key, R){
+  const s = SYSTEMS[key];
+  const spillFactor = Math.min(1, R / s.neededRegs);           // fewer register spills as R grows
+  const occFrac = occupancyWarps(R) / MAX_WARPS;                // fraction of max warps resident
+  const occComp = Math.min(1, occFrac / s.occNeeded);           // enough warps to hide latency?
+  return spillFactor * occComp;
+}
+
+function findPeak(key){
+  let best=-1, bestR=64;
+  for(let R=64;R<=255;R++){ const v=rawSpeed(key,R); if(v>best){best=v; bestR=R;} }
+  return {peak:best, peakR:bestR};
+}
+const PEAKS = { narrow: findPeak('narrow'), broad: findPeak('broad') };
+function speedNorm(key,R){ return rawSpeed(key,R)/PEAKS[key].peak; }
+
+function composite(Rn,Rb){ return 0.5*speedNorm('narrow',Rn) + 0.5*speedNorm('broad',Rb); }
+const RAW_BASELINE = composite(64,64); // shared 64-register budget for both systems
+
+// ---- state ----
+const regState = { narrow:64, broad:64 };
+let selected = 'narrow';
+
+const sysSel = document.getElementById('sysSel');
+const rSlider = document.getElementById('rSlider');
+const rVal = document.getElementById('rVal');
+const warpVal = document.getElementById('warpVal');
+const utilVal = document.getElementById('utilVal');
+const thrVal = document.getElementById('thrVal');
+const bwVal = document.getElementById('bwVal');
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function resizeCanvas(){
+  const w = canvas.parentElement.clientWidth;
+  canvas.width = Math.max(300, w);
+  canvas.height = Math.round(canvas.width * 0.48);
+  draw();
+}
+
+function updateReadouts(){
+  const R = regState[selected];
+  rVal.textContent = R;
+  rSlider.value = R; // keep control and label in sync regardless of update path
+  warpVal.textContent = occupancyWarps(R);
+
+  const c = composite(regState.narrow, regState.broad);
+  const frac = (c - RAW_BASELINE) / (1 - RAW_BASELINE);
+
+  const util = clamp(UTIL_BASE + (UTIL_PEAK - UTIL_BASE) * frac, 10, 40);
+  const thr  = clamp(THR_BASE  + (THR_PEAK  - THR_BASE)  * frac, 1.0e6, 2.0e6);
+  const bw   = clamp(BW_BASE   + (BW_PEAK   - BW_BASE)   * frac, 25, 80);
+
+  utilVal.textContent = util.toFixed(1);
+  thrVal.textContent  = (thr/1e6).toFixed(2) + 'M';
+  bwVal.textContent   = bw.toFixed(0);
+}
+
+function draw(){
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const m = {l:48, r:52, t:26, b:34};
+  const pw = W-m.l-m.r, ph = H-m.t-m.b;
+  const xOf = R => m.l + (R-64)/(255-64)*pw;
+  const yW  = w => m.t + (1 - w/MAX_WARPS)*ph;
+  const yS  = p => m.t + (1 - p/100)*ph;
+
+  const text = cssVar('--text'), muted = cssVar('--muted'), grid = cssVar('--grid');
+  const occC = cssVar('--occ'), spdC = cssVar('--spd'), accC = cssVar('--accent');
+
+  // grid + ticks
+  ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.font='11px sans-serif';
+  ctx.lineWidth=1;
+  [64,100,150,200,255].forEach(R=>{
+    const x=xOf(R);
+    ctx.beginPath(); ctx.moveTo(x,m.t); ctx.lineTo(x,m.t+ph); ctx.stroke();
+    ctx.fillText(R, x-8, m.t+ph+16);
+  });
+  [0,16,32,48,64].forEach(w=>{
+    const y=yW(w);
+    ctx.fillText(w, 6, y+4);
+  });
+  [0,25,50,75,100].forEach(p=>{
+    const y=yS(p);
+    ctx.fillText(p, W-m.r+6, y+4);
+  });
+
+  // axis titles
+  ctx.fillStyle=text; ctx.font='12px sans-serif';
+  ctx.fillText('registers per thread (R)', m.l + pw/2 - 60, H-4);
+  ctx.save(); ctx.fillStyle=occC; ctx.font='11px sans-serif';
+  ctx.fillText('resident warps (left axis)', m.l, 14);
+  ctx.fillStyle=spdC;
+  ctx.fillText('speed, % of peak (right axis)', W-m.r-150, 14);
+  ctx.restore();
+
+  // occupancy curve
+  ctx.strokeStyle = occC; ctx.lineWidth=2; ctx.beginPath();
+  for(let R=64;R<=255;R++){
+    const x=xOf(R), y=yW(occupancyWarps(R));
+    if(R===64) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // speed curve for selected system
+  ctx.strokeStyle = spdC; ctx.beginPath();
+  for(let R=64;R<=255;R++){
+    const x=xOf(R), y=yS(speedNorm(selected,R)*100);
+    if(R===64) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // current R marker
+  const R = regState[selected];
+  ctx.setLineDash([4,3]); ctx.strokeStyle = accC; ctx.beginPath();
+  ctx.moveTo(xOf(R), m.t); ctx.lineTo(xOf(R), m.t+ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  function dot(x,y,c){ ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fill(); }
+  dot(xOf(R), yW(occupancyWarps(R)), occC);
+  dot(xOf(R), yS(speedNorm(selected,R)*100), spdC);
+
+  // peak marker + label
+  const pk = PEAKS[selected];
+  ctx.strokeStyle = spdC; ctx.beginPath();
+  ctx.arc(xOf(pk.peakR), yS(100), 5, 0, 7); ctx.stroke();
+  ctx.fillStyle = muted; ctx.font='11px sans-serif';
+  ctx.fillText('peak at R='+pk.peakR, Math.min(xOf(pk.peakR)+6, W-m.r-90), yS(100)-6);
+
+  // current value label
+  ctx.fillStyle = accC; ctx.font='11px sans-serif';
+  ctx.fillText('current R='+R, Math.min(xOf(R)+6, W-m.r-70), m.t+12);
+
+  updateReadouts();
+}
+
+sysSel.addEventListener('change', ()=>{
+  selected = sysSel.value;
+  rSlider.value = regState[selected];
+  draw();
+});
+
+function onSliderMove(){
+  regState[selected] = parseInt(rSlider.value,10);
+  draw();
+}
+rSlider.addEventListener('input', onSliderMove);
+rSlider.addEventListener('change', onSliderMove);
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;pgo-register-allocation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Splitting the megakernel's register budget per system raises GPU utilization"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing simulators</h2>
+  <div class="part-lede">With the machine built, we can put it head-to-head against both a naive GPU port and a strong CPU baseline, using the paper's own measured numbers.</div>
+</header>
+<section class="scene" id="naive-gpu-mapping-fails">
+  <h3>One environment per GPU thread wastes almost the whole GPU</h3>
+  <div class="caption">Put one whole environment on one GPU thread and you get exactly the failure from earlier scenes: only 1.9% of compute and memory bandwidth used, and a design 3× slower than a good CPU implementation. Toggle between throughput and utilization — Madrona wins both.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="naive-gpu-mapping-fails"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Naive GPU mapping wastes the GPU</title>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --panel:#ffffff;
+  --text:#1a1a1a;
+  --muted:#6b6b76;
+  --grid:#d9d9e0;
+  --c-ecsgpu:#d1552e;
+  --c-ecscpu:#3567c8;
+  --c-madrona:#1f9e5c;
+  --c-compute:#4c6ef5;
+  --c-memory:#e08e00;
+  --c-na:#9a9a9a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#111318;
+    --panel:#1b1e26;
+    --text:#e8e8ee;
+    --muted:#9a9aa5;
+    --grid:#33363f;
+    --c-ecsgpu:#ff8a65;
+    --c-ecscpu:#6fb3ff;
+    --c-madrona:#4cd08c;
+    --c-compute:#8aa2ff;
+    --c-memory:#ffc24c;
+    --c-na:#7a7a82;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+button{
+  font:600 13px/1.2 inherit;padding:8px 12px;border-radius:7px;
+  border:1px solid var(--grid);background:var(--panel);color:var(--text);cursor:pointer;
+}
+button.active{background:var(--c-madrona);color:#fff;border-color:var(--c-madrona);}
+canvas{max-width:100%;width:100%;height:auto;display:block;background:var(--panel);
+  border-radius:8px;border:1px solid var(--grid);}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+.readout{flex:1 1 130px;background:var(--panel);border:1px solid var(--grid);
+  border-radius:7px;padding:6px 8px;font-size:12.5px;}
+.readout b{display:block;font-size:15px;margin-top:2px;}
+.eqs{margin-top:14px;}
+.eqBlock{margin-bottom:10px;}
+math{font-size:16px;}
+.legend{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;controls&quot;>
+    <button id=&quot;btnT&quot; class=&quot;active&quot;>Throughput (steps/sec)</button>
+    <button id=&quot;btnU&quot;>GPU utilization (%)</button>
+  </div>
+  <canvas id=&quot;chart&quot; width=&quot;640&quot; height=&quot;320&quot; role=&quot;img&quot;
+    aria-label=&quot;Bar chart comparing ECS-GPU naive, ECS-CPU, and Madrona&quot;></canvas>
+  <div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+
+  <div class=&quot;eqs&quot;>
+    <div class=&quot;eqBlock&quot;>
+      <math display=&quot;block&quot;>
+        <msub><mi>U</mi><mtext>compute</mtext></msub><mo>=</mo>
+        <mfrac><mn>1</mn><mi>W</mi></mfrac><mo>·</mo><mi>&amp;#951;</mi><mo>·</mo><mn>100</mn><mi>%</mi>
+      </math>
+      <div class=&quot;legend&quot;>U<sub></sub>compute — GPU compute utilization when 1 environment = 1 thread (%) · W — warp size, threads that execute in lockstep (dimensionless, 32) · η — memory-access efficiency factor after scattered per-thread reads (dimensionless, &amp;lt;1)</div>
+    </div>
+    <div class=&quot;eqBlock&quot;>
+      <math display=&quot;block&quot;>
+        <mi>S</mi><mo>=</mo>
+        <mfrac><msub><mi>T</mi><mtext>Madrona</mtext></msub><msub><mi>T</mi><mtext>ECS-GPU</mtext></msub></mfrac>
+      </math>
+      <div class=&quot;legend&quot;>S — speedup factor (dimensionless) · T — simulation throughput of each design (steps/sec)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+&quot;use strict&quot;;
+
+// ---------- physical / architectural constants (auditable) ----------
+const WARP_SIZE = 32;                 // threads per warp executed in lockstep on the GPU
+const MEM_EFFICIENCY_FACTOR = 0.6;    // fraction of warp-limited throughput kept after scattered per-thread memory access
+const ECS_GPU_COMPUTE_UTIL = (1/WARP_SIZE) * MEM_EFFICIENCY_FACTOR * 100; // ~1.875 -> reported as 1.9%
+const ECS_GPU_MEM_UTIL = ECS_GPU_COMPUTE_UTIL;
+
+const MADRONA_COMPUTE_UTIL = 33; // % measured: batched megakernel keeps SIMD lanes busy
+const MADRONA_MEM_UTIL = 69;     // % measured: shared component tables give coalesced access
+
+const MADRONA_THROUGHPUT = 1000000;      // steps/sec, reference measured batched throughput
+const SPEEDUP_VS_ECS_GPU = 42;           // measured
+const SPEEDUP_VS_ECS_CPU = 3;            // measured
+const ECS_GPU_THROUGHPUT = MADRONA_THROUGHPUT / SPEEDUP_VS_ECS_GPU;
+const ECS_CPU_THROUGHPUT = MADRONA_THROUGHPUT / SPEEDUP_VS_ECS_CPU;
+
+const bars = [
+  {key:'ecsgpu',  label:'ECS-GPU',  sub:'naive, 1 env/thread', color:'--c-ecsgpu',
+    throughput:ECS_GPU_THROUGHPUT, compute:ECS_GPU_COMPUTE_UTIL, memory:ECS_GPU_MEM_UTIL},
+  {key:'ecscpu',  label:'ECS-CPU',  sub:'32-thread',           color:'--c-ecscpu',
+    throughput:ECS_CPU_THROUGHPUT, compute:null, memory:null},
+  {key:'madrona', label:'Madrona',  sub:'batched GPU',         color:'--c-madrona',
+    throughput:MADRONA_THROUGHPUT, compute:MADRONA_COMPUTE_UTIL, memory:MADRONA_MEM_UTIL},
+];
+
+const cv = (name)=>getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---------- state ----------
+let mode = 'throughput'; // or 'utilization'
+let progress = 1;        // reveal animation 0..1
+let animStart = null;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DUR = 550;
+
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const readoutsEl = document.getElementById('readouts');
+
+function fmtInt(n){ return Math.round(n).toLocaleString(); }
+
+// log-scale mapping for throughput axis
+const LOG_MIN = 3;    // 10^3
+const LOG_MAX = 6.3;  // headroom above 10^6
+function logFrac(v){
+  const l = Math.log10(Math.max(v,1));
+  return Math.min(1, Math.max(0, (l-LOG_MIN)/(LOG_MAX-LOG_MIN)));
+}
+
+function draw(){
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const left=70, right=20, top=26, bottom=54;
+  const plotW = W-left-right, plotH = H-top-bottom;
+
+  ctx.strokeStyle = cv('--grid');
+  ctx.fillStyle = cv('--text');
+  ctx.lineWidth = 1;
+
+  // gridlines + y labels
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = cv('--muted');
+  ctx.textAlign = 'right';
+  if (mode==='utilization'){
+    for (let p=0;p<=100;p+=20){
+      const y = top + plotH*(1-p/100);
+      ctx.strokeStyle = cv('--grid');
+      ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(W-right,y);ctx.stroke();
+      ctx.fillText(p+'%', left-8, y+4);
+    }
+    ctx.save();
+    ctx.translate(16, top+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';
+    ctx.fillText('GPU utilization (%)',0,0);
+    ctx.restore();
+  } else {
+    const ticks=[1e3,1e4,1e5,1e6];
+    ticks.forEach(t=>{
+      const y = top + plotH*(1-logFrac(t));
+      ctx.strokeStyle = cv('--grid');
+      ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(W-right,y);ctx.stroke();
+      ctx.fillText(fmtInt(t), left-8, y+4);
+    });
+    ctx.save();
+    ctx.translate(16, top+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';
+    ctx.fillText('throughput (steps/sec, log scale)',0,0);
+    ctx.restore();
+  }
+
+  // x axis baseline
+  ctx.strokeStyle = cv('--grid');
+  ctx.beginPath();ctx.moveTo(left,top+plotH);ctx.lineTo(W-right,top+plotH);ctx.stroke();
+
+  const slotW = plotW/bars.length;
+  ctx.textAlign='center';
+
+  bars.forEach((b,i)=>{
+    const cx = left + slotW*(i+0.5);
+    const color = cv(b.color);
+
+    if (mode==='throughput'){
+      const target = logFrac(b.throughput)*progress;
+      const bw = slotW*0.42;
+      const bh = plotH*target;
+      const x = cx-bw/2, y = top+plotH-bh;
+      ctx.fillStyle = color;
+      ctx.fillRect(x,y,bw,bh);
+      ctx.fillStyle = cv('--text');
+      ctx.font='600 12px sans-serif';
+      ctx.fillText(fmtInt(b.throughput*progress), cx, y-8);
+    } else {
+      const bw = slotW*0.28, gap = 6;
+      if (b.compute===null){
+        // CPU: GPU utilization metric doesn't apply
+        const bh = plotH*0.06*progress;
+        const x = cx-bw*0.9, y = top+plotH-bh;
+        ctx.fillStyle = cv('--c-na');
+        ctx.fillRect(x,y,bw*1.8,bh);
+        ctx.fillStyle = cv('--muted');
+        ctx.font='11px sans-serif';
+        ctx.fillText('N/A (CPU, no GPU metric)', cx, top+plotH-bh-8);
+      } else {
+        const cH = plotH*(b.compute/100)*progress;
+        const mH = plotH*(b.memory/100)*progress;
+        const xc = cx-gap/2-bw, xm = cx+gap/2;
+        ctx.fillStyle = cv('--c-compute');
+        ctx.fillRect(xc, top+plotH-cH, bw, cH);
+        ctx.fillStyle = cv('--c-memory');
+        ctx.fillRect(xm, top+plotH-mH, bw, mH);
+        ctx.fillStyle = cv('--text');
+        ctx.font='600 11px sans-serif';
+        ctx.fillText((b.compute*progress).toFixed(1)+'%', xc+bw/2, top+plotH-cH-8);
+        ctx.fillText((b.memory*progress).toFixed(1)+'%', xm+bw/2, top+plotH-mH-8);
+      }
+    }
+
+    // category label
+    ctx.fillStyle = cv('--text');
+    ctx.font='600 12px sans-serif';
+    ctx.fillText(b.label, cx, top+plotH+18);
+    ctx.fillStyle = cv('--muted');
+    ctx.font='10.5px sans-serif';
+    ctx.fillText(b.sub, cx, top+plotH+32);
+  });
+
+  if (mode==='utilization'){
+    ctx.font='11px sans-serif';
+    ctx.textAlign='left';
+    ctx.fillStyle = cv('--c-compute');
+    ctx.fillText('■ compute utilization', left, top+12);
+    ctx.fillStyle = cv('--c-memory');
+    ctx.fillText('■ memory-bandwidth utilization', left+150, top+12);
+  }
+}
+
+function updateReadouts(){
+  const g = bars[0], c = bars[1], m = bars[2];
+  const items = mode==='throughput' ? [
+    ['Madrona', fmtInt(m.throughput)+' steps/sec'],
+    ['ECS-CPU', fmtInt(c.throughput)+' steps/sec'],
+    ['ECS-GPU (naive)', fmtInt(g.throughput)+' steps/sec'],
+    ['Madrona / ECS-GPU', SPEEDUP_VS_ECS_GPU+'×  faster'],
+  ] : [
+    ['Madrona compute', m.compute.toFixed(0)+'%'],
+    ['Madrona memory', m.memory.toFixed(0)+'%'],
+    ['ECS-GPU (naive)', g.compute.toFixed(1)+'% compute / '+g.memory.toFixed(1)+'% memory'],
+    ['ECS-CPU', 'N/A — not a GPU'],
+  ];
+  readoutsEl.innerHTML = items.map(([k,v])=>
+    `<div class=&quot;readout&quot;>${k}<b>${v}</b></div>`).join('');
+}
+
+function frame(ts){
+  if (animStart===null) animStart = ts;
+  const t = Math.min(1, (ts-animStart)/DUR);
+  progress = 1 - Math.pow(1-t,3); // easeOutCubic
+  draw();
+  updateReadouts();
+  if (t<1) requestAnimationFrame(frame);
+}
+
+function startReveal(){
+  if (reduceMotion){
+    progress = 1;
+    draw(); updateReadouts();
+    return;
+  }
+  progress = 0;
+  animStart = null;
+  requestAnimationFrame(frame);
+}
+
+document.getElementById('btnT').addEventListener('click', ()=>{
+  if (mode==='throughput') return;
+  mode='throughput';
+  document.getElementById('btnT').classList.add('active');
+  document.getElementById('btnU').classList.remove('active');
+  startReveal();
+});
+document.getElementById('btnU').addEventListener('click', ()=>{
+  if (mode==='utilization') return;
+  mode='utilization';
+  document.getElementById('btnU').classList.add('active');
+  document.getElementById('btnT').classList.remove('active');
+  startReveal();
+});
+
+// initial paint
+draw();
+updateReadouts();
+window.__sceneReady = true;
+if (!reduceMotion){ startReveal(); }
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;naive-gpu-mapping-fails&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One environment per GPU thread wastes almost the whole GPU"
+  ></iframe>
+</section>
+
+<section class="scene" id="quantitative-payoff">
+  <h3>1.9 million steps per second turns 40 days of training into 1.5</h3>
+  <div class="caption">Put it all together: 1.9 million steps per second on one RTX 4090. Pick a simulator and watch the same <math><mn>1.15</mn><mo>×</mo><msup><mn>10</mn><mrow><mn>11</mn></mrow></msup></math>-step training run take anywhere from months down to about a day and a half.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="quantitative-payoff"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Quantitative payoff — training-time comparison</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f4f6f9;
+    --fg:#12141a;
+    --muted:#5b6270;
+    --accent:#2f6fed;
+    --c-ref:#c8631f;
+    --c-cpu:#7a4fc4;
+    --c-madrona:#178a5c;
+    --grid:#d4d9e1;
+    --barbg:#e7eaf0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141a;
+      --panel:#1b1e27;
+      --fg:#edf0f6;
+      --muted:#9aa3b2;
+      --accent:#5b93ff;
+      --c-ref:#f28b4f;
+      --c-cpu:#b198ef;
+      --c-madrona:#3cc490;
+      --grid:#333a48;
+      --barbg:#242833;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h2{font-size:15px;margin:2px 0 10px;font-weight:600;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  button.simbtn{
+    flex:1 1 150px;min-width:130px;
+    padding:8px 8px;border-radius:8px;border:1.5px solid var(--grid);
+    background:var(--panel);color:var(--fg);font-size:12.5px;cursor:pointer;
+    line-height:1.3;
+  }
+  button.simbtn[aria-pressed=&quot;true&quot;]{
+    border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;
+    font-weight:600;
+  }
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  .barval{transition:width .35s ease, x .35s ease;}
+  @media (prefers-reduced-motion: reduce){ .barval{transition:none;} }
+  .readouts{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;
+  }
+  .ro{
+    flex:1 1 140px;background:var(--panel);border-radius:8px;padding:7px 9px;
+    border:1px solid var(--grid);
+  }
+  .ro .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;}
+  .ro .v{font-size:15px;font-weight:600;margin-top:1px;}
+  .eqbox{margin-top:12px;font-size:14px;overflow-x:auto;}
+  .legend{font-size:11px;color:var(--muted);line-height:1.5;margin-top:2px;}
+  math{font-size:15px;}
+  @media (max-width:420px){
+    button.simbtn{font-size:11.5px;padding:7px 6px;}
+    .ro .v{font-size:13.5px;}
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Training wall-clock time to 1.15×10<sup>11</sup> steps</h2>
+
+  <div class=&quot;controls&quot; role=&quot;group&quot; aria-label=&quot;Choose simulator&quot;>
+    <button class=&quot;simbtn&quot; data-sim=&quot;reference&quot;>Python / MuJoCo reference<br>(~7K steps/sec)</button>
+    <button class=&quot;simbtn&quot; data-sim=&quot;cpu&quot;>ECS-CPU, 32 threads<br>(~170K steps/sec)</button>
+    <button class=&quot;simbtn&quot; data-sim=&quot;madrona&quot;>Madrona, batched GPU<br>(1.9M steps/sec)</button>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 700 320&quot; role=&quot;img&quot; aria-label=&quot;Bar chart of training time per simulator&quot;></svg>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Selected simulator</div><div class=&quot;v&quot; id=&quot;roName&quot;>—</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Raw throughput</div><div class=&quot;v&quot; id=&quot;roRate&quot;>—</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Time to 1.15×10¹¹ steps</div><div class=&quot;v&quot; id=&quot;roDays&quot;>—</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>First emergent behavior</div><div class=&quot;v&quot; id=&quot;roEmerg&quot;>—</div></div>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>t</mi><mo>=</mo>
+      <mfrac>
+        <mrow><msub><mi>N</mi><mtext>steps</mtext></msub><mo>·</mo>
+          <mfenced><mrow><mfrac><mn>1</mn><mi>R</mi></mfrac><mo>+</mo><mi>τ</mi></mrow></mfenced>
+        </mrow>
+        <mn>86400</mn>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      t — wall-clock training time (days) · N<sub>steps</sub> — total training steps needed, 1.15×10¹¹ ·
+      R — raw simulator throughput (steps/sec, shown on buttons) · τ — extra wall-clock cost per step from
+      CPU↔GPU data movement and host synchronization (sec/step, smallest for Madrona because data never leaves the GPU) ·
+      86400 — seconds per day
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- physics constants (named, auditable) ----
+  const N_STEPS = 1.15e11;      // total environment steps target for this RL training run
+  const SEC_PER_DAY = 86400;    // s
+  const EMERGENT_STEPS = 1e10;  // steps at which early emergent behavior is typically visible
+
+  // per-step overhead (s/step) beyond raw simulate time: CPU<->GPU transfer + host sync.
+  // Madrona keeps sim+learning co-resident on GPU -> near-zero. CPU-ECS must cross PCIe
+  // each step to feed the learner. The Python reference adds interpreter overhead on top.
+  const SIMS = {
+    reference: {label:'Python / MuJoCo reference', throughput:7000,    overhead:1.57665e-4, color:'var(--c-ref)'},
+    cpu:       {label:'ECS-CPU (32-thread)',        throughput:170000, overhead:2.41698e-5, color:'var(--c-cpu)'},
+    madrona:   {label:'Madrona (batched GPU)',       throughput:1900000,overhead:6.0064e-7,  color:'var(--c-madrona)'}
+  };
+  const ORDER = ['reference','cpu','madrona'];
+
+  function perStepSec(sim){ return 1/sim.throughput + sim.overhead; }
+  function trainingDays(sim){ return N_STEPS * perStepSec(sim) / SEC_PER_DAY; }
+  function emergentHours(sim){ return EMERGENT_STEPS * perStepSec(sim) / 3600; }
+
+  let selected = 'reference';
+
+  // ---- log-scale layout (shared axis, in days) ----
+  const X0 = 206, X1 = 616;
+  const LOG_MIN = 0.05, LOG_MAX = 500;
+  const l0 = Math.log10(LOG_MIN), l1 = Math.log10(LOG_MAX);
+  function xPos(days){
+    const d = Math.min(LOG_MAX, Math.max(LOG_MIN, days));
+    const t = (Math.log10(d) - l0) / (l1 - l0);
+    return X0 + t * (X1 - X0);
+  }
+  const rowY = {reference:55, cpu:105, madrona:155};
+  const barH = 26;
+  const axisY = 198;
+  const emergY = 246;
+
+  const svg = document.getElementById('chart');
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function fmtDays(d){ return (d < 10 ? d.toFixed(2) : d.toFixed(1)) + ' d'; }
+  function fmtHours(h){ return (h < 10 ? h.toFixed(2) : h.toFixed(1)) + ' h'; }
+
+  function build(){
+    svg.innerHTML = '';
+    const style = getComputedStyle(document.documentElement);
+    const grid = style.getPropertyValue('--grid').trim();
+    const muted = style.getPropertyValue('--muted').trim();
+    const fg = style.getPropertyValue('--fg').trim();
+    const barbg = style.getPropertyValue('--barbg').trim();
+
+    // axis ticks (log scale, days)
+    [0.1, 1, 10, 100].forEach(v=>{
+      const x = xPos(v);
+      svg.appendChild(el('line',{x1:x,y1:35,x2:x,y2:axisY,stroke:grid,'stroke-width':1}));
+      const t = el('text',{x:x,y:axisY+14,'font-size':10.5,fill:muted,'text-anchor':'middle'});
+      t.textContent = v < 1 ? v+' d' : v+' d';
+      svg.appendChild(t);
+    });
+    svg.appendChild(el('line',{x1:X0,y1:axisY,x2:X1,y2:axisY,stroke:grid,'stroke-width':1.2}));
+
+    // three training-time bars (always visible for comparison; ordering is baked into geometry)
+    ORDER.forEach(key=>{
+      const sim = SIMS[key];
+      const y = rowY[key];
+      const days = trainingDays(sim);
+      const isSel = key === selected;
+      const color = getComputedStyle(document.documentElement).getPropertyValue(
+        key==='reference'?'--c-ref':key==='cpu'?'--c-cpu':'--c-madrona').trim();
+
+      // label
+      const name = el('text',{x:8,y:y+9,'font-size':11.5,fill:fg,'font-weight': isSel?700:400});
+      name.textContent = sim.label;
+      svg.appendChild(name);
+      const rate = el('text',{x:8,y:y+21,'font-size':10,fill:muted});
+      rate.textContent = Math.round(sim.throughput).toLocaleString() + ' steps/s';
+      svg.appendChild(rate);
+
+      // background track
+      svg.appendChild(el('rect',{x:X0,y:y,width:X1-X0,height:barH,rx:5,fill:barbg}));
+      // value bar
+      const w = Math.max(2, xPos(days) - X0);
+      svg.appendChild(el('rect',{class:'barval',x:X0,y:y,width:w,height:barH,rx:5,
+        fill:color, opacity: isSel ? 1 : 0.45}));
+      // end label (always includes explicit unit &quot;d&quot; for days, matching stat card)
+      const vt = el('text',{class:'barval',x:X0+w+6,y:y+barH/2+4,'font-size':11.5,
+        fill: isSel?fg:muted,'font-weight': isSel?700:400});
+      vt.textContent = fmtDays(days);
+      svg.appendChild(vt);
+    });
+
+    // emergent-behavior bar (recomputed for the selected simulator)
+    const simSel = SIMS[selected];
+    const eh = emergentHours(simSel);
+    const eDaysEquiv = eh/24;
+    const labelE = el('text',{x:8,y:emergY+9,'font-size':11.5,fill:fg,'font-weight':700});
+    labelE.textContent = 'First sign of learning — 1×10¹⁰ steps ('+simSel.label+')';
+    svg.appendChild(labelE);
+
+    svg.appendChild(el('rect',{x:X0,y:emergY+14,width:X1-X0,height:barH,rx:5,fill:barbg}));
+    const wE = Math.max(2, xPos(eDaysEquiv) - X0);
+    const colorSel = getComputedStyle(document.documentElement).getPropertyValue(
+      selected==='reference'?'--c-ref':selected==='cpu'?'--c-cpu':'--c-madrona').trim();
+    svg.appendChild(el('rect',{class:'barval',x:X0,y:emergY+14,width:wE,height:barH,rx:5,fill:colorSel}));
+
+    // 4-hour marker on this row
+    const x4 = xPos(4/24);
+    svg.appendChild(el('line',{x1:x4,y1:emergY+8,x2:x4,y2:emergY+14+barH,stroke:muted,'stroke-width':1,'stroke-dasharray':'3,2'}));
+    const t4 = el('text',{x:x4,y:emergY+8,'font-size':9.5,fill:muted,'text-anchor':'middle'});
+    t4.textContent = '4 h mark';
+    svg.appendChild(t4);
+
+    const vtE = el('text',{class:'barval',x:X0+wE+6,y:emergY+14+barH/2+4,'font-size':11.5,fill:fg,'font-weight':700});
+    vtE.textContent = fmtHours(eh) + (eh<4 ? '  ✓ under 4 h' : '');
+    svg.appendChild(vtE);
+  }
+
+  function updateReadouts(){
+    const sim = SIMS[selected];
+    document.getElementById('roName').textContent = sim.label;
+    document.getElementById('roRate').textContent = Math.round(sim.throughput).toLocaleString()+' steps/s';
+    document.getElementById('roDays').textContent = fmtDays(trainingDays(sim));
+    document.getElementById('roEmerg').textContent = fmtHours(emergentHours(sim));
+  }
+
+  function setSelected(key){
+    selected = key;
+    document.querySelectorAll('.simbtn').forEach(b=>{
+      b.setAttribute('aria-pressed', b.dataset.sim === key ? 'true':'false');
+    });
+    build();
+    updateReadouts();
+  }
+
+  document.querySelectorAll('.simbtn').forEach(b=>{
+    b.addEventListener('click', ()=>setSelected(b.dataset.sim));
+  });
+
+  setSelected(selected);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;quantitative-payoff&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="1.9 million steps per second turns 40 days of training into 1.5"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it matters now</h2>
+  <div class="part-lede">The architecture's payoff isn't a fluke of one hand-tuned task — it generalizes across simple and complex environments alike, which is exactly the property reinforcement learning research needs as tasks keep getting more complex.</div>
+</header>
+<section class="scene" id="two-level-parallelism">
+  <h3>Entities inside one environment give the GPU work even at modest scale</h3>
+  <div class="caption">A single environment already has dozens of entities to spread across threads, so Madrona doesn't need millions of environments to stay busy. Pick a task and watch how few environments it takes to hit 75% of peak throughput — 8,000 for a busy multi-agent task versus half a million for a nearly empty one.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="two-level-parallelism"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Two-level parallelism: entities per environment</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f5f6f8;
+    --text:#1a1d23;
+    --muted:#5a6270;
+    --grid:#d7dbe2;
+    --hideseek:#c0392b;
+    --cartpole:#2266cc;
+    --dim:#aab0bb;
+    --marker:#2a2a2a;
+    --accent-bg:#eef0f4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a;
+      --panel:#1c1f25;
+      --text:#e8eaee;
+      --muted:#9aa1ac;
+      --grid:#333844;
+      --hideseek:#ff6b57;
+      --cartpole:#5fa8ff;
+      --dim:#4a4f59;
+      --marker:#e8eaee;
+      --accent-bg:#20242b;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  #wrap{max-width:680px;margin:0 auto;padding:12px 14px 16px;}
+  h1{font-size:15px;font-weight:600;margin:0 0 8px;line-height:1.35;}
+  canvas{width:100%;height:auto;display:block;max-width:100%;background:var(--panel);
+    border-radius:6px;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0 6px;}
+  .group{display:flex;flex-direction:column;gap:4px;min-width:150px;flex:1 1 200px;}
+  label{font-size:12px;color:var(--muted);}
+  .btnrow{display:flex;gap:6px;}
+  button{
+    font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--accent-bg);color:var(--text);cursor:pointer;
+  }
+  button.active{background:var(--cartpole);color:#fff;border-color:var(--cartpole);}
+  button.active.hs{background:var(--hideseek);border-color:var(--hideseek);}
+  input[type=range]{width:100%;}
+  .readouts{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:8px;}
+  .ro{font-size:12.5px;color:var(--muted);}
+  .ro b{color:var(--text);font-weight:600;}
+  math{font-size:15px;}
+  .legend{font-size:11.5px;color:var(--muted);margin:2px 0 10px;line-height:1.5;}
+  .caption-eq{margin-top:10px;padding-top:8px;border-top:1px solid var(--grid);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div id=&quot;wrap&quot;>
+  <h1>Throughput saturation vs. number of parallel environments</h1>
+  <canvas id=&quot;cv&quot; width=&quot;1280&quot; height=&quot;720&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;group&quot;>
+      <label>Task (sets entities per environment)</label>
+      <div class=&quot;btnrow&quot;>
+        <button id=&quot;btnCart&quot;>Cartpole (1–2 entities)</button>
+        <button id=&quot;btnHS&quot;>HideSeek (many entities)</button>
+      </div>
+    </div>
+    <div class=&quot;group&quot;>
+      <label for=&quot;nSlider&quot;>Cursor: environments simulated, N = <span id=&quot;nVal&quot;></span></label>
+      <input id=&quot;nSlider&quot; type=&quot;range&quot; min=&quot;2&quot; max=&quot;6&quot; step=&quot;0.02&quot; value=&quot;3.3&quot;>
+    </div>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;>Selected task: <b id=&quot;roTask&quot;></b></div>
+    <div class=&quot;ro&quot;>N at 75% of peak: <b id=&quot;ro75&quot;></b></div>
+    <div class=&quot;ro&quot;>Throughput at cursor (HideSeek): <b id=&quot;roHS&quot;></b></div>
+    <div class=&quot;ro&quot;>Throughput at cursor (Cartpole): <b id=&quot;roCP&quot;></b></div>
+  </div>
+
+  <div class=&quot;caption-eq&quot;>
+    <math display=&quot;block&quot;>
+      <mi>f</mi><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo>
+      <mfrac><mi>N</mi><mrow><mi>N</mi><mo>+</mo><mi>K</mi></mrow></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      N — number of environments simulated in parallel &amp;middot;
+      f(N) — fraction of peak throughput reached (0–1) &amp;middot;
+      K — half-saturation constant (environments needed for 50% of peak), fixed per task from the 75%-crossing point.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const col = name => css.getPropertyValue(name).trim();
+
+  // ---- physics model ----
+  // f(N) = N / (N + K); solved so f(N75)=0.75  =>  K = N75/3
+  const N75_HS = 8000;
+  const N75_CP = 500000;
+  const K_HS = N75_HS/3;
+  const K_CP = N75_CP/3;
+  const frac = (N,K) => N/(N+K);
+
+  const NMIN = 100, NMAX = 1e6;
+  const logMin = Math.log10(NMIN), logMax = Math.log10(NMAX);
+
+  let task = 'hs'; // 'hs' or 'cart'
+  let sliderLog = 3.3;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let animMarker = null; // for smooth marker transition
+
+  function targetMarkerLog(){
+    return task==='hs' ? Math.log10(N75_HS) : Math.log10(N75_CP);
+  }
+  if (reduced) animMarker = targetMarkerLog();
+
+  function fmtN(n){
+    if (n>=1000) return Math.round(n/1000)+'k'.replace('k', n>=1e6?'M':'k');
+  }
+  function niceN(n){
+    if (n>=1e6) return (n/1e6).toFixed(2).replace(/\.00$/,'')+'M';
+    if (n>=1000) return Math.round(n/1000).toLocaleString()+'k';
+    return Math.round(n).toLocaleString();
+  }
+
+  // layout
+  const W = 1280, H = 720;
+  const M = {left:70, right:40, top:30, bottom:60};
+  const plotW = W - M.left - M.right;
+  const plotH = H - M.top - M.bottom;
+
+  function xPix(N){
+    const l = Math.log10(N);
+    return M.left + (l-logMin)/(logMax-logMin)*plotW;
+  }
+  function yPix(frac01){
+    return M.top + (1-frac01)*plotH;
+  }
+
+  function draw(){
+    const W2 = cv.width, H2 = cv.height;
+    ctx.clearRect(0,0,W2,H2);
+    ctx.save();
+    ctx.scale(W2/W, H2/H);
+
+    ctx.font = '20px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    const textCol = col('--text');
+    const mutedCol = col('--muted');
+    const gridCol = col('--grid');
+
+    // grid + x ticks (log)
+    ctx.strokeStyle = gridCol;
+    ctx.fillStyle = mutedCol;
+    ctx.lineWidth = 1;
+    for (let p=2;p<=6;p++){
+      const N = Math.pow(10,p);
+      const x = xPix(N);
+      ctx.beginPath();
+      ctx.moveTo(x, M.top);
+      ctx.lineTo(x, M.top+plotH);
+      ctx.stroke();
+      ctx.textAlign='center';
+      ctx.textBaseline='top';
+      const supers = {2:'\u00b2',3:'\u00b3',4:'\u2074',5:'\u2075',6:'\u2076'};
+      ctx.fillText('10'+supers[p], x, M.top+plotH+10);
+    }
+    ctx.textAlign='center';
+    ctx.fillText('Environments simulated in parallel, N (log scale)', M.left+plotW/2, M.top+plotH+34);
+
+    // y grid ticks
+    ctx.textAlign='right';
+    ctx.textBaseline='middle';
+    for (let p=0;p<=100;p+=25){
+      const y = yPix(p/100);
+      ctx.strokeStyle = gridCol;
+      ctx.beginPath();
+      ctx.moveTo(M.left,y); ctx.lineTo(M.left+plotW,y); ctx.stroke();
+      ctx.fillStyle = mutedCol;
+      ctx.fillText(p+'%', M.left-10, y);
+    }
+    // y axis label
+    ctx.save();
+    ctx.translate(20, M.top+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';
+    ctx.fillStyle = mutedCol;
+    ctx.fillText('% of peak throughput', 0, 0);
+    ctx.restore();
+
+    // 75% reference line
+    const y75 = yPix(0.75);
+    ctx.strokeStyle = mutedCol;
+    ctx.setLineDash([6,6]);
+    ctx.beginPath();
+    ctx.moveTo(M.left, y75); ctx.lineTo(M.left+plotW, y75);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign='left';
+    ctx.fillStyle = mutedCol;
+    ctx.fillText('75% of peak', M.left+8, y75-14);
+
+    // curves
+    function drawCurve(K, color, dim, label){
+      ctx.beginPath();
+      ctx.strokeStyle = dim ? col('--dim') : color;
+      ctx.lineWidth = dim ? 3 : 5;
+      let first=true;
+      for (let i=0;i<=200;i++){
+        const l = logMin + (logMax-logMin)*i/200;
+        const N = Math.pow(10,l);
+        const f = frac(N,K);
+        const x = xPix(N), y = yPix(f);
+        if (first){ctx.moveTo(x,y); first=false;} else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    drawCurve(K_CP, col('--cartpole'), task!=='cart', 'Cartpole');
+    drawCurve(K_HS, col('--hideseek'), task!=='hs', 'HideSeek');
+
+    // curve end labels
+    ctx.font = '19px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    ctx.textAlign='left';
+    ctx.fillStyle = (task==='hs') ? col('--hideseek') : col('--dim');
+    ctx.fillText('HideSeek (many entities/env)', xPix(1.5e3), yPix(frac(1500,K_HS))-14);
+    ctx.fillStyle = (task==='cart') ? col('--cartpole') : col('--dim');
+    ctx.fillText('Cartpole (1\u20132 entities/env)', xPix(6e3), yPix(frac(6000,K_CP))+30);
+
+    // marker (smooth toward target)
+    const target = targetMarkerLog();
+    if (animMarker===null) animMarker = target;
+    if (!reduced){
+      animMarker += (target-animMarker)*0.18;
+      if (Math.abs(target-animMarker)>0.0005) requestAnimationFrame(draw);
+    } else {
+      animMarker = target;
+    }
+    const Nmark = Math.pow(10, animMarker);
+    const xm = xPix(Nmark);
+    const markerCol = task==='hs' ? col('--hideseek') : col('--cartpole');
+    ctx.strokeStyle = markerCol;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(xm, M.top); ctx.lineTo(xm, M.top+plotH);
+    ctx.stroke();
+    ctx.fillStyle = markerCol;
+    ctx.beginPath();
+    ctx.arc(xm, y75, 7, 0, Math.PI*2);
+    ctx.fill();
+    ctx.textAlign='center';
+    ctx.font = '20px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    ctx.fillText('N \u2248 '+niceN(Nmark), xm, M.top+18);
+
+    // slider cursor
+    const Ncursor = Math.pow(10, sliderLog);
+    const xc = xPix(Ncursor);
+    ctx.strokeStyle = col('--marker');
+    ctx.setLineDash([3,4]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xc, M.top); ctx.lineTo(xc, M.top+plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+    updateReadouts(Ncursor);
+  }
+
+  function updateReadouts(Ncursor){
+    document.getElementById('roTask').textContent =
+      task==='hs' ? 'HideSeek (many entities/env)' : 'Cartpole (1\u20132 entities/env)';
+    document.getElementById('ro75').textContent =
+      task==='hs' ? niceN(N75_HS)+' envs' : niceN(N75_CP)+' envs';
+    document.getElementById('roHS').textContent =
+      (frac(Ncursor,K_HS)*100).toFixed(1)+'%';
+    document.getElementById('roCP').textContent =
+      (frac(Ncursor,K_CP)*100).toFixed(1)+'%';
+    document.getElementById('nVal').textContent = niceN(Ncursor);
+  }
+
+  function setTask(t){
+    task = t;
+    document.getElementById('btnCart').classList.toggle('active', t==='cart');
+    document.getElementById('btnHS').classList.toggle('active', t==='hs');
+    document.getElementById('btnHS').classList.toggle('hs', t==='hs');
+    if (reduced) animMarker = targetMarkerLog();
+    requestAnimationFrame(draw);
+  }
+
+  document.getElementById('btnCart').addEventListener('click', ()=>setTask('cart'));
+  document.getElementById('btnHS').addEventListener('click', ()=>setTask('hs'));
+  document.getElementById('nSlider').addEventListener('input', (e)=>{
+    sliderLog = parseFloat(e.target.value);
+    draw();
+  });
+
+  setTask('hs');
+  draw();
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;two-level-parallelism&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Entities inside one environment give the GPU work even at modest scale"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>An Extensible, Data-Oriented Architecture for High-Performance, Many-World Simulation</em> — Brennan Shacklett, Luc Guy Rosenzweig, Zhiqiang Xie, Bidipta Sarkar, Andrew Szot, Erik Wijmans, Vladlen Koltun, Dhruv Batra, Kayvon Fatahalian. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

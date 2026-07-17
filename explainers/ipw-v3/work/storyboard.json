@@ -1,0 +1,367 @@
+{
+  "title": "Intelligence per Watt: Can Your Laptop Replace the Cloud?",
+  "hook": "Your phone and laptop can now answer almost nine out of ten real chatbot questions correctly, without ever calling out to a remote AI system. Two years ago that number was far lower — not just because the models got smarter, but because memory capacity, numeric precision, and batching all improved too. To measure that gain, we need one number: intelligence per watt, accuracy divided by power draw. That's where we start.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Before we can call one system more 'efficient' than another, we need to fix what power, energy, and a model's 'answer' actually cost physically — and see why local devices were long dismissed as too small for the job."
+    },
+    {
+      "title": "The new technology",
+      "lede": "With the physics and the local-vs-cloud divide in hand, here is the paper's actual machinery: a trick that lets huge models run cheap, and the metric built to track the resulting tradeoff."
+    },
+    {
+      "title": "Why it's a breakthrough vs existing tech",
+      "lede": "Now the head-to-head: where local hardware still trails the cloud, why part of that gap is an illusion of scale rather than silicon, and two concrete levers — picking the best model per query and cutting numeric precision — that close the gap further."
+    },
+    {
+      "title": "Why now, and what it leads to",
+      "lede": "Finally, the hardware shift that made any of this possible, and the paper's practical payoff: a routing strategy that captures most of the savings today."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "power-vs-energy",
+      "conceptId": "power-vs-energy",
+      "part": "The basic building blocks",
+      "title": "Power and energy measure different things",
+      "teaches": "Power (watts) is the instantaneous rate of energy use, while energy (joules) is power accumulated over time, so a task can be efficient by one measure and not the other.",
+      "requires": [],
+      "caption": "Drag the clock forward and watch the joule meter fill while the watt gauge stays still. A high-power chip that finishes fast can still spend fewer total joules than a low-power chip that lingers.",
+      "visualMetaphor": "Two chips side by side, each with a wattmeter (a vertical bar, y-axis in watts) and a shared stopwatch. Chip A draws high power but has a short task duration; Chip B draws low power over a long duration. Below each wattmeter, a joule-meter fills in as a shaded area under the power-vs-time curve, growing as the time slider advances.",
+      "animatedVariable": {
+        "name": "elapsed time within a fixed task",
+        "control": "slider",
+        "range": "t = 0 to 10 seconds",
+        "whatChangesOnScreen": "the shaded area under each chip's power curve grows and the joule readout climbs, while each chip's watt readout stays fixed at its instantaneous draw"
+      },
+      "quantitativeAnchor": "E = P·t; e.g. 200W for 2s = 400J, the same total as 50W for 8s",
+      "physicsChecks": [
+        "at t=0 both energy readouts read 0J even though the power readouts already differ",
+        "the high-power, short-duration chip can end with equal or fewer total joules than the low-power, long-duration chip",
+        "the energy readout only changes when the time slider moves; the power readout does not depend on the slider"
+      ]
+    },
+    {
+      "id": "forward-pass-cost",
+      "conceptId": "llm-parameters-forward-pass",
+      "part": "The basic building blocks",
+      "title": "Answering a query means multiplying through every stored weight once",
+      "teaches": "An LLM (large language model) generates each token by pushing the input through all its parameters in one forward pass, and the number of parameters touched sets the arithmetic, time, and energy cost.",
+      "requires": [],
+      "caption": "An answer is one pass through every stored weight — no skipping. Slide the number of layers in this toy model and watch the parameter-counter and the time-to-answer bar climb together.",
+      "visualMetaphor": "A vertical stack of labeled boxes (layers), each containing a grid of small numbers (parameters). An input token enters at the top; as it passes each layer, that layer's grid cells light up one row at a time (representing parallel multiply-add operations). A counter labeled 'parameters touched' increments as layers light up, and a horizontal time bar grows alongside it. The output token appears only after the last layer finishes lighting up.",
+      "animatedVariable": {
+        "name": "number of layers in the toy model",
+        "control": "slider",
+        "range": "L = 2 to 12 layers",
+        "whatChangesOnScreen": "more layers light up in sequence, and both the parameters-touched counter and the time-to-answer bar grow proportionally with L"
+      },
+      "quantitativeAnchor": "a single forward pass touches every one of the model's parameters exactly once per output token",
+      "physicsChecks": [
+        "the parameters-touched counter increases monotonically as L increases",
+        "the time bar's length is proportional to L",
+        "the output token only appears after the last layer's grid finishes lighting up"
+      ]
+    },
+    {
+      "id": "memory-bandwidth-bottleneck",
+      "conceptId": "memory-bandwidth-bottleneck",
+      "part": "The basic building blocks",
+      "title": "Chips often wait on memory, not on math",
+      "teaches": "Generating a token requires streaming weights from memory into the compute units, and when memory bandwidth is lower than what the compute units could consume, the chip idles waiting on memory rather than being limited by arithmetic speed.",
+      "requires": [
+        "forward-pass-cost"
+      ],
+      "caption": "A chip can only compute as fast as it's fed. Slide memory bandwidth from a laptop's 546 GB/s toward a datacenter GPU's 8,000 GB/s and watch idle, gray compute cells turn active.",
+      "visualMetaphor": "A pipe (labeled 'memory bandwidth, GB/s') feeding a grid of multiply units (the compute engine). Two marked tick positions on the bandwidth slider: 'Apple M4 Max: 546 GB/s' and 'NVIDIA H200/B200: 4.8-8 TB/s'. At low bandwidth most grid cells sit gray (idle, waiting on data); at high bandwidth nearly all cells are lit (active). A 'time per token' readout shrinks as bandwidth rises.",
+      "animatedVariable": {
+        "name": "memory bandwidth feeding the compute units",
+        "control": "slider",
+        "range": "546 GB/s to 8,000 GB/s",
+        "whatChangesOnScreen": "the fraction of active (non-gray) compute cells rises and the time-per-token readout falls, even though the grid's maximum arithmetic capacity never changes"
+      },
+      "quantitativeAnchor": "Apple M4 Max unified memory: ~546 GB/s vs NVIDIA H200/B200 HBM3e: 4.8-8 TB/s",
+      "physicsChecks": [
+        "at 546 GB/s many compute cells are shown gray/idle",
+        "at 8,000 GB/s nearly all compute cells are shown active",
+        "the time-per-token readout at high bandwidth is roughly an order of magnitude smaller than at 546 GB/s"
+      ]
+    },
+    {
+      "id": "local-vs-cloud-models",
+      "conceptId": "local-vs-cloud-models",
+      "part": "The basic building blocks",
+      "title": "Local models fit on a laptop; cloud models need a datacenter",
+      "teaches": "Local LMs (≤20B active parameters) run at interactive speed on laptop-class chips, while cloud/frontier models (≥100B parameters) require datacenter GPUs — this is the paper's core dividing line.",
+      "requires": [
+        "forward-pass-cost",
+        "memory-bandwidth-bottleneck"
+      ],
+      "caption": "Local models (≤20B parameters used per query) run on a laptop chip; cloud models (≥100B parameters) need a rack of datacenter GPUs. Slide the year and watch local accuracy close in on cloud — but the size classes never change.",
+      "visualMetaphor": "Two columns. Left: a laptop icon with an Apple M4 Max chip and a small parameter-count bar labeled Qwen3, GPT-OSS, Gemma3 (≤20B active). Right: a datacenter rack icon with NVIDIA H200/B200 GPUs and a large parameter-count bar labeled GPT-5, Claude Sonnet 4.5, Gemini 2.5 Pro (≥100B). Beside each column, a bar shows accuracy (% of test queries answered correctly). A year slider raises the local accuracy bar while the cloud accuracy bar stays roughly flat; chip icons and size-class bars never change.",
+      "animatedVariable": {
+        "name": "year",
+        "control": "slider",
+        "range": "2023 to 2025",
+        "whatChangesOnScreen": "the local-model accuracy bar rises noticeably while the cloud accuracy bar stays roughly flat and high, and the parameter-count size classes stay fixed throughout"
+      },
+      "quantitativeAnchor": "local: ≤20B active parameters (Qwen3, GPT-OSS, Gemma3); cloud: ≥100B parameters (GPT-5, Claude Sonnet 4.5, Gemini 2.5 Pro) on NVIDIA H200/B200",
+      "physicsChecks": [
+        "the local icon is always a laptop/Apple M4 Max, the cloud icon always a GPU rack, never swapped",
+        "the local accuracy bar height increases as the year slider moves from 2023 to 2025",
+        "the cloud accuracy bar stays high and roughly constant across the year slider"
+      ]
+    },
+    {
+      "id": "moe-active-vs-total",
+      "conceptId": "active-vs-total-parameters-moe",
+      "part": "The new technology",
+      "title": "A model can store 120 billion weights but use only 20 billion per query",
+      "teaches": "In a Mixture-of-Experts model, a router activates only a handful of expert sub-networks per token, so compute and energy scale with 'active' parameters while memory scales with the much larger 'total' parameter count.",
+      "requires": [
+        "forward-pass-cost",
+        "local-vs-cloud-models"
+      ],
+      "caption": "GPT-OSS-120B stores 120 billion weights but touches ≤20 billion per query. Slide how many of 16 toy sub-networks a small gate activates per query and watch the active-parameter counter move while the stored total stays fixed.",
+      "visualMetaphor": "A router node receives one token and connects to a grid of 16 toy 'expert' boxes below it, all shown stored (grayed background, representing memory). A slider sets k, the number of experts activated per token; k of the boxes light up (compute path) while the rest stay gray. Two readouts: 'active parameters this query' (scales with k) and 'total parameters stored' (fixed). A callout notes GPT-OSS-120B fits a 128GB Apple M4 Max at FP4 while activating ≤20B parameters per query.",
+      "animatedVariable": {
+        "name": "number of experts activated per token (k)",
+        "control": "slider",
+        "range": "k = 1 to 16 experts (of 16 total)",
+        "whatChangesOnScreen": "only k expert boxes light up and compute per query while 'total parameters stored' never changes; 'active parameters' rises linearly with k"
+      },
+      "quantitativeAnchor": "GPT-OSS-120B: 120B total parameters, ≤20B active per query, fits within a 128GB Apple M4 Max at FP4 precision",
+      "physicsChecks": [
+        "the total-parameters readout never changes as k moves",
+        "the active-parameters readout scales linearly with k",
+        "at k=16 all experts light up simultaneously, matching a dense model"
+      ]
+    },
+    {
+      "id": "intelligence-per-watt",
+      "conceptId": "intelligence-per-watt",
+      "part": "The new technology",
+      "title": "One number, accuracy divided by power, ranks efficiency",
+      "teaches": "Intelligence per watt (IPW) is average task accuracy divided by average power draw, so only model-hardware pairs that are both capable and power-efficient score high.",
+      "requires": [
+        "power-vs-energy",
+        "local-vs-cloud-models"
+      ],
+      "caption": "Intelligence per watt is just \\(\\frac{\\text{accuracy}}{\\text{power}}\\). Pick a model-hardware pair and watch the diagonal line through it — everything above the line is more efficient, everything below is less.",
+      "visualMetaphor": "A scatter chart: x-axis power draw (watts), y-axis accuracy (%). Several dots mark model-hardware pairs. Buttons let the reader select a preset dot (e.g. cloud GPU, local laptop 2023, local laptop 2025); a diagonal 'iso-IPW' line is redrawn through the selected dot, and dots above/left of the line have higher IPW than dots below/right. A readout box shows the numeric IPW value for the selected dot.",
+      "animatedVariable": {
+        "name": "selected model-hardware pair",
+        "control": "buttons",
+        "range": "3-4 preset dots: cloud GPU, local laptop 2023, local laptop 2025",
+        "whatChangesOnScreen": "the IPW readout updates to the selected dot's accuracy/power ratio, and the diagonal line through it redraws so other dots visibly fall above (better) or below (worse)"
+      },
+      "quantitativeAnchor": "APW(m,h) = E[acc(m,q)] / E[P(m,h,q)]",
+      "physicsChecks": [
+        "moving the iso-IPW line to pass through a high-accuracy, low-power dot pushes most other dots below it",
+        "a dot with both higher accuracy and lower power always shows higher IPW than one with lower accuracy and higher power",
+        "the readout numerically equals accuracy divided by power for the selected dot"
+      ]
+    },
+    {
+      "id": "ipw-vs-ipj-divergence",
+      "conceptId": "ipw-vs-ipj-divergence",
+      "part": "The new technology",
+      "title": "Counting time changes the winner: per-watt vs per-joule",
+      "teaches": "Intelligence per joule additionally divides by how long the query takes, so hardware that is both lower-power and faster gets a compounded efficiency boost that per-watt alone misses.",
+      "requires": [
+        "intelligence-per-watt",
+        "power-vs-energy"
+      ],
+      "caption": "Per-joule adds the clock: \\(\\frac{\\text{accuracy}}{\\text{power}·\\text{latency}}\\). Slide a faster chip's latency down and watch its per-joule bar grow while its per-watt bar barely moves — that's why hardware shows a 1.7x gain per watt but a 5.9x gain per joule.",
+      "visualMetaphor": "Two side-by-side bar charts sharing the same two hardware options (older GPU vs Apple M4 Max). Left chart: IPW bars. Right chart: IPJ bars. A slider sets the latency (seconds per query) of the newer accelerator; as latency drops, only its IPJ bar grows taller, while its IPW bar (which ignores time) stays fixed.",
+      "animatedVariable": {
+        "name": "latency of the newer accelerator",
+        "control": "slider",
+        "range": "τ = 0.2s to 2.0s",
+        "whatChangesOnScreen": "the IPJ bar for that accelerator grows as latency shrinks, while its IPW bar in the left chart does not move"
+      },
+      "quantitativeAnchor": "hardware contribution: 1.7x under IPW vs 5.9x under IPJ",
+      "physicsChecks": [
+        "IPW bars are invariant to the latency slider",
+        "IPJ bar height is inversely proportional to the latency slider value",
+        "at equal latency, IPJ and IPW rankings of the two chips agree"
+      ]
+    },
+    {
+      "id": "llm-as-judge-evaluation",
+      "conceptId": "llm-as-judge-evaluation",
+      "part": "The new technology",
+      "title": "When there's no single right answer, another model judges the answer",
+      "teaches": "For open-ended chat queries without a ground-truth answer, the paper scores a candidate model's response by having a separate judge model compare it to a strong reference model's response, counting ties or wins as correct.",
+      "requires": [
+        "intelligence-per-watt"
+      ],
+      "caption": "A judge model compares the candidate's answer to a strong reference model's, calling it correct on a tie or win. Toggle to a math question and the judge disappears — it's graded against a fixed answer key instead.",
+      "visualMetaphor": "Flow diagram: a query box feeds two paths — a 'candidate model' (small local-model icon) producing Answer A, and a 'reference model' (Qwen3-235B icon) producing Answer B. Both feed a 'judge' box (GPT-4o icon) outputting Win A / Tie / Win B, which drives a correct/incorrect checkbox (checked for Tie or Win A). Buttons switch to a contrasting panel for math queries: candidate answer compared directly to a fixed answer key, no judge box involved.",
+      "animatedVariable": {
+        "name": "evaluation path",
+        "control": "buttons",
+        "range": "chat query (judge verdict) vs math query (exact match)",
+        "whatChangesOnScreen": "for chat queries the judge's verdict drives the correct/incorrect checkbox; for math queries the checkbox instead comes from direct comparison to a fixed answer key, with the judge box grayed out"
+      },
+      "quantitativeAnchor": "WildChat: 500K real chat queries scored by GPT-4o judging candidate vs. Qwen3-235B reference",
+      "physicsChecks": [
+        "judge path: Tie or Win-A mark 'correct', Win-B marks 'incorrect'",
+        "math path: correctness never depends on the judge box, only the answer-key comparison",
+        "switching buttons visibly swaps which mechanism drives the checkbox"
+      ]
+    },
+    {
+      "id": "hardware-efficiency-gap",
+      "conceptId": "hardware-efficiency-gap",
+      "part": "Why it's a breakthrough vs existing tech",
+      "title": "Even running the same model, cloud chips are still more efficient",
+      "teaches": "Holding the model fixed, purpose-built cloud accelerators still beat general-purpose local unified-memory chips by 1.4x on IPW and up to 7.4x on IPJ, showing local hardware still has room to improve.",
+      "requires": [
+        "intelligence-per-watt",
+        "ipw-vs-ipj-divergence"
+      ],
+      "caption": "Run the identical model on three chips: even holding the software fixed, cloud silicon wins. Toggle per-watt vs per-joule and watch the gap between the laptop chip and the datacenter chips widen from 1.4x to up to 7.4x.",
+      "visualMetaphor": "Bar chart, x-axis hardware (Apple M4 Max, NVIDIA B200, SambaNova SN40L), all running the identical model (e.g. Qwen3). Buttons toggle between an IPW view and an IPJ view of the same bars; numeric values are labeled directly on each bar.",
+      "animatedVariable": {
+        "name": "metric view",
+        "control": "buttons",
+        "range": "Intelligence per Watt vs Intelligence per Joule",
+        "whatChangesOnScreen": "the gap between the Apple M4 Max bar and the B200/SN40L bars is modest under IPW (1.4-1.78x) but widens sharply under IPJ (6.5-7.4x), same underlying model"
+      },
+      "quantitativeAnchor": "B200: 1.40x higher IPW; SambaNova SN40L: up to 1.78x higher IPW; gap widens to 6.5-7.4x under IPJ",
+      "physicsChecks": [
+        "the model label (Qwen3/GPT-OSS) stays fixed across both metric views",
+        "the IPW view shows the local bar within ~1.4-1.78x of the cloud bars",
+        "the IPJ view shows the local bar 6.5-7.4x below the cloud bars"
+      ]
+    },
+    {
+      "id": "batching-amortization",
+      "conceptId": "batching-amortization",
+      "part": "Why it's a breakthrough vs existing tech",
+      "title": "Cloud efficiency partly comes from serving many users at once",
+      "teaches": "GPU power draw scales sublinearly with batch size while queries processed scale roughly linearly, so energy per query drops sharply when a datacenter batches many users' requests — an advantage a single local device cannot access.",
+      "requires": [
+        "hardware-efficiency-gap",
+        "power-vs-energy"
+      ],
+      "caption": "A GPU's power draw barely climbs as it serves more requests at once, while the number served climbs almost linearly. Slide batch size up and watch energy per query fall 12-20x. A single local device, serving one user, is stuck at the far left of this curve.",
+      "visualMetaphor": "Two linked charts sharing an x-axis, batch size (1 to 64). Top: GPU power draw (watts) rising sublinearly, 255W at batch 1 to 883W at batch 64. Bottom: energy per query (joules) falling steeply as power is spread over more simultaneous queries. A laptop icon is pinned at batch size = 1, labeled 'local device: stuck here.'",
+      "animatedVariable": {
+        "name": "batch size (queries served simultaneously)",
+        "control": "slider",
+        "range": "1 to 64",
+        "whatChangesOnScreen": "GPU power draw rises from 255W to 883W (sublinearly) while energy-per-query falls 12-20x; the local-device marker stays fixed at batch size 1 throughout"
+      },
+      "quantitativeAnchor": "NVIDIA B200: 255W at batch=1 vs 883W at batch=64; energy per query drops 12-20x from batch=1 to batch=64",
+      "physicsChecks": [
+        "power rises only ~3.5x (255→883W) while batch size rises 64x, clearly sublinear",
+        "energy-per-query is monotonically decreasing across the whole slider range",
+        "the local-device marker never moves off batch size = 1"
+      ]
+    },
+    {
+      "id": "best-of-local-routing",
+      "conceptId": "best-of-local-routing",
+      "part": "Why it's a breakthrough vs existing tech",
+      "title": "Picking the best local model per query beats any single model",
+      "teaches": "Different local models succeed on different, complementary queries, so an oracle that always picks the best-performing local model per query achieves higher coverage than even the single strongest local model.",
+      "requires": [
+        "local-vs-cloud-models",
+        "llm-as-judge-evaluation"
+      ],
+      "caption": "Toggle from 'best single model' to 'best-of-local.' Watch the highlighted correct answers switch from one fixed row to the union across every model, as coverage jumps from 71.4% to 88.7%.",
+      "visualMetaphor": "A grid: 12 toy query columns × 6 toy model rows, each cell green (correct) or red (incorrect) in a checkerboard pattern. Button 'best single model' highlights the row with the most green cells and reports its coverage. Button 'best-of-local oracle' instead highlights, per column, any green cell present in that column across all rows, computing union coverage. Real numbers overlay the readout: 71.4% vs 88.7%.",
+      "animatedVariable": {
+        "name": "selection strategy",
+        "control": "buttons",
+        "range": "best single model vs best-of-local oracle",
+        "whatChangesOnScreen": "the highlighted correct-cell pattern switches from one fixed row to a per-column union across all rows, and the coverage readout jumps from the single best model's score to the oracle's higher score"
+      },
+      "quantitativeAnchor": "GPT-OSS-120B alone: 71.4% coverage; best-of-local oracle across 20+ models: 88.7% coverage",
+      "physicsChecks": [
+        "best-of-local coverage is always ≥ the best single model's coverage for the same grid",
+        "the oracle's highlighted cells are a superset of the single best row's green cells",
+        "the toy grid's oracle coverage percentage matches the underlying green/red pattern shown"
+      ]
+    },
+    {
+      "id": "quantization-tradeoff",
+      "conceptId": "quantization-tradeoff",
+      "part": "Why it's a breakthrough vs existing tech",
+      "title": "Cutting numeric precision saves more energy than shrinking the model",
+      "teaches": "Storing and computing weights in fewer bits (FP16→FP8→FP4) roughly halves memory and cuts energy 3-3.5x per step at a cost of only about 2.5 accuracy points, so a bigger model quantized down can beat a smaller model at full precision on both fronts.",
+      "requires": [
+        "forward-pass-cost",
+        "moe-active-vs-total"
+      ],
+      "caption": "Storing weights in fewer bits — FP16 → FP8 → FP4 — roughly halves memory per step. Each step also cuts energy 3-3.5x, at a cost of about 2.5 accuracy points. Slide the precision down and watch a bigger model at FP4 land above and to the left of a smaller model at full precision.",
+      "visualMetaphor": "Chart with x-axis precision (FP16, FP8, FP4 as discrete slider steps), one y-axis energy per query (joules, falling bars) and a second y-axis accuracy (%, gently dropping line). Two labeled markers overlay the chart: 'Qwen3-4B at FP16' and 'Qwen3-14B at FP4', with the FP4 marker positioned above and left of the FP16 marker.",
+      "animatedVariable": {
+        "name": "weight precision",
+        "control": "slider",
+        "range": "FP16 → FP8 → FP4 (3 discrete steps)",
+        "whatChangesOnScreen": "the energy-per-query bar drops 3-3.5x at each step while the accuracy line dips only about 2.5 points per step; the Qwen3-14B-FP4 marker ends up above and left of the Qwen3-4B-FP16 marker"
+      },
+      "quantitativeAnchor": "each precision step roughly halves memory and cuts energy 3-3.5x at ~2.5 accuracy points cost; Qwen3-14B at FP4 beats Qwen3-4B at FP16 on both accuracy and energy",
+      "physicsChecks": [
+        "the energy bar strictly decreases moving FP16→FP8→FP4",
+        "the accuracy line decreases by roughly equal small steps (~2.5 pts) at each precision step",
+        "the 14B-FP4 marker's accuracy is higher and energy is lower than the 4B-FP16 marker"
+      ]
+    },
+    {
+      "id": "memory-capacity-growth",
+      "conceptId": "memory-capacity-growth",
+      "part": "Why now, and what it leads to",
+      "title": "Local device memory grew 126-fold, finally big enough for these models",
+      "teaches": "Consumer accelerator memory grew about 126x from 2012 to 2025 via unified-memory architectures sharing one large pool across CPU, GPU, and NPU, removing the ceiling that once forced these models onto the cloud.",
+      "requires": [
+        "local-vs-cloud-models",
+        "moe-active-vs-total"
+      ],
+      "caption": "Local chip memory grew about 126x between 2012 and 2025. Slide the year forward and watch the capacity curve cross the line needed to store a 120-billion-parameter model.",
+      "visualMetaphor": "Line chart, x-axis year (2012 to 2025), y-axis local accelerator memory capacity in GB (log scale), climbing from ~20GB to 128-512GB. A horizontal reference line marks the memory needed to store GPT-OSS-120B at FP4 (~60-65GB). A laptop icon flips between 'can't fit' and 'fits' as the year slider crosses the point where the curve passes the reference line.",
+      "animatedVariable": {
+        "name": "year",
+        "control": "slider",
+        "range": "2012 to 2025",
+        "whatChangesOnScreen": "the memory-capacity curve rises log-scale from ~20GB to 128-512GB, and the laptop icon flips from 'can't fit' to 'fits' once the curve crosses the reference line for a 120B-parameter model at FP4"
+      },
+      "quantitativeAnchor": "local/consumer accelerator memory grew ~126x from 2012 to 2025, from single-digit-to-20GB up to 128-512GB",
+      "physicsChecks": [
+        "the capacity curve is monotonically non-decreasing across the year slider",
+        "the laptop icon status flips exactly once, at the year the curve crosses the reference line",
+        "the endpoint value at 2025 falls within the 128-512GB range"
+      ]
+    },
+    {
+      "id": "hybrid-local-cloud-routing",
+      "conceptId": "hybrid-local-cloud-routing",
+      "part": "Why now, and what it leads to",
+      "title": "Routing most queries locally cuts energy 60-80% without losing accuracy",
+      "teaches": "A router sends each query to a small local model or a large cloud model based on predicted difficulty, falling back to the cloud on misroutes, so most of the energy is saved because roughly 80% of real queries are handled correctly locally.",
+      "requires": [
+        "hardware-efficiency-gap",
+        "best-of-local-routing",
+        "batching-amortization"
+      ],
+      "caption": "A router sends easy queries to a cheap local model; local answers that fail get escalated to the cloud, so quality never drops below cloud-only. Slide router accuracy up and watch queries shift into the local box and the total-energy bar shrink toward an 80.4% saving.",
+      "visualMetaphor": "Flow diagram: 100 incoming query icons hit a router diamond. A slider sets router accuracy (fraction of queries correctly triaged as easy-enough-for-local). Correctly-routed-easy queries flow to a 'local model' box (cheap); hard and misrouted queries flow to a 'cloud model' box (expensive, also catching misroutes as fallback). A bar compares 'all-cloud baseline' energy (fixed) against 'hybrid routing' energy (shrinking as router accuracy rises), with a percentage-saved readout.",
+      "animatedVariable": {
+        "name": "router accuracy (fraction of queries correctly triaged)",
+        "control": "slider",
+        "range": "0% (all-cloud) to 100% (oracle router)",
+        "whatChangesOnScreen": "more query icons flow into the cheap local-model box instead of the cloud box, and the total-energy bar shrinks toward the oracle savings level as router accuracy rises"
+      },
+      "quantitativeAnchor": "oracle router: 80.4% energy reduction; realistic 80%-accurate router: 64.3% energy savings; ~80% of real queries answerable locally",
+      "physicsChecks": [
+        "at router accuracy = 0%, the energy bar equals the all-cloud baseline (no savings)",
+        "at router accuracy = 100% (oracle), the energy savings readout reaches 80.4%",
+        "at router accuracy = 80%, the energy savings readout is near 64.3%, roughly 80% of the oracle's savings"
+      ]
+    }
+  ]
+}

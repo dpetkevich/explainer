@@ -1,0 +1,3883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One Engine, Both Knobs: How Sunlight-Heated Ammonia Breaks the Speed-vs-Efficiency Trap</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>One Engine, Both Knobs: How Sunlight-Heated Ammonia Breaks the Speed-vs-Efficiency Trap</h1>
+  <p class="hook">For fifty years, every satellite has faced the same forced choice. Engines with real thrust drain their tanks after a few hundred meters per second of maneuvering. Efficient electric thrusters sip propellant, but a big orbit change takes over a year of continuous firing. This explainer follows one satellite through one maneuver: a 5,000 m/s climb from low Earth orbit to geostationary orbit. The trap is not a law of physics. A thermal rocket's exhaust velocity depends only on gas temperature and molecular weight. It does not care where the heat came from. Feed cheap ammonia through a heat exchanger cooked to 3,000 K by concentrated sunlight, and the maneuver that costs an electric thruster 527 days takes 9 hours.</p>
+  <p class="page-links"><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.1.0 · Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Meet the running example — a 500 kg satellite that must buy a 5,000 m/s orbit change — and the three pieces of freshman mechanics that price it: momentum exchange, the rocket equation, and the power budget. Together they explain why every existing engine sits in one of two bad corners.</div>
+</header>
+<section class="scene" id="geo-sprint-price-tag">
+  <h3>Every orbital maneuver has a fixed price in velocity change, set by geometry alone</h3>
+  <div class="caption">In orbit there is no friction, so moving between orbits costs a definite velocity change — written <math><mi>Δ</mi><mi>v</mi></math> — no matter which engine you use. Our running example, the GEO sprint, carries a fixed bill of 5,000 m/s.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="geo-sprint-price-tag"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>GEO Sprint: The Price of Δv</title>
+<style>
+:root{
+  --bg:#f7f8fb; --panel:#ffffff; --text:#1a2230; --muted:#5b6472;
+  --earth:#3d7dca; --leo:#1f9e7a; --geo:#8a4fd1; --transfer:#d9772b;
+  --sat:#e8b93a; --accent:#2563eb; --border:#d7dce3;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1420; --panel:#161d2b; --text:#e7ecf3; --muted:#9aa6b6;
+    --earth:#5b9be0; --leo:#3ec39a; --geo:#b083ec; --transfer:#f0a25a;
+    --sat:#f2d165; --accent:#5b8cff; --border:#2b3648;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px;}
+svg{width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+text{fill:var(--text);font-size:12px;}
+.muted-text{fill:var(--muted);font-size:11px;}
+.tagname{fill:var(--muted);font-size:11px;}
+.tagprice{fill:var(--accent);font-size:13px;font-weight:700;}
+.controls{margin-top:12px;}
+.control-label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+button{
+  font:inherit;font-size:12.5px;padding:7px 10px;border-radius:6px;
+  border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;
+}
+button small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px;}
+button.active{border-color:var(--accent);background:var(--accent);color:#fff;}
+button.active small{color:#e2e9ff;}
+button:disabled{opacity:0.4;cursor:not-allowed;}
+.reveal{font-size:12px;color:var(--accent);min-height:16px;margin:2px 0 10px;}
+ul.readouts{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px;}
+ul.readouts li b{color:var(--accent);}
+.eqbox{border-top:1px solid var(--border);padding-top:10px;}
+math{font-size:16px;}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.sub{font-size:12px;margin-top:4px;color:var(--muted);}
+.sub b{color:var(--text);}
+@media (max-width:400px){
+  ul.readouts{grid-template-columns:1fr;}
+  button{font-size:11.5px;padding:6px 8px;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+<svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 500&quot; role=&quot;img&quot; aria-label=&quot;Earth with LEO and GEO orbits and a transfer path between them&quot;>
+  <circle id=&quot;earth&quot; fill=&quot;var(--earth)&quot;/>
+  <text id=&quot;earthLabel&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot;>Earth</text>
+
+  <circle id=&quot;leoOrbit&quot; fill=&quot;none&quot; stroke=&quot;var(--leo)&quot; stroke-width=&quot;1.5&quot; stroke-dasharray=&quot;4 3&quot;/>
+  <text id=&quot;leoLabel&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot;>LEO — 500 km altitude</text>
+
+  <circle id=&quot;geoOrbit&quot; fill=&quot;none&quot; stroke=&quot;var(--geo)&quot; stroke-width=&quot;1.5&quot; stroke-dasharray=&quot;4 3&quot;/>
+  <text id=&quot;geoLabel&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot;>GEO — 35,786 km altitude</text>
+
+  <path id=&quot;transferPath&quot; fill=&quot;none&quot; stroke=&quot;var(--transfer)&quot; stroke-width=&quot;2&quot; stroke-dasharray=&quot;6 4&quot;/>
+
+  <line id=&quot;burstLine&quot; stroke=&quot;var(--transfer)&quot; stroke-width=&quot;2&quot;/>
+
+  <circle id=&quot;satellite&quot; r=&quot;6&quot; fill=&quot;var(--sat)&quot; stroke=&quot;var(--text)&quot; stroke-width=&quot;1&quot;/>
+  <text id=&quot;satLabel&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot;>satellite (500 kg)</text>
+
+  <text id=&quot;tagLine1&quot; text-anchor=&quot;middle&quot; class=&quot;tagname&quot; style=&quot;paint-order:stroke;stroke:var(--panel);stroke-width:4px;&quot;></text>
+  <text id=&quot;tagLine2&quot; text-anchor=&quot;middle&quot; class=&quot;tagprice&quot; style=&quot;paint-order:stroke;stroke:var(--panel);stroke-width:4px;&quot;></text>
+</svg>
+
+<div class=&quot;controls&quot;>
+  <span class=&quot;control-label&quot;>Maneuver — pick which orbital change to price:</span>
+  <div class=&quot;btn-row&quot; id=&quot;maneuverRow&quot;>
+    <button class=&quot;maneuver-btn&quot; data-m=&quot;dodge&quot;>Collision dodge<small>~1 m/s</small></button>
+    <button class=&quot;maneuver-btn&quot; data-m=&quot;reposition&quot;>Constellation repositioning<small>~100 m/s</small></button>
+    <button class=&quot;maneuver-btn&quot; data-m=&quot;geo&quot;>LEO → GEO transfer<small>~5,000 m/s</small></button>
+  </div>
+
+  <span class=&quot;control-label&quot; id=&quot;speedPrompt&quot;>Predict: does taking 3 months instead of 6 hours lower the price? Click a burn style to reveal —</span>
+  <div class=&quot;btn-row&quot;>
+    <button id=&quot;fastBtn&quot; data-s=&quot;fast&quot;>Fast burn (~hours)</button>
+    <button id=&quot;slowBtn&quot; data-s=&quot;slow&quot;>Slow spiral (~months)</button>
+  </div>
+  <div class=&quot;reveal&quot; id=&quot;revealMsg&quot;></div>
+</div>
+
+<ul class=&quot;readouts&quot;>
+  <li>Maneuver: <b id=&quot;rManeuver&quot;></b></li>
+  <li>Δv price: <b id=&quot;rDv&quot;></b></li>
+  <li>Transfer time: <b id=&quot;rTime&quot;></b></li>
+  <li>Orbit change: <b id=&quot;rOrbit&quot;></b></li>
+</ul>
+
+<div class=&quot;eqbox&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>Δv</mi><mtext>total</mtext></msub>
+  <mo>=</mo>
+  <msub><mi>Δv</mi><mn>1</mn></msub>
+  <mo>+</mo>
+  <msub><mi>Δv</mi><mn>2</mn></msub>
+  <mo>+</mo>
+  <msub><mi>Δv</mi><mtext>plane</mtext></msub>
+</math>
+<div class=&quot;legend&quot;>
+Δv<sub>total</sub> — total price of the LEO→GEO transfer (m/s) · Δv<sub>1</sub> — burn raising LEO into the transfer ellipse (m/s) · Δv<sub>2</sub> — burn circularizing at GEO (m/s) · Δv<sub>plane</sub> — inclination change + finite-burn margin (m/s)
+</div>
+<div class=&quot;sub&quot; id=&quot;subLine&quot;></div>
+</div>
+
+</div>
+
+<script>
+// ---- physics constants (visible, auditable) ----
+const MU = 398600;        // km^3/s^2, Earth's standard gravitational parameter
+const R_EARTH = 6371;     // km, mean Earth radius
+const H_LEO = 500;        // km, LEO altitude
+const H_GEO = 35786;      // km, GEO altitude
+const r1 = R_EARTH + H_LEO;   // km, LEO orbital radius
+const r2 = R_EARTH + H_GEO;   // km, GEO orbital radius
+
+// Hohmann transfer via vis-viva
+const v1 = Math.sqrt(MU / r1);
+const aT = (r1 + r2) / 2;
+const vp = Math.sqrt(MU * (2 / r1 - 1 / aT));
+const dv1 = (vp - v1) * 1000;       // m/s, perigee burn
+const v2 = Math.sqrt(MU / r2);
+const va = Math.sqrt(MU * (2 / r2 - 1 / aT));
+const dv2 = (v2 - va) * 1000;       // m/s, apogee burn
+
+// Real GEO missions also pay for an inclination change (typical launch
+// inclination ~28.5-51.6 deg) plus finite-burn/gravity-loss margin.
+const PLANE_CHANGE_MARGIN = Math.round(5000 - (dv1 + dv2)); // m/s
+const DV_GEO = Math.round(dv1 + dv2 + PLANE_CHANGE_MARGIN);
+
+// half-period of the transfer ellipse = real coast time of a fast burn
+const T_transfer = 2 * Math.PI * Math.sqrt(Math.pow(aT, 3) / MU); // s
+const fastHours = (T_transfer / 2) / 3600;
+const SLOW_TRANSFER_DAYS = 90; // representative low-thrust GEO transfer duration
+
+const DV_VALUES = { dodge: 1, reposition: 100, geo: DV_GEO };
+const INFO = {
+  dodge:      { label: &quot;Collision dodge&quot;,              orbit: &quot;small nudge within LEO shell&quot; },
+  reposition: { label: &quot;Constellation repositioning&quot;,   orbit: &quot;larger shift within LEO shell&quot; },
+  geo:        { label: &quot;LEO → GEO transfer&quot;,            orbit: &quot;LEO (500 km) → GEO (35,786 km)&quot; }
+};
+
+// ---- geometry (pixels), scaled from real radii ----
+const EARTH_PX = 34;
+const scale = EARTH_PX / R_EARTH;
+const r1_px = r1 * scale;
+const r2_px = r2 * scale;
+const cx = 260, cy = 255;
+const a_px = (r1_px + r2_px) / 2;
+const c_px = a_px - r1_px;
+const b_px = Math.sqrt(a_px * a_px - c_px * c_px);
+const apexX = cx + (r2_px - r1_px) / 2;
+const apexY = cy - b_px;
+
+const leoStart = { x: cx - r1_px, y: cy };
+const geoEnd = { x: cx + r2_px, y: cy };
+
+const $ = id => document.getElementById(id);
+const svgns = &quot;http://www.w3.org/2000/svg&quot;;
+
+function initStatic(){
+  $(&quot;earth&quot;).setAttribute(&quot;cx&quot;, cx); $(&quot;earth&quot;).setAttribute(&quot;cy&quot;, cy); $(&quot;earth&quot;).setAttribute(&quot;r&quot;, EARTH_PX);
+  $(&quot;earthLabel&quot;).setAttribute(&quot;x&quot;, cx); $(&quot;earthLabel&quot;).setAttribute(&quot;y&quot;, cy + 4);
+
+  $(&quot;leoOrbit&quot;).setAttribute(&quot;cx&quot;, cx); $(&quot;leoOrbit&quot;).setAttribute(&quot;cy&quot;, cy); $(&quot;leoOrbit&quot;).setAttribute(&quot;r&quot;, r1_px);
+  // Placed below the LEO ring (in the open gap between LEO and GEO) so it never
+  // collides with the Earth / satellite / price-tag text clustered above center.
+  $(&quot;leoLabel&quot;).setAttribute(&quot;x&quot;, cx); $(&quot;leoLabel&quot;).setAttribute(&quot;y&quot;, cy + r1_px + 20);
+
+  $(&quot;geoOrbit&quot;).setAttribute(&quot;cx&quot;, cx); $(&quot;geoOrbit&quot;).setAttribute(&quot;cy&quot;, cy); $(&quot;geoOrbit&quot;).setAttribute(&quot;r&quot;, r2_px);
+  $(&quot;geoLabel&quot;).setAttribute(&quot;x&quot;, cx); $(&quot;geoLabel&quot;).setAttribute(&quot;y&quot;, cy - r2_px - 10);
+
+  $(&quot;transferPath&quot;).setAttribute(&quot;d&quot;,
+    `M ${leoStart.x} ${leoStart.y} A ${a_px} ${b_px} 0 0 1 ${geoEnd.x} ${geoEnd.y}`);
+
+  $(&quot;subLine&quot;).innerHTML =
+    `<b>${Math.round(dv1)}</b> + <b>${Math.round(dv2)}</b> + <b>${PLANE_CHANGE_MARGIN}</b> = <b>${DV_GEO.toLocaleString()} m/s</b>`;
+}
+
+let currentManeuver = &quot;dodge&quot;, speedMode = null, animId = null;
+const prefersReduced = matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;).matches;
+
+function setSatellite(x, y){
+  $(&quot;satellite&quot;).setAttribute(&quot;cx&quot;, x); $(&quot;satellite&quot;).setAttribute(&quot;cy&quot;, y);
+  $(&quot;satLabel&quot;).setAttribute(&quot;x&quot;, x);
+  $(&quot;satLabel&quot;).setAttribute(&quot;y&quot;, y + 22); // tracks the marker, always a clear 22px below it
+}
+
+function setTag(x, y, l1, l2){
+  $(&quot;tagLine1&quot;).setAttribute(&quot;x&quot;, x); $(&quot;tagLine1&quot;).setAttribute(&quot;y&quot;, y); $(&quot;tagLine1&quot;).textContent = l1;
+  $(&quot;tagLine2&quot;).setAttribute(&quot;x&quot;, x); $(&quot;tagLine2&quot;).setAttribute(&quot;y&quot;, y + 16); $(&quot;tagLine2&quot;).textContent = l2;
+}
+
+function updateBurst(show){
+  const b = $(&quot;burstLine&quot;);
+  if(!show){ b.setAttribute(&quot;stroke-opacity&quot;,&quot;0&quot;); return; }
+  b.setAttribute(&quot;stroke-opacity&quot;,&quot;1&quot;);
+  b.setAttribute(&quot;x1&quot;, leoStart.x); b.setAttribute(&quot;y1&quot;, leoStart.y);
+  b.setAttribute(&quot;x2&quot;, leoStart.x - 22); b.setAttribute(&quot;y2&quot;, leoStart.y - 22);
+}
+
+function updateReadouts(){
+  $(&quot;rManeuver&quot;).textContent = INFO[currentManeuver].label;
+  $(&quot;rDv&quot;).textContent = Math.round(DV_VALUES[currentManeuver]).toLocaleString() + &quot; m/s&quot;;
+  $(&quot;rOrbit&quot;).textContent = INFO[currentManeuver].orbit;
+  if(currentManeuver !== &quot;geo&quot;){
+    $(&quot;rTime&quot;).textContent = &quot;seconds (single impulsive burn)&quot;;
+  } else if(speedMode === &quot;fast&quot;){
+    $(&quot;rTime&quot;).textContent = fastHours.toFixed(1) + &quot; hours (fast burn)&quot;;
+  } else if(speedMode === &quot;slow&quot;){
+    $(&quot;rTime&quot;).textContent = &quot;~&quot; + SLOW_TRANSFER_DAYS + &quot; days (slow spiral)&quot;;
+  } else {
+    $(&quot;rTime&quot;).textContent = &quot;pick a burn style below&quot;;
+  }
+}
+
+function selectManeuver(key){
+  currentManeuver = key; speedMode = null;
+  if(animId) cancelAnimationFrame(animId);
+  document.querySelectorAll(&quot;.maneuver-btn&quot;).forEach(b => b.classList.toggle(&quot;active&quot;, b.dataset.m === key));
+  $(&quot;fastBtn&quot;).disabled = key !== &quot;geo&quot;;
+  $(&quot;slowBtn&quot;).disabled = key !== &quot;geo&quot;;
+  $(&quot;fastBtn&quot;).classList.remove(&quot;active&quot;); $(&quot;slowBtn&quot;).classList.remove(&quot;active&quot;);
+  $(&quot;revealMsg&quot;).textContent = &quot;&quot;;
+  $(&quot;transferPath&quot;).style.display = key === &quot;geo&quot; ? &quot;block&quot; : &quot;none&quot;;
+
+  if(key === &quot;geo&quot;){
+    setSatellite(leoStart.x, leoStart.y);
+    updateBurst(false);
+    setTag(apexX, apexY - 12, &quot;Transfer arc&quot;, &quot;Δv = &quot; + DV_GEO.toLocaleString() + &quot; m/s&quot;);
+  } else {
+    setSatellite(leoStart.x, leoStart.y);
+    updateBurst(true);
+    setTag(leoStart.x, leoStart.y - 42, INFO[key].label, &quot;Δv = &quot; + DV_VALUES[key] + &quot; m/s&quot;);
+  }
+  updateReadouts();
+}
+
+function posOnPath(t){
+  const path = $(&quot;transferPath&quot;);
+  const len = path.getTotalLength();
+  return path.getPointAtLength(t * len);
+}
+
+function posOnSpiral(t){
+  const loops = 3;
+  const angle = Math.PI + t * (2 * Math.PI * loops - Math.PI);
+  const radius = r1_px + t * (r2_px - r1_px);
+  return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+}
+
+function startTransfer(mode){
+  speedMode = mode;
+  $(&quot;fastBtn&quot;).classList.toggle(&quot;active&quot;, mode === &quot;fast&quot;);
+  $(&quot;slowBtn&quot;).classList.toggle(&quot;active&quot;, mode === &quot;slow&quot;);
+  updateReadouts();
+  $(&quot;revealMsg&quot;).textContent = &quot;Revealed: both burns cost Δv = &quot; + DV_GEO.toLocaleString() +
+    &quot; m/s — only the time changes (&quot; + fastHours.toFixed(1) + &quot; h vs ~&quot; + SLOW_TRANSFER_DAYS + &quot; d).&quot;;
+
+  if(animId) cancelAnimationFrame(animId);
+  if(prefersReduced){
+    const p = mode === &quot;fast&quot; ? posOnPath(1) : posOnSpiral(1);
+    setSatellite(p.x, p.y);
+    return;
+  }
+  const duration = mode === &quot;fast&quot; ? 2200 : 5500;
+  let start = null;
+  function frame(ts){
+    if(!start) start = ts;
+    const t = Math.min(1, (ts - start) / duration);
+    const p = mode === &quot;fast&quot; ? posOnPath(t) : posOnSpiral(t);
+    setSatellite(p.x, p.y);
+    if(t < 1){ animId = requestAnimationFrame(frame); }
+  }
+  animId = requestAnimationFrame(frame);
+}
+
+document.querySelectorAll(&quot;.maneuver-btn&quot;).forEach(b =>
+  b.addEventListener(&quot;click&quot;, () => selectManeuver(b.dataset.m)));
+$(&quot;fastBtn&quot;).addEventListener(&quot;click&quot;, () => { if(currentManeuver===&quot;geo&quot;) startTransfer(&quot;fast&quot;); });
+$(&quot;slowBtn&quot;).addEventListener(&quot;click&quot;, () => { if(currentManeuver===&quot;geo&quot;) startTransfer(&quot;slow&quot;); });
+
+initStatic();
+selectManeuver(&quot;dodge&quot;);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;geo-sprint-price-tag&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Every orbital maneuver has a fixed price in velocity change, set by geometry alone"
+  ></iframe>
+</section>
+
+<section class="scene" id="thrust-power-equation">
+  <h3>Thrust is momentum thrown overboard: F = ṁ·vₑ, but power grows as vₑ²</h3>
+  <div class="caption">To spend that 5,000 m/s bill, the satellite throws mass backward: thrust is <math><mi>F</mi><mo>=</mo><mi>dot</mi><mrow><mi>m</mi></mrow><mo>·</mo><msub><mi>v</mi><mi>e</mi></msub></math>, where <math><mi>dot</mi><mrow><mi>m</mi></mrow></math> is kilograms of propellant expelled per second and <math><msub><mi>v</mi><mi>e</mi></msub></math> is the exhaust velocity in m/s. At a fixed power budget <math><mi>F</mi><mo>=</mo><mn>2</mn><mi>P</mi><mo>/</mo><msub><mi>v</mi><mi>e</mi></msub></math>, so thrust and exhaust velocity trade directly.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="thrust-power-equation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Thrust vs. Exhaust Velocity at Fixed Power</title>
+<style>
+:root{
+  --bg:#f7f7fa; --panel:#ffffff; --fg:#1a1a2e; --muted:#5a5a72;
+  --accent:#2d6cdf; --accent2:#e0663e; --border:#d8d8e2; --stream:#7d8ba1;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14151c; --panel:#1d1e29; --fg:#eceef5; --muted:#9a9db0;
+    --accent:#6ea8ff; --accent2:#ff9770; --border:#33344a; --stream:#8fa3c4;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+  display:flex; justify-content:center;
+}
+.scene{ width:100%; max-width:680px; padding:14px 14px 20px; }
+h1{font-size:15px; margin:0 0 10px; font-weight:600; text-align:center;}
+.eqblock{ background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 8px; margin-bottom:8px;}
+math{font-size:18px;}
+.legend{font-size:11.5px; color:var(--muted); text-align:center; margin:4px 0 0; line-height:1.4;}
+.derived{font-size:12.5px; text-align:center; color:var(--muted); margin-top:6px;}
+canvas{width:100%; max-width:640px; display:block; margin:8px auto; background:var(--panel); border:1px solid var(--border); border-radius:10px;}
+.readouts{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:8px 0;}
+.ro{ background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:6px 10px; min-width:78px; text-align:center;}
+.ro .lab{font-size:10.5px; color:var(--muted);}
+.ro .val{font-size:15px; font-weight:600;}
+.controls{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; margin-top:10px;}
+button{
+  font-size:12.5px; padding:8px 12px; border-radius:8px; border:1px solid var(--border);
+  background:var(--accent); color:#fff; cursor:pointer;
+}
+button.secondary{ background:var(--panel); color:var(--fg); }
+.state-note{font-size:11px; text-align:center; color:var(--muted); margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Thrust vs. exhaust velocity at fixed power</h1>
+
+  <div class=&quot;eqblock&quot;>
+    <math display=&quot;block&quot;>
+      <mi>F</mi><mo>=</mo><mover><mi>m</mi><mo>&amp;#729;</mo></mover><mo>&amp;#183;</mo><msub><mi>v</mi><mi>e</mi></msub>
+    </math>
+    <div class=&quot;legend&quot;>F &amp;mdash; thrust force (N) &amp;middot; &amp;#7745; &amp;mdash; mass flow rate, kg of propellant expelled per second (kg/s) &amp;middot; v<sub style=&quot;font-size:80%&quot;>e</sub> &amp;mdash; exhaust velocity (m/s)</div>
+
+    <math display=&quot;block&quot;>
+      <mi>P</mi><mo>=</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mover><mi>m</mi><mo>&amp;#729;</mo></mover><mo>&amp;#183;</mo><msup><msub><mi>v</mi><mi>e</mi></msub><mn>2</mn></msup>
+    </math>
+    <div class=&quot;legend&quot;>P &amp;mdash; power delivered to the exhaust stream (W) &amp;middot; &amp;#7745;, v<sub style=&quot;font-size:80%&quot;>e</sub> as above</div>
+
+    <math display=&quot;block&quot;>
+      <mi>F</mi><mo>=</mo><mfrac><mrow><mn>2</mn><mi>P</mi></mrow><msub><mi>v</mi><mi>e</mi></msub></mfrac>
+    </math>
+    <div class=&quot;derived&quot;>Combine the two: at fixed power, thrust and exhaust velocity trade off directly &amp;mdash; double v<sub style=&quot;font-size:80%&quot;>e</sub>, halve F.</div>
+  </div>
+
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;170&quot;></canvas>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>P &amp;mdash; power (kW)</div><div class=&quot;val&quot; id=&quot;roP&quot;>10.0</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>v<sub style=&quot;font-size:70%&quot;>e</sub> &amp;mdash; exhaust vel. (m/s)</div><div class=&quot;val&quot; id=&quot;roVe&quot;>1000</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>&amp;#7745; &amp;mdash; mass flow (kg/s)</div><div class=&quot;val&quot; id=&quot;roMdot&quot;>0.020</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>F &amp;mdash; thrust (N)</div><div class=&quot;val&quot; id=&quot;roF&quot;>20.0</div></div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;>Switch strategy: throw a little, very fast</button>
+    <button id=&quot;playBtn&quot; class=&quot;secondary&quot;>Pause animation</button>
+  </div>
+  <div class=&quot;state-note&quot; id=&quot;stateNote&quot;>Currently: throw a lot, slowly &amp;mdash; thick, slow exhaust stream, high thrust.</div>
+</div>
+
+<script>
+// ---- physics ----
+const P_WATTS = 10000; // fixed power, W (10 kW)
+const STATE_A = { ve: 1000, label: &quot;throw a lot, slowly&quot; };
+const STATE_B = { ve: 2000, label: &quot;throw a little, very fast&quot; };
+let state = STATE_A;
+
+function derive(ve){
+  const mdot = 2*P_WATTS/(ve*ve); // kg/s, from P = 1/2 mdot ve^2
+  const F = mdot*ve;              // N, from F = mdot*ve  ( = 2P/ve )
+  return {mdot, F};
+}
+
+// ---- DOM ----
+const roP = document.getElementById('roP');
+const roVe = document.getElementById('roVe');
+const roMdot = document.getElementById('roMdot');
+const roF = document.getElementById('roF');
+const toggleBtn = document.getElementById('toggleBtn');
+const playBtn = document.getElementById('playBtn');
+const stateNote = document.getElementById('stateNote');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function updateReadouts(){
+  const d = derive(state.ve);
+  roP.textContent = (P_WATTS/1000).toFixed(1);
+  roVe.textContent = Math.round(state.ve);
+  roMdot.textContent = d.mdot.toFixed(3);
+  roF.textContent = d.F.toFixed(1);
+  toggleBtn.textContent = &quot;Switch strategy: &quot; + (state===STATE_A ? STATE_B.label : STATE_A.label);
+  stateNote.textContent = &quot;Currently: &quot; + state.label + &quot; \u2014 &quot; +
+    (state===STATE_A ? &quot;thick, slow exhaust stream, high thrust.&quot; : &quot;thin, fast exhaust stream, low thrust.&quot;);
+}
+
+toggleBtn.addEventListener('click', ()=>{
+  state = (state===STATE_A) ? STATE_B : STATE_A;
+  updateReadouts();
+});
+
+// ---- animation ----
+let playing = true;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduced) playing = false;
+playBtn.textContent = playing ? &quot;Pause animation&quot; : &quot;Play animation&quot;;
+playBtn.addEventListener('click', ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? &quot;Pause animation&quot; : &quot;Play animation&quot;;
+});
+
+let particles = [];
+let lastSpawn = 0;
+let lastT = null;
+
+function mapRadius(mdot){
+  // radius ~ sqrt(mdot), scaled for visibility
+  return Math.max(3, Math.min(24, 127.3*Math.sqrt(mdot)));
+}
+function mapSpeed(ve){
+  return 0.06*ve; // px per ms-scaled unit, chosen so 1000->60, 2000->120 px/s
+}
+
+function drawScene(dtMs){
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0,0,w,h);
+  const fg = css('--fg'), muted = css('--muted'), accent = css('--accent'),
+        accent2 = css('--accent2'), stream = css('--stream'), border = css('--border');
+
+  // rocket body
+  ctx.fillStyle = accent;
+  ctx.fillRect(30, 62, 100, 46);
+  ctx.beginPath();
+  ctx.moveTo(130,62); ctx.lineTo(170,85); ctx.lineTo(130,108); ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = fg;
+  ctx.font = &quot;12px sans-serif&quot;;
+  ctx.textAlign = &quot;center&quot;;
+  ctx.fillText(&quot;rocket body&quot;, 80, 55);
+  ctx.fillText(&quot;nozzle&quot;, 150, 122);
+
+  // exhaust stream lane
+  ctx.strokeStyle = border;
+  ctx.beginPath();
+  ctx.moveTo(172, 85); ctx.lineTo(620, 85);
+  ctx.setLineDash([3,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const d = derive(state.ve);
+  const r = mapRadius(d.mdot);
+  const speedPxSec = mapSpeed(state.ve);
+
+  // spawn particles
+  lastSpawn += dtMs;
+  const spawnEvery = 220; // ms, fixed cadence
+  if (playing &amp;&amp; lastSpawn > spawnEvery){
+    lastSpawn = 0;
+    particles.push({x:174, y:85 + (Math.random()-0.5)*r*0.6});
+  }
+  // advance + draw
+  ctx.fillStyle = accent2;
+  particles = particles.filter(p => p.x < 630);
+  for (const p of particles){
+    if (playing) p.x += speedPxSec * (dtMs/1000);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r*0.42, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // stream thickness indicator
+  ctx.strokeStyle = stream;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(180, 85-r/2); ctx.lineTo(180, 85+r/2);
+  ctx.stroke();
+  ctx.fillStyle = muted;
+  ctx.font = &quot;10.5px sans-serif&quot;;
+  ctx.textAlign = &quot;left&quot;;
+  ctx.fillText(&quot;stream thickness \u221D \u1e41 (mass flow)&quot;, 190, 85 - r/2 - 4 < 20 ? 20 : 85 - r/2 - 4);
+
+  ctx.textAlign = &quot;center&quot;;
+  ctx.fillStyle = fg;
+  ctx.font = &quot;11px sans-serif&quot;;
+  ctx.fillText(&quot;exhaust stream \u2014 particle speed \u221D v&quot; + &quot;\u2091&quot;, 400, 145);
+  ctx.fillText(&quot;thrust F = &quot; + d.F.toFixed(1) + &quot; N   |   v&quot; + &quot;\u2091 = &quot; + Math.round(state.ve) + &quot; m/s&quot;, 400, 160);
+}
+
+function loop(t){
+  if (lastT===null) lastT = t;
+  const dt = t - lastT;
+  lastT = t;
+  drawScene(dt);
+  requestAnimationFrame(loop);
+}
+
+// ---- init ----
+updateReadouts();
+requestAnimationFrame((t)=>{ lastT=t; drawScene(16); window.__sceneReady = true; requestAnimationFrame(loop); });
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;thrust-power-equation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Thrust is momentum thrown overboard: F = ṁ·vₑ, but power grows as vₑ²"
+  ></iframe>
+</section>
+
+<section class="scene" id="rocket-equation">
+  <h3>Δv grows only as the logarithm of propellant mass: the Tsiolkovsky rocket equation</h3>
+  <div class="caption">Thrust says how hard the engine pushes; this equation says how much total <math><mi>Δ</mi><mi>v</mi></math> the tanks can buy: because the rocket hauls its own unburned propellant, <math><mi>Δ</mi><mi>v</mi><mo>=</mo><msub><mi>v</mi><mi>e</mi></msub><mi>ln</mi><mo>(</mo><msub><mi>m</mi><mrow><mi>wet</mi></mrow></msub><mo>/</mo><msub><mi>m</mi><mrow><mi>dry</mi></mrow></msub><mo>)</mo></math>, where <math><msub><mi>m</mi><mrow><mi>wet</mi></mrow></msub></math> is the fully fueled mass and <math><msub><mi>m</mi><mrow><mi>dry</mi></mrow></msub></math> the empty-tank mass. Adding tanks pays off only logarithmically; raising <math><msub><mi>v</mi><mi>e</mi></msub></math> pays off linearly.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="rocket-equation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The Rocket Equation</title>
+<style>
+:root{
+  --bg:#f7f7fa;
+  --panel:#ffffff;
+  --fg:#1a1a1f;
+  --muted:#5c5c66;
+  --grid:#d6d6de;
+  --dry:#8a8f98;
+  --prop:#3a7bd5;
+  --prop2:#6fa8ff;
+  --curve:#d9534f;
+  --accent:#1a7a4c;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141418;
+    --panel:#1c1c22;
+    --fg:#e8e8ee;
+    --muted:#a3a3ad;
+    --grid:#3a3a44;
+    --dry:#7a7f88;
+    --prop:#5b9dff;
+    --prop2:#8fc0ff;
+    --curve:#ff7a72;
+    --accent:#3ecb85;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:12px;
+  background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}
+.scene{
+  max-width:680px; margin:0 auto;
+  background:var(--panel); border-radius:10px;
+  padding:14px 16px 18px; overflow:hidden;
+}
+h2{font-size:15px; margin:0 0 10px; font-weight:600;}
+.eqblock{margin-bottom:10px;}
+math{font-size:19px;}
+.legend{font-size:12px; color:var(--muted); margin:2px 0 8px; line-height:1.4;}
+.sub{font-size:12.5px; color:var(--fg); background:rgba(120,120,140,0.08); border-radius:6px; padding:6px 8px; margin-bottom:12px;}
+svg{width:100%; height:auto; max-width:100%; display:block;}
+.controls{margin-top:8px;}
+.controls label{font-size:13px; display:block; margin-bottom:4px;}
+input[type=range]{width:100%;}
+.readouts{display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:10px; font-size:13px;}
+.readouts div{min-width:120px;}
+.readouts b{color:var(--accent);}
+.svglabel{font-size:11px; fill:var(--muted);}
+.svgtitle{font-size:12px; fill:var(--fg); font-weight:600;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Tsiolkovsky rocket equation</h2>
+
+  <div class=&quot;eqblock&quot;>
+    <math display=&quot;block&quot;>
+      <mi>Δ</mi><mi>v</mi><mo>=</mo>
+      <msub><mi>v</mi><mi>e</mi></msub><mo>&amp;#8290;</mo><mi>ln</mi>
+      <mfenced><mfrac>
+        <msub><mi>m</mi><mtext>wet</mtext></msub>
+        <msub><mi>m</mi><mtext>dry</mtext></msub>
+      </mfrac></mfenced>
+    </math>
+    <div class=&quot;legend&quot;>
+      Δv — total achievable velocity change (m/s) &amp;middot;
+      v<sub>e</sub> — exhaust velocity (m/s) &amp;middot;
+      m<sub>wet</sub> — mass with tanks full (kg) &amp;middot;
+      m<sub>dry</sub> — mass with tanks empty, satellite + structure (kg)
+    </div>
+
+    <math display=&quot;block&quot;>
+      <msub><mi>v</mi><mi>e</mi></msub><mo>=</mo>
+      <msub><mi>I</mi><mtext>sp</mtext></msub><mo>·</mo>
+      <msub><mi>g</mi><mn>0</mn></msub>
+    </math>
+    <div class=&quot;legend&quot;>
+      I<sub>sp</sub> — specific impulse, the engine's efficiency rating (s), held fixed at 300 s here &amp;middot;
+      g<sub>0</sub> — standard gravity, 9.81 m/s²
+    </div>
+    <div class=&quot;sub&quot; id=&quot;sub&quot;></div>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;blocks&quot;>Propellant loaded onto the 500 kg dry mass — drag to add fuel blocks (125 kg each)</label>
+    <input type=&quot;range&quot; id=&quot;blocks&quot; min=&quot;0&quot; max=&quot;8&quot; step=&quot;1&quot; value=&quot;0&quot;>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>m<sub>wet</sub>: <b id=&quot;rWet&quot;>500</b> kg</div>
+    <div>m<sub>dry</sub>: <b>500</b> kg</div>
+    <div>v<sub>e</sub>: <b id=&quot;rVe&quot;>2943</b> m/s</div>
+    <div>Δv: <b id=&quot;rDv&quot;>0</b> m/s</div>
+  </div>
+</div>
+
+<script>
+const NS = &quot;http://www.w3.org/2000/svg&quot;;
+const G0 = 9.81;         // m/s^2, standard gravity
+const ISP = 300;         // s, assumed constant chemical-engine specific impulse
+const VE = ISP * G0;     // m/s, exhaust velocity
+const DRY = 500;         // kg, fixed satellite dry mass
+const BLOCK = 125;       // kg, mass of one propellant block
+const NMAX = 8;
+
+const svg = document.getElementById('diagram');
+const slider = document.getElementById('blocks');
+
+function dv(n){ // n propellant blocks -> Delta-v
+  const wet = DRY + n*BLOCK;
+  return VE * Math.log(wet/DRY);
+}
+
+function el(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function draw(n){
+  svg.innerHTML = '';
+
+  // ---- panel: stacked-bar diagram (left) ----
+  const barX = 60, barW = 70, baseY = 260;
+  const scale = 190 / (DRY + NMAX*BLOCK); // px per kg
+  const dryH = DRY*scale;
+
+  svg.appendChild(el('text', {x:barX-20, y:24, class:'svgtitle'})).textContent = &quot;Satellite mass stack&quot;;
+
+  // dry mass block
+  const dryRect = el('rect', {x:barX, y:baseY-dryH, width:barW, height:dryH, fill:'var(--dry)', rx:3});
+  svg.appendChild(dryRect);
+  const dryLabel = el('text', {x:barX+barW/2, y: baseY-dryH/2+4, class:'svglabel', 'text-anchor':'middle'});
+  dryLabel.textContent = 'dry 500 kg';
+  dryLabel.setAttribute('fill','#fff');
+  svg.appendChild(dryLabel);
+
+  // propellant blocks stacked above
+  const blockH = BLOCK*scale;
+  for (let i=0;i<n;i++){
+    const y = baseY - dryH - (i+1)*blockH;
+    const rect = el('rect', {x:barX, y:y, width:barW, height:blockH-1.5,
+      fill: (i%2===0)?'var(--prop)':'var(--prop2)', rx:2});
+    svg.appendChild(rect);
+  }
+  if(n>0){
+    const t = el('text', {x:barX+barW+8, y: baseY-dryH-(n*blockH)/2, class:'svglabel'});
+    t.textContent = n + ' × 125 kg propellant';
+    svg.appendChild(t);
+  }
+  svg.appendChild(el('line', {x1:barX-10,y1:baseY,x2:barX+barW+10,y2:baseY,stroke:'var(--grid)'}));
+  svg.appendChild(el('text', {x:barX, y:baseY+16, class:'svglabel'})).textContent = 'm_wet = ' + (DRY+n*BLOCK) + ' kg';
+
+  // ---- panel: running Delta-v curve (right) ----
+  const cx0=230, cx1=610, cy0=30, cy1=260;
+  const dvMax = dv(NMAX);
+  const yScale = (cy1-cy0)/dvMax;
+  const xScale = (cx1-cx0)/NMAX;
+
+  svg.appendChild(el('text', {x:cx0-10, y:24, class:'svgtitle'})).textContent = &quot;Running Δv total&quot;;
+
+  // axes
+  svg.appendChild(el('line', {x1:cx0,y1:cy0,x2:cx0,y2:cy1, stroke:'var(--grid)'}));
+  svg.appendChild(el('line', {x1:cx0,y1:cy1,x2:cx1,y2:cy1, stroke:'var(--grid)'}));
+
+  // y ticks
+  for(let f=0; f<=1.0001; f+=0.25){
+    const val = f*dvMax;
+    const y = cy1 - val*yScale;
+    svg.appendChild(el('line', {x1:cx0-4,y1:y,x2:cx0,y2:y, stroke:'var(--grid)'}));
+    const lbl = el('text', {x:cx0-8, y:y+3, class:'svglabel', 'text-anchor':'end'});
+    lbl.textContent = Math.round(val);
+    svg.appendChild(lbl);
+  }
+  svg.appendChild(el('text', {x:cx0-46, y:cy0-6, class:'svglabel'})).textContent = 'Δv (m/s)';
+
+  // x ticks
+  for(let i=0;i<=NMAX;i+=2){
+    const x = cx0+i*xScale;
+    svg.appendChild(el('line', {x1:x,y1:cy1,x2:x,y2:cy1+4, stroke:'var(--grid)'}));
+    const lbl = el('text', {x:x, y:cy1+16, class:'svglabel', 'text-anchor':'middle'});
+    lbl.textContent = i;
+    svg.appendChild(lbl);
+  }
+  svg.appendChild(el('text', {x:cx1-70, y:cy1+30, class:'svglabel'})).textContent = 'propellant blocks (n)';
+
+  // curve traced up to current n
+  let pts = [];
+  for(let i=0;i<=n;i++){
+    const x = cx0 + i*xScale;
+    const y = cy1 - dv(i)*yScale;
+    pts.push(x+','+y);
+  }
+  if(pts.length>1){
+    svg.appendChild(el('polyline', {points:pts.join(' '), fill:'none', stroke:'var(--curve)', 'stroke-width':2.2}));
+  }
+  pts.forEach((p,i)=>{
+    const [x,y]=p.split(',').map(Number);
+    svg.appendChild(el('circle', {cx:x, cy:y, r:3, fill:'var(--curve)'}));
+  });
+  // current point label
+  if(n>=0){
+    const x = cx0 + n*xScale;
+    const y = cy1 - dv(n)*yScale;
+    const lbl = el('text', {x: Math.min(x+8, cx1-90), y: y-8, class:'svglabel'});
+    lbl.setAttribute('fill','var(--curve)');
+    lbl.textContent = 'Δv = ' + Math.round(dv(n)) + ' m/s';
+    svg.appendChild(lbl);
+  }
+  // concavity annotation
+  svg.appendChild(el('text', {x:cx0+2, y:cy0+14, class:'svglabel'})).textContent =
+    'each added block buys less Δv than the last (concave)';
+}
+
+function update(){
+  const n = parseInt(slider.value,10);
+  const wet = DRY + n*BLOCK;
+  const d = dv(n);
+  document.getElementById('rWet').textContent = wet;
+  document.getElementById('rVe').textContent = Math.round(VE);
+  document.getElementById('rDv').textContent = d.toFixed(0);
+  document.getElementById('sub').textContent =
+    'Substituting: ln(' + wet + '/' + DRY + ') = ' + Math.log(wet/DRY).toFixed(3) +
+    '  →  Δv = ' + Math.round(VE) + ' × ' + Math.log(wet/DRY).toFixed(3) +
+    ' ≈ ' + d.toFixed(0) + ' m/s';
+  draw(n);
+}
+
+slider.addEventListener('input', update);
+
+// respect reduced motion (no auto-play exists here; scene is control-driven only)
+update();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;rocket-equation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Δv grows only as the logarithm of propellant mass: the Tsiolkovsky rocket equation"
+  ></iframe>
+</section>
+
+<section class="scene" id="biprop-wall">
+  <h3>On storable chemical propellant, the 500 kg satellite hits a wall near 700 m/s</h3>
+  <div class="caption">Now apply the rocket equation to our satellite's 5,000 m/s bill. Before you drag the slider, guess how much of the wet mass must be propellant at chemical <math><msub><mi>v</mi><mi>e</mi></msub><mo>≈</mo><mn>2.9</mn></math> km/s. Then watch the curve — and watch what happens when <math><msub><mi>v</mi><mi>e</mi></msub></math> rises instead.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="biprop-wall"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Propellant Wall — Rocket Equation</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#ffffff; --fg:#1b1e22; --muted:#5b6470;
+    --grid:#d7dbe0; --curve:#1f6fb2; --dash:#c0392b; --flag:#8a5a1f;
+    --marker:#1f6fb2; --accent:#0f7a4d; --track:#c9cfd6; --thumb:#1f6fb2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --panel:#1b1f26; --fg:#e7ebef; --muted:#9aa4b2;
+      --grid:#333a44; --curve:#5db2ff; --dash:#ff8a76; --flag:#e0a75e;
+      --marker:#5db2ff; --accent:#4fd39a; --track:#3a414c; --thumb:#5db2ff;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h1{font-size:15px;font-weight:600;margin:2px 0 8px;}
+  .panel{background:var(--panel);border-radius:10px;padding:10px 12px 6px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;}
+  svg{max-width:100%;height:auto;display:block;flex:1 1 460px;min-width:280px;}
+  .sliderCol{display:flex;flex-direction:column;align-items:center;gap:6px;
+    flex:0 0 auto;padding-top:6px;}
+  .vwrap{width:26px;height:220px;position:relative;}
+  .vwrap input[type=range]{
+    width:220px;height:26px;position:absolute;top:97px;left:-97px;
+    transform:rotate(-90deg);transform-origin:center;margin:0;
+    accent-color:var(--thumb);
+  }
+  .sliderLabel{font-size:12px;color:var(--muted);text-align:center;max-width:110px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 4px;padding:0;list-style:none;}
+  .readouts li{font-size:12.5px;color:var(--fg);}
+  .readouts b{color:var(--accent);}
+  .eqbox{font-size:13px;margin:2px 0 2px;}
+  .legend{font-size:11.5px;color:var(--muted);line-height:1.4;margin:0 0 10px;}
+  text{fill:var(--fg);font-size:11px;}
+  .axisTitle{fill:var(--muted);font-size:11px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Rocket equation applied: how much of the satellite must be fuel?</h1>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;eqbox&quot;>
+      <math display=&quot;block&quot;>
+        <mi>Δv</mi><mo>=</mo><msub><mi>v</mi><mi>e</mi></msub><mo>&amp;#8901;</mo><mi>ln</mi><mo>(</mo>
+        <mfrac><msub><mi>m</mi><mtext>wet</mtext></msub><msub><mi>m</mi><mtext>dry</mtext></msub></mfrac>
+        <mo>)</mo>
+      </math>
+    </div>
+    <div class=&quot;legend&quot;>
+      Δv — required velocity change (m/s) &amp;middot; v<sub style=&quot;font-size:10px&quot;>e</sub> (v_e) — exhaust velocity of the engine (m/s) &amp;middot;
+      m<sub style=&quot;font-size:10px&quot;>wet</sub>, m<sub style=&quot;font-size:10px&quot;>dry</sub> — fueled and empty satellite mass (kg).
+      Propellant fraction plotted below = 1 − m_dry/m_wet = 1 − e<sup style=&quot;font-size:10px&quot;>−Δv/v_e</sup>.
+    </div>
+    <div class=&quot;eqbox&quot;>
+      <math display=&quot;block&quot;>
+        <msub><mi>I</mi><mtext>sp</mtext></msub><mo>=</mo>
+        <mfrac><msub><mi>v</mi><mi>e</mi></msub><msub><mi>g</mi><mn>0</mn></msub></mfrac>
+      </math>
+    </div>
+    <div class=&quot;legend&quot;>
+      I<sub style=&quot;font-size:10px&quot;>sp</sub> — specific impulse (s), the standard rating of engine performance quoted by rocket engineers instead of v_e directly &amp;middot;
+      g<sub style=&quot;font-size:10px&quot;>0</sub> — standard gravity, a fixed constant = 9.807 m/s² (not the local gravity of any planet, just a unit-conversion factor).
+      Isp and v_e carry the same information: Isp = v_e / g₀.
+    </div>
+    <div class=&quot;row&quot;>
+      <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 380&quot; role=&quot;img&quot; aria-label=&quot;Propellant fraction vs delta-v&quot;></svg>
+      <div class=&quot;sliderCol&quot;>
+        <div class=&quot;vwrap&quot;>
+          <input id=&quot;veSlider&quot; type=&quot;range&quot; min=&quot;1.8&quot; max=&quot;8&quot; step=&quot;0.05&quot; value=&quot;2.0&quot;>
+        </div>
+        <div class=&quot;sliderLabel&quot;>Exhaust velocity v_e (km/s) — engine performance. Drag to change propellant technology.</div>
+      </div>
+    </div>
+    <ul class=&quot;readouts&quot;>
+      <li>v_e = <b id=&quot;veOut&quot;>2.00</b> km/s</li>
+      <li>Isp (specific impulse, = v_e/g₀) = <b id=&quot;ispOut&quot;>204</b> s</li>
+      <li>Δv ceiling (30% tank) = <b id=&quot;ceilOut&quot;>713</b> m/s</li>
+      <li>Propellant at Δv=5,000 m/s = <b id=&quot;frac5000&quot;>82</b>%</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function(){
+  const g0 = 9.80665; // m/s^2, standard gravity, defines Isp = ve/g0
+  const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('chart');
+  const L=52,R=22,T=22,B=42,W=640,H=380;
+  const cw = W-L-R, ch = H-T-B;
+  const dvMax = 5000; // m/s, x-axis domain
+  const tankFrac = 0.30; // realistic propellant-tank fraction ceiling
+
+  function xPix(dv){ return L + (dv/dvMax)*cw; }
+  function yPix(pct){ return T + ch - (pct/100)*ch; } // pct in 0..100
+
+  function el(tag, attrs){
+    const e = document.createElementNS(svgNS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // static grid + axes
+  for(let dv=0; dv<=dvMax; dv+=1000){
+    const x = xPix(dv);
+    svg.appendChild(el('line',{x1:x,y1:T,x2:x,y2:T+ch,stroke:'var(--grid)','stroke-width':1}));
+    const t = el('text',{x:x,y:T+ch+16,'text-anchor':'middle'}); t.textContent = dv.toLocaleString();
+    svg.appendChild(t);
+  }
+  for(let p=0; p<=100; p+=20){
+    const y = yPix(p);
+    svg.appendChild(el('line',{x1:L,y1:y,x2:L+cw,y2:y,stroke:'var(--grid)','stroke-width':1}));
+    const t = el('text',{x:L-8,y:y+4,'text-anchor':'end'}); t.textContent = p+'%';
+    svg.appendChild(t);
+  }
+  svg.appendChild(el('line',{x1:L,y1:T+ch,x2:L+cw,y2:T+ch,stroke:'var(--fg)','stroke-width':1.2}));
+  svg.appendChild(el('line',{x1:L,y1:T,x2:L,y2:T+ch,stroke:'var(--fg)','stroke-width':1.2}));
+
+  const xTitle = el('text',{x:L+cw/2,y:H-6,'text-anchor':'middle',class:'axisTitle'});
+  xTitle.textContent = 'Δv — target mission velocity change (m/s)';
+  svg.appendChild(xTitle);
+
+  const yTitle = el('text',{x:14,y:T+ch/2,'text-anchor':'middle',class:'axisTitle',
+    transform:`rotate(-90 14 ${T+ch/2})`});
+  yTitle.textContent = 'Propellant fraction of wet mass (%)';
+  svg.appendChild(yTitle);
+
+  // 30% tank-fraction reference line
+  const y30 = yPix(30);
+  svg.appendChild(el('line',{x1:L,y1:y30,x2:L+cw,y2:y30,stroke:'var(--dash)','stroke-width':1.4,'stroke-dasharray':'6,4'}));
+  const tankLabel = el('text',{x:L+6,y:y30-6,fill:'var(--dash)'});
+  tankLabel.textContent = 'realistic tank fraction ~30% of wet mass';
+  svg.appendChild(tankLabel);
+
+  // GEO sprint flag at Δv = 5000
+  const xFlag = xPix(5000);
+  svg.appendChild(el('line',{x1:xFlag,y1:T,x2:xFlag,y2:T+ch,stroke:'var(--flag)','stroke-width':1.2,'stroke-dasharray':'3,3'}));
+  const flagTop = el('text',{x:xFlag-6,y:T+12,'text-anchor':'end',fill:'var(--flag)'});
+  flagTop.textContent = 'GEO sprint: Δv = 5,000 m/s';
+  svg.appendChild(flagTop);
+
+  // dynamic elements
+  const curve = el('path',{fill:'none',stroke:'var(--curve)','stroke-width':2.4});
+  svg.appendChild(curve);
+
+  const curveLabel = el('text',{x:L+10,y:T+16,fill:'var(--curve)'});
+  svg.appendChild(curveLabel);
+
+  const ceilLineV = el('line',{stroke:'var(--marker)','stroke-width':1.2,'stroke-dasharray':'4,3'});
+  svg.appendChild(ceilLineV);
+  const ceilDot = el('circle',{r:4.5,fill:'var(--marker)'});
+  svg.appendChild(ceilDot);
+  const ceilLabel = el('text',{fill:'var(--marker)'});
+  svg.appendChild(ceilLabel);
+
+  const flagDot = el('circle',{r:4.5,fill:'var(--flag)'});
+  svg.appendChild(flagDot);
+  const flagValLabel = el('text',{'text-anchor':'end',fill:'var(--flag)'});
+  svg.appendChild(flagValLabel);
+
+  const veSlider = document.getElementById('veSlider');
+  const veOut = document.getElementById('veOut');
+  const ispOut = document.getElementById('ispOut');
+  const ceilOut = document.getElementById('ceilOut');
+  const frac5000Out = document.getElementById('frac5000');
+
+  function propFrac(dv, ve){ return 1 - Math.exp(-dv/ve); } // ve, dv in m/s -> fraction 0..1
+
+  function draw(){
+    const veKm = parseFloat(veSlider.value);
+    const ve = veKm * 1000; // m/s
+    const isp = ve / g0; // s, specific impulse: Isp = v_e / g0
+
+    // curve
+    let d = '';
+    const N = 100;
+    for(let i=0;i<=N;i++){
+      const dv = dvMax*i/N;
+      const pct = propFrac(dv, ve)*100;
+      const x = xPix(dv), y = yPix(pct);
+      d += (i===0?'M':'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    }
+    curve.setAttribute('d', d);
+    curveLabel.textContent = 'chemical bipropellant curve, v_e = ' + veKm.toFixed(2) + ' km/s';
+
+    // ceiling at 30% tank fraction
+    const dvCeil = ve * Math.log(1/(1-tankFrac));
+    const xC = xPix(dvCeil), yC = yPix(30);
+    ceilLineV.setAttribute('x1', xC); ceilLineV.setAttribute('x2', xC);
+    ceilLineV.setAttribute('y1', T); ceilLineV.setAttribute('y2', T+ch);
+    ceilDot.setAttribute('cx', xC); ceilDot.setAttribute('cy', yC);
+    const labelRight = xC < L+cw-140;
+    ceilLabel.setAttribute('x', labelRight ? xC+8 : xC-8);
+    ceilLabel.setAttribute('text-anchor', labelRight ? 'start':'end');
+    ceilLabel.setAttribute('y', T+ch-8);
+    ceilLabel.textContent = 'practical Δv ceiling: ' + Math.round(dvCeil) + ' m/s';
+
+    // value at flag (5000 m/s)
+    const frac5000 = propFrac(5000, ve)*100;
+    const yF = yPix(frac5000);
+    flagDot.setAttribute('cx', xFlag); flagDot.setAttribute('cy', yF);
+    flagValLabel.setAttribute('x', xFlag-8);
+    // Always place this label below the flag dot: the &quot;GEO sprint&quot; annotation
+    // sits fixed near the top of the chart, and the dot itself can sit very
+    // close to the top when v_e is low (fraction near 100%). Placing the
+    // value label below the dot (rather than above it) keeps a reliable
+    // vertical gap from the fixed top annotation across the whole v_e range.
+    const yLabel = Math.min(T+ch-6, yF+20);
+    flagValLabel.setAttribute('y', yLabel);
+    flagValLabel.textContent = frac5000.toFixed(0) + '% of wet mass must be propellant';
+
+    // readouts
+    veOut.textContent = veKm.toFixed(2);
+    ispOut.textContent = Math.round(isp);
+    ceilOut.textContent = Math.round(dvCeil);
+    frac5000Out.textContent = frac5000.toFixed(0);
+  }
+
+  veSlider.addEventListener('input', draw);
+  draw();
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;biprop-wall&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="On storable chemical propellant, the 500 kg satellite hits a wall near 700 m/s"
+  ></iframe>
+</section>
+
+<section class="scene" id="thrust-isp-binary">
+  <h3>Fifty years of engines occupy two opposite corners: high thrust or high Isp, never both</h3>
+  <div class="caption">The rocket equation says raise <math><msub><mi>v</mi><mi>e</mi></msub></math>; the power equation says raising <math><msub><mi>v</mi><mi>e</mi></msub></math> at fixed power kills thrust. Isp — specific impulse — is just exhaust velocity restated in seconds (<math><msub><mi>v</mi><mi>e</mi></msub></math> divided by <math><mi>g</mi></math>). Before you press each engine's button, predict: can it finish the 5,000 m/s GEO sprint at all, and if so, how long does it take?</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="thrust-isp-binary"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Thrust vs. Isp — the empty middle</title>
+<style>
+:root{
+  --bg:#f7f7f4; --panel:#ffffff; --fg:#1a1a1a; --muted:#666561;
+  --grid:#d9d8d2; --chem:#c1440e; --elec:#0d7a78; --gap:#e7e3d9; --curve:#7d4fae; --accent:#1a1a1a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#151515; --panel:#1e1e1e; --fg:#eaeaea; --muted:#a3a29c;
+    --grid:#3a3a36; --chem:#ff8a56; --elec:#5fe0dd; --gap:#2b2a26; --curve:#c39cf0; --accent:#eaeaea;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:10px 12px 18px;}
+h1{font-size:13.5px;font-weight:600;margin:2px 0 8px;line-height:1.3;}
+svg{width:100%;height:auto;max-width:100%;display:block;}
+.pt{transition:r .25s ease, opacity .25s ease;}
+@media (prefers-reduced-motion: reduce){ .pt{transition:none;} }
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+button{font-size:12px;padding:7px 9px;border-radius:6px;border:1px solid var(--grid);background:var(--panel);color:var(--fg);cursor:pointer;}
+button.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;font-weight:600;}
+.panel{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:9px 11px;font-size:12.5px;}
+.row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed var(--grid);}
+.row:last-child{border-bottom:none;}
+.row .k{color:var(--muted);}
+.row .v{font-weight:600;text-align:right;}
+ul.detail{margin:6px 0 0;padding-left:16px;font-size:11.5px;color:var(--muted);}
+ul.detail li{margin:3px 0;}
+.eq{margin-top:12px;}
+math{font-size:14.5px;}
+.legend{font-size:10.8px;color:var(--muted);margin:2px 0 10px;line-height:1.5;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h1>Thrust vs. specific impulse: fifty years of engines occupy two opposite corners</h1>
+<svg id=&quot;chart&quot; viewBox=&quot;0 0 640 440&quot; role=&quot;img&quot; aria-label=&quot;Scatter chart of thrust versus specific impulse, showing chemical and electric engine clusters and an empty middle region&quot;></svg>
+
+<div class=&quot;controls&quot;>
+  <button id=&quot;btnChem&quot;>Show storable chemical engine (high thrust, low Isp)</button>
+  <button id=&quot;btnElec&quot;>Show Hall-effect electric thruster (low thrust, high Isp)</button>
+</div>
+
+<div class=&quot;panel&quot;>
+  <div class=&quot;row&quot;><span class=&quot;k&quot;>Selected engine</span><span class=&quot;v&quot; id=&quot;vEngine&quot;>—</span></div>
+  <div class=&quot;row&quot;><span class=&quot;k&quot;>Representative Isp</span><span class=&quot;v&quot; id=&quot;vIsp&quot;>—</span></div>
+  <div class=&quot;row&quot;><span class=&quot;k&quot;>Representative thrust</span><span class=&quot;v&quot; id=&quot;vThrust&quot;>—</span></div>
+  <div class=&quot;row&quot;><span class=&quot;k&quot;>GEO sprint, Δv = 5,000 m/s</span><span class=&quot;v&quot; id=&quot;vVerdict&quot;>—</span></div>
+  <ul class=&quot;detail&quot; id=&quot;vDetail&quot;></ul>
+</div>
+
+<div class=&quot;eq&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>I</mi><mtext>sp</mtext></msub><mo>=</mo>
+  <mfrac><msub><mi>v</mi><mtext>e</mtext></msub><msub><mi>g</mi><mn>0</mn></msub></mfrac>
+</math>
+<div class=&quot;legend&quot;>I<span style=&quot;font-size:9px;vertical-align:sub;&quot;>sp</span> — specific impulse (s) &amp;middot; v<span style=&quot;font-size:9px;vertical-align:sub;&quot;>e</span> — exhaust velocity (m/s) &amp;middot; g0 — standard gravity, 9.807 m/s².</div>
+
+<math display=&quot;block&quot;>
+  <mi>F</mi><mo>=</mo>
+  <mfrac><mrow><mn>2</mn><mi>η</mi><mi>P</mi></mrow><msub><mi>v</mi><mtext>e</mtext></msub></mfrac>
+</math>
+<div class=&quot;legend&quot;>F — thrust (N) &amp;middot; η — thruster electrical efficiency (dimensionless, ≈0.5 for Hall thrusters) &amp;middot; P — electrical power delivered to the thruster (W) &amp;middot; v_e — exhaust velocity (m/s). At fixed onboard power P, raising v_e (higher Isp) forces F down — the iso-power curve plotted on the chart.</div>
+</div>
+</div>
+
+<script>
+(function(){
+  const cs = getComputedStyle(document.documentElement);
+  const col = n => cs.getPropertyValue(n).trim();
+
+  // ---- named physical constants (all computation is auditable) ----
+  const G0 = 9.80665;      // m/s^2, standard gravity
+  const ETA = 0.5;         // dimensionless, Hall-thruster electrical->kinetic efficiency
+  const P_ELECTRIC = 5000; // W, representative spacecraft power budget for the thruster
+  const M_SC = 707;        // kg, representative spacecraft mass (assumed ~constant over the burn)
+  const F_ELECTRIC = 0.0776; // N, representative Hall-thruster thrust (~78 mN), sized so the
+                              // 5,000 m/s GEO sprint totals ~527 days (>12,600 hours)
+  const ISP_ELECTRIC = 1500; // s
+  const F_CHEM = 490;      // N, representative storable bipropellant apogee-engine thrust
+  const ISP_CHEM = 300;    // s
+  const DV_TANK_LIMIT = 700;  // m/s, structural/tank-mass-fraction ceiling (from prior scene)
+  const DV_STATIONKEEP = 100; // m/s
+  const DV_SPRINT = 5000;     // m/s
+
+  const hoursFor = (dv,F,m) => dv*m/F/3600; // constant-thrust, constant-mass burn time
+
+  const t100  = hoursFor(DV_STATIONKEEP, F_ELECTRIC, M_SC);
+  const t5000 = hoursFor(DV_SPRINT, F_ELECTRIC, M_SC);
+
+  // ---- chart geometry ----
+  const NS='http://www.w3.org/2000/svg';
+  const svg = document.getElementById('chart');
+  const W=640,H=440, M={l:58,r:18,t:16,b:46};
+  const plotW=W-M.l-M.r, plotH=H-M.t-M.b;
+  const ISP_MIN=100, ISP_MAX=2000, LG_MIN=-3, LG_MAX=3; // thrust decades: 1 mN .. 1 kN
+  const xPos = isp => M.l + (isp-ISP_MIN)/(ISP_MAX-ISP_MIN)*plotW;
+  const yPos = F => M.t + (LG_MAX-Math.log10(F))/(LG_MAX-LG_MIN)*plotH;
+
+  function el(tag,attrs,txt){
+    const e=document.createElementNS(NS,tag);
+    for(const k in attrs) e.setAttribute(k,attrs[k]);
+    if(txt!=null) e.textContent=txt;
+    return e;
+  }
+
+  const chemPoints=[{isp:300,f:F_CHEM},{isp:320,f:110},{isp:285,f:22},{isp:230,f:4.5},{isp:310,f:900}];
+  const elecPoints=[{isp:ISP_ELECTRIC,f:F_ELECTRIC},{isp:1600,f:0.061},{isp:1800,f:0.045},{isp:1350,f:0.235},{isp:1950,f:0.028}];
+
+  function build(){
+    // gridlines + ticks
+    const xTicks=[100,500,1000,1500,2000];
+    const yTicks=[0.001,0.01,0.1,1,10,100,1000];
+    const yLabels=['1 mN','10 mN','100 mN','1 N','10 N','100 N','1 kN'];
+
+    xTicks.forEach(v=>{
+      const x=xPos(v);
+      svg.appendChild(el('line',{x1:x,x2:x,y1:M.t,y2:H-M.b,stroke:col('--grid'),'stroke-width':1}));
+      svg.appendChild(el('text',{x:x,y:H-M.b+18,'text-anchor':'middle','font-size':11,fill:col('--muted')}, v));
+    });
+    yTicks.forEach((v,i)=>{
+      const y=yPos(v);
+      svg.appendChild(el('line',{x1:M.l,x2:W-M.r,y1:y,y2:y,stroke:col('--grid'),'stroke-width':1}));
+      svg.appendChild(el('text',{x:M.l-8,y:y+3,'text-anchor':'end','font-size':10.5,fill:col('--muted')}, yLabels[i]));
+    });
+
+    // gap rectangle: the empty middle
+    const gx1=xPos(450), gx2=xPos(1150);
+    svg.appendChild(el('rect',{x:gx1,y:M.t,width:gx2-gx1,height:plotH,fill:col('--gap'),stroke:col('--grid'),'stroke-dasharray':'4,3'}));
+    svg.appendChild(el('text',{x:(gx1+gx2)/2,y:M.t+30,'text-anchor':'middle','font-size':12.5,'font-style':'italic',fill:col('--muted')},'empty for 50 years'));
+
+    // iso-power curve: F = 2*eta*P/(Isp*g0)
+    let d='';
+    for(let isp=ISP_MIN; isp<=ISP_MAX; isp+=25){
+      const F = 2*ETA*P_ELECTRIC/(isp*G0);
+      const x=xPos(isp), y=yPos(F);
+      d += (isp===ISP_MIN? 'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    }
+    svg.appendChild(el('path',{d:d,fill:'none',stroke:col('--curve'),'stroke-width':2}));
+    const labIsp=700, labF=2*ETA*P_ELECTRIC/(labIsp*G0);
+    svg.appendChild(el('text',{x:xPos(labIsp)-95,y:yPos(labF)+18,'font-size':10.5,fill:col('--curve')},'constant power ≈5 kW: F = 2ηP/vₑ'));
+
+    // axes
+    svg.appendChild(el('line',{x1:M.l,x2:W-M.r,y1:H-M.b,y2:H-M.b,stroke:col('--fg'),'stroke-width':1.2}));
+    svg.appendChild(el('line',{x1:M.l,x2:M.l,y1:M.t,y2:H-M.b,stroke:col('--fg'),'stroke-width':1.2}));
+    svg.appendChild(el('text',{x:(M.l+W-M.r)/2,y:H-8,'text-anchor':'middle','font-size':12,fill:col('--fg')},'Specific impulse, Isp (s)'));
+    const yt=el('text',{x:14,y:(M.t+H-M.b)/2,'text-anchor':'middle','font-size':12,fill:col('--fg'),
+      transform:'rotate(-90 14 '+((M.t+H-M.b)/2)+')'},'Thrust, F (N) — log scale');
+    svg.appendChild(yt);
+
+    // cluster labels
+    svg.appendChild(el('text',{x:xPos(300),y:33,'text-anchor':'middle','font-size':11.5,fill:col('--chem')},'storable chemical'));
+    svg.appendChild(el('text',{x:xPos(300),y:46,'text-anchor':'middle','font-size':10,fill:col('--muted')},'(tens–hundreds of N)'));
+    svg.appendChild(el('text',{x:xPos(1650),y:yPos(0.014),'text-anchor':'middle','font-size':11.5,fill:col('--elec')},'Hall-effect electric'));
+    svg.appendChild(el('text',{x:xPos(1650),y:yPos(0.014)+13,'text-anchor':'middle','font-size':10,fill:col('--muted')},'(millinewtons)'));
+
+    // points
+    chemPoints.forEach(p=>{
+      svg.appendChild(el('circle',{cx:xPos(p.isp),cy:yPos(p.f),r:5,fill:col('--chem'),opacity:0.85,class:'pt','data-kind':'chem'}));
+    });
+    elecPoints.forEach(p=>{
+      svg.appendChild(el('circle',{cx:xPos(p.isp),cy:yPos(p.f),r:5,fill:col('--elec'),opacity:0.85,class:'pt','data-kind':'elec'}));
+    });
+  }
+
+  let selected=null;
+  function selectEngine(kind){
+    selected=kind;
+    document.getElementById('btnChem').classList.toggle('active',kind==='chem');
+    document.getElementById('btnElec').classList.toggle('active',kind==='elec');
+    document.querySelectorAll('.pt').forEach(c=>{
+      const isSel = c.getAttribute('data-kind')===kind;
+      c.setAttribute('r', isSel? 7.5:4);
+      c.setAttribute('opacity', isSel? 1 : 0.28);
+    });
+    updatePanel();
+  }
+
+  function updatePanel(){
+    const vEngine=document.getElementById('vEngine'), vIsp=document.getElementById('vIsp'),
+          vThrust=document.getElementById('vThrust'), vVerdict=document.getElementById('vVerdict'),
+          vDetail=document.getElementById('vDetail');
+    vDetail.innerHTML='';
+    function li(t){ const e=document.createElement('li'); e.textContent=t; vDetail.appendChild(e); }
+
+    if(selected==='chem'){
+      vEngine.textContent='Storable chemical (hydrazine/NTO)';
+      vIsp.textContent=ISP_CHEM+' s';
+      vThrust.textContent=F_CHEM+' N';
+      vVerdict.textContent='cannot reach';
+      li('Tank-wall structural limit caps deliverable Δv at ≈'+DV_TANK_LIMIT+' m/s ('+Math.round(DV_TANK_LIMIT/DV_SPRINT*100)+'% of the sprint) — see the propellant-tank tradeoff.');
+      li('Chemistry caps vₑ (hence Isp); thrust itself is plentiful — the failure here is Δv, not thrust.');
+    } else if(selected==='elec'){
+      vEngine.textContent='Hall-effect electric (xenon, solar-powered)';
+      vIsp.textContent=ISP_ELECTRIC+' s';
+      vThrust.textContent=Math.round(F_ELECTRIC*1000)+' mN';
+      vVerdict.textContent='reachable — '+Math.round(t5000).toLocaleString()+' h ('+Math.round(t5000/24)+' days)';
+      li('Δv = '+DV_STATIONKEEP+' m/s station-keeping burn: ≈'+Math.round(t100)+' hours of continuous firing.');
+      li('Δv = '+DV_SPRINT+' m/s GEO sprint: ≈'+Math.round(t5000).toLocaleString()+' hours ('+Math.round(t5000/24)+' days) of continuous firing.');
+      li('Thrust is capped by onboard power (F = 2ηP/vₑ), not by chemistry — the failure here is time, not Δv.');
+    } else {
+      vEngine.textContent='—'; vIsp.textContent='—'; vThrust.textContent='—'; vVerdict.textContent='—';
+    }
+  }
+
+  document.getElementById('btnChem').addEventListener('click',()=>selectEngine('chem'));
+  document.getElementById('btnElec').addEventListener('click',()=>selectEngine('elec'));
+
+  build();
+  selectEngine('chem');
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;thrust-isp-binary&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Fifty years of engines occupy two opposite corners: high thrust or high Isp, never both"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">The trap in Part 1 came from letting the propellant supply its own energy. Solar-thermal propulsion cuts that link: sunlight provides the heat, so the propellant can be chosen purely for its physics — and <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi><mo>/</mo><mi>M</mi></mrow></msqrt></math> does the rest.</div>
+</header>
+<section class="scene" id="temperature-mass-equation">
+  <h3>For a thermal rocket, exhaust velocity depends only on T/M: hot gas, light molecules</h3>
+  <div class="caption">Here is the loophole in the 50-year binary. A thermal rocket is any engine that heats a gas and expands it through a nozzle. For every one of them, <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi><mo>/</mo><mi>M</mi></mrow></msqrt></math>: only the gas temperature <math><mi>T</mi></math> and its molecular mass <math><mi>M</mi></math> matter, not where the heat came from.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="temperature-mass-equation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Exhaust velocity: v_e ∝ √(T/M)</title>
+<style>
+:root{
+  --bg:#f7f7fa; --fg:#1b1e24; --muted:#5b616e; --panel:#ffffff;
+  --accent:#c0392b; --accent2:#2266cc; --lock:#9aa0aa; --glow:#e8f3ff;
+  --border:#d4d7dd; --lockbg:#e9eaed;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161b; --fg:#e9ebf0; --muted:#a2a8b4; --panel:#1e2128;
+    --accent:#ff6b5e; --accent2:#5aa0ff; --lock:#565c66; --glow:#243447;
+    --border:#333844; --lockbg:#24272e;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+h2{font-size:15px;margin:0 0 8px;color:var(--muted);font-weight:600;}
+.eqbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;margin-bottom:10px;}
+math{font-size:22px;}
+.eq2{font-size:16px;color:var(--muted);margin-top:2px;}
+.legend{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.subst{font-size:13px;margin-top:8px;color:var(--fg);font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;margin-bottom:10px;}
+.ctrlgroup{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;flex:1 1 200px;min-width:170px;transition:opacity .2s, background .2s, box-shadow .2s;}
+.ctrlgroup label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;transition:color .2s;}
+.ctrlgroup input[type=range]{width:100%;accent-color:var(--accent2);cursor:pointer;}
+.readout{font-size:13px;font-weight:600;margin-top:4px;transition:color .2s;}
+button.toggle{width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
+  background:var(--accent2);color:#fff;font-size:13px;cursor:pointer;font-weight:600;}
+button.toggle:active{opacity:.85;}
+
+/* --- disabled (combustion-locked) state: must be unmistakably inert --- */
+.locked{opacity:.62;background:var(--lockbg);}
+.locked label{color:var(--lock);}
+.locked .readout{color:var(--lock);}
+.locked input[type=range]{
+  accent-color:var(--lock);
+  cursor:not-allowed;
+  filter:grayscale(1);
+}
+.locked input[type=range]:disabled{cursor:not-allowed;}
+
+/* --- enabled (external-heat) state: clearly active/highlighted --- */
+.unlocked{box-shadow:0 0 0 2px var(--accent2);background:var(--glow);}
+.unlocked input[type=range]{accent-color:var(--accent2);cursor:pointer;}
+
+.callout{background:var(--panel);border:1px dashed var(--border);border-radius:8px;
+  padding:8px 10px;font-size:12px;color:var(--muted);margin-bottom:10px;}
+.callout ul{margin:4px 0 0 18px;padding:0;}
+.callout li{margin-bottom:2px;}
+canvas{width:100%;max-width:100%;height:auto;display:block;border:1px solid var(--border);
+  border-radius:8px;background:var(--panel);}
+.playbtn{display:none;margin-bottom:8px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--fg);cursor:pointer;font-size:12px;}
+@media (max-width:420px){
+  math{font-size:18px;}
+  .eq2{font-size:13px;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h2>Thermal rocket: exhaust velocity depends only on T and M</h2>
+
+<div class=&quot;eqbox&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>v</mi><mtext>e</mtext></msub>
+  <mo>=</mo>
+  <msqrt>
+    <mfrac>
+      <mrow><mn>2</mn><mi>γ</mi><mi>R</mi><mi>T</mi></mrow>
+      <mrow><mo>(</mo><mi>γ</mi><mo>&amp;#8722;</mo><mn>1</mn><mo>)</mo><mi>M</mi></mrow>
+    </mfrac>
+  </msqrt>
+</math>
+<div class=&quot;eq2&quot;><math><msub><mi>v</mi><mtext>e</mtext></msub><mo>&amp;#8733;</mo><msqrt><mfrac><mi>T</mi><mi>M</mi></mfrac></msqrt></math></div>
+<div class=&quot;legend&quot;>
+v<sub>e</sub> — exhaust velocity of the gas leaving the nozzle (m/s) · T — gas temperature in the chamber (K), a measure of average molecular kinetic energy · M — molecular mass of the exhaust gas (kg/mol, shown as g/mol in the controls) · R — universal gas constant, 8.314 J/(mol·K) · γ — specific heat ratio of the gas (dimensionless, ≈1.2 for triatomic combustion products); this is the ideal maximum exhaust speed for full expansion to vacuum.
+</div>
+<div class=&quot;subst&quot; id=&quot;subst&quot;>substituting current values…</div>
+</div>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrlgroup&quot;>
+    <label>Heat source — how the gas gets hot</label>
+    <button class=&quot;toggle&quot; id=&quot;toggleBtn&quot;>Switch to External heat</button>
+  </div>
+  <div class=&quot;ctrlgroup&quot; id=&quot;tGroup&quot;>
+    <label id=&quot;tLabel&quot;>Gas temperature T (K)</label>
+    <input type=&quot;range&quot; id=&quot;tSlider&quot; min=&quot;300&quot; max=&quot;4000&quot; step=&quot;50&quot; value=&quot;3500&quot;>
+    <div class=&quot;readout&quot; id=&quot;tVal&quot;>T = 3500 K</div>
+  </div>
+  <div class=&quot;ctrlgroup&quot; id=&quot;mGroup&quot;>
+    <label id=&quot;mLabel&quot;>Molecular mass M (g/mol)</label>
+    <input type=&quot;range&quot; id=&quot;mSlider&quot; min=&quot;2&quot; max=&quot;44&quot; step=&quot;1&quot; value=&quot;18&quot;>
+    <div class=&quot;readout&quot; id=&quot;mVal&quot;>M = 18 g/mol</div>
+  </div>
+</div>
+
+<div class=&quot;callout&quot;>
+Burn fuel and your exhaust <em>is</em> the combustion product, at whatever temperature the reaction allows — both knobs locked (grayed out, can't be dragged):
+<ul>
+  <li>H₂O — 18 g/mol (typical hydrolox combustion product)</li>
+  <li>CO₂ — 44 g/mol (typical hydrocarbon combustion product)</li>
+</ul>
+Switch to external heat and both T and M become free choices (highlighted, draggable) — e.g. heat pure H₂ (2 g/mol) with a reactor instead of burning it.
+</div>
+
+<button class=&quot;playbtn&quot; id=&quot;playBtn&quot;>▶ Play animation</button>
+<canvas id=&quot;diagram&quot; width=&quot;640&quot; height=&quot;220&quot;></canvas>
+
+</div>
+
+<script>
+const R = 8.314;      // J/(mol·K)
+const GAMMA = 1.2;    // specific heat ratio, representative of combustion exhaust gases
+function veOf(T_K, M_gmol){
+  const M = M_gmol/1000; // kg/mol
+  return Math.sqrt( 2*GAMMA/(GAMMA-1) * R*T_K / M );
+}
+
+let mode = 'combustion';
+let T = 3500, M = 18;
+const locked = { T: 3500, M: 18 };       // combustion locks exhaust to H2O (hydrolox product)
+const external = { T: 2500, M: 2 };
+
+const tSlider = document.getElementById('tSlider');
+const mSlider = document.getElementById('mSlider');
+const tVal = document.getElementById('tVal');
+const mVal = document.getElementById('mVal');
+const tGroup = document.getElementById('tGroup');
+const mGroup = document.getElementById('mGroup');
+const tLabel = document.getElementById('tLabel');
+const mLabel = document.getElementById('mLabel');
+const toggleBtn = document.getElementById('toggleBtn');
+const subst = document.getElementById('subst');
+
+function applyMode(){
+  if(mode==='combustion'){
+    T = locked.T; M = locked.M;
+    tSlider.value = T; mSlider.value = M;
+    tSlider.disabled = true; mSlider.disabled = true;
+    tGroup.classList.add('locked'); mGroup.classList.add('locked');
+    tGroup.classList.remove('unlocked'); mGroup.classList.remove('unlocked');
+    tLabel.textContent = '🔒 Gas temperature T (K) — locked to reaction, cannot drag';
+    mLabel.textContent = '🔒 Molecular mass M (g/mol) — locked to reaction, cannot drag';
+    toggleBtn.textContent = 'Switch to External heat';
+  } else {
+    T = external.T; M = external.M;
+    tSlider.value = T; mSlider.value = M;
+    tSlider.disabled = false; mSlider.disabled = false;
+    tGroup.classList.remove('locked'); mGroup.classList.remove('locked');
+    tGroup.classList.add('unlocked'); mGroup.classList.add('unlocked');
+    tLabel.textContent = '🔓 Gas temperature T (K) — drag to set chamber temperature';
+    mLabel.textContent = '🔓 Molecular mass M (g/mol) — drag to pick the working-fluid gas';
+    toggleBtn.textContent = 'Switch to Combustion';
+  }
+  updateReadouts();
+}
+
+function updateReadouts(){
+  const lockTag = (mode==='combustion') ? ' (locked)' : '';
+  tVal.textContent = 'T = ' + Math.round(T) + ' K' + lockTag;
+  mVal.textContent = 'M = ' + Math.round(M) + ' g/mol' + lockTag;
+  const ve = veOf(T, M);
+  subst.textContent = 'T = ' + Math.round(T) + ' K, M = ' + Math.round(M) +
+    ' g/mol → v_e = ' + Math.round(ve) + ' m/s';
+}
+
+toggleBtn.addEventListener('click', ()=>{
+  mode = (mode==='combustion') ? 'external' : 'combustion';
+  applyMode();
+});
+tSlider.addEventListener('input', ()=>{
+  if(mode==='external'){ external.T = +tSlider.value; T = external.T; updateReadouts(); }
+});
+mSlider.addEventListener('input', ()=>{
+  if(mode==='external'){ external.M = +mSlider.value; M = external.M; updateReadouts(); }
+});
+
+// ---------- canvas diagram: light lane vs heavy lane at current T ----------
+// The &quot;current&quot; lane always tracks the actual exhaust species selected above
+// (H2O when combustion-locked, whatever gas the M slider picks under external heat).
+// The &quot;compare&quot; lane is a fixed reference gas on the opposite end of the mass
+// range, so the light-vs-heavy contrast is always visible without ever putting
+// a raw-H2 label on a combustion exhaust stream.
+const canvas = document.getElementById('diagram');
+const ctx = canvas.getContext('2d');
+const cssVar = (name)=>getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const MASS_H2 = 2, MASS_CO2 = 44;
+const laneY = {h2: 70, co2: 150};
+const chamberW = 130, nozzleW = 60, fullW = 640, exhaustEnd = 620;
+
+let ballsLight = [], ballsHeavy = [];
+function initBalls(){
+  ballsLight = []; ballsHeavy = [];
+  for(let i=0;i<4;i++) ballsLight.push({x: 10 + i*30});
+  for(let i=0;i<4;i++) ballsHeavy.push({x: 10 + i*40});
+}
+initBalls();
+
+function speciesLabel(mass){
+  if(Math.abs(mass-2)<0.6) return 'H₂';
+  if(Math.abs(mass-18)<0.6) return 'H₂O';
+  if(Math.abs(mass-44)<0.6) return 'CO₂';
+  return 'gas';
+}
+
+// Decide the fixed comparison mass (opposite end of the range from the
+// current gas) and work out which lane is actually lighter/heavier.
+function currentLanes(){
+  const refMass = (M < 23) ? MASS_CO2 : MASS_H2;
+  const isMLight = M <= refMass;
+  return {
+    lightMass: isMLight ? M : refMass,
+    heavyMass: isMLight ? refMass : M,
+    lightIsCurrent: isMLight
+  };
+}
+
+function speedPx(mass){
+  // scale physical v_e (m/s) into a pixel-per-frame rate for legible animation
+  const ve = veOf(T, mass);
+  const refMax = veOf(4000, MASS_H2); // normalization reference (lightest gas, hottest T)
+  return 0.6 + 3.4 * (ve / refMax);
+}
+
+function drawChamberAndNozzle(fg, muted, accent2){
+  // chamber box
+  ctx.strokeStyle = fg; ctx.lineWidth = 1.5;
+  ctx.strokeRect(4, 20, chamberW, 180);
+  ctx.fillStyle = muted; ctx.font = '11px sans-serif';
+  ctx.fillText('heated chamber', 10, 14);
+  // heat icon
+  ctx.fillStyle = mode==='combustion' ? cssVar('--accent') : accent2;
+  ctx.font = '20px sans-serif';
+  ctx.fillText(mode==='combustion' ? '🔥' : '⚡', chamberW/2 - 8, 118);
+  ctx.fillStyle = muted; ctx.font = '10px sans-serif';
+  ctx.fillText(mode==='combustion'?'combustion':'external heat', 14, 200);
+  // nozzle (converging shape)
+  ctx.beginPath();
+  ctx.moveTo(chamberW+4, 20);
+  ctx.lineTo(chamberW+4+nozzleW, 90);
+  ctx.lineTo(chamberW+4+nozzleW, 130);
+  ctx.lineTo(chamberW+4, 200);
+  ctx.closePath();
+  ctx.strokeStyle = fg;
+  ctx.stroke();
+  ctx.fillStyle = muted; ctx.font = '11px sans-serif';
+  ctx.fillText('nozzle', chamberW+8, 14);
+  ctx.fillText('exhaust', 520, 14);
+}
+
+function drawLane(balls, y, mass, label, color){
+  ctx.strokeStyle = cssVar('--border');
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(8,y); ctx.lineTo(exhaustEnd,y); ctx.stroke();
+  ctx.setLineDash([]);
+  const r = 4 + Math.sqrt(mass);
+  ctx.fillStyle = color;
+  for(const b of balls){
+    ctx.beginPath();
+    ctx.arc(b.x, y, r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  const ve = Math.round(veOf(T, mass));
+  ctx.fillStyle = cssVar('--fg'); ctx.font = '11px sans-serif';
+  ctx.fillText(label + '  v_e = ' + ve + ' m/s', 8, y-14);
+}
+
+let playing = true;
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const playBtn = document.getElementById('playBtn');
+if(reduceMotion){ playing = false; playBtn.style.display = 'block'; }
+playBtn.addEventListener('click', ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸ Pause animation' : '▶ Play animation';
+  if(playing) requestAnimationFrame(loop);
+});
+
+function step(){
+  const {lightMass, heavyMass} = currentLanes();
+  const sLight = speedPx(lightMass), sHeavy = speedPx(heavyMass);
+  for(const b of ballsLight){ b.x += sLight; if(b.x > exhaustEnd) b.x = 10; }
+  for(const b of ballsHeavy){ b.x += sHeavy; if(b.x > exhaustEnd) b.x = 10; }
+}
+
+function draw(){
+  const fg = cssVar('--fg'), muted = cssVar('--muted'), accent2 = cssVar('--accent2');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = cssVar('--panel');
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawChamberAndNozzle(fg, muted, accent2);
+
+  const {lightMass, heavyMass, lightIsCurrent} = currentLanes();
+  const lightName = speciesLabel(lightMass);
+  const heavyName = speciesLabel(heavyMass);
+  const lightLabel = (lightIsCurrent ? 'current: ' : 'compare: ') + lightName +
+    ' (' + Math.round(lightMass) + ' g/mol) — light';
+  const heavyLabel = (lightIsCurrent ? 'compare: ' : 'current: ') + heavyName +
+    ' (' + Math.round(heavyMass) + ' g/mol) — heavy';
+
+  drawLane(ballsLight, laneY.h2, lightMass, lightLabel, cssVar('--accent2'));
+  drawLane(ballsHeavy, laneY.co2, heavyMass, heavyLabel, cssVar('--accent'));
+}
+
+function loop(){
+  if(playing){ step(); }
+  draw();
+  if(playing) requestAnimationFrame(loop);
+}
+
+applyMode();
+draw();
+requestAnimationFrame(function first(){
+  if(playing) loop();
+  window.__sceneReady = true;
+});
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;temperature-mass-equation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="For a thermal rocket, exhaust velocity depends only on T/M: hot gas, light molecules"
+  ></iframe>
+</section>
+
+<section class="scene" id="propellant-picker">
+  <h3>Pick a light working fluid, push the temperature, and Isp doubles past chemical's ceiling</h3>
+  <div class="caption">With both knobs unlocked, turn them. Predict first: which wins more Isp — halving <math><mi>M</mi></math> or doubling <math><mi>T</mi></math>? Then drag the temperature slider and switch fluids to check against <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi><mo>/</mo><mi>M</mi></mrow></msqrt></math>.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="propellant-picker"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Propellant Picker — Isp vs Temperature</title>
+<style>
+:root{
+  --bg:#ffffff; --panel:#f4f5f8; --fg:#181a1f; --muted:#585c68;
+  --grid:#d7d9e1; --accent:#2260c4;
+  --co2:#8a8a92; --h2o:#3d92c4; --nh3:#cf7a26; --h2:#1f9a5a;
+  --ceiling:#cc3333; --band:rgba(207,122,38,0.16); --marker:#222;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#111319; --panel:#1a1d26; --fg:#e9eaf0; --muted:#a3a7b5;
+    --grid:#31353f; --accent:#7aa6ff;
+    --co2:#8c8f9c; --h2o:#69c0ec; --nh3:#ffab5c; --h2:#4fdc8f;
+    --ceiling:#ff6b6b; --band:rgba(255,171,92,0.14); --marker:#f0f0f0;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+h2{font-size:16px;margin:0 0 6px;}
+.eqBlock{background:var(--panel);border-radius:8px;padding:8px 10px;margin-bottom:8px;}
+math{font-size:16px;}
+.legend{font-size:11px;color:var(--muted);line-height:1.4;margin:4px 0 0;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:10px 0;}
+.fluidRow{display:flex;gap:6px;flex-wrap:wrap;}
+button.fluidBtn{border:1px solid var(--grid);background:var(--panel);color:var(--fg);
+  border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;line-height:1.3;}
+button.fluidBtn[aria-pressed=&quot;true&quot;]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;font-weight:600;}
+.sliderBox{display:flex;flex-direction:column;gap:3px;flex:1;min-width:220px;}
+.sliderBox label{font-size:12px;color:var(--muted);}
+input[type=range]{width:100%;}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 4px;font-size:12px;}
+.readouts div{background:var(--panel);border-radius:6px;padding:5px 8px;min-width:110px;}
+.readouts b{display:block;font-size:15px;}
+svg{max-width:100%;height:auto;display:block;}
+.foot{font-size:11px;color:var(--muted);margin-top:8px;}
+.noteRow{font-size:11px;color:var(--muted);margin:4px 0 0;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Pick a working fluid, push the temperature: Isp vs the chemical ceiling</h2>
+
+  <div class=&quot;eqBlock&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>v</mi><mtext>e</mtext></msub><mo>=</mo>
+      <msqrt><mfrac><mrow><mi>k</mi><mo>·</mo><mi>R</mi><mo>·</mo><mi>T</mi></mrow><mi>M</mi></mfrac></msqrt>
+      <mo>,</mo><mspace width=&quot;0.6em&quot;/>
+      <mtext>Isp</mtext><mo>=</mo><mfrac><msub><mi>v</mi><mtext>e</mtext></msub><msub><mi>g</mi><mn>0</mn></msub></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      v<sub></sub>e — exhaust velocity (m/s) · k — effective thermal/nozzle factor (dimensionless, ≈4.9; combines specific-heat ratio γ and nozzle efficiency) ·
+      R — gas constant, 8.314 J·mol⁻¹·K⁻¹ · T — chamber temperature (K) · M — molar mass of the exhaust gas (kg/mol) ·
+      Isp — specific impulse (s) · g0 — standard gravity, 9.807 m/s²
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;fluidRow&quot; id=&quot;fluidRow&quot; role=&quot;group&quot; aria-label=&quot;Choose working fluid&quot;></div>
+    <div class=&quot;sliderBox&quot;>
+      <label for=&quot;tSlider&quot;>Chamber temperature T — drag to heat the propellant (K)</label>
+      <input id=&quot;tSlider&quot; type=&quot;range&quot; min=&quot;1000&quot; max=&quot;3000&quot; step=&quot;50&quot; value=&quot;2000&quot;>
+    </div>
+  </div>
+  <div class=&quot;noteRow&quot;>* NH₃ molecules break apart (decompose) at high chamber temperature into N₂ and H₂ fragments; the exhaust mixture then has an average molar mass ≈8.5 g/mol, well below intact NH₃'s 17 g/mol — this is why the lighter value drives Isp here.</div>
+
+  <div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 340&quot; role=&quot;img&quot; aria-label=&quot;Isp versus temperature chart&quot;></svg>
+
+  <div class=&quot;foot&quot;>Hydrogen wins on physics but is cryogenic (boils at 20 K) — a constraint the story revisits in Part 3.</div>
+</div>
+
+<script>
+// ---- physics constants (auditable) ----
+const R = 8.314;        // J/(mol·K), universal gas constant
+const G0 = 9.80665;     // m/s^2, standard gravity
+const K_FACTOR = 4.93;  // dimensionless, effective 2γ/(γ-1)·η_nozzle lumping heat-capacity ratio &amp; nozzle losses
+
+const FLUIDS = [
+  {key:'co2', name:'CO₂',  M:0.044,  colorVar:'--co2'},
+  {key:'h2o', name:'H₂O',  M:0.018,  colorVar:'--h2o'},
+  {key:'nh3', name:'NH₃ decomposed (N₂+H₂, ≈8.5 g/mol)*', short:'NH₃*', M:0.0085, colorVar:'--nh3'},
+  {key:'h2',  name:'H₂',   M:0.002,  colorVar:'--h2'}
+];
+
+function ve(T, M){ return Math.sqrt(K_FACTOR * R * T / M); } // m/s
+function isp(T, M){ return ve(T,M) / G0; }                    // s
+
+let selected = 'nh3';
+
+// ---- build fluid buttons ----
+const fluidRow = document.getElementById('fluidRow');
+FLUIDS.forEach(f=>{
+  const b = document.createElement('button');
+  b.className='fluidBtn';
+  b.type='button';
+  b.setAttribute('aria-pressed', f.key===selected ? 'true':'false');
+  b.innerHTML = (f.short||f.name) + '<br><span style=&quot;font-size:10px;color:var(--muted)&quot;>'+(f.M*1000).toFixed(1)+' g/mol</span>';
+  b.title = f.name;
+  b.addEventListener('click', ()=>{ selected=f.key; refreshButtons(); draw(); });
+  b.dataset.key=f.key;
+  fluidRow.appendChild(b);
+});
+function refreshButtons(){
+  [...fluidRow.children].forEach(b=>b.setAttribute('aria-pressed', b.dataset.key===selected ? 'true':'false'));
+}
+
+const slider = document.getElementById('tSlider');
+slider.addEventListener('input', draw);
+
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---- chart geometry ----
+const svgNS='http://www.w3.org/2000/svg';
+const svg = document.getElementById('chart');
+const W=640,H=340, ML=52, MR=118, MT=22, MB=40;
+const PW=W-ML-MR, PH=H-MT-MB;
+const TMIN=1000, TMAX=3000, YMAX=900;
+
+function X(T){ return ML + (T-TMIN)/(TMAX-TMIN)*PW; }
+function Y(v){ return MT + PH - (v/YMAX)*PH; }
+
+function el(tag,attrs){
+  const e=document.createElementNS(svgNS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  return e;
+}
+
+function draw(){
+  const T = parseFloat(slider.value);
+  svg.innerHTML='';
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+
+  const fg=cssVar('--fg'), muted=cssVar('--muted'), grid=cssVar('--grid');
+
+  // grid + axes
+  const yTicks=[0,200,400,600,800];
+  yTicks.forEach(v=>{
+    svg.appendChild(el('line',{x1:ML,x2:ML+PW,y1:Y(v),y2:Y(v),stroke:grid,'stroke-width':1}));
+    const t=el('text',{x:ML-8,y:Y(v)+4,'text-anchor':'end','font-size':11,fill:muted}); t.textContent=v; svg.appendChild(t);
+  });
+  const xTicks=[1000,1500,2000,2500,3000];
+  xTicks.forEach(v=>{
+    svg.appendChild(el('line',{x1:X(v),x2:X(v),y1:MT,y2:MT+PH,stroke:grid,'stroke-width':1}));
+    const t=el('text',{x:X(v),y:MT+PH+18,'text-anchor':'middle','font-size':11,fill:muted}); t.textContent=v; svg.appendChild(t);
+  });
+  const yl=el('text',{x:14,y:MT+PH/2,'text-anchor':'middle','font-size':11,fill:muted,transform:'rotate(-90 14 '+(MT+PH/2)+')'});
+  yl.textContent='Specific impulse, Isp (s)'; svg.appendChild(yl);
+  const xl=el('text',{x:ML+PW/2,y:H-6,'text-anchor':'middle','font-size':11,fill:muted});
+  xl.textContent='Chamber temperature, T (K)'; svg.appendChild(xl);
+
+  // ammonia realistic band 350-450 s
+  svg.appendChild(el('rect',{x:ML,y:Y(450),width:PW,height:Y(350)-Y(450),fill:cssVar('--band')}));
+  const bandLabel=el('text',{x:ML+6,y:Y(450)-6,'font-size':10,fill:muted});
+  bandLabel.textContent='ammonia real-engine band (350–450 s)'; svg.appendChild(bandLabel);
+
+  // ceiling line at 330 s
+  svg.appendChild(el('line',{x1:ML,x2:ML+PW,y1:Y(330),y2:Y(330),stroke:cssVar('--ceiling'),'stroke-width':2,'stroke-dasharray':'6,4'}));
+  const ceilLabel=el('text',{x:ML+6,y:Y(330)+14,'font-size':10,fill:cssVar('--ceiling')});
+  ceilLabel.textContent='storable chemical ceiling — 330 s'; svg.appendChild(ceilLabel);
+
+  // fluid curves
+  const N=20;
+  FLUIDS.forEach(f=>{
+    let d='';
+    for(let i=0;i<=N;i++){
+      const t = TMIN + (TMAX-TMIN)*i/N;
+      const v = isp(t,f.M);
+      d += (i===0?'M':'L') + X(t).toFixed(1) + ' ' + Y(v).toFixed(1) + ' ';
+    }
+    const isSel = f.key===selected;
+    const path=el('path',{d,fill:'none',stroke:cssVar(f.colorVar),
+      'stroke-width': isSel?3:1.4, opacity: isSel?1:0.5,
+      'stroke-dasharray': isSel?'':'5,4'});
+    svg.appendChild(path);
+
+    const vEnd = isp(TMAX,f.M);
+    const lbl=el('text',{x:X(TMAX)+8,y:Y(vEnd)+4,'font-size':11,fill:cssVar(f.colorVar),
+      'font-weight': isSel?'700':'400'});
+    lbl.textContent=(f.short||f.name)+' ≈'+Math.round(vEnd)+'s';
+    svg.appendChild(lbl);
+  });
+
+  // current marker for selected fluid
+  const fSel = FLUIDS.find(f=>f.key===selected);
+  const curIsp = isp(T, fSel.M);
+  svg.appendChild(el('line',{x1:X(T),x2:X(T),y1:MT,y2:MT+PH,stroke:muted,'stroke-width':1,'stroke-dasharray':'3,3'}));
+  svg.appendChild(el('circle',{cx:X(T),cy:Y(curIsp),r:5,fill:cssVar(fSel.colorVar),stroke:fg,'stroke-width':1}));
+
+  // readouts
+  const curVe = ve(T, fSel.M);
+  const readouts = document.getElementById('readouts');
+  readouts.innerHTML = '';
+  const rows = [
+    ['Temperature T', T.toFixed(0)+' K'],
+    ['Molar mass M', (fSel.M*1000).toFixed(1)+' g/mol'],
+    ['Exhaust velocity v_e', (curVe/1000).toFixed(2)+' km/s'],
+    ['Specific impulse Isp', curIsp.toFixed(0)+' s']
+  ];
+  rows.forEach(([label,val])=>{
+    const d=document.createElement('div');
+    d.innerHTML = '<span>'+label+'</span><b>'+val+'</b>';
+    readouts.appendChild(d);
+  });
+}
+
+draw();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;propellant-picker&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Pick a light working fluid, push the temperature, and Isp doubles past chemical's ceiling"
+  ></iframe>
+</section>
+
+<section class="scene" id="solar-thermal-architecture">
+  <h3>Mirrors, a heat exchanger, and a nozzle: sunlight heats the propellant directly</h3>
+  <div class="caption">Deployable mirrors focus sunlight onto a heat exchanger. Ammonia flows through at ~3,000 K and the hot gas expands out a nozzle at 100–200 N. This is not solar-electric — toggle the comparison and count the conversion steps each design requires.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="solar-thermal-architecture"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Solar-Thermal Propulsion Architecture</title>
+<style>
+:root{
+  --bg:#f6f6f3; --panel:#ffffff; --text:#1a1a1a; --muted:#666a6e;
+  --thermal:#c85a20; --thermal-light:#f3c197; --thermal-flame:#ff8a3d;
+  --electric:#2f6bab; --electric-light:#bcd6ef;
+  --line:#8a8a85; --accent:#177a54; --border:#d8d8d2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a; --panel:#1e2126; --text:#e9e9e6; --muted:#a2a7ac;
+    --thermal:#ff9a52; --thermal-light:#6b3c17; --thermal-flame:#ffb066;
+    --electric:#7fb0e8; --electric-light:#28405c;
+    --line:#767b80; --accent:#4fd1a5; --border:#33373d;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h2{font-size:1.05rem;margin:2px 0 8px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;margin-bottom:10px;}
+svg{width:100%;height:auto;display:block;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+.controls label{font-size:0.85rem;display:flex;flex-direction:column;gap:3px;}
+button{font-size:0.85rem;padding:6px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+button:hover{border-color:var(--accent);}
+input[type=range]{width:180px;}
+.readouts{display:flex;flex-wrap:wrap;gap:0;list-style:none;padding:0;margin:0;}
+.readouts li{flex:1 1 130px;padding:6px 8px;border-right:1px solid var(--border);}
+.readouts li:last-child{border-right:none;}
+.readouts .k{font-size:0.72rem;color:var(--muted);display:block;}
+.readouts .v{font-size:1.0rem;font-weight:600;}
+.facts{margin:6px 0 0;padding-left:18px;font-size:0.82rem;color:var(--text);}
+.facts li{margin:2px 0;}
+math{font-size:1rem;}
+.legend{font-size:0.76rem;color:var(--muted);margin-top:2px;}
+.small{font-size:0.72rem;color:var(--muted);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Solar-thermal propulsion: one conversion, sunlight → heat → thrust</h2>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;>Show solar-electric comparison ▾</button>
+    <label>Thrust setpoint, F (N)
+      <input id=&quot;thrustSlider&quot; type=&quot;range&quot; min=&quot;100&quot; max=&quot;200&quot; step=&quot;1&quot; value=&quot;150&quot;>
+    </label>
+    <button id=&quot;playBtn&quot; style=&quot;display:none;&quot;>Play animation</button>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 410&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+      <defs>
+        <marker id=&quot;arrow&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;8&quot; refY=&quot;5&quot; markerWidth=&quot;7&quot; markerHeight=&quot;7&quot; orient=&quot;auto-start-reverse&quot;>
+          <path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--line)&quot;></path>
+        </marker>
+        <linearGradient id=&quot;sun&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;1&quot; y2=&quot;0&quot;>
+          <stop offset=&quot;0%&quot; stop-color=&quot;var(--thermal-light)&quot;></stop>
+          <stop offset=&quot;100%&quot; stop-color=&quot;var(--thermal)&quot;></stop>
+        </linearGradient>
+        <linearGradient id=&quot;flame&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;1&quot; y2=&quot;0&quot;>
+          <stop offset=&quot;0%&quot; stop-color=&quot;var(--thermal-flame)&quot;></stop>
+          <stop offset=&quot;100%&quot; stop-color=&quot;var(--thermal-flame)&quot; stop-opacity=&quot;0&quot;></stop>
+        </linearGradient>
+        <linearGradient id=&quot;ionplume&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;1&quot; y2=&quot;0&quot;>
+          <stop offset=&quot;0%&quot; stop-color=&quot;var(--electric)&quot;></stop>
+          <stop offset=&quot;100%&quot; stop-color=&quot;var(--electric)&quot; stop-opacity=&quot;0&quot;></stop>
+        </linearGradient>
+      </defs>
+
+      <!-- THERMAL ROW -->
+      <text x=&quot;8&quot; y=&quot;18&quot; font-size=&quot;12&quot; fill=&quot;var(--muted)&quot;>Solar-thermal path (actual design)</text>
+
+      <g>
+        <ellipse cx=&quot;65&quot; cy=&quot;105&quot; rx=&quot;34&quot; ry=&quot;13&quot; transform=&quot;rotate(-28 65 105)&quot; fill=&quot;var(--thermal-light)&quot; stroke=&quot;var(--thermal)&quot;></ellipse>
+        <ellipse cx=&quot;65&quot; cy=&quot;105&quot; rx=&quot;34&quot; ry=&quot;13&quot; fill=&quot;var(--thermal-light)&quot; stroke=&quot;var(--thermal)&quot;></ellipse>
+        <ellipse cx=&quot;65&quot; cy=&quot;105&quot; rx=&quot;34&quot; ry=&quot;13&quot; transform=&quot;rotate(28 65 105)&quot; fill=&quot;var(--thermal-light)&quot; stroke=&quot;var(--thermal)&quot;></ellipse>
+        <text x=&quot;65&quot; y=&quot;150&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>Mirror petals</text>
+        <text x=&quot;65&quot; y=&quot;163&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>deployable, focus sunlight</text>
+      </g>
+
+      <path id=&quot;sunCone&quot; d=&quot;M104,105 L196,84 L196,126 Z&quot; fill=&quot;url(#sun)&quot; opacity=&quot;0.85&quot;></path>
+      <text x=&quot;150&quot; y=&quot;70&quot; font-size=&quot;10.5&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>focused sunlight</text>
+
+      <g>
+        <rect x=&quot;200&quot; y=&quot;80&quot; width=&quot;86&quot; height=&quot;52&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--thermal)&quot; stroke-width=&quot;2&quot;></rect>
+        <line x1=&quot;208&quot; y1=&quot;94&quot; x2=&quot;278&quot; y2=&quot;94&quot; stroke=&quot;var(--thermal)&quot; stroke-width=&quot;1.5&quot;></line>
+        <line x1=&quot;208&quot; y1=&quot;106&quot; x2=&quot;278&quot; y2=&quot;106&quot; stroke=&quot;var(--thermal)&quot; stroke-width=&quot;1.5&quot;></line>
+        <line x1=&quot;208&quot; y1=&quot;118&quot; x2=&quot;278&quot; y2=&quot;118&quot; stroke=&quot;var(--thermal)&quot; stroke-width=&quot;1.5&quot;></line>
+        <text x=&quot;243&quot; y=&quot;68&quot; font-size=&quot;11&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>Heat exchanger</text>
+        <text x=&quot;243&quot; y=&quot;147&quot; font-size=&quot;10&quot; fill=&quot;var(--thermal)&quot; text-anchor=&quot;middle&quot;>~3,000 K (3D-printed refractory)</text>
+      </g>
+
+      <line x1=&quot;288&quot; y1=&quot;106&quot; x2=&quot;322&quot; y2=&quot;106&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.6&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+      <g>
+        <rect x=&quot;326&quot; y=&quot;88&quot; width=&quot;66&quot; height=&quot;36&quot; rx=&quot;10&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.6&quot;></rect>
+        <text x=&quot;359&quot; y=&quot;70&quot; font-size=&quot;10.5&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>Ammonia tank</text>
+        <text x=&quot;359&quot; y=&quot;140&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>liquid, modest pressure</text>
+        <text x=&quot;359&quot; y=&quot;151&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>~$1/kg</text>
+      </g>
+
+      <line x1=&quot;394&quot; y1=&quot;106&quot; x2=&quot;426&quot; y2=&quot;106&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.6&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+      <g>
+        <path d=&quot;M430,86 L430,126 L488,140 L488,72 Z&quot; fill=&quot;var(--thermal)&quot; opacity=&quot;0.9&quot;></path>
+        <path id=&quot;thermalPlume&quot; d=&quot;M488,72 L488,140 L590,106 Z&quot; fill=&quot;url(#flame)&quot;></path>
+        <text x=&quot;459&quot; y=&quot;60&quot; font-size=&quot;10.5&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>Nozzle</text>
+        <text x=&quot;540&quot; y=&quot;164&quot; font-size=&quot;10.5&quot; fill=&quot;var(--thermal)&quot; text-anchor=&quot;middle&quot;>100–200 N</text>
+        <text x=&quot;540&quot; y=&quot;177&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>Isp 350–450 s</text>
+      </g>
+
+      <text x=&quot;8&quot; y=&quot;192&quot; font-size=&quot;11.5&quot; fill=&quot;var(--accent)&quot; font-weight=&quot;600&quot;>Conversion steps: 1 — sunlight → heat → expansion</text>
+
+      <!-- ELECTRIC ROW (toggle) -->
+      <g id=&quot;electricRow&quot;>
+        <line x1=&quot;0&quot; y1=&quot;212&quot; x2=&quot;680&quot; y2=&quot;212&quot; stroke=&quot;var(--border)&quot;></line>
+        <text x=&quot;8&quot; y=&quot;232&quot; font-size=&quot;12&quot; fill=&quot;var(--muted)&quot;>Solar-electric path (comparison, not used here)</text>
+
+        <g>
+          <rect x=&quot;20&quot; y=&quot;248&quot; width=&quot;86&quot; height=&quot;46&quot; fill=&quot;var(--electric-light)&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1.6&quot;></rect>
+          <line x1=&quot;30&quot; y1=&quot;260&quot; x2=&quot;30&quot; y2=&quot;284&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1&quot;></line>
+          <line x1=&quot;50&quot; y1=&quot;260&quot; x2=&quot;50&quot; y2=&quot;284&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1&quot;></line>
+          <line x1=&quot;70&quot; y1=&quot;260&quot; x2=&quot;70&quot; y2=&quot;284&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1&quot;></line>
+          <line x1=&quot;90&quot; y1=&quot;260&quot; x2=&quot;90&quot; y2=&quot;284&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1&quot;></line>
+          <text x=&quot;63&quot; y=&quot;240&quot; font-size=&quot;10.5&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>PV panel</text>
+        </g>
+        <line x1=&quot;106&quot; y1=&quot;271&quot; x2=&quot;150&quot; y2=&quot;271&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrow)&quot;></line>
+        <text x=&quot;128&quot; y=&quot;264&quot; font-size=&quot;8.7&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>step 1 (loss)</text>
+
+        <g>
+          <rect x=&quot;154&quot; y=&quot;248&quot; width=&quot;96&quot; height=&quot;46&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1.6&quot;></rect>
+          <text x=&quot;202&quot; y=&quot;240&quot; font-size=&quot;10&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>Power electronics</text>
+          <text x=&quot;202&quot; y=&quot;278&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>DC conditioning</text>
+        </g>
+        <line x1=&quot;250&quot; y1=&quot;271&quot; x2=&quot;294&quot; y2=&quot;271&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrow)&quot;></line>
+        <text x=&quot;272&quot; y=&quot;264&quot; font-size=&quot;8.7&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>step 2 (loss)</text>
+
+        <g>
+          <rect x=&quot;298&quot; y=&quot;248&quot; width=&quot;104&quot; height=&quot;46&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--electric)&quot; stroke-width=&quot;1.6&quot;></rect>
+          <text x=&quot;350&quot; y=&quot;240&quot; font-size=&quot;10&quot; fill=&quot;var(--text)&quot; text-anchor=&quot;middle&quot;>Ion accelerator</text>
+          <text x=&quot;350&quot; y=&quot;278&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>grid, field → ion KE</text>
+        </g>
+        <line x1=&quot;402&quot; y1=&quot;271&quot; x2=&quot;440&quot; y2=&quot;271&quot; stroke=&quot;var(--line)&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrow)&quot;></line>
+        <text x=&quot;421&quot; y=&quot;264&quot; font-size=&quot;8.7&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>step 3 (loss)</text>
+
+        <path id=&quot;electricPlume&quot; d=&quot;M440,262 L440,282 L560,271 Z&quot; fill=&quot;url(#ionplume)&quot;></path>
+        <text x=&quot;500&quot; y=&quot;308&quot; font-size=&quot;10&quot; fill=&quot;var(--electric)&quot; text-anchor=&quot;middle&quot;>~1–2 mN thrust</text>
+        <text x=&quot;500&quot; y=&quot;320&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>Isp ~1,500–3,000 s</text>
+
+        <text x=&quot;8&quot; y=&quot;345&quot; font-size=&quot;11.5&quot; fill=&quot;var(--electric)&quot; font-weight=&quot;600&quot;>Conversion steps: 3 — sunlight → electricity → field → ion kinetic energy</text>
+        <text x=&quot;8&quot; y=&quot;362&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>Thrust ratio: ~10⁵× weaker than solar-thermal, despite higher Isp</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <ul class=&quot;readouts&quot; id=&quot;readouts&quot;>
+      <li><span class=&quot;k&quot;>Thrust, F</span><span class=&quot;v&quot; id=&quot;fVal&quot;>150</span><span class=&quot;k&quot;>N</span></li>
+      <li><span class=&quot;k&quot;>Specific impulse, Isp</span><span class=&quot;v&quot; id=&quot;ispVal&quot;>400</span><span class=&quot;k&quot;>s (mid-range 350–450)</span></li>
+      <li><span class=&quot;k&quot;>Exhaust velocity, v_e</span><span class=&quot;v&quot; id=&quot;veVal&quot;>3.92</span><span class=&quot;k&quot;>km/s</span></li>
+      <li><span class=&quot;k&quot;>Mass flow, ṁ</span><span class=&quot;v&quot; id=&quot;mdotVal&quot;>0.038</span><span class=&quot;k&quot;>kg/s</span></li>
+    </ul>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <math display=&quot;block&quot;>
+      <mi>F</mi><mo>=</mo><mover><mi>m</mi><mo>˙</mo></mover><mo>·</mo><msub><mi>v</mi><mtext>e</mtext></msub>
+      <mo>,</mo><mtext>&amp;#160;&amp;#160;&amp;#160;</mtext>
+      <msub><mi>v</mi><mtext>e</mtext></msub><mo>=</mo><msub><mi>I</mi><mtext>sp</mtext></msub><mo>·</mo><msub><mi>g</mi><mn>0</mn></msub>
+    </math>
+    <div class=&quot;legend&quot;>F — thrust (N) &amp;nbsp;·&amp;nbsp; ṁ — propellant mass flow rate (kg/s) &amp;nbsp;·&amp;nbsp; v<sub></sub>e — effective exhaust velocity (m/s) &amp;nbsp;·&amp;nbsp; I<sub></sub>sp — specific impulse (s) &amp;nbsp;·&amp;nbsp; g0 — standard gravity, 9.807 m/s² (fixed constant)</div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <ul class=&quot;facts&quot;>
+      <li>Total Δv budget: 5–6 km/s over the mission (≈7–8× the ~700 m/s chemical biprop budget).</li>
+      <li>Propellant cost: ~$1/kg (ammonia, stored as a liquid at modest pressure).</li>
+      <li>Restart capability: hundreds of restarts — thermal cycling, not combustion instability, sets the limit.</li>
+    </ul>
+    <div class=&quot;small&quot;>Move the thrust slider to see ṁ and v_e recompute from F = ṁ·v_e. Toggle the comparison to count conversion steps in each architecture.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const G0 = 9.80665; // m/s^2, standard gravity (named constant)
+  const ISP_FIXED = 400; // s, representative point within 350-450 s range
+  const thrustSlider = document.getElementById('thrustSlider');
+  const fVal = document.getElementById('fVal');
+  const ispVal = document.getElementById('ispVal');
+  const veVal = document.getElementById('veVal');
+  const mdotVal = document.getElementById('mdotVal');
+  const toggleBtn = document.getElementById('toggleBtn');
+  const electricRow = document.getElementById('electricRow');
+  const playBtn = document.getElementById('playBtn');
+  const thermalPlume = document.getElementById('thermalPlume');
+  const electricPlume = document.getElementById('electricPlume');
+
+  let showElectric = false;
+  electricRow.style.display = 'none';
+
+  function updatePhysics(){
+    const F = parseFloat(thrustSlider.value);
+    const ve = ISP_FIXED * G0;          // m/s, from Isp * g0
+    const mdot = F / ve;                // kg/s, from F = mdot * ve
+    fVal.textContent = Math.round(F);
+    ispVal.textContent = ISP_FIXED;
+    veVal.textContent = (ve/1000).toFixed(2);
+    mdotVal.textContent = mdot.toFixed(3);
+  }
+  thrustSlider.addEventListener('input', updatePhysics);
+
+  toggleBtn.addEventListener('click', function(){
+    showElectric = !showElectric;
+    electricRow.style.display = showElectric ? '' : 'none';
+    toggleBtn.textContent = showElectric ?
+      'Hide solar-electric comparison ▴' : 'Show solar-electric comparison ▾';
+  });
+
+  // Motion / animation with reduced-motion support
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduceMotion;
+  if (reduceMotion){
+    playBtn.style.display = 'inline-block';
+    playBtn.textContent = 'Play animation';
+  }
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause animation' : 'Play animation';
+    if (playing) requestAnimationFrame(loop);
+  });
+
+  function setFlicker(t){
+    const flick = (0.82 + 0.18 * Math.sin(t * 3)).toFixed(2);
+    thermalPlume.setAttribute('opacity', flick);
+    electricPlume.setAttribute('opacity', (0.5 + 0.15*Math.sin(t*3+1)).toFixed(2));
+  }
+
+  function loop(ts){
+    if (!playing) return;
+    setFlicker(ts/1000);
+    requestAnimationFrame(loop);
+  }
+
+  // init
+  updatePhysics();
+  setFlicker(0);
+  if (playing) requestAnimationFrame(loop);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;solar-thermal-architecture&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Mirrors, a heat exchanger, and a nozzle: sunlight heats the propellant directly"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing tech</h2>
+  <div class="part-lede">With the mechanism in hand, run the GEO sprint head-to-head. Solar thermal is the only architecture that finishes in hours, stays cheapest across the whole Δv range, and can wait in orbit for months without its propellant boiling away.</div>
+</header>
+<section class="scene" id="maneuver-time">
+  <h3>The GEO sprint: 9 hours for solar thermal, 527 days for electric, unreachable for chemical</h3>
+  <div class="caption">Now race all three engines through maneuvers of growing size. Drag the Δv slider toward the 5,000 m/s GEO sprint and watch the electric curve leave the chart while solar thermal stays in single-digit hours.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="maneuver-time"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The GEO Sprint: Maneuver Time vs Δv</title>
+<style>
+:root{
+  --bg:#f7f7fa; --panel:#ffffff; --text:#1b1e24; --muted:#5a6070;
+  --chem:#c9622a; --elec:#3d5ce0; --solar:#1f9d55;
+  --band:#dff1e4; --grid:#d6d9e0; --cursor:#8a1f9d; --wall:#b32a2a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --panel:#1d2028; --text:#e8e9ee; --muted:#9aa0b2;
+    --chem:#ff9a5a; --elec:#7d97ff; --solar:#5be08a;
+    --band:#173025; --grid:#33384a; --cursor:#d391ec; --wall:#ff7676;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+h1{font-size:15px;font-weight:600;margin:0 0 8px;}
+svg{width:100%;max-width:100%;height:auto;display:block;background:var(--panel);border-radius:8px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;}
+.ctrl{display:flex;flex-direction:column;gap:2px;flex:1 1 220px;min-width:200px;}
+.ctrl label{font-size:12px;color:var(--muted);}
+input[type=range]{width:100%;}
+button{padding:6px 12px;font-size:13px;border-radius:6px;border:1px solid var(--grid);background:var(--panel);color:var(--text);cursor:pointer;}
+ul.readout{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+ul.readout li{display:flex;align-items:center;gap:8px;font-size:13px;background:var(--panel);border:1px solid var(--grid);border-radius:6px;padding:6px 10px;}
+.swatch{width:12px;height:12px;border-radius:3px;flex:0 0 auto;}
+.dvline{font-size:13px;margin-top:8px;color:var(--muted);}
+.dvline b{color:var(--text);}
+math{font-size:15px;}
+.legend{font-size:11.5px;color:var(--muted);margin:2px 0 0;}
+.eqbox{margin-top:14px;padding-top:10px;border-top:1px solid var(--grid);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+<h1>The GEO sprint: maneuver time vs required Δv</h1>
+<svg id=&quot;chart&quot; viewBox=&quot;0 0 640 380&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;></svg>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrl&quot;>
+    <label for=&quot;dv&quot;>Maneuver Δv (m/s) — velocity change needed for the burn</label>
+    <input type=&quot;range&quot; id=&quot;dv&quot; min=&quot;100&quot; max=&quot;5000&quot; step=&quot;10&quot; value=&quot;100&quot;>
+  </div>
+  <button id=&quot;playBtn&quot;>▶ Sweep Δv</button>
+</div>
+
+<div class=&quot;dvline&quot;>Cursor: Δv = <b id=&quot;dvVal&quot;>100</b> m/s</div>
+<ul class=&quot;readout&quot;>
+  <li><span class=&quot;swatch&quot; style=&quot;background:var(--chem)&quot;></span>Storable chemical (~400 N thrust): <b id=&quot;chemVal&quot;></b></li>
+  <li><span class=&quot;swatch&quot; style=&quot;background:var(--elec)&quot;></span>Hall-effect electric (~0.1 N thrust): <b id=&quot;elecVal&quot;></b></li>
+  <li><span class=&quot;swatch&quot; style=&quot;background:var(--solar)&quot;></span>Solar thermal (~185 N thrust): <b id=&quot;solarVal&quot;></b></li>
+</ul>
+
+<div class=&quot;eqbox&quot;>
+<math display=&quot;block&quot;>
+  <mi>t</mi><mo>=</mo><mfrac><mi>&amp;#916;v</mi><mi>a</mi></mfrac>
+  <mo>,</mo><mspace width=&quot;0.6em&quot;/><mi>a</mi><mo>=</mo><mfrac><mi>F</mi><mi>m</mi></mfrac>
+</math>
+<div class=&quot;legend&quot;>t — maneuver time (s) &amp;middot; &amp;#916;v — required velocity change (m/s) &amp;middot; a — spacecraft acceleration (m/s&amp;sup2;) &amp;middot; F — engine thrust (N) &amp;middot; m — spacecraft mass (kg, ~800 kg used here for all three)</div>
+</div>
+</div>
+
+<script>
+// ---------- physics constants (auditable) ----------
+const M_SC = 800;            // kg, representative small GEO spacecraft mass, same for all engines
+const F_CHEM = 400;          // N, storable bipropellant thrust
+const A_CHEM = F_CHEM / M_SC;
+const DV_WALL = 700;         // m/s, propellant tank mass-fraction limit (see biprop tank-wall scene)
+
+const F_ELEC = 0.1;          // N, Hall-effect thruster thrust
+const A_ELEC = F_ELEC / M_SC;
+const V_REF = 35000;         // m/s, phenomenological derating scale for eclipse/duty-cycle losses
+
+const F_ST = 185;            // N, solar-thermal thrust (within 100-200 N design range)
+const A_ST = F_ST / M_SC;
+const COAST = 1.5;           // multiplicative overhead: 50% coasting for multi-arc burns
+
+function tChemS(dv){ return dv / A_CHEM; }                              // seconds
+function tElecS(dv){ return (dv / A_ELEC) * (1 + dv / V_REF); }         // seconds
+function tSolarS(dv){ return COAST * dv / A_ST; }                       // seconds
+
+function fmtHours(h){
+  if (h < 1) return Math.round(h*60) + ' min';
+  const d = h/24;
+  if (h < 48) return h.toFixed(1) + ' h';
+  if (d < 1500) return Math.round(h).toLocaleString() + ' h (' + Math.round(d) + ' d)';
+  return Math.round(h).toLocaleString() + ' h (' + (d/365).toFixed(2) + ' yr)';
+}
+
+// ---------- chart geometry ----------
+const DV_MIN=100, DV_MAX=5000;
+const L=64, R=620, T=28, B=330;
+const YMIN=0.1, YMAX=20000; // hours, log scale
+const logYMIN=Math.log10(YMIN), logYMAX=Math.log10(YMAX);
+
+function xScale(dv){ return L + (dv-DV_MIN)/(DV_MAX-DV_MIN)*(R-L); }
+function yScale(h){
+  const f = (Math.log10(Math.max(h,YMIN))-logYMIN)/(logYMAX-logYMIN);
+  return B - f*(B-T);
+}
+
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+const svg = document.getElementById('chart');
+const css = getComputedStyle(document.documentElement);
+const col = n => css.getPropertyValue(n).trim();
+
+function pathFor(fn, dvStart, dvEnd, steps){
+  let d='';
+  for(let i=0;i<=steps;i++){
+    const dv = dvStart + (dvEnd-dvStart)*i/steps;
+    const h = fn(dv)/3600;
+    const x = xScale(dv), y = yScale(h);
+    d += (i===0?'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+  }
+  return d;
+}
+
+function buildStatic(){
+  // shaded &quot;operationally responsive&quot; band: bottom of chart up to 1 day
+  const bandTopY = yScale(24);
+  svg.appendChild(el('rect',{x:L,y:bandTopY,width:R-L,height:B-bandTopY,fill:col('--band'),opacity:'0.6'}));
+  const bt = el('text',{x:L+8,y:bandTopY+16,'font-size':'11','fill':col('--muted')});
+  bt.textContent='operationally responsive: hours, not months';
+  svg.appendChild(bt);
+
+  // y gridlines
+  const yticks=[{h:1/6,l:'10 min'},{h:1,l:'1 hr'},{h:10,l:'10 hr'},{h:24,l:'1 day'},{h:168,l:'1 week'},{h:730,l:'1 month'},{h:8760,l:'1 year'}];
+  yticks.forEach(t=>{
+    const y=yScale(t.h);
+    svg.appendChild(el('line',{x1:L,x2:R,y1:y,y2:y,stroke:col('--grid'),'stroke-width':'1'}));
+    const lab=el('text',{x:L-6,y:y+3,'text-anchor':'end','font-size':'10.5','fill':col('--muted')});
+    lab.textContent=t.l;
+    svg.appendChild(lab);
+  });
+
+  // x gridlines/ticks
+  [100,1000,2000,3000,4000,5000].forEach(dv=>{
+    const x=xScale(dv);
+    svg.appendChild(el('line',{x1:x,x2:x,y1:T,y2:B,stroke:col('--grid'),'stroke-width':'0.6'}));
+    const lab=el('text',{x:x,y:B+16,'text-anchor':'middle','font-size':'10.5','fill':col('--muted')});
+    lab.textContent=dv;
+    svg.appendChild(lab);
+  });
+
+  // axis titles
+  const xt=el('text',{x:(L+R)/2,y:B+34,'text-anchor':'middle','font-size':'12','fill':col('--text')});
+  xt.textContent='maneuver \u0394v (m/s)';
+  svg.appendChild(xt);
+  const yt=el('text',{x:16,y:(T+B)/2,'text-anchor':'middle','font-size':'12','fill':col('--text'),transform:`rotate(-90 16 ${(T+B)/2})`});
+  yt.textContent='maneuver time (log scale: minutes \u2192 years)';
+  svg.appendChild(yt);
+
+  // curves
+  svg.appendChild(el('path',{d:pathFor(tChemS,100,DV_WALL,20),fill:'none',stroke:col('--chem'),'stroke-width':'2.4'}));
+  svg.appendChild(el('path',{d:pathFor(tElecS,100,5000,60),fill:'none',stroke:col('--elec'),'stroke-width':'2.4'}));
+  svg.appendChild(el('path',{d:pathFor(tSolarS,100,5000,60),fill:'none',stroke:col('--solar'),'stroke-width':'2.4'}));
+
+  // wall marker at chemical curve termination
+  const wx = xScale(DV_WALL);
+  const wy = yScale(tChemS(DV_WALL)/3600);
+  svg.appendChild(el('line',{x1:wx,x2:wx,y1:wy,y2:B,stroke:col('--wall'),'stroke-width':'2','stroke-dasharray':'4 3'}));
+  svg.appendChild(el('circle',{cx:wx,cy:wy,r:4,fill:col('--wall')}));
+  const wlab1=el('text',{x:wx+6,y:wy-6,'font-size':'10.5','fill':col('--wall')});
+  wlab1.textContent='tank mass-fraction wall';
+  svg.appendChild(wlab1);
+  const wlab2=el('text',{x:wx+6,y:wy+8,'font-size':'10.5','fill':col('--wall')});
+  wlab2.textContent='\u0394v \u2248 700 m/s: cannot reach beyond';
+  svg.appendChild(wlab2);
+
+  // curve labels
+  function curveLabel(fn,dvAt,text,color,dy){
+    const x=xScale(dvAt), y=yScale(fn(dvAt)/3600)+dy;
+    const t=el('text',{x:x,y:Math.max(T+12,y),'font-size':'11','fill':color});
+    t.textContent=text;
+    svg.appendChild(t);
+  }
+  curveLabel(tChemS,260,'storable chemical','','','' );
+  curveLabel(tChemS,260,'storable chemical',col('--chem'),-8);
+  curveLabel(tElecS,2500,'Hall-effect electric',col('--elec'),-10);
+  curveLabel(tSolarS,3900,'solar thermal',col('--solar'),-10);
+}
+
+// cursor group (rebuilt on slider move)
+let cursorGroup = el('g',{});
+svg.appendChild(cursorGroup);
+
+function updateCursor(dv){
+  while(cursorGroup.firstChild) cursorGroup.removeChild(cursorGroup.firstChild);
+  const x = xScale(dv);
+  cursorGroup.appendChild(el('line',{x1:x,x2:x,y1:T,y2:B,stroke:col('--cursor'),'stroke-width':'1.4','stroke-dasharray':'3 3'}));
+
+  const hElec = tElecS(dv)/3600;
+  const hSolar = tSolarS(dv)/3600;
+  cursorGroup.appendChild(el('circle',{cx:x,cy:yScale(hElec),r:4,fill:col('--elec')}));
+  cursorGroup.appendChild(el('circle',{cx:x,cy:yScale(hSolar),r:4,fill:col('--solar')}));
+  if(dv<=DV_WALL){
+    const hChem=tChemS(dv)/3600;
+    cursorGroup.appendChild(el('circle',{cx:x,cy:yScale(hChem),r:4,fill:col('--chem')}));
+  }
+
+  document.getElementById('dvVal').textContent = Math.round(dv);
+  document.getElementById('chemVal').textContent = dv<=DV_WALL ? fmtHours(tChemS(dv)/3600) : 'cannot reach \u2014 exceeds ~700 m/s tank limit';
+  document.getElementById('elecVal').textContent = fmtHours(hElec);
+  document.getElementById('solarVal').textContent = fmtHours(hSolar);
+}
+
+buildStatic();
+const slider = document.getElementById('dv');
+updateCursor(parseFloat(slider.value));
+slider.addEventListener('input', ()=>updateCursor(parseFloat(slider.value)));
+
+// ---------- optional auto-sweep (respects reduced motion) ----------
+const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const playBtn = document.getElementById('playBtn');
+let sweeping = false, sweepStart = 0;
+const SWEEP_MS = 5000;
+function frame(ts){
+  if(!sweeping) return;
+  if(!sweepStart) sweepStart = ts;
+  const p = Math.min(1, (ts-sweepStart)/SWEEP_MS);
+  const dv = 100 + p*(5000-100);
+  slider.value = dv;
+  updateCursor(dv);
+  if(p<1) requestAnimationFrame(frame);
+  else { sweeping=false; playBtn.textContent='\u25b6 Sweep \u0394v'; }
+}
+playBtn.addEventListener('click', ()=>{
+  if(reduced){
+    slider.value = 5000;
+    updateCursor(5000);
+    return;
+  }
+  if(sweeping) { sweeping=false; playBtn.textContent='\u25b6 Sweep \u0394v'; return; }
+  sweeping = true; sweepStart = 0; playBtn.textContent='\u23f8 Pause';
+  requestAnimationFrame(frame);
+});
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;maneuver-time&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The GEO sprint: 9 hours for solar thermal, 527 days for electric, unreachable for chemical"
+  ></iframe>
+</section>
+
+<section class="scene" id="cost-per-maneuver">
+  <h3>Cheap propellant, a big reusable Δv budget, and free sunlight make solar thermal cheapest at every Δv</h3>
+  <div class="caption">The stacked bars split each engine's cost into propellant, hardware amortization, and energy. Solar thermal's ammonia costs $1/kg; the electric thruster's xenon costs $2,500/kg. That gap keeps solar thermal's bar shortest across the whole range.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="cost-per-maneuver"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Cost per Maneuver: Solar Thermal vs Chemical vs Electric</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1e; --muted:#5a5a63;
+  --grid:#d8d8de; --axis:#8a8a92;
+  --propellant:#1f9e8f; --hardware:#d9822b; --energy:#7c5cbf;
+  --cannot:#b0323e; --btn-bg:#e7e7ec; --btn-active:#3a5fcd; --btn-active-text:#fff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141417; --panel:#1c1c22; --text:#eceef2; --muted:#a3a3ad;
+    --grid:#33333c; --axis:#8a8a92;
+    --propellant:#3cc2af; --hardware:#f0a04b; --energy:#a889e6;
+    --cannot:#e2626e; --btn-bg:#2a2a33; --btn-active:#5b7fe0; --btn-active-text:#fff;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
+  padding:12px;}
+.wrap{max-width:680px;margin:0 auto;}
+h1{font-size:15px;font-weight:600;margin:0 0 8px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
+.controls span.lbl{font-size:12.5px;color:var(--muted);margin-right:2px;}
+button{background:var(--btn-bg);color:var(--text);border:none;border-radius:6px;
+  padding:7px 12px;font-size:13px;cursor:pointer;}
+button.active{background:var(--btn-active);color:var(--btn-active-text);font-weight:600;}
+.chart-wrap{background:var(--panel);border-radius:10px;padding:8px;}
+canvas{width:100%;aspect-ratio:16/10;display:block;max-width:100%;}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);
+  margin:8px 2px 2px;}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;
+  vertical-align:middle;}
+.eqbox{background:var(--panel);border-radius:10px;padding:10px 14px;margin-top:10px;}
+math{font-size:15px;}
+.eqlegend{font-size:11.5px;color:var(--muted);margin:4px 0 10px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+<h1>Cost per maneuver: propellant + hardware + energy</h1>
+<div class=&quot;controls&quot;>
+  <span class=&quot;lbl&quot;>Maneuver size Δv (steps through the mission's typical burns):</span>
+  <button data-i=&quot;0&quot; class=&quot;dvbtn&quot;>100 m/s</button>
+  <button data-i=&quot;1&quot; class=&quot;dvbtn&quot;>1,000 m/s</button>
+  <button data-i=&quot;2&quot; class=&quot;dvbtn&quot;>5,000 m/s</button>
+</div>
+<div class=&quot;chart-wrap&quot;><canvas id=&quot;cv&quot;></canvas></div>
+<div class=&quot;legend&quot;>
+  <span><i class=&quot;sw&quot; style=&quot;background:var(--propellant)&quot;></i>propellant cost</span>
+  <span><i class=&quot;sw&quot; style=&quot;background:var(--hardware)&quot;></i>hardware amortization</span>
+  <span><i class=&quot;sw&quot; style=&quot;background:var(--energy)&quot;></i>energy cost</span>
+  <span><i class=&quot;sw&quot; style=&quot;background:var(--cannot)&quot;></i>cannot reach this Δv</span>
+</div>
+<div class=&quot;eqbox&quot;>
+<math display=&quot;block&quot;>
+ <msub><mi>m</mi><mtext>prop</mtext></msub><mo>=</mo><msub><mi>m</mi><mtext>dry</mtext></msub>
+ <mo>(</mo><msup><mi>e</mi><mrow><mi>Δv</mi><mo>/</mo><msub><mi>v</mi><mtext>e</mtext></msub></mrow></msup>
+ <mo>&amp;#8722;</mo><mn>1</mn><mo>)</mo>
+</math>
+<div class=&quot;eqlegend&quot;>
+m<sub></sub>prop — propellant mass burned this maneuver (kg) &amp;nbsp;·&amp;nbsp;
+m_dry — spacecraft dry mass, fixed at 500 kg &amp;nbsp;·&amp;nbsp;
+Δv — maneuver size (m/s), set by the buttons above &amp;nbsp;·&amp;nbsp;
+v_e — exhaust velocity = Isp·g<sub>0</sub> (m/s)
+</div>
+<math display=&quot;block&quot;>
+ <msub><mi>C</mi><mtext>hw</mtext></msub><mo>=</mo>
+ <mfrac><mi>Δv</mi><msub><mi>Δv</mi><mtext>budget</mtext></msub></mfrac>
+ <mo>&amp;#183;</mo><msub><mi>C</mi><mtext>hardware</mtext></msub>
+</math>
+<div class=&quot;eqlegend&quot;>
+C_hw — hardware amortization charged to this one maneuver ($) &amp;nbsp;·&amp;nbsp;
+Δv_budget — total reusable Δv the thruster delivers over its life before it's fully paid off (m/s) &amp;nbsp;·&amp;nbsp;
+C_hardware — fixed thruster hardware cost, $10M for all three systems here
+</div>
+</div>
+</div>
+
+<script>
+// ---------- physics constants (auditable) ----------
+const G0 = 9.81;            // m/s^2, standard gravity
+const M_DRY = 500;          // kg, spacecraft dry mass
+const HARDWARE_COST = 10e6; // $, standardized hardware cost for all three thrusters
+const ISP    = { chem:320,  elec:1800, solar:700  }; // s
+const PRICE  = { chem:10,   elec:2500, solar:1    }; // $/kg commodity price (ammonia $1, xenon $2500)
+const LAUNCH = { chem:800,  elec:1500, solar:50   }; // $/kg to deliver+handle propellant in orbit
+const BUDGET = { chem:700,  elec:6000, solar:4900 }; // m/s, lifetime reusable Δv budget
+const CHEM_WALL = 700;    // m/s, storable chemical cannot exceed this in one maneuver
+const ETA_ELEC = 0.6;     // Hall-thruster electrical-to-kinetic efficiency
+const ENERGY_PRICE = 160; // $/kWh, effective cost of spacecraft electrical energy
+
+const DV_VALUES = [100, 1000, 5000];
+const ENGINES = ['chem','elec','solar'];
+const NAMES = {chem:'Storable chemical', elec:'Electric (Hall/xenon)', solar:'Solar thermal (ammonia)'};
+
+function costOf(engine, dv){
+  const reachable = !(engine==='chem' &amp;&amp; dv > CHEM_WALL);
+  const ve = ISP[engine]*G0;
+  const mProp = M_DRY*(Math.exp(dv/ve)-1);
+  const propellant = mProp*(PRICE[engine]+LAUNCH[engine]);
+  const hardware = (dv/BUDGET[engine])*HARDWARE_COST;
+  let energy = 0;
+  if(engine==='elec'){
+    const Ekin = 0.5*mProp*ve*ve;         // J, kinetic energy of exhaust
+    const Eelec = Ekin/ETA_ELEC;          // J, electrical energy needed
+    energy = (Eelec/3.6e6)*ENERGY_PRICE;  // kWh * $/kWh
+  }
+  return {reachable, propellant, hardware, energy, total: propellant+hardware+energy};
+}
+
+function fmt$(v){
+  if(v>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+  if(v>=1e3) return '$'+Math.round(v/1e3)+'k';
+  return '$'+Math.round(v);
+}
+
+// ---------- state &amp; animation ----------
+let dvIndex = 0;
+let prev = ENGINES.map(e=>({propellant:0,hardware:0,energy:0,total:0,reachable:true}));
+let target = ENGINES.map(e=>costOf(e, DV_VALUES[0]));
+let animStart = performance.now(), animDur = 650;
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+let cssColors = {};
+function readColors(){
+  const s = getComputedStyle(document.documentElement);
+  ['--text','--muted','--grid','--axis','--propellant','--hardware','--energy','--cannot','--panel']
+    .forEach(k=>cssColors[k]=s.getPropertyValue(k).trim());
+}
+readColors();
+
+function resize(){
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = Math.max(320, rect.width*dpr);
+  canvas.height = Math.max(200, rect.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  render(1);
+}
+
+function lerp(a,b,t){return a+(b-a)*t;}
+
+function currentDisplay(t){
+  return ENGINES.map((e,i)=>{
+    const p=prev[i], g=target[i];
+    if(!g.reachable) return {propellant:0,hardware:0,energy:0,total:0,reachable:false};
+    const pr = p.reachable? p.propellant:0, hw = p.reachable? p.hardware:0, en = p.reachable? p.energy:0;
+    return {
+      propellant: lerp(pr, g.propellant, t),
+      hardware:   lerp(hw, g.hardware, t),
+      energy:     lerp(en, g.energy, t),
+      total:      lerp((p.reachable?p.total:0), g.total, t),
+      reachable: true
+    };
+  });
+}
+
+function render(tOverride){
+  const now = performance.now();
+  const t = tOverride!==undefined? tOverride : Math.min(1, (now-animStart)/animDur);
+  const disp = currentDisplay(t);
+  const w = canvas.getBoundingClientRect().width;
+  const h = canvas.getBoundingClientRect().height;
+  ctx.clearRect(0,0,w,h);
+
+  const maxTotal = Math.max(...disp.map(d=>d.total), 1000);
+  const yMax = maxTotal*1.22;
+  const padL=64, padR=14, padT=28, padB=44;
+  const plotW = w-padL-padR, plotH = h-padT-padB;
+
+  // gridlines + y labels
+  ctx.strokeStyle = cssColors['--grid']; ctx.fillStyle = cssColors['--muted'];
+  ctx.font='11px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  const nTicks=5;
+  for(let i=0;i<=nTicks;i++){
+    const v = yMax*i/nTicks;
+    const y = padT+plotH-(v/yMax)*plotH;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.lineWidth=1; ctx.stroke();
+    ctx.fillText(fmt$(v), padL-8, y);
+  }
+  ctx.save();
+  ctx.translate(14, padT+plotH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillText('Cost of this maneuver ($)',0,0);
+  ctx.restore();
+
+  // bars
+  const groupW = plotW/3;
+  const barW = groupW*0.5;
+  ENGINES.forEach((e,i)=>{
+    const cx = padL + groupW*i + groupW/2;
+    const g = target[i];
+    ctx.font='12px sans-serif'; ctx.textAlign='center';
+    if(!g.reachable){
+      const bh = plotH*0.28, by = padT+plotH-bh;
+      ctx.fillStyle = cssColors['--cannot'];
+      ctx.globalAlpha=0.85;
+      ctx.setLineDash([6,4]);
+      ctx.strokeStyle = cssColors['--cannot'];
+      ctx.lineWidth=2;
+      ctx.strokeRect(cx-barW/2, by, barW, bh);
+      ctx.setLineDash([]);
+      ctx.globalAlpha=1;
+      ctx.fillStyle = cssColors['--cannot'];
+      ctx.fillText('cannot reach', cx, by+bh/2-6);
+      ctx.fillText('(>~700 m/s wall)', cx, by+bh/2+10);
+    } else {
+      const d = disp[i];
+      let y = padT+plotH;
+      const segs = [
+        [d.propellant, cssColors['--propellant']],
+        [d.hardware, cssColors['--hardware']],
+        [d.energy, cssColors['--energy']]
+      ];
+      segs.forEach(([val,col])=>{
+        const segH = (val/yMax)*plotH;
+        ctx.fillStyle = col;
+        ctx.fillRect(cx-barW/2, y-segH, barW, Math.max(segH,0));
+        y -= segH;
+      });
+      ctx.fillStyle = cssColors['--text'];
+      ctx.font='12px sans-serif';
+      ctx.fillText(fmt$(d.total), cx, y-12);
+    }
+    // x label
+    ctx.fillStyle = cssColors['--text'];
+    ctx.font='11.5px sans-serif';
+    const lines = NAMES[e].split(' (');
+    ctx.fillText(lines[0], cx, padT+plotH+16);
+    if(lines[1]) ctx.fillText('('+lines[1], cx, padT+plotH+30);
+  });
+
+  window.__sceneReady = true;
+  if(t<1) requestAnimationFrame(()=>render());
+}
+
+function setDv(i){
+  dvIndex = i;
+  prev = target;
+  target = ENGINES.map(e=>costOf(e, DV_VALUES[i]));
+  document.querySelectorAll('.dvbtn').forEach((b,bi)=>b.classList.toggle('active', bi===i));
+  animStart = performance.now();
+  animDur = reduceMotion ? 0 : 650;
+  requestAnimationFrame(()=>render(reduceMotion?1:undefined));
+}
+
+document.querySelectorAll('.dvbtn').forEach((b,i)=>{
+  b.addEventListener('click', ()=>setDv(i));
+});
+document.querySelectorAll('.dvbtn')[0].classList.add('active');
+
+window.addEventListener('resize', resize);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', ()=>{readColors(); render(1);});
+
+resize();
+render(1);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;cost-per-maneuver&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Cheap propellant, a big reusable Δv budget, and free sunlight make solar thermal cheapest at every Δv"
+  ></iframe>
+</section>
+
+<section class="scene" id="storability">
+  <h3>Ammonia waits in orbit for months; cryogenic propellants boil away before the call comes</h3>
+  <div class="caption">Methalox — methane burned with liquid oxygen — has the thrust and Isp to beat the 700 m/s wall, but both propellants are cryogenic and boil off in orbit. Drag the loiter timeline and watch which tank is still full when the maneuver order arrives.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="storability"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Storability: ammonia loiter vs. cryogenic boil-off</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --panel:#ffffff; --text:#1b1b1f; --muted:#5b5b66;
+    --tank-outline:#8a8a92; --meth-fill:#3b82f6; --meth-empty:#dbe6fb;
+    --amm-fill:#22c55e; --amm-empty:#dcfce7; --accent:#e11d48; --line:#d8d8de;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111318; --panel:#1b1e24; --text:#e8e8ec; --muted:#a0a4ad;
+      --tank-outline:#6b6f78; --meth-fill:#60a5fa; --meth-empty:#1e293b;
+      --amm-fill:#4ade80; --amm-empty:#14291d; --accent:#fb7185; --line:#33363e;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  h2{font-size:15px;margin:0 0 10px;font-weight:600;}
+  .controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;margin-bottom:10px;}
+  .controls label{font-size:13px;flex:1 1 260px;}
+  .controls input[type=range]{width:100%;}
+  .controls button{font-size:13px;padding:6px 12px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer;}
+  .controls button:hover{background:var(--meth-empty);}
+  #loiterVal{font-weight:600;}
+  svg{width:100%;height:auto;max-width:100%;display:block;}
+  .panelLabel{font-size:12px;fill:var(--muted);}
+  .pct{font-size:16px;font-weight:700;fill:var(--text);}
+  .name{font-size:13px;font-weight:600;fill:var(--text);}
+  .sub{font-size:10.5px;fill:var(--muted);}
+  .readouts{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:10px 14px;margin-top:10px;font-size:13px;}
+  .readouts ul{margin:4px 0;padding-left:18px;}
+  .readouts li{margin:4px 0;}
+  .readouts li span.tag{font-weight:600;}
+  .foot{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4;}
+  .eqbox{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;margin-top:10px;}
+  math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>On-orbit loiter: propellant fill vs. time until the maneuver order</h2>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;loiter&quot;>On-orbit loiter time before maneuver order:
+      <span id=&quot;loiterVal&quot;>0 d</span>
+      <input type=&quot;range&quot; id=&quot;loiter&quot; min=&quot;0&quot; max=&quot;180&quot; step=&quot;1&quot; value=&quot;0&quot;>
+    </label>
+    <button id=&quot;playBtn&quot;>Play sweep (0 → 6 months)</button>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 250&quot; preserveAspectRatio=&quot;xMidYMid meet&quot; role=&quot;img&quot;
+       aria-label=&quot;Two tank gauges: methalox drains over time, ammonia stays full&quot;>
+    <!-- Methalox panel -->
+    <text x=&quot;170&quot; y=&quot;26&quot; text-anchor=&quot;middle&quot; class=&quot;name&quot;>Methalox vehicle (methane + LOX)</text>
+    <text x=&quot;170&quot; y=&quot;42&quot; text-anchor=&quot;middle&quot; class=&quot;sub&quot;>cryogenic — boils off in orbit</text>
+    <rect x=&quot;130&quot; y=&quot;55&quot; width=&quot;80&quot; height=&quot;150&quot; rx=&quot;8&quot; fill=&quot;var(--meth-empty)&quot; stroke=&quot;var(--tank-outline)&quot;/>
+    <rect id=&quot;methFillRect&quot; x=&quot;134&quot; y=&quot;199&quot; width=&quot;72&quot; height=&quot;4&quot; fill=&quot;var(--meth-fill)&quot;/>
+    <text id=&quot;methPct&quot; x=&quot;170&quot; y=&quot;135&quot; text-anchor=&quot;middle&quot; class=&quot;pct&quot;>100%</text>
+    <text x=&quot;170&quot; y=&quot;225&quot; text-anchor=&quot;middle&quot; class=&quot;sub&quot;>tank fill (boil-off)</text>
+
+    <!-- Ammonia panel -->
+    <text x=&quot;510&quot; y=&quot;26&quot; text-anchor=&quot;middle&quot; class=&quot;name&quot;>Solar-thermal vehicle (ammonia)</text>
+    <text x=&quot;510&quot; y=&quot;42&quot; text-anchor=&quot;middle&quot; class=&quot;sub&quot;>liquid at modest pressure — stores indefinitely</text>
+    <rect x=&quot;470&quot; y=&quot;55&quot; width=&quot;80&quot; height=&quot;150&quot; rx=&quot;8&quot; fill=&quot;var(--amm-empty)&quot; stroke=&quot;var(--tank-outline)&quot;/>
+    <rect id=&quot;ammFillRect&quot; x=&quot;474&quot; y=&quot;59&quot; width=&quot;72&quot; height=&quot;142&quot; fill=&quot;var(--amm-fill)&quot;/>
+    <text id=&quot;ammPct&quot; x=&quot;510&quot; y=&quot;135&quot; text-anchor=&quot;middle&quot; class=&quot;pct&quot;>100%</text>
+    <text x=&quot;510&quot; y=&quot;225&quot; text-anchor=&quot;middle&quot; class=&quot;sub&quot;>tank fill (no boil-off)</text>
+  </svg>
+
+  <div class=&quot;readouts&quot;>
+    <strong>Response when the maneuver order arrives at t = <span id=&quot;loiterVal2&quot;>0 d</span>:</strong>
+    <ul>
+      <li><span class=&quot;tag&quot;>Ammonia (solar-thermal):</span> burn begins in ~10 minutes</li>
+      <li><span class=&quot;tag&quot;>Methalox (cryogenic):</span> ≥24 h — fresh launch-and-fuel window required; pre-staging fueled cryogenic vehicles would need orbital logistics infrastructure that does not exist at scale</li>
+    </ul>
+  </div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>N</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo>
+      <msub><mi>N</mi><mn>0</mn></msub>
+      <msup><mi>e</mi><mrow><mo>−</mo><mi>t</mi><mo>/</mo><mi>τ</mi></mrow></msup>
+    </math>
+    <div class=&quot;legend&quot;>
+      N(t) — propellant remaining at time t (% of full tank) · N₀ — initial fill, 100% ·
+      t — loiter time since launch (days) · τ — boil-off e-folding time constant (≈13 days, illustrative for an unshielded methalox tank). Ammonia has no analogous boil-off term: its fill stays at 100% for all t.
+    </div>
+  </div>
+
+  <div class=&quot;foot&quot;>
+    Footnote: Δv (delta-v) is the total velocity change a vehicle's engine can deliver over its whole burn, in meters per second — the standard measure of how much maneuvering a propulsion system can do. If zero-boil-off cryogenic storage is ever solved, the same solar-thermal architecture running on hydrogen instead of ammonia pushes that total deliverable Δv beyond 10,000 m/s — not a capability that exists today.
+  </div>
+</div>
+
+<script>
+(function(){
+  const TAU = 13; // days — boil-off e-folding time constant (illustrative, unshielded methalox tank)
+  const TANK_TOP = 59, TANK_H = 142; // px, inner tank drawable region (SVG coords)
+
+  const slider = document.getElementById('loiter');
+  const loiterVal = document.getElementById('loiterVal');
+  const loiterVal2 = document.getElementById('loiterVal2');
+  const methPct = document.getElementById('methPct');
+  const ammPct = document.getElementById('ammPct');
+  const methRect = document.getElementById('methFillRect');
+  const ammRect = document.getElementById('ammFillRect');
+  const playBtn = document.getElementById('playBtn');
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function fillMethalox(t){ return 100*Math.exp(-t/TAU); } // % remaining
+  function fillAmmonia(){ return 100; } // % remaining, constant
+
+  function formatDays(t){
+    t = Math.round(t);
+    if (t < 31) return t + ' d';
+    return (t/30).toFixed(1) + ' mo';
+  }
+
+  function setGauge(rect, pct){
+    const h = Math.max(0, TANK_H * pct/100);
+    rect.setAttribute('height', h.toFixed(1));
+    rect.setAttribute('y', (TANK_TOP + TANK_H - h).toFixed(1));
+  }
+
+  let current = 0; // smoothed displayed methalox % (ammonia is always 100)
+  let target = 100;
+
+  function render(mFillDisplay, t){
+    setGauge(methRect, mFillDisplay);
+    setGauge(ammRect, fillAmmonia());
+    methPct.textContent = Math.round(mFillDisplay) + '%';
+    ammPct.textContent = Math.round(fillAmmonia()) + '%';
+    const label = formatDays(t);
+    loiterVal.textContent = label;
+    loiterVal2.textContent = label;
+  }
+
+  function onSlider(){
+    const t = +slider.value;
+    target = fillMethalox(t);
+    if (reduceMotion){ current = target; render(current, t); }
+  }
+  slider.addEventListener('input', onSlider);
+
+  // requestAnimationFrame loop: smooths the methalox gauge toward its target fill
+  function loop(){
+    const t = +slider.value;
+    if (!reduceMotion){
+      current += (target - current) * 0.18;
+      if (Math.abs(current - target) < 0.05) current = target;
+      render(current, t);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // Play sweep: animates the slider itself from 0 to 180 days
+  let playing = false, sweepStart = 0;
+  const SWEEP_DURATION = 6000; // ms, for a full 0->180 day sweep
+  function sweepStep(ts){
+    if (!playing) return;
+    if (!sweepStart) sweepStart = ts;
+    const frac = Math.min(1, (ts - sweepStart) / SWEEP_DURATION);
+    const t = frac * 180;
+    slider.value = t.toFixed(0);
+    target = fillMethalox(t);
+    if (reduceMotion) current = target;
+    if (frac >= 1){ playing = false; playBtn.textContent = 'Play sweep (0 → 6 months)'; return; }
+    requestAnimationFrame(sweepStep);
+  }
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    if (playing){
+      sweepStart = 0;
+      playBtn.textContent = 'Pause sweep';
+      requestAnimationFrame(sweepStep);
+    } else {
+      playBtn.textContent = 'Play sweep (0 → 6 months)';
+    }
+  });
+
+  // init
+  target = fillMethalox(0);
+  current = reduceMotion ? target : 0;
+  render(current, 0);
+  requestAnimationFrame(loop);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;storability&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Ammonia waits in orbit for months; cryogenic propellants boil away before the call comes"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now</h2>
+  <div class="part-lede">The physics was validated in ground tests decades ago, so the real question is what changed. Three subsystem breakthroughs made the hardware buildable, a filing boom is making maneuvering routine, and the same heat exchanger is the core of the next engine after this one.</div>
+</header>
+<section class="scene" id="why-now">
+  <h3>Three subsystems that were unbuildable in 1980 now exist off the shelf</h3>
+  <div class="caption">Ground tests exceeded 800 s Isp decades ago. What killed the idea in 1980 was three missing subsystems — step through what replaced each. The materials panel is worth checking with the equation you already have: since <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi></mrow></msqrt></math>, raising the limit from 1,800 K to 3,000 K raises <math><msub><mi>v</mi><mi>e</mi></msub></math> by <math><msqrt><mrow><mn>3000</mn><mo>/</mo><mn>1800</mn></mrow></msqrt><mo>≈</mo><mn>1.29</mn></math>.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="why-now"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Three subsystems that changed everything</title>
+<style>
+  :root{
+    --bg:#f7f5f0; --panel:#ffffff; --ink:#1c1c1c; --muted:#666;
+    --accent:#b3441e; --accent2:#1e6b8a; --good:#2f7d4f; --bad:#a33333;
+    --grid:#d8d3c6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a; --panel:#1e2024; --ink:#eae7df; --muted:#9a9a9a;
+      --accent:#e0895a; --accent2:#6fb8d6; --good:#63c48b; --bad:#e07a7a;
+      --grid:#3a3d44;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  h1{font-size:15px;line-height:1.3;margin:0 0 8px;}
+  .buttons{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  button{
+    background:var(--panel);color:var(--ink);border:1px solid var(--grid);
+    border-radius:6px;padding:7px 10px;font-size:12.5px;cursor:pointer;
+  }
+  button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .panel{background:var(--panel);border:1px solid var(--grid);border-radius:8px;
+    padding:8px;}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  .matPanel{margin-top:10px;}
+  .matHead{font-weight:bold;font-size:13px;margin-bottom:6px;}
+  .controls{margin-top:8px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;}
+  .ctrl{display:flex;flex-direction:column;gap:3px;font-size:12px;flex:1;min-width:180px;}
+  input[type=range]{width:100%;}
+  .readouts{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:12.5px;}
+  .readout b{font-size:14px;color:var(--accent2);}
+  math{font-size:15px;}
+  .legend{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+  .cap{font-size:11px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Three subsystems unbuildable in 1980, now off the shelf</h1>
+  <div class=&quot;buttons&quot; id=&quot;btns&quot;>
+    <button data-p=&quot;0&quot; class=&quot;active&quot;>1. Heat exchanger</button>
+    <button data-p=&quot;1&quot;>2. Materials</button>
+    <button data-p=&quot;2&quot;>3. Mirrors</button>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 300&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;></svg>
+  </div>
+
+  <!-- Materials readout is always visible, independent of which diagram button is
+       active, so the temperature limit and the derived v_e multiplier can always
+       be read off the page. -->
+  <div class=&quot;panel matPanel&quot;>
+    <div class=&quot;matHead&quot;>Materials constraint: nozzle-throat temperature limit (applies regardless of which diagram above is shown)</div>
+
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;tSlide&quot;>Nozzle-throat temperature limit T (K) — drag to see how much hotter modern alloys allow the propellant to run</label>
+        <input type=&quot;range&quot; id=&quot;tSlide&quot; min=&quot;1800&quot; max=&quot;3000&quot; step=&quot;10&quot; value=&quot;1800&quot;>
+      </div>
+    </div>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;>T = <b id=&quot;tVal&quot;>1800</b> K</div>
+      <div class=&quot;readout&quot;>v<sub>e</sub> multiplier = <b id=&quot;mult&quot;>1.00</b>&amp;times;</div>
+    </div>
+
+    <div>
+      <math display=&quot;block&quot;>
+        <msub><mi>v</mi><mtext>e</mtext></msub><mo>=</mo>
+        <msub><mi>v</mi><mtext>e,1980</mtext></msub><mo>&amp;#183;</mo>
+        <msqrt><mfrac><mi>T</mi><msub><mi>T</mi><mtext>1980</mtext></msub></mfrac></msqrt>
+      </math>
+      <div class=&quot;legend&quot;>
+        v<sub>e</sub> — exhaust velocity at temperature T (m/s) &amp;middot;
+        v<sub>e,1980</sub> — exhaust velocity at the 1980 structural limit (m/s) &amp;middot;
+        T — current nozzle-throat temperature (K), set by the slider above &amp;middot;
+        T<sub>1980</sub> — 1980 structural limit, 1800 K
+      </div>
+    </div>
+  </div>
+
+  <div class=&quot;cap&quot; id=&quot;cap&quot;></div>
+</div>
+
+<script>
+const root = getComputedStyle(document.documentElement);
+const col = n => root.getPropertyValue(n).trim();
+const svg = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+
+let panel = 0;
+let T = 1800;       // current nozzle-throat temperature, K (slider-controlled) — starts at 1980 baseline
+const T0 = 1800;    // 1980 structural limit, K
+
+function el(tag,attrs,parent){
+  const e = document.createElementNS(NS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  (parent||svg).appendChild(e);
+  return e;
+}
+function txt(x,y,s,attrs){
+  const t = el('text',Object.assign({x,y,fill:col('--ink'),'font-size':12},attrs||{}));
+  t.textContent = s;
+  return t;
+}
+
+function drawHeatExchanger(){
+  txt(20,22,'1980: hundreds of machined parts, brazed together',{'font-size':13,'font-weight':'bold'});
+  for(let r=0;r<7;r++){
+    for(let c=0;c<6;c++){
+      const x=30+c*24, y=45+r*24;
+      el('rect',{x,y,width:18,height:18,rx:2,fill:'none',stroke:col('--bad'),'stroke-width':1.2});
+    }
+  }
+  txt(30,215,'~300 individually machined channels',{fill:col('--muted'),'font-size':11});
+  txt(30,230,'brazed at hundreds of joints (leak risk)',{fill:col('--muted'),'font-size':11});
+
+  el('line',{x1:330,y1:15,x2:330,y2:270,stroke:col('--grid')});
+
+  txt(350,22,'Now: one 3D-printed monolithic part',{'font-size':13,'font-weight':'bold'});
+  el('path',{d:'M360,55 Q340,140 380,200 Q430,235 500,220 Q560,200 560,130 Q560,70 500,55 Q430,40 360,55 Z',
+     fill:'none',stroke:col('--good'),'stroke-width':2.5});
+  for(let i=0;i<5;i++){
+    el('path',{d:`M380,${75+i*25} C420,${65+i*25} 470,${95+i*25} 540,${75+i*25}`,
+       fill:'none',stroke:col('--accent2'),'stroke-width':1.6,opacity:0.85});
+  }
+  txt(360,245,'1 refractory-alloy part, additive-',{fill:col('--muted'),'font-size':11});
+  txt(360,260,'manufactured internal channels',{fill:col('--muted'),'font-size':11});
+  txt(360,280,'(inherited from rocket-engine 3D printing)',{fill:col('--muted'),'font-size':11});
+}
+
+function drawMaterials(){
+  const x0=60, x1=580, y=110, w=x1-x0;
+  txt(20,25,'Structural temperature limit at the nozzle throat',{'font-size':13,'font-weight':'bold'});
+  const grad = el('linearGradient',{id:'tgrad',x1:'0%',x2:'100%'});
+  el('stop',{offset:'0%','stop-color':col('--bad')},grad);
+  el('stop',{offset:'100%','stop-color':col('--good')},grad);
+  el('rect',{x:x0,y:y,width:w,height:28,fill:'url(#tgrad)',rx:4});
+
+  const xAt = t => x0 + (t-1800)/(3000-1800)*w;
+
+  el('line',{x1:xAt(1800),y1:y-8,x2:xAt(1800),y2:y+36,stroke:col('--bad'),'stroke-width':2});
+  txt(xAt(1800)-4,y-14,'1,800 K — 1980 limit (failure)',{fill:col('--bad'),'font-size':11});
+
+  el('line',{x1:xAt(3000)-1,y1:y-8,x2:xAt(3000)-1,y2:y+36,stroke:col('--good'),'stroke-width':2});
+  txt(xAt(3000)-190,y+58,'3,000 K — modern refractory alloys',{fill:col('--good'),'font-size':11});
+
+  const cx = xAt(T);
+  el('polygon',{points:`${cx-7},${y-14} ${cx+7},${y-14} ${cx},${y-2}`,fill:col('--accent')});
+  txt(Math.min(Math.max(cx-14,x0),x1-40),y+95,T+' K — current setting',{fill:col('--accent'),'font-size':12,'font-weight':'bold'});
+
+  txt(x0-6,y+45,'1,800',{fill:col('--muted'),'font-size':10});
+  txt(x1-24,y+45,'3,000',{fill:col('--muted'),'font-size':10});
+  txt(x0+w/2-70,y+45,'temperature T (K)',{fill:col('--muted'),'font-size':11});
+}
+
+function drawMirrors(){
+  txt(20,24,'Same satellite mass budget, two collector technologies',{'font-size':13,'font-weight':'bold'});
+  const baseY=250, massBudget=100; // kg, illustrative fixed budget
+  const convPow=100, memPow=1000; // W/kg
+  const scale=0.16;
+  const wConv=Math.sqrt(convPow*massBudget)*scale*3;
+  const wMem=Math.sqrt(memPow*massBudget)*scale*3;
+
+  const hConv=wConv, hMem=wMem;
+  const x1=140, x2=430;
+  el('rect',{x:x1-hConv/2,y:baseY-hConv,width:hConv,height:hConv,fill:'none',stroke:col('--accent2'),'stroke-width':2});
+  txt(x1-70,baseY+22,'Conventional solar array',{'font-size':12});
+  txt(x1-70,baseY+38,'~100 W/kg',{fill:col('--accent2'),'font-size':13,'font-weight':'bold'});
+
+  el('rect',{x:x2-hMem/2,y:baseY-hMem,width:hMem,height:hMem,fill:'none',stroke:col('--accent'),'stroke-width':2});
+  txt(x2-90,baseY+22,'Membrane reflector mirror',{'font-size':12});
+  txt(x2-70,baseY+38,'>1,000 W/kg',{fill:col('--accent'),'font-size':13,'font-weight':'bold'});
+
+  txt(x2-140,baseY+60,'(collector area ~10&amp;times; larger, same mass)',{fill:col('--muted'),'font-size':11});
+  el('line',{x1:60,y1:baseY+2,x2:580,y2:baseY+2,stroke:col('--grid')});
+  txt(60,baseY+80,'Both boxes represent equal spacecraft mass allotted to power/heat collection.',{fill:col('--muted'),'font-size':10.5});
+}
+
+function render(){
+  svg.innerHTML='';
+  if(panel===0) drawHeatExchanger();
+  else if(panel===1) drawMaterials();
+  else drawMirrors();
+
+  const caps = [
+    'The 1980 exchanger needed hundreds of brazed joints, each a potential leak; the modern one is a single printed refractory-alloy part.',
+    'Raising the temperature limit raises exhaust velocity as \u221AT — drag the slider below to see the multiplier update live.',
+    'Membrane mirrors deliver an order of magnitude more collected power per kilogram than rigid solar arrays.'
+  ];
+  document.getElementById('cap').textContent = caps[panel];
+}
+
+function updateMaterialsReadouts(){
+  const mult = Math.sqrt(T/T0); // v_e / v_e,1980 = sqrt(T / T_1980)
+  document.getElementById('tVal').textContent = Math.round(T);
+  document.getElementById('mult').textContent = mult.toFixed(2);
+  if(panel===1) render(); // keep the temperature-bar marker in sync while that diagram is shown
+}
+
+document.getElementById('btns').addEventListener('click',e=>{
+  const b = e.target.closest('button');
+  if(!b) return;
+  panel = parseInt(b.dataset.p,10);
+  document.querySelectorAll('#btns button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  render();
+});
+
+document.getElementById('tSlide').addEventListener('input',e=>{
+  T = parseFloat(e.target.value);
+  updateMaterialsReadouts();
+});
+
+render();
+updateMaterialsReadouts();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;why-now&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Three subsystems that were unbuildable in 1980 now exist off the shelf"
+  ></iframe>
+</section>
+
+<section class="scene" id="demand-inflection">
+  <h3>Filings for 1.2 million satellites turn maneuvering from a rare event into infrastructure</h3>
+  <div class="caption">Cheap fast Δv only matters if satellites actually need to move — so look at the pipeline, which is regulatory filings, not deployed hardware. Even a fraction of 1.2 million filed satellites means routine collision-avoidance burns, repositioning, and end-of-life de-orbit.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="demand-inflection"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Demand inflection: today vs. filed satellite fleets</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --panel:#ffffff; --fg:#1a1a1f; --muted:#5b5b66; --grid:#d9d9e2;
+    --today:#2b6cb0; --broadband:#2f9e6f; --datacenter1:#b7791f; --datacenter2:#c05621; --datacenter3:#9b2c2c;
+    --badge-bg:#fff3cd; --badge-fg:#7a5b00; --btn-bg:#2b6cb0; --btn-fg:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111318; --panel:#181b22; --fg:#e8e8ee; --muted:#a7a7b2; --grid:#33363f;
+      --today:#5b9bd5; --broadband:#4fd08c; --datacenter1:#e0a95f; --datacenter2:#e2895b; --datacenter3:#e2696e;
+      --badge-bg:#3a2f00; --badge-fg:#f2d675; --btn-bg:#5b9bd5; --btn-fg:#0b1220;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+  h1{font-size:14px;font-weight:700;margin:2px 0 10px;line-height:1.3;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+  button{background:var(--btn-bg);color:var(--btn-fg);border:none;border-radius:6px;
+    padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;max-width:100%;}
+  .chartRow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;}
+  canvas{max-width:100%;display:block;background:var(--panel);border-radius:8px;}
+  .side{flex:1 1 200px;min-width:180px;opacity:0;max-height:0;overflow:hidden;
+    transition:opacity .4s;}
+  .side.show{opacity:1;max-height:600px;}
+  .badge{background:var(--badge-bg);color:var(--badge-fg);padding:6px 9px;border-radius:6px;
+    font-size:11.5px;font-weight:700;display:inline-block;margin-bottom:8px;}
+  .side h2{font-size:11.5px;margin:6px 0 3px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.02em;}
+  ul{margin:2px 0 8px;padding-left:16px;font-size:12px;line-height:1.45;}
+  li{margin-bottom:2px;}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;}
+  .readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));
+    gap:8px;margin-top:12px;}
+  .ro{background:var(--panel);border-radius:6px;padding:6px 8px;}
+  .ro .l{font-size:10.5px;color:var(--muted);}
+  .ro .v{font-size:15px;font-weight:700;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Satellite fleet size: today's operating paradigm vs. filed regulatory pipeline</h1>
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;>Show filed satellite filings (&amp;gt;1.2 million) instead of today's active fleet</button>
+  </div>
+  <div class=&quot;chartRow&quot;>
+    <canvas id=&quot;chart&quot; width=&quot;680&quot; height=&quot;460&quot; role=&quot;img&quot;
+      aria-label=&quot;Log-scale bar comparing about 15,000 active satellites today to over 1.2 million filed satellites&quot;></canvas>
+    <div class=&quot;side&quot; id=&quot;side&quot;>
+      <div class=&quot;badge&quot;>Regulatory intent, not hardware — these are filings, not satellites in orbit</div>
+      <h2>Broadband filings breakdown (~95,000 total)</h2>
+      <ul>
+        <li><span class=&quot;sw&quot; style=&quot;background:var(--broadband)&quot;></span>Starlink authorization — 42,000</li>
+        <li><span class=&quot;sw&quot; style=&quot;background:var(--broadband)&quot;></span>Amazon Leo — 7,727</li>
+        <li><span class=&quot;sw&quot; style=&quot;background:var(--broadband)&quot;></span>Three Chinese constellations — ~38,000</li>
+      </ul>
+      <h2>Becomes routine at this density</h2>
+      <ul>
+        <li>Collision avoidance — routine conjunction burns</li>
+        <li>Repositioning — shifting slots to fill coverage</li>
+        <li>Servicing — refuel / repair rendezvous</li>
+        <li>De-orbit — controlled reentry at end of life</li>
+      </ul>
+    </div>
+  </div>
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><div class=&quot;l&quot;>Displayed total (satellites)</div><div class=&quot;v&quot; id=&quot;roTotal&quot;>15,000</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;l&quot;>Today baseline</div><div class=&quot;v&quot;>15,000</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;l&quot;>Filed total</div><div class=&quot;v&quot;>1,234,600</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;l&quot;>Jump, filed ÷ today</div><div class=&quot;v&quot; id=&quot;roMult&quot;>82×</div></div>
+  </div>
+</div>
+
+<script>
+// ---- named physical/quantitative constants (satellite counts, from public filings) ----
+const TODAY_ACTIVE = 15000;
+const STARLINK_AUTH = 42000;
+const AMAZON_LEO = 7727;
+const CHINA_CONSTELLATIONS = 38000;
+const OTHER_BROADBAND = 95000 - (STARLINK_AUTH + AMAZON_LEO + CHINA_CONSTELLATIONS); // rounds group to ~95,000
+const BROADBAND_TOTAL = STARLINK_AUTH + AMAZON_LEO + CHINA_CONSTELLATIONS + OTHER_BROADBAND;
+const SPACEX_DATACENTER = 1000000;
+const STARCLOUD = 88000;
+const BLUE_ORIGIN = 51600;
+const DATACENTER_TOTAL = SPACEX_DATACENTER + STARCLOUD + BLUE_ORIGIN;
+const FILED_TOTAL = BROADBAND_TOTAL + DATACENTER_TOTAL; // > 1.2 million — must equal sum of all stacked segments
+
+// ordered bottom-to-top; internal partition is LINEAR proportion of value/FILED_TOTAL
+const SEGMENTS = [
+  { label: 'Blue Origin data center — 51,600',            value: BLUE_ORIGIN,       colorVar: '--datacenter1' },
+  { label: 'Starcloud data center — 88,000',               value: STARCLOUD,         colorVar: '--datacenter2' },
+  { label: 'Broadband (3 filings) — 95,000',               value: BROADBAND_TOTAL,   colorVar: '--broadband'   },
+  { label: 'SpaceX data center — 1,000,000',               value: SPACEX_DATACENTER, colorVar: '--datacenter3' }
+];
+
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+let W = 680, H = 460;
+
+let t = 0, target = 0, animating = false;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+
+function valueToY(v, plotTop, plotBottom){
+  const dMin = 3, dMax = Math.log10(2000000); // domain 1e3 .. 2e6
+  const l = Math.log10(Math.max(v, 1000));
+  const frac = (l - dMin) / (dMax - dMin);
+  return plotBottom - frac * (plotBottom - plotTop);
+}
+
+function draw(){
+  ctx.clearRect(0, 0, W, H);
+  const plotLeft = 78, plotRight = W - 16, plotTop = 36, plotBottom = H - 74;
+  const fs = W < 440 ? 10 : 11.5;
+
+  // gridlines + ticks
+  [1000, 10000, 100000, 1000000].forEach(v => {
+    const y = valueToY(v, plotTop, plotBottom);
+    ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(plotLeft, y); ctx.lineTo(plotRight, y); ctx.stroke();
+    ctx.fillStyle = css('--muted'); ctx.font = fs + 'px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(v.toLocaleString('en-US'), plotLeft - 8, y + 4);
+  });
+
+  // today reference line (always visible for magnitude comparison)
+  const yToday = valueToY(TODAY_ACTIVE, plotTop, plotBottom);
+  ctx.save();
+  ctx.strokeStyle = css('--fg'); ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(plotLeft, yToday); ctx.lineTo(plotRight, yToday); ctx.stroke();
+  ctx.restore();
+
+  // baseline annotation: right-aligned, below the line, clear of the bar/segment labels,
+  // with a background patch so it stays legible against any bar color behind it.
+  const annLine1 = 'today baseline: ~15,000 active';
+  const annLine2 = '(static park-and-drift, mN thrusters)';
+  ctx.font = fs + 'px sans-serif';
+  ctx.textAlign = 'right';
+  const annW = Math.max(ctx.measureText(annLine1).width, ctx.measureText(annLine2).width);
+  const annX = plotRight;
+  const lineGap = fs + 3;
+  const annY1 = yToday + 14;
+  const annY2 = annY1 + lineGap;
+  ctx.fillStyle = css('--panel');
+  ctx.globalAlpha = 0.88;
+  ctx.fillRect(annX - annW - 6, annY1 - fs, annW + 6, lineGap * 2 + 2);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = css('--muted');
+  ctx.fillText(annLine1, annX, annY1);
+  ctx.fillText(annLine2, annX, annY2);
+
+  // animated bar: top position on true log scale; internal fill crossfades
+  const barW = Math.min(140, (plotRight - plotLeft) * 0.30);
+  const barX = plotLeft + 14;
+  const yFiledTop = valueToY(FILED_TOTAL, plotTop, plotBottom);
+  const barTop = yToday + (yFiledTop - yToday) * t;
+  const barBottom = plotBottom;
+  const barH = barBottom - barTop;
+
+  // solid &quot;today&quot; fill, fades out
+  ctx.globalAlpha = 1 - t;
+  ctx.fillStyle = css('--today');
+  ctx.fillRect(barX, barTop, barW, barH);
+  ctx.globalAlpha = 1;
+
+  // proportional segments (linear share of current bar height), fade in
+  let cursorY = barBottom;
+  const labelX = barX + barW + 10;
+  SEGMENTS.forEach(seg => {
+    const frac = seg.value / FILED_TOTAL;
+    const segH = barH * frac;
+    const segTop = cursorY - segH;
+    ctx.globalAlpha = t;
+    ctx.fillStyle = css(seg.colorVar);
+    ctx.fillRect(barX, segTop, barW, segH);
+    ctx.globalAlpha = 1;
+    if (t > 0.08) {
+      const midY = (segTop + cursorY) / 2;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, t * 1.3);
+      ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(barX + barW, midY); ctx.lineTo(labelX - 3, midY); ctx.stroke();
+      ctx.fillStyle = css('--fg'); ctx.font = fs + 'px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(seg.label, labelX, midY + 4);
+      ctx.restore();
+    }
+    cursorY = segTop;
+  });
+
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1;
+  ctx.strokeRect(barX, barTop, barW, barH);
+
+  // total value above bar — locked to the current toggle target so it always
+  // agrees exactly with the &quot;Filed total&quot; / &quot;Displayed total&quot; readouts below,
+  // regardless of where the rise/fall animation currently is.
+  const totalNow = (state === 'filed') ? FILED_TOTAL : TODAY_ACTIVE;
+  ctx.fillStyle = css('--fg'); ctx.font = 'bold ' + fs + 'px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(fmt(totalNow) + ' satellites', barX + barW / 2, Math.max(barTop - 8, plotTop + 10));
+
+  // axis title (rotated)
+  ctx.save();
+  ctx.translate(16, (plotTop + plotBottom) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = css('--muted'); ctx.font = fs + 'px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('satellites (log scale)', 0, 0);
+  ctx.restore();
+
+  // bottom axis note
+  ctx.fillStyle = css('--muted'); ctx.font = fs + 'px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('fleet size — one bar, toggled composition', barX + barW / 2, plotBottom + 20);
+}
+
+function resize(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = Math.max(300, Math.floor(rect.width));
+  H = 460;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+const toggleBtn = document.getElementById('toggleBtn');
+const side = document.getElementById('side');
+const roTotal = document.getElementById('roTotal');
+const roMult = document.getElementById('roMult');
+roMult.textContent = Math.round(FILED_TOTAL / TODAY_ACTIVE) + '×';
+
+let state = 'today';
+function updateUI(){
+  if (state === 'filed'){
+    toggleBtn.textContent = &quot;Show today's active fleet (~15,000) instead of filed satellite filings&quot;;
+    side.classList.add('show');
+    roTotal.textContent = fmt(FILED_TOTAL);
+  } else {
+    toggleBtn.textContent = 'Show filed satellite filings (>1.2 million) instead of today\'s active fleet';
+    side.classList.remove('show');
+    roTotal.textContent = fmt(TODAY_ACTIVE);
+  }
+}
+
+function step(){
+  t += (target - t) * 0.12;
+  if (Math.abs(target - t) < 0.002){ t = target; animating = false; draw(); return; }
+  draw();
+  requestAnimationFrame(step);
+}
+
+toggleBtn.addEventListener('click', () => {
+  state = (state === 'today') ? 'filed' : 'today';
+  target = (state === 'filed') ? 1 : 0;
+  updateUI();
+  if (reduced){
+    t = target; draw();
+  } else if (!animating){
+    animating = true;
+    requestAnimationFrame(step);
+  }
+});
+
+new ResizeObserver(resize).observe(canvas.parentElement);
+window.addEventListener('resize', resize);
+
+updateUI();
+resize();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;demand-inflection&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Filings for 1.2 million satellites turn maneuvering from a rare event into infrastructure"
+  ></iframe>
+</section>
+
+<section class="scene" id="nuclear-bridge">
+  <h3>Swap the mirror for a reactor and the same hardware becomes a nuclear-thermal rocket</h3>
+  <div class="caption">One last consequence of <math><msub><mi>v</mi><mi>e</mi></msub><mo>∝</mo><msqrt><mrow><mi>T</mi><mo>/</mo><mi>M</mi></mrow></msqrt></math>: the equation never asked where the heat comes from. Toggle the heat source: the heat exchanger, propellant handling, and nozzle carry over unchanged to a nuclear-thermal engine. What remains is a 2030s regulatory question, not a physics one.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="nuclear-bridge"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Solar-thermal ↔ nuclear-thermal: same downstream hardware</title>
+<style>
+  :root{
+    --bg:#f5f6f7;
+    --panel:#ffffff;
+    --text:#1b1e23;
+    --muted:#5b6270;
+    --border:#c7cbd1;
+    --accent-solar:#c9781c;
+    --accent-nuclear:#2f6fc4;
+    --shared:#eef3ee;
+    --shared-border:#5f9a75;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a;
+      --panel:#1d2024;
+      --text:#e8eaed;
+      --muted:#9aa1ab;
+      --border:#3a3f47;
+      --accent-solar:#e0a24a;
+      --accent-nuclear:#6fa8f2;
+      --shared:#1a231d;
+      --shared-border:#4f8f66;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  h1{font-size:14px;margin:0 0 10px;font-weight:600;}
+  svg{width:100%;max-width:680px;height:auto;display:block;}
+  .lbl{fill:var(--text);font-size:11.5px;text-anchor:middle;font-family:inherit;}
+  .lbl-sm{fill:var(--muted);font-size:9.5px;text-anchor:middle;font-family:inherit;}
+  .block{fill:var(--panel);stroke:var(--border);stroke-width:1.4;}
+  .src-solar{fill:color-mix(in srgb, var(--accent-solar) 22%, var(--panel));stroke:var(--accent-solar);stroke-width:2;}
+  .src-nuclear{fill:color-mix(in srgb, var(--accent-nuclear) 22%, var(--panel));stroke:var(--accent-nuclear);stroke-width:2;}
+  .sharedbox{fill:var(--shared);stroke:var(--shared-border);stroke-width:2;stroke-dasharray:6 4;}
+  .arrow{stroke:var(--muted);stroke-width:2;fill:none;}
+  .def-text{fill:var(--muted);font-size:10.5px;text-anchor:middle;}
+  .controls{margin:10px 0 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  button{font-size:13px;padding:7px 12px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button:hover{border-color:var(--accent-nuclear);}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px;}
+  .ro{flex:1 1 140px;background:var(--panel);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px;}
+  .ro .k{font-size:10px;color:var(--muted);}
+  .ro .v{font-size:13.5px;font-weight:600;}
+  math{display:block;margin:12px auto 2px;font-size:16px;}
+  .legend{font-size:11px;color:var(--muted);text-align:center;margin:2px 0 14px;line-height:1.5;}
+  ul.compare{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+  ul.compare li{background:var(--panel);border:1px solid var(--border);border-radius:6px;
+    padding:7px 10px;font-size:12px;}
+  ul.compare b{color:var(--text);}
+  @media (max-width:420px){
+    .lbl{font-size:10px;} .lbl-sm{font-size:8.5px;}
+    .ro{flex:1 1 100%;}
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Same equation, different heat source: solar-thermal ↔ nuclear-thermal rocket</h1>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 220&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;>
+    <!-- shared hardware box -->
+    <rect class=&quot;sharedbox&quot; x=&quot;228&quot; y=&quot;26&quot; width=&quot;435&quot; height=&quot;158&quot; rx=&quot;8&quot;></rect>
+    <text class=&quot;lbl-sm&quot; x=&quot;445&quot; y=&quot;18&quot;>unchanged hardware — carries over exactly</text>
+
+    <!-- heat source block -->
+    <rect id=&quot;sourceRect&quot; class=&quot;block src-solar&quot; x=&quot;14&quot; y=&quot;52&quot; width=&quot;150&quot; height=&quot;112&quot; rx=&quot;8&quot;></rect>
+    <g id=&quot;solarIcon&quot;>
+      <circle cx=&quot;89&quot; cy=&quot;82&quot; r=&quot;13&quot; fill=&quot;var(--accent-solar)&quot;></circle>
+      <g stroke=&quot;var(--accent-solar)&quot; stroke-width=&quot;2&quot;>
+        <line x1=&quot;103&quot; y1=&quot;82&quot; x2=&quot;111&quot; y2=&quot;82&quot;></line>
+        <line x1=&quot;75&quot;  y1=&quot;82&quot; x2=&quot;67&quot; y2=&quot;82&quot;></line>
+        <line x1=&quot;89&quot; y1=&quot;68&quot; x2=&quot;89&quot; y2=&quot;60&quot;></line>
+        <line x1=&quot;89&quot; y1=&quot;96&quot; x2=&quot;89&quot; y2=&quot;104&quot;></line>
+        <line x1=&quot;99&quot; y1=&quot;72&quot; x2=&quot;105&quot; y2=&quot;66&quot;></line>
+        <line x1=&quot;79&quot; y1=&quot;72&quot; x2=&quot;73&quot; y2=&quot;66&quot;></line>
+        <line x1=&quot;99&quot; y1=&quot;92&quot; x2=&quot;105&quot; y2=&quot;98&quot;></line>
+        <line x1=&quot;79&quot; y1=&quot;92&quot; x2=&quot;73&quot; y2=&quot;98&quot;></line>
+      </g>
+    </g>
+    <g id=&quot;nuclearIcon&quot; style=&quot;display:none&quot;>
+      <circle cx=&quot;89&quot; cy=&quot;82&quot; r=&quot;13&quot; fill=&quot;none&quot; stroke=&quot;var(--accent-nuclear)&quot; stroke-width=&quot;1.5&quot;></circle>
+      <circle cx=&quot;89&quot; cy=&quot;82&quot; r=&quot;8&quot; fill=&quot;var(--accent-nuclear)&quot; opacity=&quot;0.45&quot;></circle>
+      <circle cx=&quot;89&quot; cy=&quot;82&quot; r=&quot;3.5&quot; fill=&quot;var(--accent-nuclear)&quot;></circle>
+    </g>
+    <text id=&quot;sourceTitle&quot; class=&quot;lbl&quot; x=&quot;89&quot; y=&quot;140&quot; font-weight=&quot;600&quot;>Solar concentrator</text>
+    <text id=&quot;sourceSub&quot; class=&quot;lbl-sm&quot; x=&quot;89&quot; y=&quot;153&quot;>mirrors</text>
+
+    <!-- heat exchanger -->
+    <rect class=&quot;block&quot; x=&quot;244&quot; y=&quot;52&quot; width=&quot;118&quot; height=&quot;112&quot; rx=&quot;8&quot;></rect>
+    <text class=&quot;lbl&quot; x=&quot;303&quot; y=&quot;88&quot; font-weight=&quot;600&quot;>Heat</text>
+    <text class=&quot;lbl&quot; x=&quot;303&quot; y=&quot;103&quot; font-weight=&quot;600&quot;>exchanger</text>
+    <text class=&quot;lbl-sm&quot; x=&quot;303&quot; y=&quot;118&quot;>refractory, ~3000 K</text>
+
+    <!-- propellant feed -->
+    <rect class=&quot;block&quot; x=&quot;392&quot; y=&quot;52&quot; width=&quot;118&quot; height=&quot;112&quot; rx=&quot;8&quot;></rect>
+    <text class=&quot;lbl&quot; x=&quot;451&quot; y=&quot;88&quot; font-weight=&quot;600&quot;>Propellant</text>
+    <text class=&quot;lbl&quot; x=&quot;451&quot; y=&quot;103&quot; font-weight=&quot;600&quot;>feed</text>
+    <text class=&quot;lbl-sm&quot; x=&quot;451&quot; y=&quot;118&quot;>H₂, stored + pumped</text>
+
+    <!-- nozzle -->
+    <rect class=&quot;block&quot; x=&quot;540&quot; y=&quot;52&quot; width=&quot;108&quot; height=&quot;112&quot; rx=&quot;8&quot;></rect>
+    <text class=&quot;lbl&quot; x=&quot;594&quot; y=&quot;95&quot; font-weight=&quot;600&quot;>Nozzle</text>
+    <text class=&quot;lbl-sm&quot; x=&quot;594&quot; y=&quot;110&quot;>expansion → v_e</text>
+
+    <!-- arrows -->
+    <defs>
+      <marker id=&quot;arrow&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;8&quot; refY=&quot;5&quot; markerWidth=&quot;7&quot; markerHeight=&quot;7&quot; orient=&quot;auto-start-reverse&quot;>
+        <path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--muted)&quot;></path>
+      </marker>
+    </defs>
+    <line class=&quot;arrow&quot; x1=&quot;166&quot; y1=&quot;108&quot; x2=&quot;240&quot; y2=&quot;108&quot; marker-end=&quot;url(#arrow)&quot;></line>
+    <line class=&quot;arrow&quot; x1=&quot;364&quot; y1=&quot;108&quot; x2=&quot;388&quot; y2=&quot;108&quot; marker-end=&quot;url(#arrow)&quot;></line>
+    <line class=&quot;arrow&quot; x1=&quot;512&quot; y1=&quot;108&quot; x2=&quot;536&quot; y2=&quot;108&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+    <text id=&quot;sourceDef&quot; class=&quot;def-text&quot; x=&quot;340&quot; y=&quot;205&quot;>Concentrated sunlight — no combustion</text>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;>Swap heat source → fission reactor</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Heat source</div><div class=&quot;v&quot; id=&quot;roSource&quot;>Solar concentrator</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Availability</div><div class=&quot;v&quot; id=&quot;roAvail&quot;>Flight-provable now</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Heat-exchanger temperature, T</div><div class=&quot;v&quot; id=&quot;roT&quot;>—</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;k&quot;>Exhaust velocity, v<sub>e</sub></div><div class=&quot;v&quot; id=&quot;roVe&quot;>—</div></div>
+  </div>
+
+  <math display=&quot;block&quot;>
+    <msub><mi>v</mi><mtext>e</mtext></msub>
+    <mo>=</mo>
+    <msqrt>
+      <mrow>
+        <mfrac><mrow><mn>2</mn><mi>γ</mi></mrow><mrow><mi>γ</mi><mo>-</mo><mn>1</mn></mrow></mfrac>
+        <mo>&amp;#8290;</mo>
+        <mfrac><mrow><mi>R</mi><mi>T</mi></mrow><mi>M</mi></mfrac>
+      </mrow>
+    </msqrt>
+  </math>
+  <div class=&quot;legend&quot;>
+    v<sub>e</sub> — exhaust velocity (m/s) · γ — heat-capacity ratio of propellant gas, 1.4 for H₂ (dimensionless) ·
+    R — gas constant, 8.314 J/(mol·K) · T — heat-exchanger temperature (K) · M — propellant molar mass (kg/mol).
+    None of these depend on where the heat came from.
+  </div>
+
+  <ul class=&quot;compare&quot;>
+    <li><b>Solar-thermal today:</b> ~90% of nuclear-thermal exhaust performance, using the diagram above with the mirror block.</li>
+    <li><b>Cost:</b> ~10% of a nuclear-thermal program — no reactor fuel, shielding, or licensing burden.</li>
+    <li><b>Nuclear-thermal variant:</b> same downstream hardware, but gated on reactor licensing — earliest realistic flight, 2030s.</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+  const R = 8.314;      // J/(mol·K)
+  const gamma = 1.4;    // heat-capacity ratio, H2
+  const T = 3000;       // K, heat-exchanger temperature (shared hardware limit)
+  const M = 0.002;      // kg/mol, hydrogen propellant
+  const ve = Math.sqrt((2*gamma/(gamma-1)) * (R*T/M)); // m/s
+
+  document.getElementById('roT').textContent = Math.round(T) + ' K';
+  document.getElementById('roVe').textContent = (ve/1000).toFixed(2) + ' km/s';
+
+  const btn = document.getElementById('toggleBtn');
+  const sourceRect = document.getElementById('sourceRect');
+  const solarIcon = document.getElementById('solarIcon');
+  const nuclearIcon = document.getElementById('nuclearIcon');
+  const sourceTitle = document.getElementById('sourceTitle');
+  const sourceSub = document.getElementById('sourceSub');
+  const defText = document.getElementById('sourceDef');
+  const roSource = document.getElementById('roSource');
+  const roAvail = document.getElementById('roAvail');
+
+  let isNuclear = false;
+
+  function render(){
+    sourceRect.setAttribute('class', 'block ' + (isNuclear ? 'src-nuclear' : 'src-solar'));
+    solarIcon.style.display = isNuclear ? 'none' : 'block';
+    nuclearIcon.style.display = isNuclear ? 'block' : 'none';
+    sourceTitle.textContent = isNuclear ? 'Fission reactor' : 'Solar concentrator';
+    sourceSub.textContent = isNuclear ? 'compact core' : 'mirrors';
+    defText.textContent = isNuclear
+      ? 'Controlled nuclear heat source — no combustion'
+      : 'Concentrated sunlight — no combustion';
+    roSource.textContent = isNuclear ? 'Fission reactor' : 'Solar concentrator';
+    roAvail.textContent = isNuclear ? 'Gated on regulation — 2030s+' : 'Flight-provable now';
+    btn.textContent = isNuclear
+      ? 'Swap heat source → solar concentrator'
+      : 'Swap heat source → fission reactor';
+  }
+
+  btn.addEventListener('click', function(){
+    isNuclear = !isNuclear;
+    render();
+  });
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;nuclear-bridge&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Swap the mirror for a reactor and the same hardware becomes a nuclear-thermal rocket"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Portal Space Systems: Solar-Thermal Propulsion and the Case for Responsive On-Orbit Maneuverability</em> — Mach33 Space Intelligence. Explainer generated 2026-07-16.</footer>
+</main>
+<script>
+  // Scenes report their height via postMessage({ explainItScene, height }).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        frame.style.height = Math.ceil(data.height) + "px";
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

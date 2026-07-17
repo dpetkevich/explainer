@@ -7,19 +7,24 @@
  * Usage: npx tsx scripts/reassemble.ts
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import Database from "better-sqlite3";
+import { join, resolve } from "node:path";
 import { ConceptMapSchema, StoryboardSchema } from "../src/lib/schemas.js";
 import { paths, type Ctx } from "../src/lib/context.js";
 import { runAssemble } from "../src/stages/assemble.js";
 import type { QaSummary } from "../src/stages/qa.js";
-import { DATA_DIR } from "../src/server/db.js";
+import { listExplainers } from "../src/server/db.js";
 
-const db = new Database(join(DATA_DIR, "explainers.db"));
-const rows = db.prepare("SELECT id, out_dir FROM explainers WHERE status = 'done' ORDER BY created_at").all() as {
-  id: string;
-  out_dir: string;
-}[];
+// Minimal .env loader so POSTGRES_URL is available (mirrors cli.ts).
+(() => {
+  const envFile = resolve(".env");
+  if (!existsSync(envFile)) return;
+  for (const line of readFileSync(envFile, "utf8").split("\n")) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && m[1] && !(m[1] in process.env)) process.env[m[1]] = m[2]!.replace(/^["']|["']$/g, "");
+  }
+})();
+
+const rows = (await listExplainers()).filter((r) => r.status === "done");
 
 let ok = 0;
 let skipped = 0;
@@ -44,5 +49,4 @@ for (const row of rows) {
     skipped++;
   }
 }
-db.close();
 console.log(`\nreassembled ${ok} explainer(s), skipped ${skipped}`);

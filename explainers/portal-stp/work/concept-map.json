@@ -1,0 +1,98 @@
+{
+  "paper": {
+    "title": "Space Intelligence: Portal Space Systems and the Solar-Thermal Propulsion Thesis",
+    "authors": [
+      "Mach33 (investment analysis team)"
+    ],
+    "oneSentenceClaim": "Solar-thermal propulsion — sunlight concentrated onto a 3D-printed heat exchanger that heats cheap ammonia propellant — is the only architecture that delivers both chemical-class thrust and electric-class efficiency, making it the sole viable option for the responsive, repeatable maneuvering that 1.2 million planned orbital assets will require."
+  },
+  "prerequisites": [
+    "Newtonian mechanics: momentum conservation, F = dp/dt",
+    "Orbital mechanics at the level of 'changing orbits requires changing velocity'",
+    "Basic thermodynamics: heat transfer, temperature limits of materials",
+    "Exponential functions and natural logarithms",
+    "Energy conservation and the distinction between energy source and reaction mass"
+  ],
+  "concepts": [
+    {
+      "id": "delta-v-as-currency",
+      "name": "Delta-v: the finite budget every spacecraft spends",
+      "whyItMatters": "The entire economic argument of the paper is denominated in delta-v — cost per m/s and time per m/s — so the reader must see delta-v as a spacecraft's total lifetime allowance for changing orbits, not a rate or a distance.",
+      "coreMechanism": "In vacuum, a spacecraft can only change its orbit by expelling mass. Each maneuver (repositioning, collision avoidance, LEO-to-GEO transfer) has a characteristic velocity-change cost: ~100 m/s for a small reposition, ~5,000 m/s for LEO-to-GEO. The vehicle carries a fixed propellant load, which translates into a fixed total delta-v budget; when it's spent, the satellite is done maneuvering forever. Delta-v is therefore the natural unit for pricing in-space mobility.",
+      "misconception": "Delta-v is not fuel-per-maneuver or speed — it is a cumulative budget. Two 500 m/s maneuvers cost the same budget as one 1,000 m/s maneuver, regardless of when they happen.",
+      "foundational": true
+    },
+    {
+      "id": "rocket-equation-tyranny",
+      "name": "The Tsiolkovsky rocket equation and its exponential penalty",
+      "whyItMatters": "The rocket equation is why propulsion efficiency (Isp) dominates spacecraft economics: it sets the exponential relationship between delta-v demanded and propellant mass carried, and it is the physics behind every cost curve in the paper.",
+      "coreMechanism": "Momentum conservation applied continuously to a vehicle expelling mass at exhaust velocity v_e gives Δv = v_e · ln(m_wet/m_dry). The logarithm means propellant requirements grow exponentially with delta-v demanded: doubling your delta-v budget more than doubles your propellant fraction. Exhaust velocity is conventionally quoted as specific impulse, Isp = v_e/g₀, in seconds. This is why a 500 kg spacecraft on storable chemical propellant (Isp ~180–330s) exhausts its entire delta-v budget at only ~700 m/s — the tanks physically cannot hold enough propellant to go further.",
+      "keyEquation": "\\Delta v = I_{sp}\\, g_0 \\ln\\!\\left(\\frac{m_{wet}}{m_{dry}}\\right)",
+      "foundational": true
+    },
+    {
+      "id": "thrust-vs-isp-dichotomy",
+      "name": "The 50-year thrust-versus-efficiency binary",
+      "whyItMatters": "The paper's central claim is that solar thermal breaks a trade-off previously assumed to be fundamental; the reader must first understand why chemical and electric propulsion occupy opposite corners and why neither can do both.",
+      "coreMechanism": "Chemical propulsion releases energy stored in the propellant itself, so power output is enormous (hundreds of newtons of thrust, burns in seconds) but exhaust velocity is capped by combustion chemistry at Isp ~180–330s for storable propellants. Electric (Hall-effect) thrusters use externally generated solar power to accelerate ions to very high exhaust velocity (Isp ~1,500s), but available electrical power limits thrust to millinewtons — a 100 m/s maneuver takes ~220 hours and a 5,000 m/s LEO-to-GEO transfer takes >12,600 hours (527 days) of continuous firing. The dichotomy exists because chemical systems are energy-limited by their fuel and electric systems are power-limited by their panels.",
+      "misconception": "Higher Isp is not unconditionally better. An electric thruster's efficiency is operationally worthless for defense missions if the maneuver takes 95 days — the tactical window closes long before arrival.",
+      "foundational": true
+    },
+    {
+      "id": "solar-thermal-mechanism",
+      "name": "Solar-thermal propulsion: decoupling the energy source from the propellant",
+      "whyItMatters": "This is the core technology claim: by taking energy from concentrated sunlight instead of combustion or electricity, the system achieves chemical-class thrust (~100–200 N) at Isp exceeding storable chemical's ceiling — the 'goldilocks' position.",
+      "coreMechanism": "Deployable mirrors concentrate sunlight onto a heat exchanger, which heats a working fluid (ammonia or hydrogen) to ~3,000K; the hot gas expands through a nozzle exactly like a chemical rocket's exhaust — but no combustion occurs. Because exhaust velocity scales with √(T/M), a light molecule at high temperature beats combustion products: ~350–450s Isp with ammonia, ~800s with hydrogen. Thrust stays high (~100–200 N) because the thermal power delivered by concentrated sunlight is orders of magnitude above what solar panels can supply electrically. The result is 5–6 km/s of total delta-v per vehicle with hundreds of restarts, versus ~700 m/s for storable biprop.",
+      "keyEquation": "v_e \\propto \\sqrt{\\frac{T_{chamber}}{M_{molar}}}",
+      "misconception": "This is not solar-electric propulsion with extra steps. Sunlight heats the propellant directly as thermal power (no photovoltaic conversion, no ion acceleration), which is why thrust is ~5 orders of magnitude above a Hall thruster's."
+    },
+    {
+      "id": "energy-source-decoupling",
+      "name": "Why an external, free energy source changes the cost structure",
+      "whyItMatters": "The paper's cost model shows solar thermal is cheapest across the entire delta-v spectrum because all three cost drivers — propellant, hardware amortization, and energy — align, and this concept explains the deepest of the three.",
+      "coreMechanism": "A chemical rocket burns its energy supply along with its reaction mass; every joule of kinetic energy in the exhaust was launched from Earth as chemical bonds. An electric thruster's energy is external (solar panels) but the thruster erodes with propellant throughput, making it a slow consumable with a finite lifetime delta-v. Solar thermal draws heat from sunlight — free, external, unlimited — while the reaction mass is $1/kg ammonia, storable indefinitely. Per-maneuver energy cost is zero and the heat exchanger survives hundreds to thousands of restarts, so hardware cost amortizes across dozens of maneuvers instead of concentrating into a handful."
+    },
+    {
+      "id": "cost-per-maneuver-economics",
+      "name": "Cost per maneuver: where physics becomes price",
+      "whyItMatters": "The quantitative case for the paper's claim: solar thermal is the lowest-cost class at essentially every delta-v, and the mechanisms driving each curve's shape are the rocket equation plus propellant price plus amortization.",
+      "coreMechanism": "Modeling a standardized 500 kg / $10M spacecraft: at 100 m/s, solar thermal costs ~$222k per maneuver versus $1.46M for storable biprop (which amortizes its whole disposable stage over few burns) and $216k for electric Hall (the only point where electric competes). At 700 m/s solar thermal holds ~$1.39M while storable biprop hits its tank-capacity wall and terminates. At 5,000 m/s solar thermal is ~$9.1M versus $10.9M for electric — electric's advantage erodes because xenon costs $2,500/kg versus ammonia's $1/kg, and thruster degradation means big maneuvers consume big fractions of the thruster's finite lifetime. The exponential propellant-mass growth from the rocket equation bends every curve upward, but low Isp bends chemical's curve up fastest.",
+      "keyFigureRef": "Cost per Maneuver by Propulsion Type chart",
+      "misconception": "Electric propulsion's high Isp does not make it the cheapest at high delta-v. Xenon price and thruster wear are cost terms the rocket equation doesn't capture, and they dominate at large delta-v budgets."
+    },
+    {
+      "id": "maneuver-time-responsiveness",
+      "name": "Maneuver time: the 9-hour versus 527-day gap",
+      "whyItMatters": "For defense customers, responsiveness is the product. Solar thermal is the only class that stays in single-digit hours across the full delta-v spectrum while also being cheapest — this dual win is the paper's sharpest claim.",
+      "coreMechanism": "Maneuver time is set by thrust: Δt ≈ m·Δv/F for constant thrust. At 100–200 N, solar thermal completes a 100 m/s maneuver in ~10 minutes and a 5,000 m/s LEO-to-GEO transfer in ~9 hours. Millinewton electric thrust means the same transfers take ~223 hours and >12,600 hours (527 days) respectively — a continuous low-thrust spiral. Storable chemical matches solar thermal's speed but dies at ~700 m/s of capacity. Cryogenic methalox has the thrust but boils off in orbit, so every mission carries a ≥24-hour launch-and-fuel delay. A mobility asset that arrives in 9 hours responds to a threat; one that arrives in 527 days documents it.",
+      "keyFigureRef": "Maneuver Time by Propulsion Type chart"
+    },
+    {
+      "id": "storability-constraint",
+      "name": "Propellant storability: why 'fast when fueled' isn't good enough",
+      "whyItMatters": "This eliminates the obvious counter-proposal (high-thrust cryogenic chemical stages) from the responsive-mobility market and explains why ammonia is a strategic choice, not a compromise.",
+      "coreMechanism": "Cryogenic propellants like methalox must be kept tens of kelvin below ambient radiative equilibrium in orbit; without active cooling they boil off within days. A methalox mobility vehicle therefore cannot loiter fueled — it needs a launch/fueling window before any burn, adding a minimum 24-hour latency, and orbital cryo-fueling infrastructure does not yet exist at scale. Ammonia is storable indefinitely at ordinary spacecraft temperatures, so a solar-thermal vehicle can sit dormant for months and fire on command. Responsive maneuvering requires both fast burns and indefinite fueled readiness; only storables plus solar-thermal heating provide both.",
+      "foundational": true
+    },
+    {
+      "id": "enabling-tech-convergence",
+      "name": "Why solar thermal failed in the 1980s and works in 2026",
+      "whyItMatters": "The physics were validated decades ago (a 1979 Rockwell study; >800s Isp hydrogen ground tests), so the paper must explain what changed — otherwise the claim reduces to 'this time it's different' without a mechanism.",
+      "coreMechanism": "Three subsystems were unbuildable with 1980s technology. (1) The heat exchanger needed intricate internal channels for near-theoretical heat transfer; then, that meant hundreds of machined parts brazed together — fragile and unoptimizable. Additive manufacturing now prints it as a single monolithic refractory-alloy part with computationally optimized internal geometry. (2) Materials capped chamber temperature at ~1,800K before structural failure; modern refractory alloys hold to ~3,000K, and since Isp ∝ √T, that temperature gain directly buys specific impulse. (3) Deployable mirrors were too heavy to close the mass budget; modern membrane reflectors deliver >1,000 W/kg, an order of magnitude above conventional solar arrays (~100 W/kg). All three had to converge; any one missing kills the architecture.",
+      "misconception": "The concept was never disproven — it was shelved for manufacturability, not physics. The 1980s programs demonstrated the target Isp on the ground."
+    },
+    {
+      "id": "demand-regime-shift",
+      "name": "From static parking orbits to a maneuvering economy",
+      "whyItMatters": "Physics alone doesn't create a market; the paper argues the demand for responsive delta-v is new and structural, driven by a ~80x increase in planned orbital population.",
+      "coreMechanism": "The orbital economy was built assuming satellites park and stay: GEO comsats hold slots for 15 years, constellations maintain fixed shells, and propulsion exists only for drift correction — millinewton thrust suffices. Filings now total >1.2 million satellites (95,000+ broadband; SpaceX's 1M orbital-data-center filing at 500–2,000 km; Starcloud's 88,000; Blue Origin's 51,600) against ~15,000 active today. At that density, collision avoidance, repositioning, servicing, and deorbit stop being edge cases and become continuous infrastructure operations — and adversarial on-orbit maneuvering by China and Russia adds a time-critical defense demand that millinewton thrusters physically cannot serve.",
+      "keyFigureRef": "Projected Satellite Populations chart"
+    },
+    {
+      "id": "nuclear-thermal-bridge",
+      "name": "Solar thermal as the on-ramp to nuclear thermal",
+      "whyItMatters": "The paper's forward-looking claim: the same heat-exchanger architecture works with a reactor replacing the sun, giving the technology a second act when nuclear propulsion becomes permissible (likely 2030s).",
+      "coreMechanism": "Solar-thermal and nuclear-thermal rockets are the same machine with different heat sources: both flow propellant through a high-temperature heat exchanger and expand it through a nozzle, so the hard engineering — refractory materials at ~3,000K, channel geometry, restart durability — transfers directly. Solar thermal reportedly achieves ~90% of nuclear-thermal performance at ~10% of the cost, without fissile material or its regulatory burden. Flight heritage accumulated on solar-thermal heat exchangers becomes the engineering base for reactor-heated versions once regulation permits."
+    }
+  ]
+}

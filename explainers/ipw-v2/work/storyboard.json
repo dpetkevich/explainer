@@ -1,0 +1,335 @@
+{
+  "title": "Intelligence per Watt: How Much Thinking Can a Laptop Buy You?",
+  "hook": "Every time you ask a chatbot a question, some machine burns real electricity to answer it — and today that machine almost always sits in a distant data center, not in the phone or laptop in your hand. This explainer asks a very physical question: how much useful thinking can a chip deliver per watt of power it draws, and has that number improved fast enough that your own device could now handle most of the work instead? To answer honestly, we have to start from the basic physics of power and energy, then work up through how a chatbot actually computes an answer, before we can see why small AI models running locally have quietly gotten good enough to take over most of what the cloud used to do.",
+  "parts": [
+    {
+      "title": "Power, energy, and how a chatbot actually computes an answer",
+      "lede": "Before judging any efficiency claim we need the physics vocabulary underneath it — the difference between power and energy, and the two distinct steps every chatbot goes through to produce an answer. That second step turns out to be the thing local hardware struggles with most."
+    },
+    {
+      "title": "How the paper measures — and improves — AI efficiency",
+      "lede": "With those ground rules in hand, we can define the paper's core yardstick, intelligence per watt, and see the concrete levers — smarter architecture, lower-precision arithmetic, and a sharper energy accounting — that the paper shows actually move it."
+    },
+    {
+      "title": "Local AI versus the cloud: how close is it really?",
+      "lede": "Now we put the yardstick to work: how much of everyday chatbot traffic can a small local model actually handle, where does that capability come from, and where does local hardware still fall short of purpose-built cloud chips?"
+    },
+    {
+      "title": "Why this is happening now, and what it leads to",
+      "lede": "Capability and metric in hand, the last question is timing: what specific hardware shift unlocked this, why history suggests this kind of crossover is a recognizable pattern, and what a real deployment mixing local and cloud could actually save."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "power-vs-energy-basics",
+      "conceptId": "power-vs-energy",
+      "part": "Power, energy, and how a chatbot actually computes an answer",
+      "title": "Total energy is power multiplied by how long the computation runs",
+      "teaches": "Energy consumed by a computation equals its power draw multiplied by how long it runs, so total energy depends on both power and time, not power alone.",
+      "requires": [],
+      "caption": "Energy is power integrated over time — \\(E ≈ P·τ\\). Drag power and latency and watch the shaded rectangle (joules) grow or shrink.",
+      "visualMetaphor": "A time-axis chart (0 to τ seconds) with power P(t) on the y-axis as a flat line at height P while a query runs, dropping to an idle baseline after. The rectangle under the line during the query is shaded and labeled 'Energy E = area under curve = P·τ'. A readout below shows E in joules updating live.",
+      "animatedVariable": {
+        "name": "power draw P (watts) and query latency τ (seconds)",
+        "control": "slider",
+        "range": "P = 10–300 W; τ = 0.5–10 s",
+        "whatChangesOnScreen": "the shaded rectangle's height (P) and width (τ) change independently, and the energy readout E updates live as their product"
+      },
+      "quantitativeAnchor": "Example: a phone chip at 8 W for 5 s uses 40 J; a GPU at 400 W for 0.1 s also uses 40 J — same energy, very different power profile.",
+      "physicsChecks": [
+        "At P=100 W, τ=2 s, the readout shows E=200 J exactly.",
+        "Doubling τ at fixed P doubles both the shaded area and the E readout.",
+        "Halving P while doubling τ leaves E unchanged (area invariant).",
+        "E never changes unless the P×τ product changes."
+      ]
+    },
+    {
+      "id": "prefill-vs-decode",
+      "conceptId": "prefill-decode-inference",
+      "part": "Power, energy, and how a chatbot actually computes an answer",
+      "title": "Generating an answer is memory-bandwidth-limited, not compute-limited",
+      "teaches": "Answering a prompt involves two distinct phases — a parallel, compute-bound read of the prompt, then a sequential, memory-bandwidth-bound generation of tokens — and local chips' lower memory bandwidth makes that second phase the bottleneck.",
+      "requires": [],
+      "caption": "Every answer has two stages: reading the prompt in parallel, then writing tokens one at a time. Slide memory bandwidth and watch the second stage — the one that sets total time — shrink or stretch.",
+      "visualMetaphor": "A timeline split into two labeled blocks. Left block 'Prefill' shows all prompt tokens processed in one parallel sweep, tagged 'compute-bound', fixed width. Right block 'Decode' shows tokens generated one at a time, each requiring the chip to pull all active weights from a drawn memory bank, tagged 'memory-bandwidth-bound', its width driven by a bandwidth slider. A bar below marks reference points for 'local' (546 GB/s) and 'cloud' (6,000 GB/s).",
+      "animatedVariable": {
+        "name": "memory bandwidth of the accelerator (GB/s)",
+        "control": "slider",
+        "range": "273 GB/s to 8,000 GB/s",
+        "whatChangesOnScreen": "the decode-phase block shrinks as bandwidth rises since each output token re-reads all active weights; the prefill block stays fixed width because it is compute-, not bandwidth-, bound"
+      },
+      "quantitativeAnchor": "Apple M4 Max unified memory: 546 GB/s vs. cloud HBM3e: 4.8–8 TB/s (roughly 9–15x more bandwidth).",
+      "physicsChecks": [
+        "The decode block's length scales roughly inversely with the bandwidth slider; the prefill block's length never changes.",
+        "At bandwidth=546 GB/s the decode block matches the 'local' marker; at 6,000 GB/s it matches the 'cloud' marker and is markedly shorter.",
+        "Total timeline length (prefill+decode) is dominated by the decode block at low bandwidth values."
+      ]
+    },
+    {
+      "id": "intelligence-per-watt-defined",
+      "conceptId": "ipw-metric",
+      "part": "How the paper measures — and improves — AI efficiency",
+      "title": "One ratio ranks any model-hardware pair: accuracy divided by power",
+      "teaches": "Dividing average accuracy by average power draw produces a single ratio, intelligence per watt, that ranks any model-hardware pair on one axis.",
+      "requires": [
+        "power-vs-energy-basics"
+      ],
+      "caption": "One ratio, accuracy over power, ranks every model-hardware pair on the same axis. Drag the point and watch which diagonal it lands on.",
+      "visualMetaphor": "A scatter plot with power draw (W) on the x-axis and accuracy (%) on the y-axis. Several fixed labeled reference dots represent real model-hardware pairs. Diagonal iso-IPW lines (accuracy/power = constant) radiate from the origin, each labeled with its ratio value. A draggable point represents a hypothetical pair; a readout shows its live IPW value.",
+      "animatedVariable": {
+        "name": "power draw P (watts) of the draggable point at fixed accuracy",
+        "control": "slider",
+        "range": "P = 5 W to 500 W",
+        "whatChangesOnScreen": "the point slides horizontally; its IPW readout (accuracy/power) rises as power falls, and the point crosses different labeled iso-IPW diagonals"
+      },
+      "quantitativeAnchor": "\\(\\mathrm{APW}(m,h) = \\mathbb{E}[\\mathrm{acc}]/\\mathbb{E}[P]\\): a model at 60% accuracy drawing 20 W has IPW = 3.0 %/W; the same accuracy at 5 W has IPW = 12.0 %/W.",
+      "physicsChecks": [
+        "Moving the slider to lower power at fixed accuracy monotonically increases the IPW readout.",
+        "The IPW readout always equals accuracy divided by power, matching the formula exactly.",
+        "Two points with different absolute power/accuracy but the same ratio sit on the same diagonal line."
+      ]
+    },
+    {
+      "id": "moe-active-vs-total-params",
+      "conceptId": "active-vs-total-parameters-moe",
+      "part": "How the paper measures — and improves — AI efficiency",
+      "title": "A model can store far more than it spends on any single query",
+      "teaches": "In a mixture-of-experts model, a router sends each token through only a small active subset of the network's total parameters, so per-query cost tracks active parameters while total parameters only set memory needs.",
+      "requires": [
+        "intelligence-per-watt-defined"
+      ],
+      "caption": "A model can store far more than it spends per query. Grow the expert pool and watch total parameters climb while the active (and power) bar stays flat.",
+      "visualMetaphor": "A grid of labeled 'expert' blocks representing sub-networks. A token enters a router box that lights up only 2 blocks per token, dimming the rest. Below, two bars: 'Total parameters stored' and 'Active parameters used per token', both updating as the grid resizes.",
+      "animatedVariable": {
+        "name": "total number of experts in the model (total parameters)",
+        "control": "slider",
+        "range": "4 experts (~20B total) to 64 experts (~120B total)",
+        "whatChangesOnScreen": "the grid grows and the 'total parameters' bar climbs with the slider, but the number of lit/active blocks per token stays fixed at 2, so the 'active parameters' (and power/energy) bar stays flat"
+      },
+      "quantitativeAnchor": "GPT-OSS-120B: 120B total parameters stored, but ≤20B active per token — fits the power/energy budget of a ~20B dense model.",
+      "physicsChecks": [
+        "The total-parameter bar grows roughly linearly with the expert-count slider.",
+        "The active-parameter bar stays constant across the entire slider range.",
+        "At slider=64 experts, total reads ~120B while active still reads ≤20B — a 6x gap."
+      ]
+    },
+    {
+      "id": "quantization-energy-tradeoff",
+      "conceptId": "quantization-tradeoff",
+      "part": "How the paper measures — and improves — AI efficiency",
+      "title": "Fewer bits per weight buys large energy savings for small accuracy cost",
+      "teaches": "Representing weights with fewer bits cuts energy roughly 3-3.5x per halving at a cost of only about 2.5 accuracy points, so a bigger quantized model can beat a smaller full-precision one.",
+      "requires": [
+        "intelligence-per-watt-defined"
+      ],
+      "caption": "Fewer bits per weight means less energy — at a small accuracy cost. Step down the precision and watch a bigger model overtake a smaller one at full precision.",
+      "visualMetaphor": "A chart with bit-width on the x-axis (16, 8, 4, selected via buttons), a bar for relative energy on the left y-axis, and a line for accuracy on the right y-axis. Two labeled reference markers, 'Qwen3-14B' and 'Qwen3-4B', sit at their respective precision points; a highlight shows when the 14B-at-FP4 marker crosses above the fixed 4B-at-FP16 marker.",
+      "animatedVariable": {
+        "name": "weight precision (bits per parameter)",
+        "control": "buttons",
+        "range": "FP16 → FP8 → FP4",
+        "whatChangesOnScreen": "the energy bar drops roughly 3-3.5x at each button press; the accuracy line dips only ~2.5 points per step; the Qwen3-14B marker crosses above the fixed Qwen3-4B FP16 reference line once FP4 is selected"
+      },
+      "quantitativeAnchor": "Qwen3-14B at FP4 scores 49.0% vs. Qwen3-4B at FP16 scoring 48.5% on SuperGPQA, at far lower energy than 14B-FP16.",
+      "physicsChecks": [
+        "The energy bar shrinks by roughly 3-3.5x between each successive button press.",
+        "The accuracy line drops by only ~2.5 percentage points per step, not proportionally to energy.",
+        "At FP4, the Qwen3-14B marker (49.0%) sits above the fixed Qwen3-4B FP16 line (48.5%)."
+      ]
+    },
+    {
+      "id": "intelligence-per-joule-and-headline-gains",
+      "conceptId": "ipj-and-model-vs-hardware-decomposition",
+      "part": "How the paper measures — and improves — AI efficiency",
+      "title": "Counting speed too: per-joule gains outpaced per-watt gains 18x vs 5.3x",
+      "teaches": "Dividing accuracy by total energy (power times latency) instead of just power reveals that hardware improvements which cut both power and latency at once produced far larger per-joule gains than per-watt gains.",
+      "requires": [
+        "intelligence-per-watt-defined",
+        "prefill-vs-decode"
+      ],
+      "caption": "Power alone misses speed. Toggle from per-watt to per-joule and watch 2025's gain jump from \\(5.3×\\) to \\(18.0×\\), almost all of it hardware.",
+      "visualMetaphor": "A grouped bar chart, one bar per year (2023, 2024, 2025), normalized to 2023=1x. A toggle switches the bar values between an 'IPW index' (2025 = 5.3x) and an 'IPJ index' (2025 = 18.0x). Within each 2025 bar, a stacked breakdown shows a 'model contribution' segment (~3.1x, same in both views) and a 'hardware contribution' segment (1.7x for IPW, 5.9x for IPJ).",
+      "animatedVariable": {
+        "name": "metric lens applied to the same historical data (per-watt vs per-joule)",
+        "control": "toggle",
+        "range": "IPW view ↔ IPJ view",
+        "whatChangesOnScreen": "the 2025 bar height changes from 5.3x to 18.0x, and the hardware-contribution segment inside it grows from 1.7x to 5.9x while the model segment stays at ~3.1x in both views"
+      },
+      "quantitativeAnchor": "Total gain 2023-2025: 5.3x per watt vs. 18.0x per joule over 16 months; hardware contributes 1.7x (IPW) vs. 5.9x (IPJ); model contributes ~3.1x in both.",
+      "physicsChecks": [
+        "Toggling from IPW to IPJ raises the 2025 bar from 5.3x to 18.0x.",
+        "The model-contribution segment (~3.1x) is unchanged between the two toggle states.",
+        "The hardware-contribution segment changes from 1.7x to 5.9x, accounting for the entire difference in total gain."
+      ]
+    },
+    {
+      "id": "local-coverage-growth",
+      "conceptId": "local-lm-coverage-growth",
+      "part": "Local AI versus the cloud: how close is it really?",
+      "title": "Local models now match cloud on 88.7% of real queries, up from 23.2%",
+      "teaches": "The share of real chat and reasoning queries a local model can answer as well as frontier cloud models has grown sharply across 2023-2025, especially for everyday chat versus hard reasoning.",
+      "requires": [
+        "moe-active-vs-total-params"
+      ],
+      "caption": "In 2023 barely a quarter of real queries could stay local. Switch the domain filter and watch coverage climb toward 88.7% — except on hard reasoning.",
+      "visualMetaphor": "A bar chart with four bars — 2023, 2024, 2025 (single best model), and 2025 (best-of-local, pick per query) — y-axis = % query coverage. Buttons switch the domain being plotted: All / Chat / Reasoning, redrawing bar heights and a small pie chart showing real traffic mix.",
+      "animatedVariable": {
+        "name": "query domain filter",
+        "control": "buttons",
+        "range": "All queries / Chat / General reasoning",
+        "whatChangesOnScreen": "the 2025 best-of-local bar changes height: 88.7% overall, 88.9% for chat, 64.9% for reasoning; the pie chart shows roughly 77% of real traffic is chat-like"
+      },
+      "quantitativeAnchor": "23.2% (2023, Mixtral-8x7B) → 48.7% (2024, Llama-3.1-8B) → 71.3% (2025, GPT-OSS-120B) → 88.7% (2025, best local model per query).",
+      "physicsChecks": [
+        "The four year-bars strictly increase: 23.2 < 48.7 < 71.3 < 88.7.",
+        "Selecting 'Reasoning' drops the 2025 bar to 64.9%, well below the 'Chat' filter's 88.9%.",
+        "The pie chart shows chat-like traffic at roughly 77% of total."
+      ]
+    },
+    {
+      "id": "best-of-local-ensemble",
+      "conceptId": "best-of-local-ensemble-effect",
+      "part": "Local AI versus the cloud: how close is it really?",
+      "title": "Picking the best of many local models beats any one model, and beats cloud",
+      "teaches": "Because different local models specialize differently, always routing to whichever local model is best for that query beats any single local model by a wide margin — a best-of-many-models effect, not individual superiority.",
+      "requires": [
+        "local-coverage-growth"
+      ],
+      "caption": "Twenty flawed specialists can outscore one generalist. Shrink the pool and watch the 'best-of' accuracy collapse toward any single model's own score.",
+      "visualMetaphor": "A heatmap grid: rows = ~20 local models, columns = query categories, cells colored by accuracy. The best cell per column is outlined (the 'best-of-local' pick). A fixed horizontal reference line marks the 3-model 'best-of-cloud' ceiling.",
+      "animatedVariable": {
+        "name": "number of local models available in the routing pool",
+        "control": "slider",
+        "range": "1 to 20+ models",
+        "whatChangesOnScreen": "as the pool shrinks, fewer distinct rows get outlined as 'best,' and the overall best-of-pool accuracy readout falls from the full ensemble's peak down toward GPT-OSS-120B's own score alone, while the fixed best-of-cloud reference line stays put"
+      },
+      "quantitativeAnchor": "Best-of-local adds +16.3 points over the single best local model (GPT-OSS-120B) and +28.8 points over Qwen3-14B; best-of-local draws from 20+ models vs. best-of-cloud's 3.",
+      "physicsChecks": [
+        "The accuracy readout is highest at pool size 20+ and falls monotonically as the slider reduces pool size toward 1.",
+        "At pool size 1 (GPT-OSS-120B alone), the readout sits exactly 16.3 points below the full-pool peak.",
+        "The best-of-cloud reference line is only exceeded once the local pool slider is large enough."
+      ]
+    },
+    {
+      "id": "local-cloud-hardware-gap",
+      "conceptId": "local-cloud-hardware-efficiency-gap",
+      "part": "Local AI versus the cloud: how close is it really?",
+      "title": "The identical model still runs more efficiently on cloud chips than local ones",
+      "teaches": "Running the identical model on purpose-built cloud accelerators still delivers meaningfully higher intelligence per watt and per joule than on local unified-memory chips.",
+      "requires": [
+        "intelligence-per-joule-and-headline-gains"
+      ],
+      "caption": "Same model, three chips. Toggle from per-watt to per-joule and watch the cloud accelerators' lead widen — up to \\(7.4×\\).",
+      "visualMetaphor": "A grouped bar chart: same model (Qwen3-32B) run on three accelerators — Apple M4 Max, NVIDIA B200, SambaNova SN40L — bars normalized to M4 Max=1x. A toggle switches between IPW view and IPJ view.",
+      "animatedVariable": {
+        "name": "metric toggle (IPW vs IPJ) for the same model across three accelerators",
+        "control": "toggle",
+        "range": "IPW view ↔ IPJ view",
+        "whatChangesOnScreen": "the B200 and SN40L bars grow taller relative to M4 Max when switching to IPJ view (e.g. SN40L jumps from 1.78x to up to 7.4x)"
+      },
+      "quantitativeAnchor": "B200: 1.40x IPW, 1.6-2.3x IPJ vs. M4 Max. SN40L: up to 1.78x IPW, 6.5-7.4x IPJ vs. M4 Max.",
+      "physicsChecks": [
+        "The M4 Max bar is fixed at 1x in both toggle states.",
+        "The B200 bar reads ~1.40x under IPW and rises to 1.6-2.3x under IPJ.",
+        "The SN40L bar reads up to 1.78x under IPW and rises to 6.5-7.4x under IPJ — the largest jump of the three."
+      ]
+    },
+    {
+      "id": "batching-amortization-caveat",
+      "conceptId": "batch-size-cloud-amortization",
+      "part": "Local AI versus the cloud: how close is it really?",
+      "title": "Batched cloud queries share a GPU's fixed power cost, widening its lead further",
+      "teaches": "Cloud servers amortize a GPU's largely fixed power draw across many simultaneously batched queries, so comparing local and cloud at one-query-at-a-time understates cloud's real efficiency edge.",
+      "requires": [
+        "local-cloud-hardware-gap"
+      ],
+      "caption": "Cloud servers rarely run one query at a time. Slide batch size up and watch power climb slowly while per-query efficiency climbs fast.",
+      "visualMetaphor": "A chart with batch size on a log-scale x-axis (1 to 64) and two lines: GPU power draw (W), rising sublinearly, and per-query intelligence-per-joule, rising steeply. Reference values annotated at both ends.",
+      "animatedVariable": {
+        "name": "batch size (concurrent queries processed together)",
+        "control": "slider",
+        "range": "bs = 1 to 64 (log scale)",
+        "whatChangesOnScreen": "the power curve climbs slowly (255W→883W, not 64x), while the per-query IPJ readout climbs steeply, reaching 11-20x its bs=1 value at bs=64"
+      },
+      "quantitativeAnchor": "NVIDIA B200: 255 W at bs=1 vs. 883 W at bs=64 (~3.5x more power for 64x more queries); per-query IPJ rises 11-20x.",
+      "physicsChecks": [
+        "The power curve at bs=64 is far below 64x the bs=1 value (883/255 ≈ 3.5x).",
+        "The IPJ readout at bs=64 lands between 11x and 20x its bs=1 value.",
+        "Both curves are monotonic non-decreasing as the slider moves from 1 toward 64."
+      ]
+    },
+    {
+      "id": "memory-capacity-growth",
+      "conceptId": "memory-capacity-growth-enabler",
+      "part": "Why this is happening now, and what it leads to",
+      "title": "Local memory grew 126x, finally big enough to store large local models",
+      "teaches": "Local accelerator memory capacity grew roughly 126x from 2012 to 2025, and that jump is what first made it physically possible to store large-capacity models on local devices at all.",
+      "requires": [
+        "moe-active-vs-total-params"
+      ],
+      "caption": "You can't run what you can't store. Scrub the timeline and watch local memory finally clear the bar a 120-billion-parameter model needs.",
+      "visualMetaphor": "A timeline chart, x-axis = year (2012-2025), y-axis = max local accelerator memory capacity in GB (log scale), a step-line climbing from under 20GB to 128-512GB. A horizontal reference line marks the storage requirement for a 120B-parameter model, with a marker where the curve first crosses it.",
+      "animatedVariable": {
+        "name": "year (scrub along historical timeline)",
+        "control": "slider",
+        "range": "2012 to 2025",
+        "whatChangesOnScreen": "the memory-capacity readout and curve position update, e.g. under 20GB in 2012 to 128-512GB by 2025 on Apple Silicon unified memory; a marker lights up the year the curve first exceeds the 120B-parameter storage line"
+      },
+      "quantitativeAnchor": "~126x growth in local accelerator memory capacity, 2012→2025 (sub-20GB → 128-512GB).",
+      "physicsChecks": [
+        "The memory-capacity readout strictly increases as the year slider moves forward.",
+        "At year=2012 the readout is under 20GB; at year=2025 it is in the 128-512GB range.",
+        "The 'crosses storage requirement' marker appears only after the curve exceeds roughly 120GB, not before."
+      ]
+    },
+    {
+      "id": "mainframe-to-pc-analogy",
+      "conceptId": "mainframe-to-pc-historical-analogy",
+      "part": "Why this is happening now, and what it leads to",
+      "title": "History's pattern: local tech wins once it's good enough within its own power budget",
+      "teaches": "Personal computers overtook mainframes once they became efficient enough for typical workloads within their own power budget, not once they became faster in absolute terms — the same threshold the paper argues local AI has now reached.",
+      "requires": [
+        "intelligence-per-watt-defined"
+      ],
+      "caption": "PCs beat mainframes not by being faster, but by finally being good enough within their own power budget. Scrub time and watch local AI's efficiency line reach for the same crossing point.",
+      "visualMetaphor": "A log-scale line chart, x-axis = year (1946-2009 historic, then 2023-2025 modern overlay), y-axis = performance-per-watt (log scale). A straight reference line shows the classical doubling-every-1.5-years trend, with a labeled 'PC crossover' dot. A second, separately colored line for local-AI IPW appears after 2023 and is compared against the same axes, with an analogous 'local-AI crossover' dot.",
+      "animatedVariable": {
+        "name": "year (scrub along combined 1946-2025 timeline)",
+        "control": "slider",
+        "range": "1946 to 2025",
+        "whatChangesOnScreen": "the readout shows performance-per-watt on the classical line at that year; past 2023 the modern local-AI line appears and climbs steeper than the classical average slope, and the 'crossover' dot lights up once local AI's line reaches the 'good enough within power budget' threshold"
+      },
+      "quantitativeAnchor": "Performance-per-watt doubled roughly every 1.5 years, 1946-2009; local AI IPW grew 5.3x in just 16 months (2023-2025) — a much steeper recent slope.",
+      "physicsChecks": [
+        "The classical line is straight on the log-y axis, confirming a constant doubling period.",
+        "The 2023-2025 local-AI segment rises more steeply than the classical line's average slope over an equivalent span.",
+        "Crossover dots are labeled 'good enough within power budget,' not 'faster than mainframe/cloud.'"
+      ]
+    },
+    {
+      "id": "hybrid-routing-savings",
+      "conceptId": "hybrid-local-cloud-routing-savings",
+      "part": "Why this is happening now, and what it leads to",
+      "title": "Routing queries between local and cloud saves more than either alone",
+      "teaches": "Routing real traffic between small local models and a large cloud model, rather than sending everything to the cloud, produces the largest system-wide energy, compute, and cost savings — and imperfect routing still captures most of those savings.",
+      "requires": [
+        "local-cloud-hardware-gap",
+        "batching-amortization-caveat"
+      ],
+      "caption": "Local hardware alone isn't the efficient half — routing is. Slide router accuracy and watch system-wide energy, compute, and cost savings rise toward the oracle's \\(80.4\\%\\).",
+      "visualMetaphor": "A flow diagram: an incoming query stream (80.2M queries/24h) splits at a router node into 'local (4 small models on M4 Max)' and 'cloud (Qwen3-235B on H200, bs=16)' paths. Downstream, three savings bars (energy, compute, cost) compare 'all-cloud' baseline (0% saved) against the current router-accuracy setting.",
+      "animatedVariable": {
+        "name": "router accuracy (probability a query is sent to the right destination)",
+        "control": "slider",
+        "range": "50% to 100% (oracle)",
+        "whatChangesOnScreen": "the energy/compute/cost savings bars shrink toward 0% as accuracy drops to 50%, and grow toward the oracle values (80.4%/77.3%/73.8%) as accuracy approaches 100%; at 80% accuracy the bars read about 64.3%/61.8%/59.0%"
+      },
+      "quantitativeAnchor": "Oracle routing: 80.4% energy, 77.3% compute, 73.8% cost saved. Realistic 80%-accurate router: 64.3% energy, 61.8% compute, 59.0% cost saved — about 80% of the oracle's gains.",
+      "physicsChecks": [
+        "At accuracy=100%, savings bars read 80.4%/77.3%/73.8%.",
+        "At accuracy=80%, savings bars read approximately 64.3%/61.8%/59.0%.",
+        "As accuracy falls to 50%, all three savings bars fall well below the 80%-accuracy values, approaching 0 as misrouting dominates."
+      ]
+    }
+  ]
+}

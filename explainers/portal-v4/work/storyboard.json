@@ -1,0 +1,324 @@
+{
+  "title": "9 Hours vs. 527 Days: How Focused Sunlight Breaks Spaceflight's Oldest Tradeoff",
+  "hook": "Over 1.2 million new satellites were filed for orbit in the last 18 months. Every one of them will need to move — dodge debris, change altitude, reach a servicing depot. For 50 years, engines forced a binary choice: move fast and die young, or move efficiently at a glacial pace. This explainer follows one job: pushing a 500 kg spacecraft from low Earth orbit to geostationary orbit, a 5,000 m/s velocity change we'll call the GEO run. One equation, \\(v_e ∝ \\sqrt{T/M}\\), lets an engine heated by mirrors do it in 9 hours. The most efficient existing thruster needs 527 days.",
+  "parts": [
+    {
+      "title": "The trap: why moving in space is expensive",
+      "lede": "Before the new engine makes sense, you need the three rules every spacecraft obeys: thrust is thrown mass, maneuvers have fixed prices, and propellant costs grow exponentially. Together they create a 50-year-old dead end."
+    },
+    {
+      "title": "The new engine: sunlight as the heat source",
+      "lede": "The trap has one exit: raise exhaust velocity without combustion. Here's the physics that permits it, and the hardware — mirrors, a heat exchanger, a nozzle — that builds it."
+    },
+    {
+      "title": "Head to head on the GEO run",
+      "lede": "Now we race. Same 500 kg spacecraft, same 5,000 m/s job, three engines — compared on time, cost, and readiness, with the paper's actual numbers."
+    },
+    {
+      "title": "Why 1980 failed and 2026 works",
+      "lede": "The physics was validated in 1979 and then shelved for four decades. Three technologies had to mature — and a million-satellite sky had to create the demand."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "thrust-is-thrown-mass",
+      "conceptId": "thrust-as-momentum-exchange",
+      "part": "The trap: why moving in space is expensive",
+      "title": "A rocket moves by throwing mass overboard, and the mass runs out",
+      "teaches": "Thrust is momentum exchange with expelled propellant — \\(F = \\dot{m}·v_e\\) — so a spacecraft's motion is bounded by the finite mass it carries to throw.",
+      "requires": [],
+      "caption": "There is nothing to push against in vacuum: the spacecraft accelerates only by expelling its own propellant, with force \\(F = \\dot{m}·v_e\\). Watch the tank — when it empties, no amount of onboard power can change the trajectory.",
+      "visualMetaphor": "Our 500 kg spacecraft (the vehicle for the whole explainer) floats on a 1D track. A slider sets exhaust velocity \\(v_e\\); a play button fires the engine, visibly ejecting a stream of propellant dots backward while the spacecraft drifts forward. Readouts: thrust \\(F = \\dot{m}·v_e\\), tank level, spacecraft speed. Predict-before-reveal: 'The tank just hit zero and the batteries are full — press fire. What happens?' Answer: the dots stop, thrust drops to 0 N, velocity freezes.",
+      "animatedVariable": {
+        "name": "exhaust velocity \\(v_e\\)",
+        "control": "slider",
+        "range": "500 – 5,000 m/s (with fixed flow rate \\(\\dot{m}\\) = 1 kg/s)",
+        "whatChangesOnScreen": "Ejected dots leave faster, the thrust readout scales linearly (1 kg/s at 3,000 m/s → 3,000 N), and the spacecraft reaches a higher final speed from the same tank."
+      },
+      "quantitativeAnchor": "Expelling 1 kg/s at \\(v_e\\) = 3,000 m/s produces exactly 3,000 N of thrust.",
+      "physicsChecks": [
+        "Doubling the \\(v_e\\) slider doubles the displayed thrust at fixed \\(\\dot{m}\\) (linear relationship visible in the readout).",
+        "With the tank at zero, firing produces 0 N and zero velocity change regardless of any other setting — the misconception check.",
+        "Total momentum is conserved: spacecraft momentum gain equals the summed momentum of ejected dots (shown as a balance readout).",
+        "Higher \\(v_e\\) at the same tank size yields visibly higher final spacecraft speed."
+      ]
+    },
+    {
+      "id": "delta-v-price-list",
+      "conceptId": "delta-v-as-currency",
+      "part": "The trap: why moving in space is expensive",
+      "title": "Every maneuver has a fixed price in velocity change, set by orbital mechanics",
+      "teaches": "Orbits are velocity states, so each maneuver costs a fixed ΔV independent of engine choice — and a spacecraft's total ΔV budget is its lifetime.",
+      "requires": [
+        "thrust-is-thrown-mass"
+      ],
+      "caption": "Changing orbit means changing velocity, and physics fixes the price no matter which engine pays it: ~100 m/s for a collision dodge, ~5,000 m/s for the full GEO run. Our spacecraft's ΔV budget is loaded at launch — when the meter empties, the vehicle is dead weight.",
+      "visualMetaphor": "Left: Earth with two orbits drawn to scale — low Earth orbit at 400 km and geostationary orbit at 35,786 km — plus our 500 kg spacecraft in LEO. Right: a menu of maneuvers with ΔV price tags (collision dodge: ~100 m/s; modest repositioning: ~100 m/s; GEO run: ~5,000 m/s) and a vertical 'ΔV budget' fuel gauge. Clicking a maneuver animates the transfer arc and drains the gauge by exactly its price. Predict-before-reveal: 'How many 100 m/s dodges fit in the budget it takes to do one GEO run?' Answer: 50.",
+      "animatedVariable": {
+        "name": "selected maneuver",
+        "control": "buttons",
+        "range": "collision dodge (100 m/s) | repositioning (100 m/s) | GEO run (5,000 m/s)",
+        "whatChangesOnScreen": "The chosen transfer arc animates on the orbit diagram and the ΔV budget gauge drops by that maneuver's fixed price."
+      },
+      "quantitativeAnchor": "LEO-to-GEO transfer: ~5,000 m/s. Collision dodge: ~100 m/s. One GEO run = fifty dodges.",
+      "physicsChecks": [
+        "The GEO run drains exactly 50× more of the gauge than one dodge.",
+        "Prices are identical regardless of any engine setting — ΔV cost is a property of the orbits, not the propulsion.",
+        "Repeating dodges eventually empties the gauge, after which maneuver buttons visibly fail (dead spacecraft).",
+        "GEO is drawn ~90× farther from Earth's surface than the LEO altitude (35,786 km vs 400 km)."
+      ]
+    },
+    {
+      "id": "rocket-equation-tax",
+      "conceptId": "tsiolkovsky-rocket-equation",
+      "part": "The trap: why moving in space is expensive",
+      "title": "Propellant needs grow exponentially with ΔV, so low exhaust velocity hits a hard ceiling",
+      "teaches": "\\(ΔV = v_e·\\ln(m_{wet}/m_{dry})\\) means the propellant fraction grows exponentially with target ΔV, capping a chemical 500 kg spacecraft near 700 m/s.",
+      "requires": [
+        "delta-v-price-list"
+      ],
+      "caption": "The logarithm in \\(ΔV = v_e·\\ln(m_{wet}/m_{dry})\\) is a tax: added propellant must itself be accelerated, so requirements grow exponentially. At \\(v_e\\) = 2,900 m/s the GEO run demands an 82%-propellant vehicle — and realistic storable-propellant tanks cap our spacecraft near 700 m/s total.",
+      "visualMetaphor": "A slider sets target ΔV (0 – 6,000 m/s). The spacecraft is drawn as a bar split into dry mass (fixed 500 kg) and propellant, which grows as the slider moves; a curve plots propellant fraction vs ΔV, visibly exponential. A dashed line marks the realistic tank limit for a small spacecraft; where the curve crosses it (~700 m/s for storable chemical, \\(v_e\\) ≈ 2,200 m/s) the bar turns red: 'cannot be built.' Predict-before-reveal: 'To double ΔV from 700 to 1,400 m/s, does propellant double?' Reveal: the mass ratio squares — far more than double.",
+      "animatedVariable": {
+        "name": "target ΔV",
+        "control": "slider",
+        "range": "0 – 6,000 m/s (toggle between \\(v_e\\) = 2,200 m/s storable and 2,900 m/s high-performance chemical)",
+        "whatChangesOnScreen": "The propellant segment of the mass bar grows exponentially, the mass-ratio readout \\(m_{wet}/m_{dry} = e^{ΔV/v_e}\\) climbs, and the bar turns red past the buildable tank limit."
+      },
+      "quantitativeAnchor": "At \\(v_e\\) = 2,900 m/s, ΔV = 5,000 m/s requires \\(m_{wet}/m_{dry} = e^{5000/2900} ≈ 5.6\\) — an 82% propellant vehicle. Storable chemical caps a 500 kg spacecraft at ~700 m/s.",
+      "physicsChecks": [
+        "Doubling the ΔV slider squares the displayed mass ratio (exponential, not linear, growth is visible in the curve's shape).",
+        "At ΔV = 0 the propellant fraction is exactly 0% (boundary behavior).",
+        "Switching to the higher-\\(v_e\\) toggle shifts the entire curve right: the same tank buys proportionally more ΔV.",
+        "The storable-chemical configuration crosses the buildable limit near 700 m/s, matching the paper's ceiling."
+      ]
+    },
+    {
+      "id": "the-fifty-year-binary",
+      "conceptId": "thrust-isp-binary",
+      "part": "The trap: why moving in space is expensive",
+      "title": "For 50 years the choice was high thrust or high efficiency — never both",
+      "teaches": "On a thrust-vs-specific-impulse map, chemical and electric engines occupy opposite corners, and the corner our GEO run needs — high thrust AND high \\(I_{sp}\\) — is empty.",
+      "requires": [
+        "rocket-equation-tax"
+      ],
+      "caption": "Engineers quote efficiency as specific impulse, \\(I_{sp} = v_e/g_0\\), in seconds: 300 s means exhaust at ~2,940 m/s. Chemical engines (180–330 s, hundreds of newtons) die at 700 m/s. Hall thrusters (1,500 s) survive the GEO run, but at millinewtons — a million times less force — it takes 527 days.",
+      "visualMetaphor": "A scatter plot: x-axis \\(I_{sp}\\) (0–2,000 s), y-axis thrust on a log scale (1 mN – 1 kN). Two labeled dots: 'chemical' (300 s, ~400 N) and 'Hall thruster / electric' (1,500 s, ~0.08 mN–mN class). The upper-right quadrant glows and is labeled 'empty for 50 years.' Predict-before-reveal: 'Pick an engine for the GEO run.' Clicking chemical stamps OUT OF PROPELLANT AT ~700 m/s across the orbit diagram; clicking electric stamps ARRIVES IN 527 DAYS.",
+      "animatedVariable": {
+        "name": "engine choice for the GEO run",
+        "control": "buttons",
+        "range": "chemical | electric (Hall thruster)",
+        "whatChangesOnScreen": "The selected dot pulses and the GEO run verdict appears: chemical fails on ΔV budget (~700 m/s ceiling); electric succeeds on ΔV but the mission clock reads 527 days."
+      },
+      "quantitativeAnchor": "Chemical: 180–330 s \\(I_{sp}\\), hundreds of N. Hall thruster: ~1,500 s \\(I_{sp}\\), millinewtons — roughly a million times less thrust.",
+      "physicsChecks": [
+        "The thrust axis is log-scaled and the chemical–electric gap spans ~6 orders of magnitude.",
+        "Neither existing engine dot sits in the highlighted upper-right region — the gap is visibly empty.",
+        "Chemical's failure mode is ΔV (budget bar empties at ~700 m/s), electric's is time (clock, not budget) — two distinct visible causes.",
+        "\\(I_{sp}\\) = 300 s converts to \\(v_e\\) ≈ 2,940 m/s in the on-screen conversion readout."
+      ]
+    },
+    {
+      "id": "hot-and-light-means-fast",
+      "conceptId": "exhaust-velocity-from-kinetic-theory",
+      "part": "The new engine: sunlight as the heat source",
+      "title": "Exhaust velocity scales as √(T/M) — combustion locks both knobs, external heat frees them",
+      "teaches": "\\(v_e ∝ \\sqrt{T/M}\\): a nozzle converts thermal motion into directed flow, so hotter gas and lighter molecules both raise exhaust velocity — and only an external heat source lets you set T and M independently.",
+      "requires": [
+        "the-fifty-year-binary"
+      ],
+      "caption": "Kinetic theory sets molecular speed at \\(\\sqrt{kT/m}\\): hotter and lighter both mean faster, so \\(v_e ∝ \\sqrt{T/M}\\). Combustion welds the two knobs together — burning fixes the temperature and produces heavy exhaust molecules. Heat the propellant externally instead, and you can pick pure hydrogen (M = 2) at 3,000 K for ~800 s \\(I_{sp}\\).",
+      "visualMetaphor": "A chamber of jiggling molecules feeding a nozzle; molecule speed and exit-stream speed animate with the controls. Two sliders: temperature T (300–3,500 K) and molar mass M (2–44 g/mol, with labeled stops: H₂ = 2, NH₃ = 17, H₂O = 18, CO₂ = 44). An \\(I_{sp}\\) gauge responds as \\(\\sqrt{T/M}\\). A 'combustion mode' toggle chains the sliders: turning it on snaps to T ≈ 3,300 K with heavy product molecules (M ≈ 18+), gauge stuck at chemical values. Predict-before-reveal: 'Combustion is off. Set M to hydrogen and T to 3,000 K — where does the gauge land?' Reveal: ~800 s, well past any chemical engine.",
+      "animatedVariable": {
+        "name": "chamber temperature T and propellant molar mass M",
+        "control": "slider",
+        "range": "T: 300–3,500 K; M: 2–44 g/mol; plus a combustion-mode toggle that locks them together",
+        "whatChangesOnScreen": "Molecules jiggle and exit faster, and the \\(I_{sp}\\) gauge moves as \\(\\sqrt{T/M}\\); combustion mode visibly freezes both sliders at chemical values."
+      },
+      "quantitativeAnchor": "Hydrogen (M = 2) at ~3,000 K: ~800 s \\(I_{sp}\\). Ammonia (M = 17): 350–450 s. Both beat chemical's 180–330 s without combustion.",
+      "physicsChecks": [
+        "Quadrupling T doubles the \\(I_{sp}\\) gauge at fixed M (square-root scaling readable from two screenshots).",
+        "At fixed T, moving M from 18 to 2 raises \\(I_{sp}\\) by a factor of 3 (\\(\\sqrt{9}\\)).",
+        "With combustion mode on, the gauge cannot exceed the chemical range (180–330 s) no matter what the reader tries — the lock is the visible cause.",
+        "Molecule animation speed rises with T and falls with M, matching the gauge direction."
+      ]
+    },
+    {
+      "id": "how-solar-thermal-works",
+      "conceptId": "solar-thermal-mechanism",
+      "part": "The new engine: sunlight as the heat source",
+      "title": "Mirrors focus sunlight onto a heat exchanger — the sun replaces the combustion chamber",
+      "teaches": "Solar-thermal propulsion concentrates sunlight onto a 3D-printed heat exchanger that heats ammonia to ~3,000 K, producing 100–200 N of thrust at 350–450 s \\(I_{sp}\\) — chemical-class force at above-chemical efficiency.",
+      "requires": [
+        "hot-and-light-means-fast"
+      ],
+      "caption": "Follow the energy: deployable mirrors concentrate sunlight onto a monolithic heat exchanger. Ammonia flashes to ~3,000 K, and the nozzle turns that heat into 100–200 N of thrust at 350–450 s \\(I_{sp}\\). This is not solar panels driving an ion thruster — the sunlight becomes heat directly, which is why the thrust is a million times higher.",
+      "visualMetaphor": "A labeled cutaway of our spacecraft, now fitted with the solar-thermal engine (Portal Space Systems' Supernova architecture): membrane mirrors → focused beam → 3D-printed refractory heat exchanger (internal channels drawn) → ammonia tank feeding through → nozzle. A step-through control lights up each stage in sequence with its number (concentration ratio, 3,000 K, 100–200 N). A comparison toggle swaps in the solar-ELECTRIC path (panels → electricity → ion thruster) with its thrust readout collapsing to millinewtons, making the distinction visible rather than asserted.",
+      "animatedVariable": {
+        "name": "energy-path walkthrough",
+        "control": "buttons",
+        "range": "step 1 (mirrors) → step 2 (heat exchanger, 3,000 K) → step 3 (nozzle, 100–200 N); toggle: solar-thermal vs solar-electric path",
+        "whatChangesOnScreen": "Each step highlights one component with its operating numbers; the toggle reroutes the energy path through panels and drops the thrust readout by a factor of ~1,000,000."
+      },
+      "quantitativeAnchor": "100–200 N of thrust at 350–450 s \\(I_{sp}\\) with ammonia heated to ~3,000 K; hydrogen variant reaches ~800 s.",
+      "physicsChecks": [
+        "The energy path in solar-thermal mode never passes through electricity — sunlight → heat → directed flow, visible in the highlighted route.",
+        "Toggling to solar-electric drops the thrust readout from ~150 N to millinewtons while \\(I_{sp}\\) rises to ~1,500 s — both change, in opposite directions.",
+        "There is no oxidizer tank anywhere in the diagram (no combustion), and the caption's 3,000 K appears at the heat exchanger, nowhere else.",
+        "The engine's plotted point lands in the previously empty upper-right region of the scene-4 thrust-vs-\\(I_{sp}\\) map (shown as an inset)."
+      ]
+    },
+    {
+      "id": "nine-hours-vs-527-days",
+      "conceptId": "maneuver-time-asymmetry",
+      "part": "Head to head on the GEO run",
+      "title": "Thrust sets the clock: the GEO run takes 9 hours, not 527 days",
+      "teaches": "Maneuver time scales inversely with thrust, so 100–200 N finishes the 5,000 m/s GEO run in ~9 hours while a millinewton Hall thruster spirals for 12,600+ hours.",
+      "requires": [
+        "how-solar-thermal-works",
+        "the-fifty-year-binary"
+      ],
+      "caption": "Maneuver time scales inversely with thrust: at 100 m/s, solar-thermal burns for ~10 minutes while electric spirals for ~223 hours. Slide to the full 5,000 m/s GEO run and the gap becomes 9 hours versus 12,600 hours — 527 days, during which the reason for moving has long expired.",
+      "visualMetaphor": "Split view. Left: the LEO-to-GEO orbit diagram with two spacecraft racing — solar-thermal executes a few short bright burn arcs with coasting, electric traces a slow continuous spiral. Right: a chart of maneuver time (log axis, 1 minute to 2 years) vs ΔV (100–5,000 m/s) with three curves: chemical (fast but grayed out and truncated at its 700 m/s ΔV ceiling), solar-thermal, electric. A ΔV slider moves a cursor along all curves. Predict-before-reveal at the start: 'Electric takes 223 hours for 100 m/s. Guess the time for 5,000 m/s before sliding.' The reveal — 527 days — lands against most readers' linear guess.",
+      "animatedVariable": {
+        "name": "maneuver ΔV",
+        "control": "slider",
+        "range": "100 – 5,000 m/s",
+        "whatChangesOnScreen": "The race animation re-runs at the chosen ΔV and both mission clocks update: solar-thermal stays in minutes-to-hours, electric climbs into weeks-to-months, chemical grays out past 700 m/s."
+      },
+      "quantitativeAnchor": "5,000 m/s GEO run: ~9 hours solar-thermal vs >12,600 hours (527 days) electric. 100 m/s: ~10 minutes vs ~223 hours.",
+      "physicsChecks": [
+        "At every slider position the solar-thermal curve sits below electric by roughly three orders of magnitude on the log time axis.",
+        "The chemical curve terminates at 700 m/s with a visible 'ΔV budget exhausted' marker — its failure mode stays distinct from electric's.",
+        "Both time readouts increase monotonically with ΔV; neither ever decreases.",
+        "The electric spiral animation visibly completes many orbits while solar-thermal's burn arcs occupy a small fraction of one transfer."
+      ]
+    },
+    {
+      "id": "cost-stack",
+      "conceptId": "cost-per-maneuver-stack",
+      "part": "Head to head on the GEO run",
+      "title": "Cheap propellant, reusable hardware, free energy: solar-thermal wins on cost at every ΔV",
+      "teaches": "Maneuver cost decomposes into propellant + hardware + energy, and solar-thermal wins all three — $222k vs $1.46M (chemical) at 100 m/s, $9.1M vs $10.9M (electric) at 5,000 m/s.",
+      "requires": [
+        "nine-hours-vs-527-days"
+      ],
+      "caption": "Speed usually costs money; here it doesn't. Ammonia runs $1/kg versus xenon at $2,500/kg, the hardware amortizes over 50+ restarts, and sunlight is free. The result: solar-thermal is cheapest at every ΔV — $222k vs $1.46M against chemical at 100 m/s, $9.1M vs $10.9M against electric on the full GEO run.",
+      "visualMetaphor": "Three stacked bars (chemical, solar-thermal, electric), each split into propellant / hardware amortization / energy layers, above a ΔV slider. As ΔV grows, each layer grows at its own rate: electric's propellant layer (xenon, $2,500/kg) balloons despite high \\(I_{sp}\\); chemical's hardware layer dominates because each stage amortizes over few burns; solar-thermal's propellant layer stays nearly flat ($1/kg ammonia) and its energy layer reads $0 throughout. Predict-before-reveal: 'Electric is 5× more fuel-efficient — at 5,000 m/s, is it cheaper than solar-thermal?' Slide to reveal: no, $10.9M vs $9.1M.",
+      "animatedVariable": {
+        "name": "maneuver ΔV",
+        "control": "slider",
+        "range": "100 – 5,000 m/s",
+        "whatChangesOnScreen": "The three stacked bars re-scale, each cost layer growing at its own rate; the total readouts hit $222k / $1.46M at 100 m/s and $9.1M / $10.9M at 5,000 m/s."
+      },
+      "quantitativeAnchor": "At 100 m/s: solar-thermal ~$222k vs chemical $1.46M. At 5,000 m/s: solar-thermal ~$9.1M vs electric $10.9M. Ammonia: $1/kg; xenon: $2,500/kg.",
+      "physicsChecks": [
+        "Solar-thermal's total bar is the shortest at both slider extremes (default 100 m/s and max 5,000 m/s).",
+        "Solar-thermal's energy layer reads $0 at every ΔV; both competitors' energy/consumable layers are nonzero.",
+        "Electric's propellant layer grows visibly faster than solar-thermal's as ΔV increases (the $2,500/kg vs $1/kg cause is labeled on the layers).",
+        "All cost totals increase monotonically with ΔV — no curve ever bends downward."
+      ]
+    },
+    {
+      "id": "storability-readiness",
+      "conceptId": "propellant-storability",
+      "part": "Head to head on the GEO run",
+      "title": "Responsiveness requires sitting fueled for months and firing in minutes",
+      "teaches": "Cryogenic propellants boil off in orbit while ammonia stores indefinitely, so solar-thermal is the only class that is simultaneously storable, high-thrust, and high-ΔV.",
+      "requires": [
+        "nine-hours-vs-527-days"
+      ],
+      "caption": "A high-performance cryogenic stage can't wait — methalox boils off, so the response starts with a launch-and-fuel delay of 24 hours minimum. Ammonia sits as a liquid at modest pressure for months. When the alarm sounds at t = 0, solar-thermal fires within minutes and completes a 100 m/s response in ~10 minutes of burn.",
+      "visualMetaphor": "A response-timeline race. At t = 0 an alert flag appears ('conjunction warning: 100 m/s response needed'). Four horizontal lanes advance with a play control: cryogenic chemical (methalox) shows a 24-hour 'launch + fuel' block before its burn can even start; storable chemical fires in minutes but its ΔV budget bar shows the maneuver consuming ~1/7 of its 700 m/s lifetime; electric fires immediately but its burn bar stretches ~223 hours; solar-thermal fires in minutes and finishes in ~10 minutes. A months-long pre-timeline strip shows each vehicle waiting: methalox's tank visibly drains (boil-off) while ammonia's stays full.",
+      "animatedVariable": {
+        "name": "mission clock",
+        "control": "play-pause",
+        "range": "t = −3 months (waiting on station) to t = +24 hours after the alert",
+        "whatChangesOnScreen": "During the waiting phase the cryogenic tank level falls while ammonia holds steady; after t = 0 each lane's burn progresses at its own rate, finish flags appearing in order: solar-thermal, storable chemical, then electric and methalox far off-screen."
+      },
+      "quantitativeAnchor": "Methalox response: ≥24 hours before the burn begins. Solar-thermal: fueled for months, fires in minutes, 100 m/s complete in ~10 minutes.",
+      "physicsChecks": [
+        "Only the ammonia tank level is unchanged between the t = −3 months and t = 0 screenshots; methalox visibly loses propellant to boil-off.",
+        "Solar-thermal's finish flag appears before any other lane's.",
+        "Storable chemical's ΔV budget bar drops by 100/700 ≈ 14% for this single maneuver, while solar-thermal's 5–6 km/s budget barely moves.",
+        "Electric's lane shows no pre-burn delay but the longest burn duration — delay and duration are separately visible causes."
+      ]
+    },
+    {
+      "id": "why-1980-failed",
+      "conceptId": "enabling-tech-convergence",
+      "part": "Why 1980 failed and 2026 works",
+      "title": "The physics passed in 1979; the manufacturing, materials, and mirrors passed in the 2020s",
+      "teaches": "Three independently matured technologies — monolithic 3D printing, 3,000 K refractory alloys, and >1,000 W/kg membrane mirrors — turned a validated concept into a buildable engine.",
+      "requires": [
+        "how-solar-thermal-works"
+      ],
+      "caption": "Rockwell validated the physics in 1979 — ground tests even demonstrated >800 s \\(I_{sp}\\) with hydrogen — but the hardware was unbuildable. Flip each subsystem from 1980 to 2026. The temperature ceiling alone rises from 1,800 K to 3,000 K; since \\(v_e ∝ \\sqrt{T}\\), that is a 29% \\(I_{sp}\\) gain before the other two fixes even land.",
+      "visualMetaphor": "Three side-by-side subsystem cards, each with a 1980/2026 toggle. Heat exchanger: hundreds of brazed machined parts (leak points highlighted) vs a single monolithic 3D-printed refractory component with computationally optimized channels. Materials: a thermometer capped at 1,800 K ('structural failure') vs 3,000 K, wired to a live \\(I_{sp}\\) gauge that moves as \\(\\sqrt{T}\\) (×\\(\\sqrt{3000/1800}\\) ≈ ×1.29). Mirrors: a heavy rigid dish vs a membrane reflector with a W/kg readout jumping past 1,000 W/kg (10× conventional solar arrays), feeding a rocket-equation mass-budget bar that flips from 'does not close' to 'closes.' Predict-before-reveal: 'Which of the three was the physics problem?' Reveal: none — all three are engineering.",
+      "animatedVariable": {
+        "name": "technology era per subsystem",
+        "control": "toggle",
+        "range": "1980 ↔ 2026, independently for each of the three cards",
+        "whatChangesOnScreen": "Each flipped card swaps its hardware drawing and numbers; only with all three at 2026 does the overall verdict banner switch from 'concept shelved' to 'flight vehicle buildable.'"
+      },
+      "quantitativeAnchor": "Temperature ceiling 1,800 K → ~3,000 K gives \\(\\sqrt{3000/1800}\\) ≈ 1.29× exhaust velocity; membrane mirrors exceed 1,000 W/kg, 10× conventional solar arrays.",
+      "physicsChecks": [
+        "The \\(I_{sp}\\) gauge rises by ~29% when only the materials card flips (square-root scaling, verifiable from the two screenshots).",
+        "The 'buildable' banner requires all three toggles at 2026 — any single 1980 setting keeps it red.",
+        "The 1979 Rockwell validation and >800 s hydrogen ground-test note are displayed in the 1980 state, making clear the physics was never the barrier.",
+        "The mirror card's mass-budget bar only closes above the 1,000 W/kg threshold."
+      ]
+    },
+    {
+      "id": "million-satellite-sky",
+      "conceptId": "orbital-density-demand",
+      "part": "Why 1980 failed and 2026 works",
+      "title": "1.2 million filed satellites turn maneuvering from an edge case into infrastructure",
+      "teaches": "Filings now exceed 1.2 million satellites against ~15,000 active today, making collision avoidance, repositioning, and de-orbit continuous operations rather than rare events.",
+      "requires": [
+        "delta-v-price-list"
+      ],
+      "caption": "Responsive ΔV was never built because it was never needed: ~15,000 active satellites mostly parked in fixed slots for 15 years. Filings in the last 18 months exceed 1.2 million — over 95,000 broadband satellites, SpaceX's 1,000,000-satellite compute filing, Blue Origin's 51,600. At that density, every spacecraft becomes our scene-2 spacecraft, dodging and repositioning continuously.",
+      "visualMetaphor": "A log-scale population chart with stacked contributions: today's ~15,000 active satellites as a thin baseline sliver, then buttons that add each filed layer — mega-constellation broadband (>95,000), SpaceX orbital compute (1,000,000, filed January 2026), Project Sunrise (51,600), other filings — climbing past 1.2 million. Beside it, an orbital-shell visualization densifies with each addition, and a counter converts density into operations: expected conjunction warnings per satellite per year rising from 'rare' to 'routine.' Predict-before-reveal: 'Today is 15,000. Guess the filed total before pressing the buttons.'",
+      "animatedVariable": {
+        "name": "satellite population layers",
+        "control": "buttons",
+        "range": "today (15,000) → +broadband (>95,000) → +orbital compute (1,000,000) → +Project Sunrise (51,600) → total >1.2M",
+        "whatChangesOnScreen": "Each button stacks a labeled layer on the log-scale bar and visibly densifies the orbital shell; the maneuvers-per-year counter climbs with density."
+      },
+      "quantitativeAnchor": "~15,000 active satellites today; >1.2 million filed in 18 months, including SpaceX's 1,000,000-satellite compute filing (January 2026) and Project Sunrise's 51,600.",
+      "physicsChecks": [
+        "The filed total exceeds the active population by roughly 80× (two orders of magnitude, readable on the log axis).",
+        "The compute-satellite layer alone dwarfs all other layers combined (1,000,000 of the 1.2M+).",
+        "The conjunction/maneuver counter increases monotonically with each added layer — density is the visible cause of demand.",
+        "The baseline sliver remains visible at all zoom states so the before/after contrast survives both screenshots."
+      ]
+    },
+    {
+      "id": "swap-sun-for-reactor",
+      "conceptId": "bridge-to-nuclear-thermal",
+      "part": "Why 1980 failed and 2026 works",
+      "title": "Nuclear-thermal is the same engine with a denser heat source",
+      "teaches": "Downstream of the heat source, solar-thermal and nuclear-thermal are identical — the same \\(v_e ∝ \\sqrt{T/M}\\), the same heat exchanger — so today's hardware is ~90% of nuclear performance at ~10% of the cost, and carries over when regulation permits reactors.",
+      "requires": [
+        "how-solar-thermal-works",
+        "why-1980-failed"
+      ],
+      "caption": "Flip the heat source and nothing downstream changes: mirrors out, reactor in, and the same 3D-printed heat exchanger and \\(v_e ∝ \\sqrt{T/M}\\) physics keep working — now free of the sunlight-availability constraint. Solar-thermal today delivers ~90% of nuclear-thermal performance at ~10% of the cost, while building exactly the flight heritage a 2030s nuclear engine will need.",
+      "visualMetaphor": "The scene-6 cutaway returns with a single toggle on the heat source. Solar mode: mirrors focus sunlight on the heat exchanger; a small constraint badge reads 'needs sunlight.' Nuclear mode: a reactor block replaces the mirrors; the badge clears; the propellant path, heat exchanger, and nozzle are drawn identically and highlighted 'unchanged.' Side readouts compare performance (~90% in solar mode relative to nuclear) and cost (~10%). Predict-before-reveal: 'How many downstream components change when you flip the source?' Reveal: zero — every unchanged part flashes green.",
+      "animatedVariable": {
+        "name": "heat source",
+        "control": "toggle",
+        "range": "concentrated sunlight ↔ fission reactor",
+        "whatChangesOnScreen": "Only the heat-source block swaps; the heat exchanger, propellant feed, and nozzle flash green as 'unchanged,' and the performance/cost readouts shift to ~100% performance / ~10× cost in nuclear mode."
+      },
+      "quantitativeAnchor": "Solar-thermal achieves ~90% of nuclear-thermal performance at ~10% of the cost; nuclear flight approval is expected in the 2030s.",
+      "physicsChecks": [
+        "Between the two toggle states, the only differing pixels in the engine diagram are the heat-source block and the sunlight-availability badge.",
+        "The governing equation \\(v_e ∝ \\sqrt{T/M}\\) is displayed identically in both modes — same physics regime, not a new one.",
+        "Performance and cost readouts move in opposite directions across the toggle (~90%→100% performance, ~10%→100% cost), matching the paper's ratios.",
+        "The heat exchanger carries a 'carries over intact' label in both states, tying back to the scene-10 manufacturing story."
+      ]
+    }
+  ]
+}

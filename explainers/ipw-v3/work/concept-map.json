@@ -1,0 +1,125 @@
+{
+  "paper": {
+    "title": "Intelligence per Watt: Measuring Intelligence Efficiency of Local AI",
+    "authors": [
+      "Jon Saad-Falcon",
+      "Avanika Narayan",
+      "Hakki Orhun Akengin",
+      "J. Wes Griffin",
+      "Herumb Shandilya",
+      "Adrian Gamarra Lafuente",
+      "Medhya Goel",
+      "Rebecca Joseph",
+      "Shlok Natarajan",
+      "Etash Kumar Guha",
+      "Shang Zhu",
+      "Ben Athiwaratkun",
+      "John Hennessy",
+      "Azalia Mirhoseini",
+      "Christopher Ré"
+    ],
+    "oneSentenceClaim": "Small AI models now run on laptops and phones. They answer 88.7% of real chatbot and reasoning queries correctly, with no cloud needed. This on-device efficiency has jumped 5.3x in just two years. Smart routing between local and cloud models cuts energy, compute, and cost by 60-80%.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "General notion of what a large language model (LLM) is and that it generates text",
+    "Basic familiarity with GPUs as specialized chips for parallel computation",
+    "Cloud computing as remote datacenter infrastructure serving user requests",
+    "General notion of machine learning benchmarks (accuracy scores on test sets)"
+  ],
+  "concepts": [
+    {
+      "id": "power-vs-energy",
+      "name": "Power vs. Energy (watts vs. joules)",
+      "whyItMatters": "The paper's central metric family splits into 'per watt' and 'per joule' versions, and these give different headline numbers (5.3x vs 18x improvement) purely because one tracks instantaneous draw and the other tracks total consumption over time.",
+      "coreMechanism": "Power (watts) is the rate of energy use at a given instant; energy (joules) is power multiplied by the time over which it's drawn, E = P·t. A chip can have high instantaneous power but still use less total energy per task if it finishes much faster, and vice versa — so 'efficient at any instant' and 'efficient overall' are not the same claim.",
+      "keyEquation": "E = P \\cdot t",
+      "foundational": true
+    },
+    {
+      "id": "llm-parameters-forward-pass",
+      "name": "LLM parameters and the forward pass",
+      "whyItMatters": "Every cost the paper measures (power, latency, energy) per query traces back to how many of a model's learned numbers get multiplied through during that query — this is the physical unit of 'work' behind every accuracy-per-watt number.",
+      "coreMechanism": "An LLM is a stack of matrix multiplications whose entries (parameters/weights) were tuned during training. To produce one output token, the input is pushed through all the layers once (a 'forward pass'); the number of parameters actually multiplied determines the arithmetic operations, and thus roughly the time and energy, needed to produce that token.",
+      "foundational": true
+    },
+    {
+      "id": "active-vs-total-parameters-moe",
+      "name": "Active vs. total parameters (Mixture-of-Experts)",
+      "whyItMatters": "This is why the paper can call a 120-billion-parameter model 'local': GPT-OSS-120B is the single best local model in the study (71.4% coverage) precisely because it only activates ≤20B parameters per query while storing far more.",
+      "coreMechanism": "A Mixture-of-Experts (MoE) model contains many expert sub-networks but a router selects only a handful for each token, so compute and energy per query scale with 'active' parameters touched, while memory/storage requirements scale with the much larger 'total' parameter count. This decouples how much a model 'knows' (capacity) from how expensive each query is (active compute), letting a model with GPT-4-scale total parameters still run at local-device power/latency budgets — e.g., GPT-OSS-120B fits within a 128GB Apple M4 Max at FP4 precision.",
+      "misconception": "A '120B parameter model' sounds obviously too large to be 'local'; the paper's ≤20B threshold is about active parameters per forward pass, not the size of the file on disk."
+    },
+    {
+      "id": "intelligence-per-watt",
+      "name": "Intelligence per Watt (IPW)",
+      "whyItMatters": "This is the paper's headline metric and organizing concept: it turns 'is local AI viable' into a single trackable number that jointly rewards capable models and power-efficient hardware, and the entire longitudinal study (2023→2025, 5.3x improvement) is measured in these units.",
+      "coreMechanism": "IPW is defined as average task accuracy divided by average power draw for a given model-hardware pair. A model that answers well but requires a power-hungry chip scores low, just as a low-power chip running an inaccurate model scores low — only configurations that are both capable and efficient score high, which is exactly the tradeoff facing power-constrained local devices like laptops.",
+      "keyEquation": "APW(m,h) = \\frac{\\mathbb{E}_{q}[acc(m,q)]}{\\mathbb{E}_{q}[P(m,h,q)]}"
+    },
+    {
+      "id": "ipw-vs-ipj-divergence",
+      "name": "Why per-watt and per-joule gains diverge",
+      "whyItMatters": "This explains a seemingly contradictory pair of headline numbers in the paper — hardware contributes only 1.7x under IPW but 5.9x under IPJ — and clarifies that the two metrics measure different things: thermal-constrained operation vs. total energy budget.",
+      "coreMechanism": "Intelligence per joule (IPJ) additionally accounts for how long a query takes (energy = power × latency), so an accelerator that both lowers power draw AND finishes tokens faster (via faster memory, dedicated tensor units) gets a compounded efficiency boost under IPJ that a pure power measurement misses. This is why newer hardware (e.g. Apple M4 Max replacing older GPUs) looks like a bigger driver of progress when measured per joule than per watt.",
+      "keyEquation": "APJ(m,h) = \\frac{\\mathbb{E}_q[acc(m,q)]}{\\mathbb{E}_q[P(m,h,q)\\cdot \\tau(m,h,q)]}"
+    },
+    {
+      "id": "local-vs-cloud-models",
+      "name": "Local LMs vs. cloud frontier models",
+      "whyItMatters": "This is the paper's core dichotomy: the entire question ('can local inference redistribute demand from centralized infrastructure?') depends on defining a clean, physically meaningful boundary between the two classes.",
+      "coreMechanism": "Local LMs (≤20B active parameters, e.g. Qwen3, GPT-OSS, Gemma3) are small enough to run at interactive speed on laptop/desktop-class accelerators like an Apple M4 Max under normal power and memory constraints; cloud/frontier models (≥100B parameters, e.g. GPT-5, Claude Sonnet 4.5, Gemini 2.5 Pro) require datacenter-class GPUs (NVIDIA H200, B200). The paper's whole empirical program is measuring how much of real-world query traffic the smaller class can now handle without invoking the larger class."
+    },
+    {
+      "id": "memory-bandwidth-bottleneck",
+      "name": "Memory bandwidth as the inference bottleneck",
+      "whyItMatters": "This is the physical root cause of the persistent 1.4–7.4x efficiency gap between local and cloud accelerators reported throughout the paper — it isn't that local chips can't do enough arithmetic, it's that they can't feed that arithmetic fast enough.",
+      "coreMechanism": "Generating each token requires streaming the relevant weights from memory into the compute units; if the rate at which memory can supply data (bandwidth, GB/s) is lower than what the compute units could consume, the chip sits idle waiting on memory rather than being limited by raw FLOPs. Apple M4 Max's unified memory delivers ~546 GB/s versus 4.8–8 TB/s HBM3e on datacenter GPUs (NVIDIA H200/B200), so cloud chips finish the same query faster and thus spend less total energy per query even without necessarily doing more work per second.",
+      "foundational": true
+    },
+    {
+      "id": "hardware-efficiency-gap",
+      "name": "Persistent cloud-vs-local hardware efficiency gap",
+      "whyItMatters": "This is one of the paper's three headline findings: even holding the model fixed, local accelerators are measurably less efficient than cloud accelerators (1.4x lower IPW, up to 7.4x lower IPJ), showing there is real headroom left in local hardware design, not just models.",
+      "coreMechanism": "Cloud accelerators (NVIDIA B200, SambaNova SN40L) are purpose-built for one workload (LLM inference) with high-bandwidth memory and dedicated tensor cores, while local unified-memory chips (Apple M4 Max) are general-purpose designs that must balance CPU, GPU, and NPU workloads within a laptop's thermal and power envelope. Running the identical Qwen3/GPT-OSS models, the B200 achieves 1.40x higher accuracy-per-watt and the SambaNova SN40L up to 1.78x higher, with the gap widening to 6.5-7.4x when latency is folded in (per joule)."
+    },
+    {
+      "id": "best-of-local-routing",
+      "name": "Model diversity and the best-of-local ensemble effect",
+      "whyItMatters": "This explains the paper's biggest coverage number: routing queries to whichever local model handles them best raises coverage to 88.7%, a 16.3 percentage-point jump over even the single strongest local model (GPT-OSS-120B at 71.4%) — diversity itself is a source of capability, not just scale.",
+      "coreMechanism": "Different local models (varying architecture, pretraining data, post-training recipe) succeed and fail on different, complementary subsets of queries; an oracle that always picks the best-performing model per query therefore does better than any single model, even one much larger. Because 'best-of-local' draws from 20+ candidate local models while 'best-of-cloud' draws from only 3 frontier models, best-of-local can even edge out best-of-cloud on some reasoning benchmarks — this is a selection-pool-size effect, not proof that small models individually beat frontier ones.",
+      "misconception": "Beating cloud routing on some benchmarks does not mean any single local model is stronger than the frontier models; it's an artifact of routing across a much larger pool of candidate local models."
+    },
+    {
+      "id": "hybrid-local-cloud-routing",
+      "name": "Hybrid local-cloud query routing at the system level",
+      "whyItMatters": "This is the paper's practical payoff (Q3): it converts the abstract efficiency numbers into a concrete deployment strategy that saves 60-80% of energy, compute, and cost versus sending everything to the cloud, even though local hardware is individually less efficient per query.",
+      "coreMechanism": "A router sends each incoming query to either a small local model or a large cloud model based on predicted difficulty, with misrouted queries falling back to the cloud model so answer quality never degrades below the cloud-only baseline. Because roughly 80% of real queries can be handled correctly by much smaller (cheaper, lower-energy) local models, redirecting them saves resources overall even though the cloud accelerator wins on pure per-query efficiency — an oracle router achieves 80.4% energy reduction, and a realistic 80%-accurate router still captures ~80% of that (64.3% energy savings)."
+    },
+    {
+      "id": "memory-capacity-growth",
+      "name": "Local accelerator memory capacity growth (unified memory)",
+      "whyItMatters": "This is the hardware precondition that made the whole paper's premise possible: without enough local memory, 8-20B-parameter models simply could not be stored and run on-device at all, regardless of how efficient the arithmetic was.",
+      "coreMechanism": "From 2012 to 2025, local/consumer accelerator memory grew about 126x, jumping from single-digit-to-20GB to 128-512GB, largely enabled by unified-memory architectures (e.g. Apple Silicon) that share one large, fast memory pool across CPU, GPU, and NPU instead of a small dedicated GPU VRAM pool. This removed the hard ceiling that previously forced 8-20B-active-parameter models off local devices and onto cloud infrastructure."
+    },
+    {
+      "id": "quantization-tradeoff",
+      "name": "Quantization: precision reduction as an energy lever",
+      "whyItMatters": "One of the paper's concrete practical takeaways is that quantizing aggressively is a bigger efficiency lever than choosing a smaller model — this matters for anyone deploying local models under a fixed power budget.",
+      "coreMechanism": "Quantization stores and computes model weights using fewer bits (FP16 → FP8 → FP4), roughly halving memory footprint and cutting energy 3-3.5x at each step, at a cost of only about 2.5 percentage points of accuracy per step. Because of this, a larger model quantized to FP4 (e.g. Qwen3-14B) can beat a smaller model at full FP16 precision (Qwen3-4B) on both accuracy and energy simultaneously, meaning practitioners should scale model size up and quantize down rather than avoid quantization to preserve precision."
+    },
+    {
+      "id": "batching-amortization",
+      "name": "Batching amortizes cloud accelerator power draw",
+      "whyItMatters": "This is a key caveat to the cloud-efficiency-advantage finding: some of the apparent superiority of cloud hardware is really 'the cloud gets to batch many users' queries together,' not purely better silicon, which matters for interpreting the 60-80% routing savings correctly.",
+      "coreMechanism": "GPU power draw scales sublinearly with batch size (255W at batch-size 1 vs. 883W at batch-size 64 in the paper's NVIDIA B200 ablation) while the number of queries processed scales roughly linearly, so energy per query drops 12-20x when moving from batch=1 to batch=64. A single local device serving one user at a time cannot batch across other users' queries and is effectively stuck near batch-size 1, so part of the cloud's per-query efficiency edge comes from this scheduling advantage rather than from the chip alone."
+    },
+    {
+      "id": "llm-as-judge-evaluation",
+      "name": "LLM-as-a-judge accuracy scoring",
+      "whyItMatters": "This defines what the numerator of every IPW/coverage number in the paper actually means for the largest dataset (500K WildChat chat queries) — without ground-truth answers, 'accuracy' has to be operationalized differently than on math benchmarks.",
+      "coreMechanism": "For open-ended chat queries with no single correct answer, the paper compares a candidate model's response against a strong reference model's (Qwen3-235B) response using another LLM (GPT-4o) as an automated judge, counting the candidate 'correct' if the judge rules a tie or win. For benchmarks with objective ground truth (math/reasoning/multiple-choice), the paper instead does direct exact-match comparison against the known answer.",
+      "misconception": "One might assume 'accuracy' means the same exact-match check throughout the paper; for the largest and most naturalistic dataset (WildChat), it actually means an AI judge's relative preference verdict, not correctness against a fixed answer key."
+    }
+  ]
+}

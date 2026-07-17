@@ -1,0 +1,137 @@
+{
+  "paper": {
+    "title": "ParallelKittens: Systematic and Practical Simplification of Multi-GPU AI Kernels",
+    "authors": [
+      "Stuart H. Sul",
+      "Simran Arora",
+      "Benjamin F. Spector",
+      "Christopher Ré"
+    ],
+    "oneSentenceClaim": "A small set of reusable CUDA primitives — chosen by matching the right data-transfer mechanism and SM-scheduling strategy to each workload, and by stripping the synchronization/buffering overhead built into libraries like NCCL/NVSHMEM — lets a <50-line kernel extension match or beat hand-tuned multi-GPU kernels across data-, tensor-, sequence-, and expert-parallel AI workloads on both Hopper and Blackwell GPUs."
+  },
+  "prerequisites": [
+    "Basic CUDA/GPU programming model (kernels, threads, launching)",
+    "Matrix multiplication (GEMM) and floating point precision formats (BF16/FP32)",
+    "General notion of distributed/parallel computing and collective communication operations",
+    "Familiarity with what LLM training/inference workloads look like at a high level",
+    "Linear algebra and calculus basics (given)"
+  ],
+  "concepts": [
+    {
+      "id": "gpu-execution-hierarchy",
+      "name": "GPU parallel execution hierarchy",
+      "whyItMatters": "Every scheduling decision in the paper (which threads do compute vs. communication) is a decision about how to partition this hierarchy, so you need the vocabulary before any trade-off makes sense.",
+      "coreMechanism": "A GPU kernel runs tens of thousands of hardware threads across over a hundred streaming multiprocessors (SMs). Threads are grouped into thread blocks, each pinned to one SM; threads within a block can cooperate via fast on-chip shared memory, while threads on different SMs can only talk through slower global memory. Each SM has 64 KB of private per-thread registers, accessible every clock cycle.",
+      "foundational": true
+    },
+    {
+      "id": "memory-hierarchy-tradeoff",
+      "name": "GPU memory hierarchy: capacity vs. bandwidth vs. latency",
+      "whyItMatters": "The paper's entire transfer-mechanism analysis is about routing data through this hierarchy as efficiently as possible; the numbers here set the ceiling every kernel is measured against.",
+      "coreMechanism": "Moving from registers to shared memory (SMEM) to L2 cache to local HBM to a peer GPU's HBM trades increasing capacity for increasing latency and, past a point, decreasing bandwidth: registers (64 KB, every cycle) → SMEM (227 KB, 33 TB/s) → L2 cache (50 MB, ~12 TB/s) → local HBM (80 GB, 3 TB/s) → peer GPU HBM over NVLink (450 GB/s unidirectional on H100, 900 GB/s on B200). A multi-GPU kernel is unusual because it must reach all the way to that last, slowest tier.",
+      "foundational": true
+    },
+    {
+      "id": "interconnect-bottleneck",
+      "name": "Why interconnect bandwidth, not compute, is now the bottleneck",
+      "whyItMatters": "This scaling mismatch is the paper's entire motivation — without it there would be no need for compute-communication overlap at all.",
+      "coreMechanism": "Hardware generations improve compute and memory bandwidth much faster than interconnect bandwidth: from Nvidia A100 to B200, BF16 tensor-core throughput improved 7.2x and HBM bandwidth 5.1x, but intra-node NVLink improved only 3x and inter-node PCIe/InfiniBand only 2x. Because GPUs now compute faster than they can move data between each other, communication idles the (increasingly powerful) compute units unless it is explicitly overlapped with useful work — in real LLM workloads this can eat over 50% of wall-clock time.",
+      "foundational": true
+    },
+    {
+      "id": "specialized-execution-units",
+      "name": "Specialized on-chip execution units (Tensor Cores, CUDA Cores, TMA, copy engine)",
+      "whyItMatters": "The paper's transfer-mechanism analysis is really a comparison of which specialized unit issues the inter-GPU traffic, so you need to know what each unit actually does and who controls it (host vs. device).",
+      "coreMechanism": "Tensor Cores execute the tiled matrix multiplies that dominate AI compute; CUDA Cores handle general elementwise arithmetic. For memory movement, the Tensor Memory Accelerator (TMA) is a bulk-transfer engine that a single GPU thread can trigger asynchronously without blocking other threads on the same SM, while the copy engine is a separate DMA unit triggered from the CPU host that moves large contiguous memory blocks independently of any SM.",
+      "foundational": true
+    },
+    {
+      "id": "bandwidth-saturation-occupancy",
+      "name": "Saturating bandwidth requires enough concurrent issuers",
+      "whyItMatters": "This is the quantitative basis for the paper's claim that TMA is dramatically more SM-efficient than register instructions, which drives the whole intra-SM-overlap strategy.",
+      "coreMechanism": "A communication link only reaches peak throughput if enough independent transfer requests are in flight simultaneously to keep the pipe full; below that, latency (not bandwidth) dominates. Empirically on H100, TMA reaches ~70%+ of peak NVLink bandwidth using only ~15 SMs, whereas plain register-level load/store instructions need ~76 SMs (3.2–5.1x more) to hit comparable utilization — meaning register-based communication leaves almost no spare SM capacity for simultaneous computation.",
+      "foundational": true
+    },
+    {
+      "id": "parallelism-strategies-and-collectives",
+      "name": "Data/tensor/sequence/expert parallelism and their collective operations",
+      "whyItMatters": "Every experiment in the paper is one of these four parallelism types fused with a collective op (all-gather, reduce-scatter, all-reduce, all-to-all) — the benchmarked kernels are literally 'GEMM + collective.'",
+      "coreMechanism": "Data parallelism splits the batch across GPUs and needs gradient/activation reduction (all-reduce). Tensor parallelism shards a weight matrix by row or column across GPUs, requiring an all-gather of inputs before, and a reduce-scatter or all-reduce of outputs after, each GEMM. Sequence parallelism (Ring Attention, DeepSpeed-Ulysses) splits one long token sequence across GPUs, needing key/value exchange or fine-grained all-to-all so attention can still see the whole sequence. Expert parallelism (MoE) spreads experts across GPUs and must scatter tokens to their assigned expert's device, then gather results back.",
+      "foundational": true
+    },
+    {
+      "id": "overlap-cost-model",
+      "name": "The compute-communication overlap cost model",
+      "whyItMatters": "This single equation is the organizing principle of the entire paper: every design choice (mechanism, scheduling, overhead-cutting) is aimed at shrinking the non-max, non-overlapped terms toward zero.",
+      "coreMechanism": "Total kernel wall-clock time is launch overhead, plus ideally the maximum (not the sum) of compute time, memory time, and communication time if they can run concurrently, plus whatever residual work cannot be overlapped, plus synchronization overhead. Existing systems fail to hit this max()-bound either because they use the wrong low-level transfer mechanism, the wrong SM-partitioning strategy, or a communication library whose synchronization/buffering choices add unnecessary Tsync and Tnon-overlap.",
+      "keyEquation": "T_{kernel} = T_{launch} + \\max(T_{comp}, T_{mem}, T_{comm}) + T_{non-overlap} + T_{sync}",
+      "misconception": "It's tempting to think 'overlapping' just means launching communication and compute on separate CUDA streams; the paper shows that without controlling which hardware mechanism and which SMs are used, overlap can still leave large non-overlapped or synchronization terms that dominate the runtime.",
+      "foundational": false
+    },
+    {
+      "id": "transfer-mechanism-tradeoff",
+      "name": "Copy engine vs. TMA vs. register instructions: the transfer-mechanism trilemma",
+      "whyItMatters": "This is the paper's first core empirical finding, and it explains why prior systems that hard-wire one mechanism (e.g., always the copy engine) become slower than doing nothing at small problem sizes (Fig. 7).",
+      "coreMechanism": "The copy engine gets the highest steady-state efficiency (82% of theoretical peak on H100, 81% on B200) but only for huge, all-at-once contiguous transfers — it needs messages ≥256 MB to hit that efficiency, so fine-grained traffic (like MoE token dispatch) pays large per-invocation overhead. TMA reaches near-peak efficiency (78%/74%) at message sizes as small as 2 KB and can be fired by a single thread without stealing registers from other threads, enabling intra-SM overlap. Register-level load/store instructions are the least bandwidth-efficient (76%/70%) and need full SM occupancy to saturate the link, but they are the *only* mechanism that exposes in-network reduction and elementwise remote access — so they remain necessary for certain functionality even though they're worse at raw throughput.",
+      "keyFigureRef": "Fig. 2, Fig. 3, Table 1, Table 2",
+      "misconception": "Higher peak-bandwidth efficiency does not mean 'always use that mechanism' — the copy engine's 82% efficiency is irrelevant if your messages are smaller than 256 MB, which is common in fine-grained AI communication patterns.",
+      "foundational": false
+    },
+    {
+      "id": "intra-vs-inter-sm-scheduling",
+      "name": "Intra-SM vs. inter-SM overlap scheduling",
+      "whyItMatters": "This is the paper's second core empirical finding and explains why no single prior system (which each commit to only one scheduling style) can be optimal across all workloads.",
+      "coreMechanism": "Intra-SM overlap splits threads *within* the same SM between compute and communication roles, so every SM's tensor cores stay busy (compute throughput still scales linearly with SM count) and synchronization between the two roles is cheap (~64 ns via an on-chip mbarrier) since it never leaves the SM. Inter-SM overlap instead dedicates entire SMs to communication and others purely to compute, sacrificing some compute SMs but freeing communication from having to follow the compute's tiling pattern, and paying for HBM-mediated cross-SM synchronization (~832 ns, ~13x slower). Which wins is workload-dependent: for GEMM+reduce-scatter, intra-SM overlap wins by 1.2x (743.7 vs 618.1 TFLOP/s) because the reduce-scatter's data pattern naturally matches the GEMM's output tiling; for GEMM+all-reduce, inter-SM overlap wins by 3.62x (623.9 vs 172.3 TFLOP/s) because it's the only way to exploit in-network reduction hardware.",
+      "keyFigureRef": "Fig. 4",
+      "misconception": "It's not the case that one scheduling strategy is generically 'better' — applying Flux's intra-SM design (tuned for reduce-scatter) to an all-reduce workload actually causes a slowdown, because it forces N-way atomic peer writes that serialize on each GPU's ~450 GB/s port.",
+      "foundational": false
+    },
+    {
+      "id": "in-network-reduction",
+      "name": "In-network reduction/multicast acceleration via NVSwitch",
+      "whyItMatters": "This hardware capability is the specific reason inter-SM scheduling can beat intra-SM by over 3x on all-reduce workloads, and it's only reachable through register-level instructions, tying together the mechanism and scheduling findings.",
+      "coreMechanism": "NVSwitch, the fabric interconnecting all GPUs' NVLinks, can perform compute (sum, multicast broadcast) on data as it transits the switch, rather than just moving bits — this can be triggered from the device with PTX instructions like multimem.ld_reduce and multimem.red. Because the reduction happens once in the fabric instead of via N-way pairwise atomic writes between GPUs (which each get bottlenecked by a single 450 GB/s port), effective communication volume drops by roughly a factor of N (the GPU count). It's impractical to invoke this directly inside a compute-heavy SM due to register pressure and occupancy loss, which is exactly why a dedicated communicator SM (inter-SM overlap) is the natural home for it.",
+      "foundational": false
+    },
+    {
+      "id": "comm-hiding-threshold",
+      "name": "Quantitative threshold for fully hiding communication behind compute",
+      "whyItMatters": "This equation gives a concrete, checkable prediction (K ≳ 2197 for BF16 on H100) that the paper verifies experimentally, turning the qualitative overlap idea into an engineering design rule.",
+      "coreMechanism": "In a GEMM+reduce-scatter kernel fused via intra-SM overlap, producing one output tile takes compute time that grows linearly with the reduction dimension K (2mnK/R), while the communication time to store that same tile is fixed regardless of K (smn/B, since the tile is only transferred once at the end). As K grows, the compute cost eventually exceeds and 'buries' the fixed communication cost. With BF16 (2 bytes/element), H100 tensor throughput R=989 TFLOP/s, and NVLink bandwidth B=450 GB/s, this predicts full hiding once K≳2197 — and measurements confirm the non-overlapped communication fraction drops from 68% (K=512) to <1% (K=4096).",
+      "keyEquation": "K \\geq \\frac{sR}{2B}",
+      "keyFigureRef": "Table 3",
+      "foundational": false
+    },
+    {
+      "id": "library-design-overhead",
+      "name": "Synchronization and buffering overhead baked into NCCL/NVSHMEM",
+      "whyItMatters": "This is the paper's third core finding: even with the right mechanism and scheduling, standard libraries lose up to 1.79x performance and 4.5x latency purely from unnecessary design choices, which PK removes by giving programmers direct control.",
+      "coreMechanism": "NCCL enforces two-way handshaking (both sender and receiver must acknowledge readiness) on every operation, even simple point-to-point sends, and routes data through small preallocated intermediate 'channel' buffers rather than writing directly to the final destination — overhead that's negligible for huge bulk transfers but dominant for fine-grained ones. NVSHMEM's public API re-fetches the peer's address from global memory (__ldg) and inserts a thread-group synchronization on every remote access instead of caching the address in a register. By pre-allocating destination buffers for direct one-way transfer and caching peer addresses while dropping redundant syncs, PK achieves up to 1.79x higher all-reduce throughput and 4.5x lower element-wise access latency.",
+      "keyFigureRef": "Fig. 6",
+      "foundational": false
+    },
+    {
+      "id": "pgl-tile-abstraction",
+      "name": "Tile-based data structures and the Parallel Global Layout (PGL)",
+      "whyItMatters": "This is PK's actual deliverable — the concrete programming abstraction that packages the three analytical findings (mechanism choice, scheduling flexibility, low overhead) into something a programmer can use in under 50 lines of code.",
+      "coreMechanism": "PK extends ThunderKittens' tile-based programming model (16x16 register tiles) to multi-GPU by adding shared-memory tiles that a single thread can asynchronously load from or store to a peer GPU's HBM via TMA (optionally with atomic reduction or multicast), and a Parallel Global Layout (PGL) — an identically-shaped memory region mirrored across all devices — that serves as the handle for peer-to-peer transfers, broadcasts, and in-network multicast/reduction, all indexed by tile coordinates. Because the abstraction is tile-granular like the compute primitives, communication logic composes directly with existing tensor-core pipelines, which is why fusing communication into an existing single-GPU GEMM/attention kernel takes under 50 lines of additional code.",
+      "keyFigureRef": "Fig. 1",
+      "foundational": false
+    },
+    {
+      "id": "sm-partitioning-knob",
+      "name": "SM partitioning as a workload-dependent tuning knob",
+      "whyItMatters": "This explains a practical failure mode of naive inter-SM implementations: a fixed split of communication vs. compute SMs is optimal for one problem size and badly suboptimal for another, so the split must be searched, not hardcoded.",
+      "coreMechanism": "In inter-SM overlap, SMs must be divided between dedicated compute and dedicated communication roles, and the right ratio shifts with problem size: smaller matrices need proportionally more communication SMs (compute has less work to hide the fixed communication behind), while larger matrices need proportionally more compute SMs (communication is comparatively small and cheap to satisfy). PK exposes this split as an auto-tunable parameter searched at runtime rather than fixing it, since the optimal number of communication SMs for an all-gather GEMM visibly shifts across matrix sizes from N=8192 to N=65536.",
+      "keyFigureRef": "Fig. 5",
+      "foundational": false
+    },
+    {
+      "id": "far-sided-l2-cache",
+      "name": "Far-sided (source-only) L2 caching of peer memory",
+      "whyItMatters": "This is a subtle but concrete motivation for choosing inter-SM bulk prefetch over naive intra-SM per-block remote loads in sequence-parallel attention — a case where the 'obvious' scheduling choice actively wastes bandwidth.",
+      "coreMechanism": "When one GPU reads data over NVLink from a peer's HBM, the L2 cache line ends up cached on the source (peer) device, not on the requesting device — so a second read of the same remote data by the requester still crosses NVLink again rather than hitting a local cache. In Ring Attention, if many independent thread blocks each try to fetch the same shared key/value block from a remote GPU, they redundantly re-saturate NVLink instead of reusing anything locally. The fix is to have a small number of dedicated communication SMs perform one bulk transfer of the KV block into the requester's *local* HBM first, after which ordinary L2 caching serves all the compute SMs cheaply.",
+      "foundational": false
+    }
+  ]
+}

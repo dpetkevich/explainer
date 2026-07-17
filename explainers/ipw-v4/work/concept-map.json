@@ -1,0 +1,122 @@
+{
+  "paper": {
+    "title": "Intelligence per Watt: Measuring Intelligence Efficiency of Local AI",
+    "authors": [
+      "Jon Saad-Falcon",
+      "Avanika Narayan",
+      "Hakki Orhun Akengin",
+      "J. Wes Griffin",
+      "Herumb Shandilya",
+      "Adrian Gamarra Lafuente",
+      "Medhya Goel",
+      "Rebecca Joseph",
+      "Shlok Natarajan",
+      "Etash Kumar Guha",
+      "Shang Zhu",
+      "Ben Athiwaratkun",
+      "John Hennessy",
+      "Azalia Mirhoseini",
+      "Christopher Ré"
+    ],
+    "oneSentenceClaim": "Small AI models on laptops can now correctly answer 88.7% of everyday chat and reasoning queries. The paper measures this with 'intelligence per watt': task accuracy divided by power draw. That efficiency improved 5.3× from 2023 to 2025, so routing easy queries to local devices can cut AI energy use by 60–80%.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "Basic energy/power concepts from mechanics (work, power = energy/time)",
+    "High-level idea that a neural network is a large matrix computation with adjustable parameters",
+    "Linear algebra basics (matrix-vector multiplication)",
+    "Comfort with orders of magnitude and unit analysis"
+  ],
+  "concepts": [
+    {
+      "id": "power-vs-energy",
+      "name": "Power vs. Energy: Watts, Joules, and Why the Metric Choice Changes the Story",
+      "whyItMatters": "The paper's headline numbers split depending on which you divide by: hardware contributes 1.7× to per-watt gains but 5.9× to per-joule gains, because newer chips cut latency as well as power draw.",
+      "coreMechanism": "Power (watts) is the instantaneous rate of energy consumption; energy (joules) is power integrated over time, E = P·τ. A query answered at 300 W in 50 s costs 15,000 J, while the same query at 900 W in 5 s costs only 4,500 J — the higher-power chip wins on energy because it finishes 10× faster. Accuracy-per-watt therefore measures steady-state efficiency under a thermal budget (relevant for a laptop that can't dissipate more than a few hundred watts), while accuracy-per-joule measures the true end-to-end energy bill per answer.",
+      "keyEquation": "E = P(m,h,q)\\cdot\\tau(m,h,q)",
+      "misconception": "Lower power draw is not the same as lower energy use. A 12 W phone chip that takes 26× longer than a 240 W workstation GPU can actually consume comparable or more joules per query.",
+      "foundational": true
+    },
+    {
+      "id": "inference-memory-bound",
+      "name": "LLM Inference Is Memory-Bandwidth Bound, Not FLOP Bound",
+      "whyItMatters": "This explains almost every hardware result in the paper: why active parameter count (not total) sets per-query cost, why cloud chips with HBM3e crush laptops, and why phone NPUs are slow despite decent compute.",
+      "coreMechanism": "Generating text is autoregressive: the model produces one token at a time, and every single token requires streaming essentially all of the model's active weights from memory through the arithmetic units. The chip's arithmetic throughput usually sits idle waiting on memory; generation speed is roughly (memory bandwidth) / (bytes of active weights). This is why an NVIDIA B200 at 8 TB/s outpaces an Apple M4 Max at 546 GB/s, and the iPhone's A18 Pro at 60 GB/s is 9–26× slower still on the same model.",
+      "misconception": "The bottleneck for running an LLM locally is not raw FLOPs — it's how fast you can pull tens of gigabytes of weights out of DRAM for every token generated.",
+      "foundational": true
+    },
+    {
+      "id": "ipw-metric",
+      "name": "Intelligence per Watt as a Unified Figure of Merit",
+      "whyItMatters": "This is the paper's central instrument: a single number that jointly scores whether a model is smart enough AND whether the hardware is efficient enough, letting you compare any (model, chip) pair on equal footing.",
+      "coreMechanism": "IPW is expected task accuracy divided by expected power draw over a query distribution: APW(m,h) = E[acc] / E[P]. Accuracy is binary per query — exact-match for benchmarks with ground truth, or win/tie against a frontier model (judged by an LLM) for open-ended chat. Dividing capability by power directly encodes the local-inference constraint: a laptop has a fixed thermal/power budget, so what matters is how much correct answering you extract per watt, not peak accuracy at any cost. A per-joule variant (accuracy / energy) additionally penalizes slow generation.",
+      "keyEquation": "\\mathrm{APW}(m,h)=\\frac{\\mathbb{E}_{q\\sim\\mathcal{Q}}[\\mathrm{acc}(m,q)]}{\\mathbb{E}_{q\\sim\\mathcal{Q}}[P(m,h,q)]}"
+    },
+    {
+      "id": "moe-active-parameters",
+      "name": "Mixture-of-Experts: Decoupling Capacity from Per-Token Cost",
+      "whyItMatters": "MoE is why a '120B model' (GPT-OSS-120B) counts as a local model and delivers the best single-model IPW in the study — it stores 120B parameters but only touches ≤20B per token.",
+      "coreMechanism": "In an MoE architecture, the model is split into many 'expert' sub-networks, and a lightweight router activates only a few experts per token. Per-query power and latency scale with active parameters (what streams through memory each token), while total parameters only govern storage. So GPT-OSS-120B needs 128 GB of unified memory to hold all experts (it fits on an M4 Max) but pays inference costs like a ~20B model — buying frontier-adjacent accuracy (71.4% average coverage) at small-model energy prices.",
+      "misconception": "Model 'size' is ambiguous: a 120B-total MoE can be cheaper per query than a 32B dense model. The paper's ≤20B threshold is on active parameters per forward pass, not weights on disk."
+    },
+    {
+      "id": "local-coverage-and-ensemble-diversity",
+      "name": "88.7% Local Coverage — and Why an Ensemble of Small Models Beats Any Single One",
+      "whyItMatters": "This is the paper's core capability claim: most real single-turn traffic no longer needs a frontier model, which is the precondition for offloading demand from data centers.",
+      "coreMechanism": "The best single local model (GPT-OSS-120B) correctly handles 71.4% of 1M real queries, but routing each query to whichever of 20+ local models handles it best reaches 88.7% — a 16.3-point jump. The gap exists because different pretraining data, architectures, and post-training give models complementary blind spots, so a diverse ensemble covers more of the query distribution than any individual. On reasoning benchmarks this best-of-N effect even lets the local ensemble beat the best-of-three frontier cloud models.",
+      "keyFigureRef": "Fig. 2",
+      "misconception": "The 88.7% is not one small model matching GPT-5; it's an oracle over a diverse local ensemble. It also masks a domain skew: 88.9% coverage on chat vs. 64.9% on hard reasoning, and the hardest reasoning tier remains 95% unsolved locally."
+    },
+    {
+      "id": "compounding-efficiency-gains",
+      "name": "The 5.3× IPW Improvement and Its Model-vs-Hardware Decomposition",
+      "whyItMatters": "This longitudinal trend — 2.27× and 2.32× year-over-year gains — is the paper's argument that local inference viability is a moving frontier, echoing the historical performance-per-watt doubling that moved computing from mainframes to PCs.",
+      "coreMechanism": "Tracking the best (local model, local accelerator) pair each year: 2023's Mixtral-8x7B on a Quadro RTX 6000 scored 7.92×10⁻⁴ accuracy/watt; 2025's GPT-OSS-120B on an M4 Max scores 4.18×10⁻³ — 5.3× total. Per watt, model advances contribute 3.1× (better pretraining, post-training, MoE sparsity) and hardware 1.7×. Per joule the total is 18× with hardware contributing 5.9×, because new accelerators (HBM3e bandwidth, tensor units) cut generation latency as well as power. Coverage rose in lockstep: 23.2% → 48.7% → 71.3%.",
+      "keyFigureRef": "Fig. 3 and Table 2"
+    },
+    {
+      "id": "local-cloud-hardware-gap",
+      "name": "The 1.4–7.4× Efficiency Headroom of Local Accelerators",
+      "whyItMatters": "Running identical models at identical batch size, cloud chips are strictly more efficient — so the gap is architectural, not a scheduling artifact, and represents concrete headroom for laptop/phone silicon design.",
+      "coreMechanism": "On the same Qwen3 and GPT-OSS models at batch size 1, the NVIDIA B200 gets 1.40× higher IPW and 1.6–2.3× higher intelligence-per-joule than the Apple M4 Max; SambaNova's SN40L reaches up to 7.4× per joule. Cause: cloud accelerators are purpose-built — HBM3e at 4.8–8 TB/s and dedicated tensor units — while the M4 Max's unified memory (546 GB/s) must serve CPU, GPU, and NPU under laptop thermal limits. Per-joule gaps exceed per-watt gaps because faster memory also finishes each query sooner, compounding the energy advantage.",
+      "keyFigureRef": "Tables 13–14"
+    },
+    {
+      "id": "hybrid-routing-savings",
+      "name": "Hybrid Local-Cloud Routing: 60–80% Savings Despite Less-Efficient Local Chips",
+      "whyItMatters": "This resolves the paper's apparent tension: local hardware loses per query, yet system-level routing wins, because the savings come from running a 20× smaller model, not from the hardware itself.",
+      "coreMechanism": "Simulating 80.2M queries/day routed between small local models (M4 Max, bs=1) and Qwen3-235B on an H200 (batched at bs=16): an oracle router sends the 80.7% of locally-solvable queries to small models and reserves frontier compute for the rest, cutting energy 80.4%, compute 77.3%, cost 73.8%. A realistic 80%-accurate router still captures ~80% of that (64.3% energy savings), and misroutes fall back to the cloud so answer quality is preserved. The dominant lever is avoiding a 235B-parameter forward pass, which dwarfs the local chip's per-query efficiency deficit.",
+      "keyFigureRef": "Fig. 4",
+      "misconception": "You don't need a near-perfect router: gains saturate around 80% routing accuracy, after which expanding the diversity of the local ensemble matters more than router precision."
+    },
+    {
+      "id": "quantization-tradeoff",
+      "name": "Quantization: Trading Bits of Precision for Joules",
+      "whyItMatters": "FP4 quantization is a key enabler of the whole local story — it's what lets a 120B-total MoE fit in 128 GB of laptop memory and cuts energy 3–3.5× per precision step.",
+      "coreMechanism": "Storing each weight in 4 bits instead of 16 shrinks the model 4× in memory, and since inference is memory-bandwidth bound, each token needs 4× fewer bytes streamed — energy per query drops 3–3.5× going FP16→FP4. The cost is quantization noise: about 2.5 accuracy points lost per precision step. Crucially, the trade favors scale: Qwen3-14B at FP4 (49.0% on SuperGPQA) still beats Qwen3-4B at full FP16 (48.5%), so the winning recipe is 'pick the biggest model that fits, then quantize hard.'",
+      "keyFigureRef": "Fig. 9"
+    },
+    {
+      "id": "batching-amortization",
+      "name": "Batching: The Structural Efficiency Advantage Cloud Serving Keeps",
+      "whyItMatters": "Batching explains why cloud data centers will remain far more joule-efficient at scale even as local chips improve — and why the paper's bs=1 comparisons are deliberately conservative toward cloud.",
+      "coreMechanism": "Since each generated token requires streaming the full active weights regardless of how many queries are in flight, a server can process 64 users' tokens per weight-load, amortizing the memory traffic and idle power. On a B200, batch size 64 delivers 11–20× higher intelligence-per-joule than batch size 1 (e.g., Qwen3-8B: 6,449 J/query → 548 J/query), while power rises only ~3.5× (255 W → 883 W). A single-user laptop has no independent queries to batch, so this advantage is structurally unavailable locally.",
+      "misconception": "The main comparisons use bs=1 for both sides not because cloud runs that way, but to isolate intrinsic chip efficiency; the routing simulation restores realism with a bs=16 cloud baseline, so the 60–80% savings already account for batching."
+    },
+    {
+      "id": "memory-capacity-enabler",
+      "name": "126× Growth in Local Memory: The Constraint That Broke",
+      "whyItMatters": "Model capability trends only matter if the model physically fits on the device; the jump from ~20 GB to 128–512 GB of unified memory is what made 8–20B-active models (and 120B-total MoEs) locally deployable at all.",
+      "coreMechanism": "From 2012 to 2025, consumer accelerator memory grew ~126×. The key architectural shift is unified memory (Apple Silicon style): CPU and GPU share one large pool, so a Mac Studio offers 128+ GB addressable by the GPU, versus discrete consumer GPUs stuck at 24–48 GB of dedicated VRAM. Since total parameters govern storage while active parameters govern speed, this capacity expansion is precisely what unlocks storing all experts of a sparse MoE locally.",
+      "keyFigureRef": "Fig. 13",
+      "foundational": true
+    },
+    {
+      "id": "phone-power-regime",
+      "name": "The Smartphone Regime: 7× Better Per-Watt, Worse Per-Joule",
+      "whyItMatters": "The iPhone result is the cleanest live demonstration of the paper's power-vs-energy distinction, and it sketches a third routing tier below the laptop for the easiest queries.",
+      "coreMechanism": "The iPhone 16 Pro's A18 Pro runs Qwen3-4B at FP4 drawing only ~9.5 W, yielding ~13.3×10⁻³ accuracy/watt — about 7× the IPW of a workstation GPU on the same model. But its 60 GB/s memory bandwidth makes each query take 37 s versus 2.5–3.5 s on workstations, so per joule the advantage shrinks or inverts depending on comparator: latency multiplies energy even when power is tiny. The 8 GB memory ceiling also forces FP4 and caps models at ~4B parameters, costing ~6.5 accuracy points.",
+      "keyFigureRef": "Table 17"
+    }
+  ]
+}

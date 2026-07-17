@@ -1,0 +1,7 @@
+{
+  "source": "https://madrona-engine.github.io/shacklett_siggraph23.pdf",
+  "pedagogy": {
+    "version": "2.0.0",
+    "label": "Visuals carry the load; minimal captions"
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "paper": {
+    "title": "Shor's algorithm is possible with as few as 10,000 reconfigurable atomic qubits",
+    "authors": [
+      "Madelyn Cain",
+      "Qian Xu",
+      "Robbie King",
+      "Lewis R. B. Picard",
+      "Harry Levine",
+      "Manuel Endres",
+      "John Preskill",
+      "Hsin-Yuan Huang",
+      "Dolev Bluvstein"
+    ],
+    "oneSentenceClaim": "By storing many protected logical qubits densely inside high-rate error-correcting codes — something only movable neutral-atom qubits can wire up — a code-breaking quantum computer needs roughly 10,000 physical qubits instead of the millions in prior estimates, with runtimes of days to months depending on how much parallelism you buy with extra atoms."
+  },
+  "prerequisites": [
+    "binary numbers and what a bit is",
+    "exponents and logarithms (e.g. what 10^-11 or 2^2048 means)",
+    "basic probability: independent events, averaging over many trials",
+    "the general idea that online security relies on secret keys"
+  ],
+  "concepts": [
+    {
+      "id": "qubit-and-fragility",
+      "name": "A qubit: a bit that can be in-between, and why that makes it fragile",
+      "whyItMatters": "Every number in this paper — 10,000 qubits, error rate 0.1%, days of runtime — traces back to one physical fact: quantum bits are powerful precisely because of a delicate in-between state that the environment constantly tries to destroy.",
+      "coreMechanism": "A classical bit is either 0 or 1. A qubit can be prepared in a blend of both at once, and a computer holding many qubits explores a huge space of combined possibilities simultaneously — that is the entire source of quantum speedup. But the blend is physically encoded in something microscopic (here, the internal state of a single atom), and any stray nudge from the outside world — a photon, a vibration, an imperfect laser pulse — randomly corrupts it. In today's best hardware, each two-qubit operation goes wrong roughly 1 time in 1,000 (an error rate p ≈ 0.1%).",
+      "misconception": "Qubits are not just 'faster bits.' Their power comes from interference between many possibilities held at once; the moment errors leak information to the environment, that interference — and the speedup — evaporates.",
+      "foundational": true
+    },
+    {
+      "id": "shor-breaks-encryption",
+      "name": "Shor's algorithm: why factoring a number breaks the internet's locks",
+      "whyItMatters": "This is the target computation the whole paper is sized against — the reason 'how many qubits?' is a question governments and banks care about.",
+      "coreMechanism": "Widely-used encryption (RSA, elliptic-curve cryptography) is safe because certain math problems — factoring a 2048-bit number, or the elliptic-curve 'discrete logarithm' — would take classical computers longer than the age of the universe. In 1994 Peter Shor showed a quantum computer can solve both in a feasible number of steps, because it can find hidden periodic patterns in these problems exponentially faster than any known classical method. Cracking one RSA-2048 key requires about 6.5 billion of a certain elementary quantum operation (the Toffoli gate); a 256-bit elliptic-curve key needs only about 70–90 million, because its keys are smaller for the same classical security.",
+      "misconception": "A quantum computer doesn't 'try all keys at once.' It exploits a specific mathematical structure (periodicity) in these particular problems — which is why some newer 'post-quantum' encryption schemes, which lack that structure, are believed safe."
+    },
+    {
+      "id": "error-correction-by-redundancy",
+      "name": "Quantum error correction: protecting information you're not allowed to look at",
+      "whyItMatters": "Shor's algorithm needs billions of flawless steps, but each physical operation fails ~1 in 1,000 times. Error correction is the only known bridge across that gap, and its cost is the paper's central bottleneck.",
+      "coreMechanism": "Classical error correction is easy: store a bit three times and take a majority vote. Quantum information can't be copied or directly read without destroying it, so instead one spreads a single 'logical' qubit across many physical qubits and repeatedly measures carefully chosen *joint* properties (parity checks, called stabilizers) that reveal where an error struck without revealing the protected data itself. The 1996 threshold theorem guarantees that if the physical error rate is below a critical value, adding more redundancy suppresses logical errors exponentially — arbitrarily long computations become possible. Each round of these checks is a 'cycle'; this paper assumes 1 millisecond per cycle.",
+      "misconception": "It feels like measuring a quantum system should destroy it. The trick is that the parity checks are engineered to ask only 'did something change?' — a question whose answer says nothing about the stored data.",
+      "foundational": true
+    },
+    {
+      "id": "code-distance-scaling",
+      "name": "Code distance: why doubling protection multiplies reliability, not adds to it",
+      "whyItMatters": "The paper's codes achieve a per-cycle failure probability of about 10^-11 — reliable enough for billions of operations — from hardware that fails 1 time in 1,000. The distance-scaling law is what makes that 100-million-fold improvement possible.",
+      "coreMechanism": "A code's 'distance' d is the minimum number of simultaneous physical errors needed to silently corrupt the logical information. For the code to fail, roughly d/2 independent errors must conspire in just the wrong pattern, so the logical error rate falls like p^(d/2) — each unit of distance multiplies reliability. The paper's largest memory code has distance ≤24, and at p = 0.1% its extrapolated failure rate is ~10^-11 per cycle across the whole block. A hidden requirement: the physical error rate must sit below threshold, which neutral-atom experiments have demonstrated (2× below, with a path to 10×).",
+      "keyEquation": "P_{\\mathrm{logical}} \\propto p^{\\,d/2}",
+      "keyFigureRef": "Fig. 2a",
+      "foundational": true
+    },
+    {
+      "id": "the-million-qubit-overhead",
+      "name": "The overhead problem: why prior estimates needed millions of qubits",
+      "whyItMatters": "This is the gap the paper claims to close by two orders of magnitude — from ~1,000,000 physical qubits down to ~10,000.",
+      "coreMechanism": "The standard error-correcting scheme, the surface code, arranges physical qubits on a flat grid where each only talks to its immediate neighbors — natural for chip-based hardware, but wasteful: one grid patch protects exactly one logical qubit, so protecting one logical qubit costs hundreds to thousands of physical ones (a ~0.1–4% 'encoding rate'). Shor's algorithm needs 1,200–1,500 logical qubits plus factories for special resource states, so surface-code estimates land at ~1 million physical qubits for RSA-2048. Meanwhile today's largest quantum processors have a few hundred qubits. The overhead, not the algorithm, is the obstacle.",
+      "keyFigureRef": "Fig. 1b"
+    },
+    {
+      "id": "movable-atom-qubits",
+      "name": "Neutral atoms in optical tweezers: qubits you can pick up and move",
+      "whyItMatters": "The paper's entire savings depends on wiring together qubits that are far apart — and reconfigurable atoms are the one platform where that wiring is native, because you physically carry the qubits to each other.",
+      "coreMechanism": "Each qubit is a single atom held in mid-vacuum by a tightly focused laser beam (an 'optical tweezer'), with the 0/1 states stored in two long-lived internal energy levels. Crucially, the tweezers can be steered: mid-computation, atoms are picked up and rearranged in parallel, so any qubit can be brought next to any other for a two-qubit operation (performed by briefly laser-exciting both atoms to a giant 'Rydberg' state that makes them interact). Arrays of 6,100 coherent atoms have been trapped, 360,000-tweezer patterns demonstrated, and full fault-tolerant operation shown on ~500 qubits — the ingredients exist, though not yet integrated in one machine.",
+      "misconception": "The atoms' slow ~1 ms operation cycle (vs. ~1 µs for superconducting chips) sounds disqualifying. The paper argues movability more than compensates: nonlocal connectivity permits far denser codes, and rastered lasers, faster readout (~1 µs demonstrated) and constant-velocity transport could later recover much of the speed."
+    },
+    {
+      "id": "high-rate-qldpc-codes",
+      "name": "High-rate codes: packing 1,480 protected qubits into one 5,278-atom block",
+      "whyItMatters": "This is the single biggest lever in the paper: a ~30% encoding rate instead of the surface code's ~0.1–4%, cutting the physical qubit count by 161× at equal protection — the source of the headline '10,000 qubits.'",
+      "coreMechanism": "If parity checks are allowed to link qubits that are physically far apart — impossible on a fixed chip, easy with movable atoms — one code block can share its redundancy among many logical qubits at once. The paper's 'lifted-product' codes achieve this: the largest, written [[5278, 1480, ≤24]], protects 1,480 logical qubits with 5,278 physical ones at distance 24. Getting the same 1,480 logical qubits from surface codes of the same distance would take 852,480 physical qubits — 161 times more. Each check still touches only ~10 qubits (the codes are 'low-density'), and the codes' repeating cyclic structure maps onto simple parallel shifts of rows of atoms.",
+      "keyFigureRef": "Fig. 2a",
+      "misconception": "Denser packing does not mean weaker protection: at p = 0.1% these blocks reach the same ~10^-11 per-cycle failure rates as equivalent surface codes. The real price is paid elsewhere — operating on individual logical qubits buried inside a dense block becomes much harder."
+    },
+    {
+      "id": "zoned-architecture-and-surgery",
+      "name": "The zoned computer: a dense library, a small workbench, and stitched-on measuring rigs",
+      "whyItMatters": "Dense codes make logic hard — you can't easily poke one logical qubit among 1,480. The paper's answer, and the reason its estimate is credible rather than hand-wavy, is a concrete division of labor whose every gadget was numerically constructed and benchmarked.",
+      "coreMechanism": "The machine is split into zones: a memory (the big 1,224- or 1,480-qubit block, acting as a dense library), a small processor code (10 or 148 logical qubits) where actual computation happens, an operation zone of helper atoms, and a resource zone (next concept). To operate, a handful of logical qubits are teleported from memory to processor — teleportation here means a sequence of joint measurements plus corrections, executed by 'code surgery': helper atoms are temporarily stitched onto the code blocks, checks are run for about 2d/3 cycles, and the helpers are measured off, revealing the joint quantity without exposing the data. Because atoms are reconfigurable, one pool of ~900–1,900 helper atoms is rearranged on demand for every needed measurement — only 10–20% of the machine's total, versus a fixed rig per measurement on rigid hardware.",
+      "keyFigureRef": "Fig. 2b",
+      "misconception": "'Teleportation' moves information via measurements and corrections between atoms already in the machine — nothing physical jumps, and nothing travels faster than light."
+    },
+    {
+      "id": "magic-states-and-toffoli",
+      "name": "Magic states: the consumable fuel for the one gate error correction can't do directly",
+      "whyItMatters": "Shor's algorithm is counted in Toffoli gates (6.5 billion for RSA-2048), and each one must consume a pre-manufactured 'magic' resource state — so the factory that makes them, and the pace at which they're burned, set the machine's speed.",
+      "coreMechanism": "Error-correcting codes natively support only a limited family of operations (Clifford gates) — necessary but not sufficient for universal computation, and efficiently simulable classically on their own. The missing ingredient, here the Toffoli gate (a reversible AND: flip a target bit only if two control bits are both 1), is supplied indirectly: prepare a special three-qubit 'magic' state offline, then splice it into the computation via teleportation. Raw magic states are noisy, so the paper grows |T⟩ states on tiny surface codes ('cultivation,' error ~10^-6), then runs batches of eight through a distillation circuit hosted in compact factory codes, yielding CCZ states with error ~10^-10 — clean enough for billions of gates — faster on average than the computation consumes them.",
+      "keyFigureRef": "Extended Data Fig. 2",
+      "misconception": "'Magic' is a term of art, not hype: it names the specific non-Clifford resource that elevates an efficiently-simulable machine to one with genuine quantum power."
+    },
+    {
+      "id": "space-time-tradeoff",
+      "name": "Buying speed with atoms: 264 days serial, 10 days parallel",
+      "whyItMatters": "This trade-off is the paper's second headline: ~10,000 qubits suffice in principle, but adding atoms to run Toffoli gates in parallel cuts elliptic-curve runtimes from ~264 days to ~10 days (26,000 qubits) and makes RSA-2048 feasible in ~97 days (102,000 qubits).",
+      "coreMechanism": "In the lean architectures, Toffoli gates execute one at a time, each costing ~2d/3-cycle surgery operations plus memory–processor traffic — an amortized 10–72 surgery cycles per Toffoli. At 1 ms per stabilizer cycle, the 90-million-Toffoli ECC-256 circuit takes 52–1,000 days depending on processor size. The time-efficient variant attacks the serial bottleneck twice: mathematically, replacing ripple-carry adders (whose n-bit additions take ~n–2n sequential Toffoli layers) with carry-lookahead adders (~4·log n layers), and physically, distilling and consuming P magic states simultaneously via parallel surgery — P = 130 for ECC-256, P = 1,160 for RSA-2048. More parallel machinery means more atoms, hence the space-for-time exchange.",
+      "keyFigureRef": "Fig. 3",
+      "misconception": "The 100× runtime gap between ECC-256 (10 days) and the naive RSA expectation isn't hardware — it's the algorithm: RSA-2048 simply requires ~70× more Toffoli gates than ECC-256, so the more 'modern' elliptic-curve encryption ironically falls to a quantum attack sooner."
+    },
+    {
+      "id": "failure-budget-arithmetic",
+      "name": "The failure budget: multiplying 10^-11 by billions of steps",
+      "whyItMatters": "This one line of arithmetic is what determines the required code sizes, and hence the final qubit counts of 9,739–13,255 — it is where all the paper's numbers meet.",
+      "coreMechanism": "For the whole algorithm to succeed with 90% probability, the expected number of block failures over the entire run must stay below ~0.1. Each Toffoli occupies roughly τ_Toff ≈ 19·(2d/3) cycles, during each of which the memory block can fail with probability P_L per cycle; the tolerable gate count is n_Toff = log(0.9)/[τ_Toff · log(1−P_L)]. Working backwards from ECC-256's ~9×10^7 Toffolis or RSA-2048's 6.5×10^9 fixes how low P_L — and thus how large a code distance and how good a physical error rate (p between 0.048% and 0.093%, all near-term plausible) — the machine needs.",
+      "keyEquation": "n_{\\mathrm{Toff}} = \\frac{\\log(0.9)}{\\tau_{\\mathrm{Toff}}\\,\\log(1 - P_L)}",
+      "keyFigureRef": "Fig. 3a",
+      "misconception": "It's tempting to think a 10^-11 failure rate is absurd overkill. But a months-long run at 1 ms per cycle accumulates ~10^10 cycles, so even one-in-a-hundred-billion per cycle only barely keeps the whole computation likely to succeed."
+    }
+  ]
+}

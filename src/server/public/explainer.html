@@ -237,16 +237,21 @@ starBtn.addEventListener("click", async () => {
 });
 loadStars();
 
-function connect() {
-  const es = new EventSource(`/api/explainers/${encodeURIComponent(id)}/events`);
-  es.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    handle(msg);
-    if (msg.type === "closed") es.close();
-  };
-  es.onerror = () => { es.close(); setTimeout(connect, 3000); }; // reconnect + re-snapshot
+// Explainers are pre-computed (no live generation), so load the finished HTML
+// directly instead of waiting on a progress stream.
+async function load() {
+  try {
+    const res = await fetch(`/api/explainers/${encodeURIComponent(id)}`);
+    if (!res.ok) return showFailed("This explainer wasn't found.");
+    const d = await res.json();
+    title = d.title || title;
+    if (d.status === "done") showViewer();
+    else showFailed(d.error || "This explainer isn't available.");
+  } catch {
+    showFailed("Couldn't load this explainer.");
+  }
 }
-connect();
+load();
 
 // ---- Comments: overall (bottom panel) + per-section (injected into the explainer) ----
 let commentsByScene = {}; // sceneId -> [comments]; "" = overall

@@ -1,0 +1,110 @@
+{
+  "paper": {
+    "title": "Shor's algorithm is possible with as few as 10,000 reconfigurable atomic qubits",
+    "authors": [
+      "Madelyn Cain",
+      "Qian Xu",
+      "Robbie King",
+      "Lewis R. B. Picard",
+      "Harry Levine",
+      "Manuel Endres",
+      "John Preskill",
+      "Hsin-Yuan Huang",
+      "Dolev Bluvstein"
+    ],
+    "oneSentenceClaim": "This paper argues Shor's algorithm, which breaks RSA and elliptic-curve encryption, needs far fewer qubits than previously thought. Using higher-efficiency error-correcting codes and movable-atom quantum hardware, it estimates as few as 10,000 to 26,000 physical qubits could do the job. Under optimistic assumptions, cracking a 256-bit elliptic-curve key could take about 10 days, and RSA-2048 about 100 days.",
+    "category": "Quantum"
+  },
+  "prerequisites": [
+    "Basic notion of a qubit and quantum gates",
+    "General awareness that quantum computers need error correction",
+    "Familiarity with RSA/public-key cryptography at a conceptual level",
+    "No prior knowledge of qLDPC codes, code surgery, or neutral-atom hardware assumed"
+  ],
+  "concepts": [
+    {
+      "id": "qubits-and-decoherence",
+      "name": "Physical qubits are noisy by nature",
+      "whyItMatters": "The entire paper is an exercise in bridging the gap between noisy real hardware and the near-perfect logic Shor's algorithm needs; that gap is why error correction (and its huge qubit overhead) exists at all.",
+      "coreMechanism": "A qubit stores a quantum superposition, but every gate, measurement, and moment of storage lets it drift or decohere due to stray interactions with its environment. Today's best physical qubits still have per-operation error rates around 0.05%-1%, whereas a cryptographically useful circuit needs the *net* error over billions of operations to stay below roughly 1 in 10 billion.",
+      "foundational": true
+    },
+    {
+      "id": "quantum-error-correction-basics",
+      "name": "Logical qubits, code distance, and the threshold theorem",
+      "whyItMatters": "Every resource estimate in the paper (number of physical qubits, error rates, runtimes) is really a statement about how large a code distance you need and how many physical qubits that distance costs.",
+      "coreMechanism": "Instead of trusting one noisy physical qubit, you spread quantum information redundantly across many physical qubits (a 'code block') and repeatedly measure check operators ('stabilizers') that reveal error syndromes without collapsing the encoded logical state. The threshold theorem guarantees that if the physical error rate p is below some threshold p_th, then increasing the code's 'distance' d (roughly, how many simultaneous errors it takes to corrupt the logical information undetected) suppresses the logical error rate super-polynomially, e.g. as (p/p_th)^{d/2}. This is why the paper's codes (distance 16-24) achieve logical error rates of 1e-7 to 1e-11 even though physical gates fail at p=0.1%.",
+      "keyEquation": "P_L(p) \\approx a\\,p^{d/2}",
+      "foundational": true
+    },
+    {
+      "id": "clifford-vs-nonclifford-gates",
+      "name": "Clifford gates are 'free', Toffoli/T gates need magic states",
+      "whyItMatters": "Shor's algorithm's cost is measured almost entirely in Toffoli gates (6.5 billion for RSA-2048), and each one has to be paid for with a manufactured magic state, so the efficiency of magic-state production and consumption dominates both the architecture's space and time cost.",
+      "coreMechanism": "Quantum gates split into two classes: Clifford gates (Hadamard, CNOT, Pauli, phase) can be tracked symbolically through a circuit and 'commuted' past later operations without ever being physically re-executed, while non-Clifford gates (T, Toffoli/CCZ) actually provide the extra computational power needed for universality and cannot be bypassed this way. The standard trick (Pauli-based computation) rewrites a circuit so all Cliffords are pushed to the end, converting the hard work into a sequence of Pauli measurements plus 'consuming' pre-made non-Clifford resource states (magic states) via gate teleportation.",
+      "foundational": true
+    },
+    {
+      "id": "shors-algorithm-crypto-threat",
+      "name": "Why Shor's algorithm threatens RSA and elliptic-curve crypto",
+      "whyItMatters": "This is the entire reason the paper picks RSA-2048 and ECC-256 as benchmarks: these are the actual key sizes deployed to secure most of today's internet traffic.",
+      "coreMechanism": "Factoring large numbers (RSA) and computing discrete logarithms on elliptic curves (ECC) are believed to be intractable for classical computers, which is why they underpin public-key cryptography. Shor's algorithm uses quantum superposition and the quantum Fourier transform to find a hidden periodicity in these problems in polynomial time, giving an exponential speedup over the best known classical attacks — so a large enough fault-tolerant quantum computer running Shor's algorithm would break both schemes.",
+      "foundational": true
+    },
+    {
+      "id": "surface-code-overhead-problem",
+      "name": "Why the standard surface code needs millions of qubits",
+      "whyItMatters": "This is the baseline the paper is beating: without a code-family change, cryptographically relevant Shor's algorithm needs roughly 1 million to 20 million physical qubits, which is why the paper's central claim (10,000-26,000 qubits) is striking.",
+      "coreMechanism": "The surface code, the dominant architecture in prior resource estimates, only connects each physical qubit to its nearest neighbors on a 2D grid. That locality constraint forces each logical qubit to be spread across a large 2D patch of physical qubits (often hundreds), and typically only one (or few) logical qubits fit per patch — an encoding rate near 0.1%. Scaling this up to the ~1,000+ logical qubits and huge distances Shor's algorithm needs multiplies out to millions of physical qubits."
+    },
+    {
+      "id": "high-rate-qldpc-codes",
+      "name": "High-rate qLDPC codes: many logical qubits per block via nonlocal wiring",
+      "whyItMatters": "This single code-family swap is responsible for most of the ~100-1000x reduction in qubit count, turning a million-qubit problem into a 10,000-qubit one, and it is the central technical contribution the paper builds everything else around.",
+      "coreMechanism": "Lifted-product (LP) quantum low-density parity-check codes are built from an algebraic 'seed' structure (a small matrix over cyclic shift operators) that lets checks connect physical qubits that are far apart within the block, not just neighbors. This nonlocal connectivity lets a single ~5,278-physical-qubit block encode 1,480 logical qubits at distance ≤24 (a ~28% encoding rate), matching the error performance of a surface code that would need 161x more physical qubits for the same number of logical qubits and distance.",
+      "keyEquation": "[[n=(r_A^2+n_A^2)\\ell,\\; k\\ge(n_A-r_A)^2\\ell,\\; d]]",
+      "keyFigureRef": "Fig. 2a",
+      "misconception": "It's tempting to assume all quantum error-correcting codes trade off qubits for reliability at roughly the same rate; in fact the encoding rate (logical qubits per physical qubit) can differ by two orders of magnitude between code families with comparable protection, purely because of what connectivity they assume."
+    },
+    {
+      "id": "reconfigurable-atom-connectivity",
+      "name": "Reconfigurable atom tweezers make nonlocal codes physically realizable",
+      "whyItMatters": "High-rate codes only pay off in practice if the hardware can actually make the long-range connections the code needs; neutral atoms are the specific enabling technology that lets this paper's theoretical qubit savings become an engineering roadmap rather than just math.",
+      "coreMechanism": "In a neutral-atom quantum computer, each qubit is an atom held in an individually-controllable optical 'tweezer' (a focused laser trap), and between gate operations these tweezers can physically move the atoms to new positions before triggering an entangling gate via excitation to Rydberg states. This means any two atoms in the array can be brought together for a gate regardless of where they're normally stored — exactly the kind of nonlocal, reconfigurable wiring the high-rate qLDPC codes require, and something fixed-wire chips (e.g. superconducting qubits) cannot easily do. Arrays trapping over 6,100 coherent atoms have already been demonstrated, plus optical tweezer masks with 360,000 trap sites."
+    },
+    {
+      "id": "code-surgery-ppms",
+      "name": "Code surgery: performing logical gates by temporary ancilla coupling",
+      "whyItMatters": "Code surgery is the concrete mechanism translating the abstract code into an actual sequence of physical operations, and its cost (ancilla qubits and cycle count) is what the paper's runtime and space estimates are built from.",
+      "coreMechanism": "To measure a logical operator (a Pauli product measurement, or PPM) on an encoded qubit without destroying the encoded information, you temporarily couple the data code to a fresh ancilla qubit system so that measuring the ancilla's stabilizers for a fixed number of cycles (about 2d/3, where d is the code distance) reveals the value of the target logical operator. Because the ancilla system's size only needs to scale with the physical 'weight' (footprint) of the specific logical operator being measured — not the entire code block — keeping the target operators low-weight keeps the extra hardware small.",
+      "keyFigureRef": "Fig. 2b"
+    },
+    {
+      "id": "architecture-zones",
+      "name": "Splitting the chip into memory, processor, resource, and operation zones",
+      "whyItMatters": "This four-zone layout is the concrete physical blueprint (Fig. 1a) that turns the abstract high-rate code + surgery scheme into something with a specific, countable physical qubit budget of 9,739 to 13,255 qubits.",
+      "coreMechanism": "Running full surgery directly on a giant 1,480-logical-qubit memory block would require ancilla systems that scale with the whole block, which is impractical to engineer. Instead, only a small subset of logical qubits (as few as 10-148) is teleported at a time out of the large memory code into a much smaller 'processor' code where Toffoli gates and mid-circuit measurements actually happen; a separate 'resource' zone continuously manufactures magic states, and an 'operation' zone hosts the reconfigurable ancilla qubits (10-20% of the total budget) used for all these surgery steps.",
+      "keyFigureRef": "Fig. 2b"
+    },
+    {
+      "id": "magic-state-cultivation-distillation",
+      "name": "Cheaply manufacturing high-fidelity magic states",
+      "whyItMatters": "Because Shor's algorithm needs billions of Toffoli gates, the throughput and error rate of this magic-state pipeline directly sets both the final logical error budget and roughly the entire 'resource zone' portion of the qubit count.",
+      "coreMechanism": "Noisy T-states are first grown ('cultivated') on small distance-7 surface code patches in only about 5 cycles, reaching an error rate near 1e-6. Many of these lower-fidelity states are then fed into a high-rate '8T-to-CCZ' distillation circuit run in parallel across several qLDPC factory code blocks, which combines eight noisy inputs into one much cleaner CCZ (Toffoli-enabling) resource state with error rate around 1e-10, producing 10 usable states per distillation round."
+    },
+    {
+      "id": "serial-vs-parallel-tradeoff",
+      "name": "Serial vs. parallel Toffoli execution: trading qubits for speed",
+      "whyItMatters": "This tradeoff explains why the paper reports two very different qubit/runtime combinations for the same cryptographic problem, and it is the lever that could bring RSA-2048's runtime down from tens of thousands of days to about 100 days.",
+      "coreMechanism": "In the basic 'space-efficient'/'balanced' compilation, every Toffoli gate and mid-circuit measurement is executed one surgery operation at a time, so runtime scales linearly with the Toffoli count (about 6.5 billion for RSA-2048), yielding runtimes from ~1,000 to ~43,000 days. Swapping in a logarithmic-depth 'carry-lookahead' adder circuit (instead of the standard linear-depth ripple-carry adder) and running many magic-state teleportations simultaneously (parallelism level P, e.g. P=1,160) shrinks runtime by nearly two orders of magnitude, but only if you build proportionally more parallel factories and ancilla systems, roughly 10x more physical qubits (26,000-102,000 instead of 10,000-13,000).",
+      "keyEquation": "\\tau_{Toff.} = \\frac{2d}{3\\beta_i}(4m_i+4\\beta_i+\\gamma_i)\\ge \\frac{8d}{3}"
+    },
+    {
+      "id": "headline-resource-comparison",
+      "name": "The headline claim: 10,000-100,000 qubits versus millions",
+      "whyItMatters": "This is the paper's central, quotable result and the reason it's newsworthy: it claims a roughly 100x reduction in required physical qubits for cryptographically-relevant Shor's algorithm compared to prior estimates, using an architecture close to demonstrated neutral-atom capability.",
+      "coreMechanism": "Prior resource estimates using planar surface codes required about 1-20 million physical qubits to run RSA-2048 or ECC-256. By combining high-rate qLDPC codes (~30% encoding rate), efficient magic-state factories, and neutral-atom nonlocal connectivity, this paper estimates 9,739-13,255 qubits for slower, space-efficient/balanced designs, and 19,000-102,000 qubits for faster, more parallel designs, with runtimes ranging from about 10 days (ECC-256) to roughly 97-260 days (RSA-2048).",
+      "keyFigureRef": "Fig. 1b, Fig. 3"
+    }
+  ]
+}
