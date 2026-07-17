@@ -117,6 +117,9 @@ app.get("/api/explainers/:id/html", async (req, reply) => {
 
 // ---- Chat with this paper (multi-turn, grounded in the explainer; fable-5) ----
 app.post("/api/explainers/:id/chat", async (req, reply) => {
+  // Chat calls the Anthropic API server-side; without a key it is disabled so a
+  // public deployment can't spend the owner's tokens.
+  if (!process.env.ANTHROPIC_API_KEY) return reply.code(503).send({ error: "Chat is unavailable on this deployment." });
   const row = await getExplainer((req.params as { id: string }).id);
   if (!row) return reply.code(404).send({ error: "Not found." });
   if (!allowChat(clientIp(req))) return reply.code(429).send({ error: "Too many messages — give it a moment." });
