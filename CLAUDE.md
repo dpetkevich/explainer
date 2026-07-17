@@ -46,16 +46,16 @@ In `prompts/review.md`: review on behalf of the injected audience profile, not t
 
 ## Web app (self-serve)
 
-One always-on Node/Fastify service (`src/server/`, run with `npm run serve`) turns the
-pipeline into a self-serve product: anyone uploads a paper (PDF or arXiv/URL) and watches
-it generate live; readers post anonymous comments. There is **no GitHub integration** —
-generation, storage, and hosting all live in this one service.
-- `index.ts` — routes: `POST /api/uploads`, `GET /api/explainers` (feed), `GET /api/explainers/:id/events` (SSE progress), `GET /api/explainers/:id/html` (the finished explainer), `GET|POST …/comments`, and the `/` + `/explainer/:id` frontend (`src/server/public/`).
-- `queue.ts` + `jobs.ts` — in-process job queue (concurrency `GEN_CONCURRENCY`, default 1) runs the pipeline stages directly (so the CLI's script gate never applies) with a fixed default audience (`AUDIENCE_PROFILE`, default `profiles/default.json`).
-- Live progress is the additive `ProgressEvent` layer: `src/lib/progress.ts` + `Ctx.onEvent`, emitted next to the existing `info()` sites in ingest/storyboard/pipeline/qa/assemble. The job's `onEvent` updates the SQLite row and fans out to SSE.
-- `db.ts` — SQLite (`better-sqlite3`) at `data/explainers.db`: explainer records + comments. On boot, `running` jobs are marked failed and `queued` jobs resume.
-- `limits.ts` — per-IP rate limits, 25 MB PDF cap, global daily generation cap. Model refusals become a typed `RefusalError` → clean `failed: content declined`.
-- Deploy as one container on a long-job host (Playwright base image for Chromium), `ANTHROPIC_API_KEY` set, a persistent volume at `data/` **and** `explainers/` (artifacts). Not Vercel — jobs are long and need a browser.
+A Fastify web app (`src/server/`, run locally with `npm run serve`) serves a read-only gallery of
+**pre-computed** explainers plus reader interactions (browse/filter, star, comment, "chat with this
+paper"). Generation is **offline** (the `scripts/regen-*.ts` drivers call `runGenerationJob`), so the
+served app never runs the pipeline or a browser and deploys as one Vercel serverless function. There
+is **no GitHub integration** and **no in-app upload/generation**.
+- `app.ts` — builds+exports the Fastify app (no listen). Routes: `GET /api/explainers` (feed), `GET /api/explainers/:id` + `…/html`, `GET|POST …/comments`, `POST …/star`, `POST …/chat` + `GET …/chats`, and the `/` + `/explainer/:id` frontend (`src/server/public/`). `index.ts` is the local bootstrap (`initDb` + listen); `api/index.ts` wraps `app` as the Vercel handler. No SSE route (explainers are always done).
+- `jobs.ts` — `runGenerationJob` runs the pipeline stages directly for the offline drivers (imports Playwright, so it is **never** imported by `app.ts`). `sse.ts`/`ProgressEvent` (`src/lib/progress.ts`) still fire during local generation as best-effort DB progress updates.
+- `db.ts` — **Postgres** via `@vercel/postgres` (async), one datastore for serving and local generation, selected by `POSTGRES_URL` (Vercel Postgres/Neon in prod; a Neon branch locally — there is no `file:` mode). `scripts/migrate-to-postgres.ts` seeds it from the old local SQLite.
+- `limits.ts` — per-IP rate limits (in-memory → best-effort per serverless instance). Model refusals become a typed `RefusalError` → clean `failed: content declined`.
+- Deploy: **Vercel**. `vercel.json` routes everything to `api/index.ts`, `includeFiles` bundles the committed artifacts (`explainers/*/explainer.html` + `work/{concept-map,storyboard,source.md}.json`) + `prompts/` + `profiles/` + `public/`, and sets `maxDuration: 60` for chat (fable-5 runs 10–40s+ → needs Vercel **Pro**). `playwright` is a devDependency; set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` in the Vercel env. Env: `POSTGRES_URL`, `ANTHROPIC_API_KEY`, `AUDIENCE_PROFILE`.
 
 ## Testing
 
