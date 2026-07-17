@@ -1,0 +1,6 @@
+# Never ship local secrets or dev state to Vercel (the function uses platform env).
+.env
+.env.*
+data/
+*.log
+.git

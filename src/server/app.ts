@@ -10,7 +10,7 @@
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { existsSync, readFileSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { paths, type Ctx } from "../lib/context.js";
@@ -30,17 +30,9 @@ import {
 import { allowComment, allowStar, allowChat } from "./limits.js";
 import { chat, type ChatMessage } from "./chat.js";
 
-// Minimal .env loader so ANTHROPIC_API_KEY / POSTGRES_URL can live in the project
-// locally (mirrors cli.ts). On Vercel there is no .env file and env comes from the
-// platform, so this is a no-op there.
-(() => {
-  const envFile = resolve(".env");
-  if (!existsSync(envFile)) return;
-  for (const line of readFileSync(envFile, "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && m[1] && !(m[1] in process.env)) process.env[m[1]] = m[2]!.replace(/^["']|["']$/g, "");
-  }
-})();
+// NOTE: no .env loading here on purpose. The Vercel function imports this module
+// directly and must rely solely on platform env vars. Local dev loads .env via
+// src/server/load-env.ts (imported first by index.ts).
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, "public");

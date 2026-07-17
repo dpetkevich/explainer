@@ -1,8 +1,9 @@
 /**
- * Local bootstrap: ensure the schema exists, then start the Fastify app on a
- * port. On Vercel the app is served by api/index.ts instead (no listen), so this
- * file is only used for `npm run serve` in development.
+ * Local bootstrap: load .env (dev only), ensure the schema exists, then start the
+ * Fastify app on a port. On Vercel the app is served by api/index.ts instead (no
+ * listen, no .env), so this file is only used for `npm run serve` in development.
  */
+import "./load-env.js"; // must run before ./app (and its transitive imports) read env
 import app from "./app.js";
 import { initDb } from "./db.js";
 
