@@ -8,6 +8,7 @@ import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import { QaReportSchema, type StoryboardScene, type QaReport } from "../lib/schemas.js";
 import { info, warn, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
+import { span } from "../lib/timings.js";
 import { sceneContract } from "./scenes.js";
 
 const MAX_REPAIRS = 2;
@@ -202,7 +203,7 @@ export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardSc
     }
 
     info("qa", `${scene.id}: rendering (attempt ${attempts + 1}/${MAX_REPAIRS + 1})`);
-    const render = await renderScene(browser, htmlPath);
+    const render = await span(`qa:${scene.id}:render#${attempts + 1}`, () => renderScene(browser, htmlPath));
     writeFileSync(paths.qaDefaultPng(ctx, scene.id), render.defaultPng);
     writeFileSync(paths.qaPerturbedPng(ctx, scene.id), render.perturbedPng);
 
@@ -212,7 +213,9 @@ export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardSc
       failureText = `Console errors while running the scene:\n${render.consoleErrors.join("\n")}`;
       info("qa", `${scene.id}: ${render.consoleErrors.length} console error(s) — skipping vision review`);
     } else {
-      const report = await reviewSceneWithRetry(ctx, scene, render);
+      const report = await span(`qa:${scene.id}:review#${attempts + 1}`, () =>
+        reviewSceneWithRetry(ctx, scene, render)
+      );
       if (report.pass) {
         const result: SceneResult = { id: scene.id, status: "pass", attempts: attempts + 1 };
         writeFileSync(reportPath, JSON.stringify(result, null, 2));
@@ -235,7 +238,9 @@ export async function qaOneScene(ctx: Ctx, browser: Browser, scene: StoryboardSc
     attempts++;
     if (attempts > MAX_REPAIRS) break;
     info("qa", `${scene.id}: repairing (${attempts}/${MAX_REPAIRS})`);
-    await repairScene(ctx, scene, readFileSync(htmlPath, "utf8"), failureText);
+    await span(`qa:${scene.id}:repair#${attempts}`, () =>
+      repairScene(ctx, scene, readFileSync(htmlPath, "utf8"), failureText)
+    );
   }
 
   const result: SceneResult = {

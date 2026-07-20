@@ -6,6 +6,7 @@ import { loadPrompt, loadPromptRaw } from "../lib/prompts.js";
 import type { StoryboardScene } from "../lib/schemas.js";
 import { info, StageError } from "../lib/log.js";
 import { paths, type Ctx } from "../lib/context.js";
+import { recordSpan } from "../lib/timings.js";
 
 export async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items];
@@ -60,6 +61,7 @@ export async function generateScene(ctx: Ctx, scene: StoryboardScene): Promise<v
   });
 
   info("scenes", `${scene.id}: generating with ${MODELS.codegen}`);
+  const t0 = Date.now();
   let html = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await callModel({
@@ -85,5 +87,6 @@ export async function generateScene(ctx: Ctx, scene: StoryboardScene): Promise<v
   mkdirSync(dirname(htmlPath), { recursive: true });
   writeFileSync(htmlPath, html);
   recordHash(hashFile, hash);
+  recordSpan(`scene:${scene.id}:generate`, t0);
   info("scenes", `${scene.id}: wrote ${htmlPath}`);
 }

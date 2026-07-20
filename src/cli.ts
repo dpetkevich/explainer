@@ -11,6 +11,7 @@ import { runIngest } from "./stages/ingest.js";
 import { runStoryboard } from "./stages/storyboard.js";
 import { runScenePipeline } from "./stages/pipeline.js";
 import { runAssemble } from "./stages/assemble.js";
+import { initTimings, recordSpan } from "./lib/timings.js";
 
 // Minimal .env loader (KEY=value lines, no expansion) so the key can live in the project.
 (() => {
@@ -47,6 +48,7 @@ async function timed<T>(stage: string, fn: () => Promise<T>): Promise<T> {
   const t0 = Date.now();
   const result = await fn();
   info(stage, `stage finished in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  recordSpan(`stage:${stage}`, t0);
   return result;
 }
 
@@ -106,6 +108,7 @@ program
         onlyScene: opts.scene,
       };
       mkdirSync(ctx.workDir, { recursive: true });
+      initTimings(ctx.workDir);
 
       // With --scene, upstream artifacts must already exist (never force-refetch them).
       const upstreamCtx: Ctx = ctx.onlyScene ? { ...ctx, force: false } : ctx;

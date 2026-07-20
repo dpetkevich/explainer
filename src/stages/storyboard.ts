@@ -8,6 +8,7 @@ import { info, warn, StageError } from "../lib/log.js";
 import { emit } from "../lib/progress.js";
 import { reviewAndReviseScript } from "./scriptReview.js";
 import { paths, type Ctx } from "../lib/context.js";
+import { span } from "../lib/timings.js";
 
 export interface StoryboardResult {
   board: Storyboard;
@@ -50,14 +51,16 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   const MAX_ATTEMPTS = 3;
   let parsed: unknown;
   for (let attempt = 1; ; attempt++) {
-    const raw = await callModel({
-      model: MODELS.planning,
-      messages: [{ role: "user", content: prompt }],
-      // Uncapped scene counts + per-scene teaches/requires fields produce large JSON,
-      // and the planning model's extended thinking also counts against max_tokens —
-      // hard papers can burn 25k+ tokens reasoning before emitting a byte of output.
-      maxTokens: 64000,
-    });
+    const raw = await span(`storyboard:llm#${attempt}`, () =>
+      callModel({
+        model: MODELS.planning,
+        messages: [{ role: "user", content: prompt }],
+        // Uncapped scene counts + per-scene teaches/requires fields produce large JSON,
+        // and the planning model's extended thinking also counts against max_tokens —
+        // hard papers can burn 25k+ tokens reasoning before emitting a byte of output.
+        maxTokens: 64000,
+      })
+    );
     try {
       parsed = JSON.parse(stripJsonFences(raw));
       break;
@@ -100,7 +103,7 @@ export async function runStoryboard(ctx: Ctx, conceptMap: ConceptMap): Promise<S
   // Prose review + auto-revise (hook + captions) before anything is cached or
   // any graphics are made. Prose fields are outside the scene contract, so this
   // never triggers scene regeneration.
-  board = await reviewAndReviseScript(ctx, board, conceptMap);
+  board = await span("storyboard:script-review", () => reviewAndReviseScript(ctx, board, conceptMap));
 
   writeFileSync(out, JSON.stringify(board, null, 2));
   writeFileSync(paths.script(ctx), renderScript(ctx, board));
