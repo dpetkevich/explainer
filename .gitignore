@@ -22,3 +22,5 @@ data/
 
 # one-off regen/run logs
 regen-*.log
+.vercel
+.env*.local
