@@ -1,0 +1,392 @@
+{
+  "title": "The Arithmetic of Running a Giant AI Model",
+  "hook": "In July 2026, the lab Moonshot AI released Kimi K3, an AI model made of 2.8 trillion stored numbers. Ask a simple question — what machine can actually run this thing? — and you might expect the answer to require a PhD. It doesn't. Two lines of multiplication and division predict which models fit on a laptop, which need a data center, and why K3 had to be built the strange way it was. By the end, you'll be able to size the hardware for any AI model on the back of an envelope.",
+  "parts": [
+    {
+      "title": "The arithmetic of running a model",
+      "lede": "Before we can size Kimi K3, we need to know what a model physically is and the two rules that govern it: one for how much memory it needs, one for how fast it can talk. We build both rules on a small model we can check by hand, then aim them at K3 — and hit a wall."
+    },
+    {
+      "title": "How Kimi K3 dodges the wall",
+      "lede": "Part 1 ended with a model that fits nowhere and, even if it did, would crawl at 2.4 tokens per second. K3's designers attack the arithmetic itself with three moves:\n- read only a sliver of the model per token (Mixture-of-Experts)\n- store each number in half a byte, trained that way from the start (4-bit training)\n- stop keeping a full record of the conversation (Kimi Delta Attention)"
+    },
+    {
+      "title": "The numbers, head to head",
+      "lede": "Each of K3's three moves changed one term in our two equations. Now we plug everything back in and compare: the impossible dense version of K3 against the real one, on real machines with real gigabytes."
+    },
+    {
+      "title": "Why 2026, and what it unlocks",
+      "lede": "K3's design only became rational when new chips made 4-bit math the fast path rather than a storage trick — and the payoff shows up somewhere anyone can verify: the price list."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "pile-of-numbers",
+      "conceptId": "model-is-a-pile-of-numbers",
+      "part": "The arithmetic of running a model",
+      "title": "An AI model is billions of stored numbers, and nearly all of them are read for every word",
+      "teaches": "A model's 'parameters' are just tuned numbers, and generating each token requires reading essentially all of them from fast memory.",
+      "requires": [],
+      "caption": "A model is nothing but parameters — tuned numbers, 8 billion in this small model, 2.8 trillion in Kimi K3. Press play and watch: producing one token — a word-sized chunk of text — means sweeping through essentially all of them.",
+      "visualMetaphor": "A chat window generating a reply one token at a time (a token: a word-sized chunk of text; models produce one at a time). Zooming out reveals the model behind the chat: a huge grid of tiny cells, each one a stored number, labeled 'Llama 3.1 8B — 8,000,000,000 parameters'. Predict-before-reveal prompt: 'To produce the next word, how much of this grid do you think gets read — a few cells? a corner?' Pressing play sweeps a highlight across the ENTIRE grid while a counter races to 8 billion, then one token appears in the chat. A side label shows where the grid must live: fast memory next to the processor (GPU VRAM, or Apple's unified memory), with a grayed-out disk icon annotated 'far too slow — if the numbers don't fit in fast memory, the model doesn't run at all'. A small inset compares the 8B grid to a barely-visible speck labeled 'Kimi K3: 2.8 trillion — 350× larger'.",
+      "animatedVariable": {
+        "name": "generate one token",
+        "control": "play-pause",
+        "range": "one full read sweep per token, repeatable",
+        "whatChangesOnScreen": "A highlight sweeps the whole parameter grid, a counter climbs to 8 billion numbers read, and exactly one new token appears in the chat window."
+      },
+      "quantitativeAnchor": "Llama 3.1 8B: 8 billion parameters; Kimi K3: 2.8 trillion parameters — 350× more.",
+      "physicsChecks": [
+        "The read counter reaches the full parameter count (8 billion) for every single token generated, not just the first.",
+        "The sweep covers the entire grid, visibly contradicting the natural guess that only a small region is consulted per word.",
+        "The disk icon is marked too slow and never participates in the sweep; only the fast-memory grid does."
+      ]
+    },
+    {
+      "id": "bytes-per-number",
+      "conceptId": "precision-is-bytes-per-number",
+      "part": "The arithmetic of running a model",
+      "title": "Each stored number costs a chosen number of bytes",
+      "teaches": "Every parameter is written down at a chosen precision — 4, 2, 1, or 0.5 bytes — and coarser precision means rounding the number to a wider grid.",
+      "requires": [
+        "pile-of-numbers"
+      ],
+      "caption": "Those 8 billion numbers each take up space, and engineers choose how much: from 4 bytes down to half a byte. Fewer bytes means each number is rounded to a coarser grid — like keeping fewer decimal places.",
+      "visualMetaphor": "One single parameter from the grid, blown up: its true value (say 0.3271) shown as a dot on a number line. Four buttons select the storage format, each with its byte cost: FP32 (full precision, 4 bytes — used in training), BF16 (the standard release format, 2 bytes), FP8/INT8 (1 byte), and 4-bit formats like INT4/MXFP4 (0.5 bytes). Selecting a format redraws the number line with that format's grid of allowed values; the dot snaps to the nearest grid point and a small 'rounding error' bracket shows the gap. Below, a strip of 8 memory-cell boxes fills according to the byte cost, making '0.5 bytes' visually concrete as 4 bits.",
+      "animatedVariable": {
+        "name": "storage precision",
+        "control": "buttons",
+        "range": "FP32 (4 B) → BF16 (2 B) → FP8 (1 B) → 4-bit (0.5 B)",
+        "whatChangesOnScreen": "The grid of allowed values gets coarser, the stored value snaps further from the true value, and the filled memory cells shrink from 32 bits to 4."
+      },
+      "quantitativeAnchor": "4 bytes (FP32), 2 bytes (BF16), 1 byte (FP8), 0.5 bytes (4-bit) per parameter.",
+      "physicsChecks": [
+        "Halving the byte count exactly halves the filled memory cells at every step (32 → 16 → 8 → 4 bits).",
+        "The rounding-error bracket grows monotonically as precision decreases and is zero-ish only at FP32.",
+        "The stored value always snaps to the nearest allowed grid point, never drifts arbitrarily."
+      ]
+    },
+    {
+      "id": "memory-equation",
+      "conceptId": "weights-memory-arithmetic",
+      "part": "The arithmetic of running a model",
+      "title": "Rule 1: memory needed = number of parameters × bytes per parameter",
+      "teaches": "One multiplication — parameter count times bytes per parameter — gives any model's weight footprint, from 4.5 GB to 1.4 TB.",
+      "requires": [
+        "pile-of-numbers",
+        "bytes-per-number"
+      ],
+      "caption": "Count times cost: that one multiplication is Rule 1. At 2 bytes per number, our small 8-billion-parameter model — it's called Llama 8B — needs 16 GB, its bigger sibling Llama 70B needs 140 GB, and at half a byte Kimi K3 still needs 1.4 TB.",
+      "visualMetaphor": "An equation scene. Center stage: \\(M_{weights} = N_{params} × B\\), with each symbol labeled in plain words — \\(M_{weights}\\): memory the model's numbers occupy (GB); \\(N_{params}\\): how many numbers (billions or trillions); \\(B\\): bytes per number, from the previous scene. Buttons pick a worked example and the terms fill in with an animated multiplication: Llama 3.1 8B × 2 B = 16 GB; the same 8B at 4-bit = ~4.5 GB; Llama 3.3 70B × 2 B = 140 GB (~35 GB at 4-bit); Kimi K3 2.8T × 0.5 B = 1.4 TB, with a ghosted row underneath showing 2.8T × 2 B = 5.6 TB 'if released the standard way'. A proportional bar under each result makes the 350× jump from 4.5 GB to 1.4 TB visceral.",
+      "animatedVariable": {
+        "name": "worked example",
+        "control": "buttons",
+        "range": "8B @ BF16 / 8B @ 4-bit / 70B @ BF16 / 70B @ 4-bit / K3 2.8T @ 4-bit",
+        "whatChangesOnScreen": "The equation's terms repopulate, the product recomputes, and the result bar rescales in exact proportion."
+      },
+      "quantitativeAnchor": "8B × 2 B = 16 GB; 70B × 2 B = 140 GB; 2.8T × 0.5 B = 1.4 TB (5.6 TB at BF16).",
+      "physicsChecks": [
+        "Switching any model from BF16 to 4-bit divides its footprint by exactly 4 (16 GB → ~4.5 GB with a note that real files carry small extras; 140 GB → ~35 GB).",
+        "Result bars scale linearly with the product — K3's bar is ~350× the 8B-at-4-bit bar.",
+        "Every symbol in the equation has a plain-word label and unit visible on screen."
+      ]
+    },
+    {
+      "id": "hardware-ladder",
+      "conceptId": "hardware-memory-ladder",
+      "part": "The arithmetic of running a model",
+      "title": "Real machines come in memory tiers — and K3's 1.4 TB overflows every single box",
+      "teaches": "Fast-memory capacity is a hard pass/fail gate: a model runs on a machine only if its footprint fits, and K3's weights alone exceed the largest single server node.",
+      "requires": [
+        "memory-equation"
+      ],
+      "caption": "Fitting is pass/fail; no processor speed rescues a model that doesn't fit. And K3's 1.4 TB overflows even the biggest H100 server — an 8-GPU node with 1.1 TB.",
+      "visualMetaphor": "A ladder of real machines drawn as containers with their fast-memory capacity: MacBook Pro (16–128 GB unified memory), RTX 4090 gaming GPU (24 GB VRAM), 48 GB workstation GPU, H100 (80 GB), H200 (141 GB), B200 (192 GB), and a standard server node of 8 × H200 (~1.1 TB). ('GPU': the specialized chip AI runs on; 'VRAM': the fast memory soldered next to it.) Buttons select a model+precision from the previous scene; its footprint drops onto each rung as a liquid fill — green when it fits, overflowing red when it doesn't. Predict prompt before selecting K3: 'It fit nothing so far except the big node — will 1.1 TB hold 1.4 TB?' K3 overflows every rung, including the biggest node, with an annotation: 'more chips per box won't appear by wishing — this model has outgrown the single machine.'",
+      "animatedVariable": {
+        "name": "model and precision",
+        "control": "buttons",
+        "range": "8B @ 4-bit (4.5 GB) → 70B @ 4-bit (35 GB) → 70B @ BF16 (140 GB) → K3 @ 4-bit (1.4 TB)",
+        "whatChangesOnScreen": "The footprint liquid pours into each machine on the ladder; rungs flip between green 'fits' and red 'overflows' as the model grows."
+      },
+      "quantitativeAnchor": "8 × H200 node ≈ 1.1 TB — still less than K3's 1.4 TB of weights alone.",
+      "physicsChecks": [
+        "8B at 4-bit (4.5 GB) fits every rung including the base MacBook; 70B at 4-bit (35 GB) fits the 48 GB workstation card but overflows the 24 GB RTX 4090.",
+        "70B at BF16 (140 GB) overflows an 80 GB H100 but fits a 141 GB H200 — the gate is capacity, not chip power.",
+        "K3 at 4-bit shows red overflow on all rungs, including the 1.1 TB node."
+      ]
+    },
+    {
+      "id": "speed-equation",
+      "conceptId": "bandwidth-speed-limit",
+      "part": "The arithmetic of running a model",
+      "title": "Rule 2: tokens per second ≈ memory bandwidth ÷ bytes read per token",
+      "teaches": "Because every token requires reading the active weights once, generation speed is capped by memory bandwidth divided by the bytes read per token.",
+      "requires": [
+        "pile-of-numbers",
+        "memory-equation"
+      ],
+      "caption": "Fitting is only half the story — remember from scene one that every token re-reads the whole model. Rule 2: divide the memory's reading speed by the gigabytes read per token, and you get the speed limit.",
+      "visualMetaphor": "An equation scene built on a pipe diagram: a memory block (holding the model's weights) connected to a processor by a pipe labeled 'memory bandwidth: how many GB per second can flow through' — the pipe's width IS the bandwidth. Center: \\(\\text{tokens/s} ≈ \\frac{\\text{bandwidth (GB/s)}}{\\text{bytes read per token (GB)}}\\), every term labeled with units. Worked example animated once through: Llama 8B at 4-bit means 4.5 GB must flow through the pipe per token; on an Apple M4 Max laptop chip (546 GB/s), that's 546 ÷ 4.5 ≈ 120 tokens/s. A single toggle swaps the numerator to an H100 (3.35 TB/s) to show the same division with a fatter pipe. An annotation kills the misconception: 'the processor itself is mostly waiting — for token-by-token generation, the pipe is the bottleneck, not the math.'",
+      "animatedVariable": {
+        "name": "chip (bandwidth)",
+        "control": "toggle",
+        "range": "M4 Max, 546 GB/s ↔ H100, 3.35 TB/s",
+        "whatChangesOnScreen": "The pipe visibly widens, the numerator swaps, and the computed tokens/s updates (≈120 vs ≈745 for the 4.5 GB model)."
+      },
+      "quantitativeAnchor": "8B @ 4-bit on M4 Max: 546 GB/s ÷ 4.5 GB ≈ 120 tokens/s.",
+      "physicsChecks": [
+        "Computed tokens/s scales exactly linearly with the bandwidth toggle (3.35 TB is ~6.1× 546 GB/s, so ~6.1× the tokens/s).",
+        "The bytes-read-per-token figure equals the model's weight footprint from Rule 1 for a dense model.",
+        "Every symbol in the equation carries a plain-word label and a unit on screen."
+      ]
+    },
+    {
+      "id": "dense-wall",
+      "conceptId": "bandwidth-speed-limit",
+      "part": "The arithmetic of running a model",
+      "title": "A conventional 2.8-trillion-parameter model would crawl at 2.4 tokens per second",
+      "teaches": "Applying Rule 2 to a dense 2.8T model shows it is not just expensive but unusable: even unlimited memory can't lift a 2.4 tokens/s ceiling.",
+      "requires": [
+        "speed-equation",
+        "hardware-ladder"
+      ],
+      "caption": "A dense model — one that reads all its parameters for every token — at 2.8T moves 1.4 TB per token. An H100, a top data-center GPU, reads about 3.4 TB of memory per second, so that's roughly 2.4 tokens/s no matter how much memory you buy.",
+      "visualMetaphor": "An interactive chart from Rule 2. X-axis: dense model size at 4-bit, log scale from 8B to 2.8T (slider). Y-axis: max tokens/s on an H100 (3.35 TB/s), log scale. A horizontal reference band marks 'comfortable reading speed, ~10–15 tokens/s'. Predict prompt pinned at the start: 'Before you drag — the ladder said K3's problem was fitting. If we bought enough memory, would speed be fine?' As the slider moves, a marker slides down the curve: 8B → ~745 tok/s, 70B → ~95 tok/s, 2.8T → 2.4 tok/s, sinking far below the reading band. At 2.8T a chat mock-up alongside types at the true 2.4 tok/s so the reader feels the crawl. Closing annotation: 'Rule 1 said it fits nowhere. Rule 2 says even if it did, it crawls. Something in the arithmetic itself has to change.'",
+      "animatedVariable": {
+        "name": "dense model size",
+        "control": "slider",
+        "range": "8B → 70B → 2.8T parameters (4-bit, on one H100)",
+        "whatChangesOnScreen": "The marker slides down the tokens/s curve, the bytes-read-per-token readout grows from 4.5 GB to 1.4 TB, and the mock chat's typing speed slows to a crawl."
+      },
+      "quantitativeAnchor": "Dense 2.8T @ 4-bit: 1.4 TB read per token → 3.35 TB/s ÷ 1.4 TB ≈ 2.4 tokens/s on an H100.",
+      "physicsChecks": [
+        "Tokens/s falls in exact inverse proportion to model size along the slider (10× the parameters → 1/10 the speed).",
+        "At 70B the marker reads ≈95 tokens/s, matching 3,350 ÷ 35.",
+        "At 2.8T the marker sits below the 10–15 tokens/s reading band and the mock chat visibly types slower than a human reads."
+      ]
+    },
+    {
+      "id": "mixture-of-experts",
+      "conceptId": "mixture-of-experts",
+      "part": "How Kimi K3 dodges the wall",
+      "title": "Mixture-of-Experts: store all 2.8 trillion numbers, but read only 2% per token",
+      "teaches": "K3 splits its layers into 896 experts and routes each token to just 16, so it reads ~50B active parameters (25 GB) per token instead of 1.4 TB.",
+      "requires": [
+        "dense-wall"
+      ],
+      "caption": "The dense wall came from reading everything per token, so a Mixture-of-Experts model routes each token to a few specialists instead. K3 picks 16 of its 896 experts — about 50B active parameters — so the read shrinks from 1.4 TB to 25 GB.",
+      "visualMetaphor": "A mechanism diagram. One model layer drawn as a wall of 896 small blocks labeled 'experts' — parallel sub-networks, each a chunk of parameters — with a tiny 'router' funnel above (a small learned scorer that picks which experts see each token). All 896 blocks are drawn solid, annotated 'ALL must stay loaded in memory — any token might need any of them, so Rule 1's bill is unchanged: still 1.4 TB.' A side note explains the router balances its picks (quantile routing) so all 896 experts stay evenly used and no expert sits idle wasting gigabytes. A toggle switches DENSE vs MoE: in dense mode a token flows in and every block lights up, the read meter filling to 1.4 TB; in MoE mode the router lights exactly 16 blocks (<2% of the wall) and the meter stops at 25 GB (50B active × 0.5 bytes). Predict prompt: 'flip to MoE — what happens to the MEMORY bar next to the READ meter?' Reveal: the memory bar doesn't move; only the read meter collapses, 56× smaller.",
+      "animatedVariable": {
+        "name": "dense vs Mixture-of-Experts",
+        "control": "toggle",
+        "range": "dense (all experts read) ↔ MoE (16 of 896 read)",
+        "whatChangesOnScreen": "Lit experts drop from 896 to 16, the per-token read meter collapses from 1.4 TB to 25 GB, while the separate memory-loaded bar stays fixed at 1.4 TB."
+      },
+      "quantitativeAnchor": "16 of 896 experts per token ≈ 50B active parameters (<2%) → 25 GB read per token, a 56× smaller read than 1.4 TB.",
+      "physicsChecks": [
+        "The memory-loaded bar is identical in both toggle states (1.4 TB) — sparsity visibly does not shrink storage.",
+        "Exactly 16 expert blocks light per token in MoE mode, and different tokens light different sets.",
+        "Read meter ratio matches the numbers: 1.4 TB ÷ 25 GB = 56×."
+      ]
+    },
+    {
+      "id": "naive-quantization",
+      "conceptId": "quantization-tradeoff",
+      "part": "How Kimi K3 dodges the wall",
+      "title": "Squeezing a finished model to 4-bit throws information away",
+      "teaches": "Quantization — re-storing a trained model's numbers on a coarser grid — is lossy, and the accumulated rounding error can degrade the model's intelligence.",
+      "requires": [
+        "bytes-per-number",
+        "memory-equation"
+      ],
+      "caption": "MoE fixed the reading bill; half-byte storage usually comes from quantization, rounding a finished model's numbers onto a coarser grid. That is not a lossless ZIP file — information is genuinely thrown away, and careless rounding makes the model dumber.",
+      "visualMetaphor": "A baseline mechanism scene. Left: a finished, fully trained model's parameters as dots at their exact trained values. A bit-width slider (16 → 8 → 4) overlays coarser and coarser grids; dots snap to grid points and small error bars appear at each dot. The errors flow rightward through a stack of layers, visibly accumulating into 'fuzz' on the output, while a quality meter dips as bits drop. A real-world panel shows Kimi K2 (K3's 1-trillion-parameter predecessor): naive 1T × 0.5 B = 500 GB, but its released INT4 files total 594 GB — annotated 'sensitive layers were kept at higher precision to protect quality, so the files run slightly over the naive number.'",
+      "animatedVariable": {
+        "name": "bits per stored number",
+        "control": "slider",
+        "range": "16-bit → 8-bit → 4-bit (compressing after training)",
+        "whatChangesOnScreen": "The grid coarsens, per-number error bars grow, accumulated fuzz at the output thickens, the quality meter dips, and the footprint readout shrinks proportionally."
+      },
+      "quantitativeAnchor": "Kimi K2 released at INT4: 594 GB (vs the naive 1T × 0.5 B = 500 GB, because sensitive layers stay at higher precision).",
+      "physicsChecks": [
+        "Footprint halves with each halving of bits, exactly tracking Rule 1.",
+        "Rounding error and output fuzz grow monotonically as bits decrease; quality meter never rises when bits drop.",
+        "K2's shown footprint (594 GB) is above the naive 500 GB, with the reason labeled on screen."
+      ]
+    },
+    {
+      "id": "qat-native-4bit",
+      "conceptId": "quantization-aware-training",
+      "part": "How Kimi K3 dodges the wall",
+      "title": "K3 is trained at 4-bit from the start, so the 4-bit file IS the model",
+      "teaches": "By training with MXFP4 weights (and MXFP8 activations) from the supervised fine-tuning stage onward, K3 learns around the coarse grid — 1.4 TB is its native, undegraded form.",
+      "requires": [
+        "naive-quantization"
+      ],
+      "caption": "The last scene's damage came from rounding a model that learned at full precision, so K3 trains on the 4-bit grid from the start. There is no fuller original to degrade; 1.4 TB is its native form.",
+      "visualMetaphor": "A two-path diagram with a toggle. Path A ('compress after training'): training happens on a fine grid, then a stamp squashes the finished dots onto the coarse 4-bit grid — error bars and the quality dip from the previous scene reappear. Path B ('train at 4-bit'): the training loop itself runs with dots constrained to the coarse grid (labeled MXFP4 weights, MXFP8 activations, from the supervised fine-tuning stage onward); each training step nudges dots between allowed grid points, and the quality meter climbs to the same height as an unquantized reference line — the model learned around the grid. Closing annotation: 'so K3 ships as 1.4 TB natively; the 5.6 TB BF16 version never existed to lose.'",
+      "animatedVariable": {
+        "name": "when quantization happens",
+        "control": "toggle",
+        "range": "compress after training ↔ train at 4-bit from the start",
+        "whatChangesOnScreen": "The pipeline rewires: the post-hoc squash stamp (with its quality dip) disappears, and the training loop runs on the coarse grid with the quality meter reaching the reference line."
+      },
+      "quantitativeAnchor": "K3 native footprint: 2.8T × 0.5 B = 1.4 TB — not a degraded copy of a 5.6 TB original.",
+      "physicsChecks": [
+        "In 'compress after' mode the quality meter ends below the reference line; in 'train at 4-bit' mode it reaches it.",
+        "In both modes the final footprint reads 1.4 TB — the toggle changes quality, not Rule 1's arithmetic.",
+        "In 'train at 4-bit' mode, weights only ever occupy allowed 4-bit grid points during the training animation."
+      ]
+    },
+    {
+      "id": "kv-cache",
+      "conceptId": "kv-cache-context-cost",
+      "part": "How Kimi K3 dodges the wall",
+      "title": "The conversation itself eats memory: the KV cache grows with every token of context",
+      "teaches": "Total memory is weights + KV cache + overhead, and the KV cache — the model's running record of every token in context — grows in direct proportion to context length.",
+      "requires": [
+        "memory-equation"
+      ],
+      "caption": "Weights aren't the whole bill: while generating, the model keeps a record of every token of the conversation so far, called the KV cache. For Llama 70B, a full 128,000-token context costs about 40 GB — as much as its entire quantized weights.",
+      "visualMetaphor": "A memory-budget bar for one GPU running Llama 3.3 70B at 4-bit: a fixed block of 35 GB labeled 'weights', and above it a growing block labeled 'KV cache — the model's running record of every token currently in context, consulted to produce the next one'. A slider feeds the model a longer and longer document; a token counter runs from 0 to 128,000 and the KV block grows at 320 KB per token (16-bit precision). Predict prompt at the start: 'the weights are loaded — is the memory bill done?' At 128,000 tokens the KV block reaches ~40 GB, visibly outweighing the weights block. The total is captioned on-screen as \\(M_{total} = M_{weights} + M_{KV} + \\text{overhead}\\), each term pointing at its block. Annotation: 'a context window is a hardware number paid in gigabytes, not a marketing number.' IMPLEMENTATION REQUIREMENT: the total-memory formula must render as a single horizontal equation with a visible equals sign — M_total = M_weights + M_KV + overhead — built as an inline MathML <mrow> with <mo>=</mo> and <mo>+</mo> operators. Never use <mfrac> or any stacked/fraction layout for this formula; a previous attempt rendered it as M_total over a horizontal bar, which reads as division and failed review. FURTHER IMPLEMENTATION REQUIREMENTS from a failed attempt: (1) The context-length slider is the ONLY control — do NOT add any play/animate/grow button or any timed animation; the scene must render its complete state instantly and deterministically from the slider position, so a screenshot with the slider at max (128,000 tokens) immediately shows the KV cache block at ~40 GB visibly exceeding the 35 GB weights block. (2) Never declare a JavaScript variable named 'top' — it collides with the read-only window.top global and throws 'Identifier top has already been declared'.",
+      "animatedVariable": {
+        "name": "context length",
+        "control": "slider",
+        "range": "0 → 128,000 tokens",
+        "whatChangesOnScreen": "The KV cache block grows linearly with the token counter while the weights block stays fixed; at max, the cache (~40 GB) exceeds the 35 GB weights."
+      },
+      "quantitativeAnchor": "Llama 3.3 70B: ~320 KB of KV cache per token → ~40 GB at a 128,000-token context.",
+      "physicsChecks": [
+        "KV block height is exactly proportional to the slider (twice the tokens, twice the gigabytes); weights block never moves.",
+        "At 128k tokens the KV readout is ~40 GB and visibly taller than the 35 GB weights block.",
+        "At 0 tokens the KV block is empty — memory use at load time understates memory use in use."
+      ]
+    },
+    {
+      "id": "kimi-delta-attention",
+      "conceptId": "linear-attention-escape",
+      "part": "How Kimi K3 dodges the wall",
+      "title": "Kimi Delta Attention keeps a running summary instead of a full per-token record",
+      "teaches": "K3's hybrid linear attention replaces the per-token record with a compact running summary in most layers, so memory no longer scales one-for-one with context — enabling its 1-million-token window.",
+      "requires": [
+        "kv-cache"
+      ],
+      "caption": "K3 advertises a 1-million-token context — about 8× the norm — so a record per token would make the KV cache the dominant cost. Kimi Delta Attention sidesteps that: it mostly keeps a fixed-size running summary of the conversation instead of a record per token.",
+      "visualMetaphor": "Two shelves side by side, fed by the same context slider. Left, 'conventional attention': every incoming token adds a card to the shelf (per layer), and the shelf physically lengthens without bound — at 1M tokens it runs off the frame. Right, 'Kimi Delta Attention (hybrid linear attention)': most layers show a single fixed-size summary box that flashes as each token updates it — like a running average that absorbs new numbers without storing them all — plus a small conventional shelf for the few remaining layers, so the total grows only gently. Predict prompt: 'drag to 1,000,000 tokens — which side runs out of room?' A speed readout under the right shelf notes Moonshot's measurement: up to 6.3× faster decoding at 1M-token context than conventional attention.",
+      "animatedVariable": {
+        "name": "context length",
+        "control": "slider",
+        "range": "0 → 1,000,000 tokens",
+        "whatChangesOnScreen": "The conventional shelf grows linearly until it overflows the frame; the KDA summary box stays fixed-size (flashing on updates) and the hybrid total grows only slightly."
+      },
+      "quantitativeAnchor": "1,000,000-token context; up to 6.3× faster decoding at 1M tokens versus conventional attention (Moonshot's figure).",
+      "physicsChecks": [
+        "Left shelf length is strictly proportional to the slider; right side's summary box never changes size.",
+        "At small contexts the two sides look comparable; the gap widens monotonically as context grows — the advantage is specifically at long context.",
+        "The 6.3× figure is displayed at the 1M end, not at short contexts."
+      ]
+    },
+    {
+      "id": "why-64-gpus",
+      "conceptId": "hardware-memory-ladder",
+      "part": "The numbers, head to head",
+      "title": "Eight top-end GPUs technically hold K3's weights — and that's exactly why it needs 64",
+      "teaches": "Stacking K3's full bill — 1.4 TB weights + KV cache + overhead — shows why 8 × B200 (1,536 GB) leaves no working room and Moonshot recommends a supernode of 64+ accelerators.",
+      "requires": [
+        "hardware-ladder",
+        "qat-native-4bit",
+        "kv-cache",
+        "mixture-of-experts"
+      ],
+      "caption": "Eight B200s, the newest data-center GPUs, hold 1,536 GB — so the 1.4 TB of weights squeaks in with only ~136 GB to spare. But at K3's full 1-million-token context, the KV cache plus working memory comes to roughly 300 GB per conversation — more than double that leftover. That is why Moonshot recommends a 'supernode' of 64 GPUs: 64 × 192 GB ≈ 12 TB, room for the weights plus many conversations at once.",
+      "visualMetaphor": "The memory-budget bar from the KV scene, now for K3, placed inside two candidate machines (buttons). Machine 1: an 8 × B200 node, capacity line at 1,536 GB. The stack fills: weights 1,400 GB (green), then KV cache for long agentic contexts plus runtime overhead tries to stack on top and slams into the capacity line with only ~136 GB of headroom — the overflow region flashes red. Predict prompt first: '1,536 > 1,400 — so one box is enough, right?' Machine 2: Moonshot's recommended supernode of 64+ accelerators; the same stack fits with generous headroom, and an annotation adds that the 25 GB-per-token read is now spread across 64 GPUs' combined memory bandwidth. Side caption: 'K3 is the first open model that has simply outgrown any single box.'",
+      "animatedVariable": {
+        "name": "deployment machine",
+        "control": "buttons",
+        "range": "8 × B200 (1,536 GB) ↔ 64+-accelerator supernode",
+        "whatChangesOnScreen": "The capacity line jumps; on 8 × B200 the KV + overhead layers overflow past 1,536 GB in red, on the supernode the full stack fits with headroom."
+      },
+      "quantitativeAnchor": "8 × B200 = 1,536 GB vs 1,400 GB of weights → ~136 GB headroom; Moonshot's recommended deployment: a supernode of 64+ accelerators.",
+      "physicsChecks": [
+        "The weights layer alone (1,400 GB) fits under the 1,536 GB line — the failure is visibly caused by the KV + overhead layers, not the weights.",
+        "Headroom on 8 × B200 reads ~136 GB, consistent with 1,536 − 1,400.",
+        "Switching machines changes only the capacity line and layout, never the size of the weight stack (1.4 TB is invariant)."
+      ]
+    },
+    {
+      "id": "speed-head-to-head",
+      "conceptId": "mixture-of-experts",
+      "part": "The numbers, head to head",
+      "title": "A 56× smaller read per token turns a 2.4 tokens/s crawl into fluid generation",
+      "teaches": "Plugging K3's 25 GB-per-token read into Rule 2 — across a supernode's combined bandwidth — is what makes a 2.8T-parameter model conversational instead of impossible.",
+      "requires": [
+        "mixture-of-experts",
+        "dense-wall",
+        "why-64-gpus"
+      ],
+      "caption": "Rule 2, head to head: the hypothetical dense 2.8T model reads 1.4 TB per token, and at an H100's 3.4 TB-per-second memory speed that is a 2.4 tokens/s crawl. The real K3 reads just 25 GB per token — 56× less — so the same 3.4 TB/s divided by 25 GB gives about 134 tokens per second on the supernode.",
+      "visualMetaphor": "A split-screen race, both sides running the same prompt. Left, 'dense 2.8T (hypothetical)': the pipe diagram from Rule 2 with 1.4 TB per token flowing through one H100's 3.35 TB/s pipe; its chat window types at a true 2.4 tokens/s. Right, 'Kimi K3 (real)': the expert wall lights 16 of 896 blocks, 25 GB flows per token across many parallel pipes labeled '64 GPUs' combined bandwidth', and its chat streams fluidly. A toggle pauses/plays the race; a read-per-token comparison bar (1.4 TB vs 25 GB, marked 56×) sits between the panes. Annotation ties the parts together: 'same 2.8 trillion numbers in memory on both sides — the only difference is how many are READ per token.'",
+      "animatedVariable": {
+        "name": "run the race",
+        "control": "play-pause",
+        "range": "side-by-side generation of the same reply",
+        "whatChangesOnScreen": "The dense side's chat creeps at 2.4 tokens/s while K3's side streams; per-token read meters fill to 1.4 TB vs 25 GB on each cycle."
+      },
+      "quantitativeAnchor": "1.4 TB vs 25 GB read per token = 56×; dense ceiling 2.4 tokens/s on an H100 (3.35 TB/s).",
+      "physicsChecks": [
+        "Both sides display the same loaded-memory figure (1.4 TB of weights); only the read meters differ.",
+        "The dense side's typing rate matches 3.35 ÷ 1.4 ≈ 2.4 tokens/s — perceptibly slower than reading speed.",
+        "The 56× label matches the two read meters' ratio, and K3's side visibly lights only 16 expert blocks per token."
+      ]
+    },
+    {
+      "id": "blackwell-why-now",
+      "conceptId": "quantization-aware-training",
+      "part": "Why 2026, and what it unlocks",
+      "title": "New chips compute in 4-bit natively, turning half-byte numbers from a storage trick into the fast path",
+      "teaches": "K3's design became rational when NVIDIA's Blackwell (B200) generation added native 4-bit arithmetic, so low precision speeds up compute instead of merely shrinking files.",
+      "requires": [
+        "qat-native-4bit"
+      ],
+      "caption": "Older GPUs could store 4-bit numbers but had to unpack them to 16-bit before doing math. Storage got cheaper; the math didn't — which is why nobody built K3 in 2023. Blackwell's B200 executes 4-bit math natively, making half-byte numbers the fastest path through the chip.",
+      "visualMetaphor": "A chip-generation toggle over a data-path diagram. 'Pre-Blackwell (e.g. H100)': 4-bit weights leave memory, hit an 'unpack to 16-bit' stage before the multiply units — the storage bar is small but the compute path is annotated 'math still runs at 16-bit; 4-bit saves memory, not compute time'. 'Blackwell (B200, 192 GB)': the unpack stage vanishes; 4-bit values feed straight into multiply units drawn smaller and more numerous, annotated 'native 4-bit math — smaller numbers, more of them per second'. A closing timeline strip connects the dots: native 4-bit hardware → training at 4-bit becomes the sensible default → K3 ships natively at MXFP4 → 2.8T parameters in 1.4 TB.",
+      "animatedVariable": {
+        "name": "chip generation",
+        "control": "toggle",
+        "range": "pre-Blackwell (unpack to 16-bit) ↔ Blackwell B200 (native 4-bit)",
+        "whatChangesOnScreen": "The unpack stage appears or disappears from the data path, and the annotation flips between '4-bit = storage trick' and '4-bit = fast path'."
+      },
+      "quantitativeAnchor": "B200: 192 GB of memory and native 4-bit arithmetic — the hardware step that made 4-bit-native training rational.",
+      "physicsChecks": [
+        "Memory footprint of the weights is identical in both toggle states — the change is in the compute path, not storage.",
+        "The unpack-to-16-bit stage exists only in the pre-Blackwell state and is the visible cause of the 'storage trick only' annotation.",
+        "The timeline orders cause before effect: native 4-bit hardware precedes 4-bit-native training precedes K3's 1.4 TB release."
+      ]
+    },
+    {
+      "id": "price-list-proof",
+      "conceptId": "economics-of-sparsity-and-caching",
+      "part": "Why 2026, and what it unlocks",
+      "title": "The arithmetic shows up on the price list: 50B-model prices for a 2.8T-parameter model",
+      "teaches": "Because K3 reads under 2% of itself per token and reuses the KV cache for repeated context, it serves at commodity prices — $3.00 per million input tokens, $15.00 output, and $0.30 for cached input.",
+      "requires": [
+        "speed-head-to-head",
+        "kv-cache"
+      ],
+      "caption": "The arithmetic lands on a public price list: $3.00 per million input tokens and $15.00 per million output. That bill is sized by the 50B parameters K3 reads, not the 2.8T it stores. Cached input costs $0.30 — 10× cheaper — because a kept KV cache means repeated context never gets recomputed.",
+      "visualMetaphor": "An invoice for a realistic agentic coding session: the same large codebase context is resent with every request. Line items show input tokens at $3.00 per million and output at $15.00 per million. A cache-hit slider (0% → 90%+) reroutes input tokens to the $0.30 cached rate; a small side diagram shows why — the KV cache blocks from the earlier scene, kept warm for the repeated prefix, so those tokens skip recomputation entirely. Predict prompt: 'in agentic coding, most of each request is the same codebase again — how much of the bill do you think caching erases?' At the paper's real figure of >90% cache hits, the input line item visibly collapses toward one-tenth. A footnote anchors the mechanism: reading <2% of the model per token is why the whole sheet resembles a 50B model's price list, not a 2.8T one.",
+      "animatedVariable": {
+        "name": "cache hit rate",
+        "control": "slider",
+        "range": "0% → 90%+ of input tokens served from cache",
+        "whatChangesOnScreen": "Input tokens flow from the $3.00 lane into the $0.30 lane, the invoice total drops, and the KV-cache diagram shows reused blocks instead of recomputation."
+      },
+      "quantitativeAnchor": "$3.00 per million input tokens, $15.00 per million output, $0.30 per million cached input (10× cheaper); >90% cache hits in agentic coding; ~2.5× better scaling efficiency than K2.",
+      "physicsChecks": [
+        "Cached-lane price is exactly one-tenth of the uncached input price at every slider position.",
+        "The invoice total decreases monotonically as cache hit rate rises; output-token cost is unaffected by the slider.",
+        "At 90%+ hits, the input portion of the bill visibly approaches one-tenth of its 0%-cache value, matching the paper's agentic-coding claim."
+      ]
+    }
+  ]
+}

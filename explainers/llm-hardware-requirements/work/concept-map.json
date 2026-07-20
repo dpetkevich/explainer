@@ -1,0 +1,98 @@
+{
+  "paper": {
+    "title": "What It Takes to Run an AI Model: The Hardware Requirements of Modern LLMs",
+    "authors": [],
+    "oneSentenceClaim": "Simple arithmetic tells you what hardware any AI model needs. Memory holds the model, and memory speed sets how fast it can talk. Kimi K3 stores 2.8 trillion numbers but reads only a small slice of itself for each word. That trick, plus storing each number in half a byte, makes it usable on a 64-GPU cluster.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "high-school algebra and unit arithmetic (GB, TB, GB/s)",
+    "what a computer bit and byte are",
+    "the general idea that AI chatbots generate text one word at a time"
+  ],
+  "concepts": [
+    {
+      "id": "model-is-a-pile-of-numbers",
+      "name": "A model is a pile of numbers that must all live in fast memory",
+      "whyItMatters": "Every hardware requirement in the article flows from one fact: the model's parameters are billions of numbers that get read on every single token generated.",
+      "coreMechanism": "A language model's 'parameters' are just tuned numbers — 8 billion for a small model, 2.8 trillion for Kimi K3. To generate text, the processor must read essentially all of the (active) numbers for every token, so they must sit in memory fast enough to keep up: GPU VRAM or Apple's unified memory. Disk and ordinary system RAM are far too slow, so if the numbers don't fit in fast memory, the model simply doesn't run — no matter how powerful the chip is.",
+      "misconception": "People assume a faster processor can compensate for too little memory. It can't: capacity is a hard pass/fail gate, and speed only matters after the weights fit.",
+      "foundational": true
+    },
+    {
+      "id": "precision-is-bytes-per-number",
+      "name": "Each number is stored at a chosen precision, measured in bytes",
+      "whyItMatters": "Bytes-per-parameter is the one dial engineers can turn to shrink a model, and it's the second factor in the memory equation the whole article runs on.",
+      "coreMechanism": "Every parameter is written down at some numerical precision: 4 bytes at full precision (FP32, used in training), 2 bytes in the standard release format (BF16), 1 byte at FP8/INT8, and 0.5 bytes in 4-bit formats like INT4 or MXFP4. Halving the bytes halves the memory in exact proportion, because memory is just a count of bytes. The trade is that each number is rounded to a coarser grid — like keeping fewer decimal places.",
+      "foundational": true
+    },
+    {
+      "id": "weights-memory-arithmetic",
+      "name": "The core equation: memory = parameters × bytes per parameter",
+      "whyItMatters": "This one multiplication predicts every model's memory footprint on the spec sheet — it is the article's Rule 1 and the root of everything else.",
+      "coreMechanism": "Multiply the parameter count by the bytes per parameter and you get the weights' memory footprint. Llama 3.1 8B: 8B × 2 bytes = 16 GB at BF16, about 4.5 GB at 4-bit. Llama 3.3 70B: 140 GB at BF16, about 35 GB at 4-bit. Kimi K3: 2.8T × 0.5 bytes = 1.4 TB at 4-bit — and it would be 5.6 TB at BF16. This single line explains why one model fits a laptop and another needs a data center.",
+      "keyEquation": "M_{weights} = N_{params} \\times B_{bytes/param}"
+    },
+    {
+      "id": "quantization-tradeoff",
+      "name": "Quantization: rounding numbers coarser to shrink the model",
+      "whyItMatters": "Quantization is what makes 70B models fit on one workstation card and what makes K3's 1.4 TB (rather than 5.6 TB) footprint possible at all.",
+      "coreMechanism": "Quantization rounds each stored parameter to a coarser grid so it fits in fewer bytes: a 4-bit model needs one quarter the memory of the same model at BF16. Done naively — compressing a finished model after training — each rounding introduces a small error, and the accumulated fuzz can degrade the model's intelligence. Kimi K2's released INT4 files total 594 GB (slightly over the naive 500 GB because sensitive layers are kept at higher precision).",
+      "misconception": "Quantization is not lossless compression like a ZIP file — information is genuinely thrown away, which is why doing it carelessly makes the model dumber."
+    },
+    {
+      "id": "quantization-aware-training",
+      "name": "Training at 4-bit from the start: the low-precision version IS the model",
+      "whyItMatters": "This is why 1.4 TB is K3's honest footprint rather than a degraded copy of a 'real' 5.6 TB model — and why 4-bit stopped being a compromise.",
+      "coreMechanism": "Instead of compressing a finished high-precision model, K3 is trained already living at low precision from the supervised fine-tuning stage onward — MXFP4 weights with MXFP8 activations. The model learns around the coarse grid during training, so there is no fidelity loss relative to some fuller original: the 4-bit weights are the native form. This became rational because NVIDIA's Blackwell chips (B200) execute 4-bit math natively in hardware, making low precision the fast path rather than just a storage trick."
+    },
+    {
+      "id": "hardware-memory-ladder",
+      "name": "The hardware ladder: laptop → GPU → 8-GPU node → multi-node cluster",
+      "whyItMatters": "Matching the footprint number to real machine tiers is how the article turns arithmetic into deployment reality — and shows why K3 is the first open model that outgrows any single box.",
+      "coreMechanism": "Real machines come in memory tiers: a MacBook Pro has 16–128 GB, an RTX 4090 has 24 GB, an H100 has 80 GB, an H200 has 141 GB, a B200 has 192 GB, and a standard server node of 8 × H200 holds about 1.1 TB. An 8B model at 4-bit (≈4.5 GB) fits any laptop; 70B at 4-bit (≈35 GB) fits one 48 GB workstation card; Kimi K2 at 594 GB nearly fills the biggest single node. K3's 1.4 TB of weights alone exceeds any single node once you leave room for working memory — hence Moonshot's recommended supernode of 64+ accelerators.",
+      "misconception": "Eight B200s (1,536 GB) could technically hold K3's weights, so it looks like one box suffices — but there'd be almost nothing left for the KV cache and overhead, which is why the practical minimum is much larger."
+    },
+    {
+      "id": "kv-cache-context-cost",
+      "name": "The conversation itself eats memory: the KV cache grows with context",
+      "whyItMatters": "Weights are not the whole bill — the article's total is weights + KV cache + overhead, and the KV term is what grows as you actually use the model harder.",
+      "coreMechanism": "While generating, the model keeps a running record of every token in the current context — the KV cache — and it grows in direct proportion to context length: twice the tokens, twice the cache. Llama 3.3 70B costs about 320 KB per token at 16-bit precision, so a full 128,000-token context costs about 40 GB — as much as the model's entire quantized weights. A 'context window' is therefore a hardware number paid in gigabytes, not just a marketing number.",
+      "keyEquation": "M_{total} = M_{weights} + M_{KV}(\\text{context length}) + \\text{overhead}",
+      "misconception": "It's natural to think memory needs are fixed once the model loads; in fact memory use climbs steadily as the conversation or document grows."
+    },
+    {
+      "id": "linear-attention-escape",
+      "name": "Kimi Delta Attention: a running summary instead of a full record",
+      "whyItMatters": "K3 advertises a 1-million-token context — about 8× the norm — which under conventional attention would make the KV cache the dominant memory cost; KDA is the architectural fix.",
+      "coreMechanism": "Conventional attention stores a per-token record for the entire context, so a million tokens means a million entries per layer. Kimi Delta Attention is a hybrid linear-attention mechanism: for most layers it keeps a compact running summary of the context instead of the full per-token record, so memory no longer scales one-for-one with context length. Moonshot reports up to 6.3× faster decoding at 1M-token context compared to conventional attention."
+    },
+    {
+      "id": "bandwidth-speed-limit",
+      "name": "Memory bandwidth sets the speed limit on generation",
+      "whyItMatters": "This is the article's punchline setup: capacity decides whether a model runs, bandwidth decides how fast — and it's what makes a dense 2.8T model impossible, not just expensive.",
+      "coreMechanism": "To generate one token, the model must read essentially all of its active weights from memory once, so max tokens per second ≈ memory bandwidth ÷ bytes read per token. An 8B model at 4-bit (4.5 GB per token) on an M4 Max (546 GB/s) tops out around 120 tokens/second; a 70B at 4-bit (35 GB) on an H100 (3.35 TB/s) around 95. A hypothetical dense 2.8T model would read 1.4 TB per token — a ceiling of about 2.4 tokens/second even on an H100, unusably slow no matter how much memory you buy.",
+      "keyEquation": "\\text{tokens/s} \\approx \\frac{\\text{memory bandwidth (GB/s)}}{\\text{bytes read per token (GB)}}",
+      "misconception": "People assume generation speed is limited by how fast the chip computes; for token-by-token generation it's almost entirely limited by how fast weights can be read from memory."
+    },
+    {
+      "id": "mixture-of-experts",
+      "name": "Mixture-of-Experts: pay for storage, not for reading",
+      "whyItMatters": "MoE is the structural escape hatch that makes a 2.8T model usable at all — it decouples the memory bill (total parameters) from the per-token speed bill (active parameters).",
+      "coreMechanism": "An MoE model splits its layers into many parallel 'experts,' and a small router picks a handful for each token. All experts must sit in memory — any token might need any of them — but each token only reads a small fraction. Kimi K3 has 896 experts totaling 2.8T parameters but activates only 16 routed experts per token, about 50B active parameters — under 2% of the model. So K3 reads 50B × 0.5 bytes = 25 GB per token instead of 1.4 TB, a 56× smaller read; spread across a 64-GPU supernode's aggregate bandwidth, that's fast enough for fluid generation.",
+      "misconception": "Sparsity does not shrink the memory requirement — every expert must still be loaded. It only shrinks the per-token reading and compute bill."
+    },
+    {
+      "id": "expert-load-balancing",
+      "name": "Keeping all 896 experts busy: quantile routing",
+      "whyItMatters": "MoE only pays off if every expert earns its memory; a 'dead' expert is pure wasted VRAM, so balanced routing is what keeps the storage bill honest.",
+      "coreMechanism": "K3's layout (Stable LatentMoE) routes each token by quantile: an expert takes the token if the router's score for it lands in the top quantile. This forces usage to stay even across all 896 experts, so no expert sits idle occupying gigabytes without contributing. Even usage also spreads the per-token load across the cluster's GPUs."
+    },
+    {
+      "id": "economics-of-sparsity-and-caching",
+      "name": "The arithmetic shows up in the price: sparse reads and cached prefixes",
+      "whyItMatters": "The article's claim that per-token compute is decoupled from total size is proven by the dollars: frontier-scale serving at commodity API prices is only possible because of it.",
+      "coreMechanism": "Because K3 reads under 2% of itself per token, its serving cost tracks a 50B-model bill, not a 2.8T one — Moonshot reports ~2.5× better scaling efficiency than K2, and prices K3 at $3.00 per million input tokens and $15.00 per million output. The caching discount ($0.30 per million cached input tokens, 10× cheaper) exists because the model keeps the KV cache for a repeated prefix and skips recomputing it. In agentic coding workloads, where the same large codebase context is resent every request, over 90% of input tokens hit the cache."
+    }
+  ]
+}
