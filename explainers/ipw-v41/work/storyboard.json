@@ -1,5 +1,5 @@
 {
-  "title": "Intelligence per Watt: When Your Laptop Should Answer Instead of a Data Center",
+  "title": "The Future of Local Models",
   "hook": "Every question you type into a chatbot is shipped to a warehouse of GPUs and shipped back. On one million real queries, a handful of laptop-sized models together answered 88.7% correctly. The paper scores every answer with one ratio: accuracy divided by power draw, intelligence per watt. For local models it improved 5.3× between 2023 and 2025.",
   "parts": [
     {

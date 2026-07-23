@@ -1,5 +1,5 @@
 {
-  "title": "One Engine, Both Knobs: How Sunlight-Heated Ammonia Breaks the Speed-vs-Efficiency Trap",
+  "title": "Portal Space's Solar-Thermal Satellite Propulsion",
   "hook": "For fifty years, every satellite has faced the same forced choice. Engines with real thrust drain their tanks after a few hundred meters per second of maneuvering. Efficient electric thrusters sip propellant, but a big orbit change takes over a year of continuous firing. This explainer follows one satellite through one maneuver: a 5,000 m/s climb from low Earth orbit to geostationary orbit. The trap is not a law of physics. A thermal rocket's exhaust velocity depends only on gas temperature and molecular weight. It does not care where the heat came from. Feed cheap ammonia through a heat exchanger cooked to 3,000 K by concentrated sunlight, and the maneuver that costs an electric thruster 527 days takes 9 hours.",
   "parts": [
     {

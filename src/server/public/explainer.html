@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>know kungfu</title>
+<title>iknowkungfu</title>
 <style>
   :root {
     --bg: #fdfdfb; --fg: #1a1a1a; --muted: #555; --rule: #e2e2dc; --accent: #2f6fed;
@@ -41,7 +41,10 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .scenebar { margin-top: 0.75rem; color: var(--muted); font-size: 0.95rem; }
   .fail { color: var(--err); }
-  iframe.viewer { width: 100%; border: 1px solid var(--rule); border-radius: 10px; background: transparent; }
+  /* content-box so height = content scrollHeight sizes the content area exactly; with
+     the global border-box the 1px border would eat 2px, leaving a stray internal scroll. */
+  iframe.viewer { width: 100%; border: 1px solid var(--rule); border-radius: 10px; background: transparent;
+    box-sizing: content-box; }
   /* All comment UI is a dev/feedback tool — hidden until dev mode (Ctrl+Shift+D). */
   section.comments { margin-top: 2.5rem; display: none; }
   body.dev section.comments { display: block; }

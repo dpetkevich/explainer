@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>know kungfu — interactive explainers of research papers</title>
+<title>iknowkungfu — interactive explainers of research papers</title>
 <meta name="description" content="Upload a paper and get an interactive, self-explaining walkthrough. Watch it build, scene by scene.">
 <style>
   :root {
@@ -84,8 +84,8 @@
 </head>
 <body>
 <main>
-  <h1>know kungfu</h1>
-  <p class="tagline">Interactive, self-explaining walkthroughs of research papers — browse, star, and comment.</p>
+  <h1>iknowkungfu</h1>
+  <p class="tagline">The best explanations in the world. What will you learn today?</p>
 
   <h2 class="feed-title">All explainers</h2>
   <div class="filters" id="filters"></div>
@@ -130,7 +130,7 @@ function card(it) {
       <span title="Stars${it.starredByYou ? " (you starred this)" : ""}">${it.starredByYou ? "★" : "☆"} ${it.stars ?? 0}</span>
       <span title="Comments">💬 ${it.commentCount}</span>
       <span class="pill" title="Tag">${esc(it.category || "Computing")}</span>
-      ${it.pedagogyVersion ? `<span class="pill" title="Pedagogy version">Pedagogy v${esc(it.pedagogyVersion)}</span>` : ""}
+      ${DEV_MODE && it.pedagogyVersion ? `<span class="pill" title="Pedagogy version">Pedagogy v${esc(it.pedagogyVersion)}</span>` : ""}
     </div>
     <details class="discuss" data-id="${esc(it.id)}">
       <summary>💬 Comment on the blurb</summary>
@@ -184,6 +184,20 @@ async function renderDiscuss(d) {
 let allItems = [];
 let filterTag = null, filterPed = null, pedTouched = false;
 
+// The Pedagogy-version filter is a developer tool, hidden by default EVERYWHERE (localhost
+// included). Turn it on explicitly with ?dev=1 and off with ?dev=0; the choice persists in
+// localStorage so it survives navigation. Dev mode is a mode you opt into, not "wherever
+// the dev server happens to run."
+const DEV_MODE = (() => {
+  const q = new URLSearchParams(location.search).get("dev");
+  if (q !== null) {
+    const on = q !== "0" && q !== "false";
+    try { localStorage.setItem("devMode", on ? "1" : "0"); } catch { /* ignore */ }
+    return on;
+  }
+  try { return localStorage.getItem("devMode") === "1"; } catch { return false; }
+})();
+
 // Compare dotted versions numerically ("2.0.0" > "1.0.0" > "1.2.0" handled right).
 function cmpVer(a, b) {
   const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
@@ -205,7 +219,7 @@ function renderFilters() {
   const el = $("#filters");
   el.innerHTML =
     row("Tag", tags, filterTag, "tag", (v) => esc(v)) +
-    (peds.length ? row("Pedagogy", peds, filterPed, "ped", (v) => "v" + esc(v)) : "");
+    (DEV_MODE && peds.length ? row("Pedagogy", peds, filterPed, "ped", (v) => "v" + esc(v)) : "");
   el.querySelectorAll(".chip").forEach((c) =>
     c.addEventListener("click", () => {
       const val = c.dataset.val || null;

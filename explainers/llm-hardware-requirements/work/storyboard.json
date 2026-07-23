@@ -1,5 +1,5 @@
 {
-  "title": "The Arithmetic of Running a Giant AI Model",
+  "title": "How Kimi 3 Works",
   "hook": "In July 2026, the lab Moonshot AI released Kimi K3, an AI model made of 2.8 trillion stored numbers. Ask a simple question — what machine can actually run this thing? — and you might expect the answer to require a PhD. It doesn't. Two lines of multiplication and division predict which models fit on a laptop, which need a data center, and why K3 had to be built the strange way it was. By the end, you'll be able to size the hardware for any AI model on the back of an envelope.",
   "parts": [
     {
