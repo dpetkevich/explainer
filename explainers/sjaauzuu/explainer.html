@@ -4003,16 +4003,59 @@ __ro.observe(document.documentElement);
   ></iframe>
 </section>
 
-  <footer>Source: <em>Distilling the Knowledge in a Neural Network</em> — Geoffrey Hinton, Oriol Vinyals, Jeff Dean. Explainer generated 2026-07-16.</footer>
+  <footer>Source: <em>Distilling the Knowledge in a Neural Network</em> — Geoffrey Hinton, Oriol Vinyals, Jeff Dean. Explainer generated 2026-07-23.</footer>
 </main>
 <script>
-  // Scenes report their height via postMessage({ explainItScene, height }).
+  // Size each scene iframe to its content so it never shows its own scrollbar
+  // (a "scrollbar inside the page scrollbar"). Two mechanisms, belt-and-suspenders:
+  //
+  // 1) Scenes postMessage({ explainItScene, height }) — but their ResizeObserver only
+  //    fires on box-size changes, so late reflow (MathML, web fonts, async SVG) that
+  //    grows content AFTER the first report is missed and the frame stays too short.
+  // 2) Because scenes are srcdoc (same-origin), we also measure each frame's true
+  //    scrollHeight directly and refit on every signal that can change it: the load
+  //    event, DOM mutations, box resizes, fonts.ready, and a few bounded timeouts that
+  //    catch reflow with no observable trigger. This converges and needs no scene changes.
+  const fitToContent = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc) return;
+    const h = Math.max(
+      doc.documentElement ? doc.documentElement.scrollHeight : 0,
+      doc.body ? doc.body.scrollHeight : 0
+    );
+    if (h && Math.ceil(h) !== Math.ceil(parseFloat(frame.style.height) || 0)) {
+      frame.style.height = Math.ceil(h) + "px";
+    }
+  };
+
+  const wireFrame = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc || !doc.documentElement) return;
+    const refit = () => fitToContent(frame);
+    refit();
+    try { new MutationObserver(refit).observe(doc.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); } catch { /* noop */ }
+    try { new ResizeObserver(refit).observe(doc.documentElement); } catch { /* noop */ }
+    try { if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(refit); } catch { /* noop */ }
+    [50, 150, 350, 700, 1200, 2500].forEach((t) => setTimeout(refit, t));
+  };
+
+  for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+    frame.addEventListener("load", () => wireFrame(frame));
+    // Non-lazy or already-cached frames may have loaded before this ran.
+    try { if (frame.contentDocument && frame.contentDocument.readyState === "complete") wireFrame(frame); } catch { /* noop */ }
+  }
+
+  // Keep honoring scene-sent heights too (harmless, and covers any edge our measure misses).
   addEventListener("message", (event) => {
     const data = event.data;
     if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
     for (const frame of document.querySelectorAll("iframe.scene-frame")) {
       if (frame.contentWindow === event.source) {
-        frame.style.height = Math.ceil(data.height) + "px";
+        if (Math.ceil(data.height) > Math.ceil(parseFloat(frame.style.height) || 0)) {
+          frame.style.height = Math.ceil(data.height) + "px";
+        }
         break;
       }
     }
