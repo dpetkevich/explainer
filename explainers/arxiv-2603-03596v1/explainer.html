@@ -1,0 +1,3860 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physical Intelligence's MEM: Giving Robots a Memory</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Physical Intelligence's MEM: Giving Robots a Memory</h1>
+  <p class="hook">The AI that runs today's best robots sees only the current camera frame — nothing it did a second ago. So a robot that just dropped a bowl sees the same scene as one that never tried, and repeats the mistake forever. Why not feed in the whole video history? Because the computer work grows with the square of the video's length, and the robot has only a few hundred milliseconds to pick its next move. Physical Intelligence's MEM keeps two memories instead — compressed video for the last minute, plus a short text note the robot rewrites itself for everything older — and that lets one robot clean a kitchen for 15 minutes straight.</p>
+  <p class="page-links"><a href="https://arxiv.org/html/2603.03596v1" target="_blank" rel="noopener noreferrer">Multi-Scale Embodied Memory for Vision Language Action Models</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.1.0 · Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Before the fix, the problem. We follow one robot on one job — cleaning an entire kitchen, a 15-minute task — and see what the program controlling it actually is, what it computes each step, and why simply feeding it the past video runs past the robot's split-second time budget.</div>
+</header>
+<section class="scene" id="policy-is-a-function">
+  <h3>The robot's controller sees only the current frame — the past is invisible to it</h3>
+  <div class="caption">Our running example: one robot cleaning a whole kitchen. Its policy — the function <math><mi>pi</mi></math> that picks the actions — reads only the current camera frame <math><msub><mi>o</mi><mi>t</mi></msub></math> and the text goal <math><mi>g</mi></math>, then outputs joint commands for the next <math><mi>H</mi></math> steps (the action horizon it commits to). Step past the dropped bowl: frame 4 is identical to frame 1, so <math><mi>pi</mi></math> repeats the same doomed grasp.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="policy-is-a-function"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Policy is a function of the current frame</title>
+<style>
+:root{
+  --bg:#f7f7f5; --fg:#1a1a1a; --panel:#ffffff; --accent:#c0392b;
+  --dim:#9a9a9a; --muted:#6b6b6b; --border:#d8d8d4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#161616; --fg:#eeeeee; --panel:#232323; --accent:#ff6b5e;
+    --dim:#555555; --muted:#a8a8a8; --border:#3a3a3a;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; padding:14px; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+  max-width:680px;
+}
+h2{font-size:15px; margin:2px 0 8px; font-weight:600;}
+.eqwrap{text-align:center; margin-bottom:2px;}
+math{font-size:19px;}
+.legend{font-size:11.5px; color:var(--muted); line-height:1.5; margin:2px 0 10px; text-align:center;}
+.quant{font-size:11px; color:var(--muted); text-align:center; margin-bottom:8px;}
+canvas{display:block; width:100%; max-width:640px; height:auto; margin:0 auto; background:var(--panel); border:1px solid var(--border); border-radius:6px;}
+.controls{display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 8px; align-items:center;}
+button{
+  font-size:13px; padding:7px 12px; border-radius:5px; border:1px solid var(--border);
+  background:var(--panel); color:var(--fg); cursor:pointer;
+}
+button:active{background:var(--accent); color:#fff;}
+.readouts{
+  display:grid; grid-template-columns:1fr 1fr; gap:4px 14px;
+  font-size:12.5px; background:var(--panel); border:1px solid var(--border);
+  border-radius:6px; padding:8px 12px;
+}
+.readouts div span.k{color:var(--muted);}
+.readouts div span.v{font-weight:600; color:var(--accent);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+
+<h2>The policy π: current frame + goal → action</h2>
+<div class=&quot;eqwrap&quot;>
+<math display=&quot;block&quot;>
+  <mi>π</mi><mo>(</mo><mi>a</mi><mo>&amp;#8739;</mo><msub><mi>o</mi><mi>t</mi></msub><mo>,</mo><mi>g</mi><mo>)</mo>
+</math>
+</div>
+<div class=&quot;legend&quot;>
+π — the policy (a function) · a — action output (joint commands) · o<sub>t</sub> — camera frame at time t (the ONLY memory of the past π gets) · g — goal text, fixed as &quot;clean the kitchen&quot;
+</div>
+<div class=&quot;quant&quot;>π emits a new action chunk ~30 times/sec; the kitchen task runs ~900 s — thousands of chances to repeat this mistake.</div>
+
+<canvas id=&quot;c&quot; width=&quot;640&quot; height=&quot;300&quot;></canvas>
+
+<div class=&quot;controls&quot;>
+  <button id=&quot;step&quot;>Step → advance to next timestep (one control cycle)</button>
+  <button id=&quot;reset&quot;>Reset — jump back to t = 1</button>
+</div>
+
+<div class=&quot;readouts&quot;>
+  <div><span class=&quot;k&quot;>timestep t: </span><span class=&quot;v&quot; id=&quot;rt&quot;>1</span></div>
+  <div><span class=&quot;k&quot;>frame type: </span><span class=&quot;v&quot; id=&quot;rtype&quot;>grasp</span></div>
+  <div><span class=&quot;k&quot;>loop (same as earlier frame): </span><span class=&quot;v&quot; id=&quot;rloop&quot;>no</span></div>
+  <div><span class=&quot;k&quot;>action a<sub>t</sub>: </span><span class=&quot;v&quot; id=&quot;raction&quot;>-</span></div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let t = 1;
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function typeOf(tt){ return (tt-1) % 3; } // 0 grasp, 1 slip, 2 retry
+
+const ACTIONS = [
+  {vals:[2.1,-0.4,0.9], grip:'close'},
+  {vals:[-1.0,0.0,-2.0], grip:'open'},
+  {vals:[0.0,1.2,-0.3], grip:'open'}
+];
+function actionFor(type){ return ACTIONS[type]; }
+function fmtAction(a){ return '[' + a.vals.map(v=>v.toFixed(1)).join(', ') + ', ' + a.grip + ']'; }
+
+function arrow(x1,y1,x2,y2){
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  const ang = Math.atan2(y2-y1, x2-x1);
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-8*Math.cos(ang-0.4), y2-8*Math.sin(ang-0.4));
+  ctx.lineTo(x2-8*Math.cos(ang+0.4), y2-8*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawFrame(x,y,w,h,type,hi,fg,panel,accent){
+  ctx.save();
+  ctx.globalAlpha = hi ? 1 : 0.15;
+  ctx.fillStyle = panel; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle = fg; ctx.lineWidth = 1; ctx.strokeRect(x,y,w,h);
+  ctx.beginPath(); ctx.moveTo(x+4,y+h*0.68); ctx.lineTo(x+w-4,y+h*0.68); ctx.strokeStyle=fg; ctx.stroke();
+  let bowlX=x+w*0.62, bowlY=y+h*0.58, armEndX=x+w*0.5, armEndY=y+h*0.5;
+  if(type===1){ bowlY = y+h*0.9; armEndX = x+w*0.35; armEndY = y+h*0.3; }
+  if(type===2){ armEndX = x+w*0.22; armEndY = y+h*0.2; }
+  ctx.beginPath(); ctx.moveTo(x+w*0.15, y+h*0.12); ctx.lineTo(armEndX,armEndY);
+  ctx.strokeStyle = fg; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(bowlX,bowlY,w*0.11,0,Math.PI*2); ctx.fillStyle = accent; ctx.fill();
+  ctx.restore();
+  if(hi){ ctx.strokeStyle = accent; ctx.lineWidth = 3; ctx.strokeRect(x,y,w,h); }
+}
+
+function draw(){
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const fg = cssVar('--fg'), panel = cssVar('--panel'), accent = cssVar('--accent'), muted = cssVar('--muted');
+
+  const n = 8, gap = 8, marginX = 20;
+  const fw = (W - 2*marginX - (n-1)*gap) / n;
+  const fh = 90, fy = 14;
+  let curX = marginX + fw/2;
+
+  for(let i=0;i<n;i++){
+    const x = marginX + i*(fw+gap);
+    const type = i % 3;
+    const hi = (i+1 === t);
+    if(hi) curX = x + fw/2;
+    drawFrame(x, fy, fw, fh, type, hi, fg, panel, accent);
+    ctx.fillStyle = hi ? accent : muted;
+    ctx.font = (hi ? 'bold ' : '') + '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('t='+(i+1), x+fw/2, fy+fh+14);
+  }
+
+  const boxW = 340, boxH = 110, boxX = (W-boxW)/2, by = fy+fh+34;
+  const targetX = Math.min(Math.max(curX, boxX+20), boxX+boxW-20);
+  ctx.strokeStyle = accent; ctx.fillStyle = accent; ctx.lineWidth = 2;
+  arrow(curX, fy+fh+2, targetX, by-4);
+  ctx.fillStyle = accent; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('o_t', (curX+targetX)/2 + 14, (fy+fh+2+by-4)/2);
+
+  ctx.fillStyle = panel; ctx.strokeStyle = fg; ctx.lineWidth = 1.5;
+  ctx.fillRect(boxX,by,boxW,boxH); ctx.strokeRect(boxX,by,boxW,boxH);
+  ctx.fillStyle = fg; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('policy π', boxX+boxW/2, by+20);
+
+  const type = typeOf(t);
+  const names = ['grasp','slip','retry'];
+  ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('input o_t: frame t='+t+' ('+names[type]+')', boxX+14, by+45);
+  ctx.fillText('input g: &quot;clean the kitchen&quot;  (fixed)', boxX+14, by+65);
+  const act = actionFor(type);
+  ctx.fillStyle = accent;
+  ctx.fillText('output a_t = '+fmtAction(act), boxX+14, by+90);
+
+  ctx.strokeStyle = fg; ctx.fillStyle = fg;
+  arrow(boxX-60, by+55, boxX-4, by+55);
+  ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('g', boxX-60, by+40);
+
+  ctx.strokeStyle = accent; ctx.fillStyle = accent;
+  arrow(boxX+boxW+4, by+90, boxX+boxW+60, by+90);
+  ctx.fillText('a_t', boxX+boxW+60, by+75);
+
+  if(t > 3){
+    ctx.fillStyle = accent; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('LOOP — identical to t='+((t-1)%3+1), W/2, by+boxH+20);
+  }
+}
+
+function updateReadouts(){
+  const type = typeOf(t);
+  document.getElementById('rt').textContent = t;
+  document.getElementById('rtype').textContent = ['grasp','slip','retry'][type];
+  document.getElementById('rloop').textContent = t>3 ? ('yes (matches t='+((t-1)%3+1)+')') : 'no';
+  document.getElementById('raction').textContent = fmtAction(actionFor(type));
+}
+
+document.getElementById('step').addEventListener('click', () => {
+  t = (t >= 8) ? 1 : t+1;
+  updateReadouts(); draw();
+});
+document.getElementById('reset').addEventListener('click', () => {
+  t = 1; updateReadouts(); draw();
+});
+
+updateReadouts();
+draw();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;policy-is-a-function&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The robot's controller sees only the current frame — the past is invisible to it"
+  ></iframe>
+</section>
+
+<section class="scene" id="images-become-tokens">
+  <h3>One camera frame is cut into hundreds of pieces before the policy can use it</h3>
+  <div class="caption">This policy is a vision-language-action model (VLA): an AI built on a network already trained on internet images and text, then taught to output robot actions. It cuts each 448×448 kitchen frame into small patches, and a vision transformer (ViT) turns each patch into a list of numbers called a token. Those tokens feed a Gemma3-4B language model and an 860M-parameter action network; drag across the four cameras to tally thousands of tokens per single timestep.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="images-become-tokens"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Images become tokens</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1a; --muted:#666;
+    --accent:#2563eb; --accent2:#dc2626; --grid:#94a3b8; --border:#d0d0d5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111318; --panel:#1b1e26; --text:#e8e8ec; --muted:#9aa0aa;
+      --accent:#60a5fa; --accent2:#f87171; --grid:#5b6472; --border:#333844;
+    }
+  }
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+  .scene{max-width:700px;margin:0 auto;padding:10px;box-sizing:border-box;}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:8px;box-sizing:border-box;}
+  canvas{max-width:100%;height:auto;display:block;}
+  .hint{font-size:11.5px;color:var(--muted);margin:4px 0 6px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:8px 0;}
+  .controls label{font-size:13px;}
+  .controls input[type=range]{vertical-align:middle;width:170px;}
+  button{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  .counterbox{min-width:170px;flex:1;}
+  .big{font-size:30px;font-weight:700;color:var(--accent);}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  ul{margin:4px 0 6px 0;padding-left:18px;font-size:12.5px;}
+  li{margin:2px 0;}
+  math{font-size:15px;}
+  .legend{font-size:11.5px;color:var(--muted);}
+  .eqbox{margin-top:8px;text-align:center;}
+  .eqsub{font-size:12.5px;color:var(--text);margin-top:4px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;row&quot;>
+    <div class=&quot;panel&quot; style=&quot;flex:1.4;min-width:280px;&quot;>
+      <div class=&quot;hint&quot;>Hover the large frame: each cell is one patch → one token.</div>
+      <canvas id=&quot;frames&quot; width=&quot;380&quot; height=&quot;230&quot;></canvas>
+    </div>
+    <div class=&quot;panel&quot; style=&quot;flex:1.3;min-width:280px;&quot;>
+      <div class=&quot;hint&quot;>Fixed pipeline order — tokens flow left to right, no stage skipped.</div>
+      <canvas id=&quot;pipe&quot; width=&quot;380&quot; height=&quot;230&quot;></canvas>
+      <div class=&quot;controls&quot; style=&quot;margin-top:0;&quot;>
+        <button id=&quot;playBtn&quot;></button>
+      </div>
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;camSlider&quot;>Camera streams active: <b id=&quot;camVal&quot;>1</b> (1–4)</label>
+    <input type=&quot;range&quot; id=&quot;camSlider&quot; min=&quot;1&quot; max=&quot;4&quot; step=&quot;1&quot; value=&quot;1&quot;>
+  </div>
+
+  <div class=&quot;row&quot;>
+    <div class=&quot;panel counterbox&quot;>
+      <div class=&quot;sub&quot;>Total tokens this timestep</div>
+      <div class=&quot;big&quot; id=&quot;totalTokens&quot;>256</div>
+      <ul id=&quot;camList&quot;></ul>
+      <div class=&quot;legend&quot;>attention operates on ALL of these tokens</div>
+    </div>
+    <div class=&quot;panel&quot; style=&quot;flex:2;min-width:280px;&quot;>
+      <div class=&quot;eqbox&quot;>
+        <math display=&quot;block&quot;>
+          <mi>N</mi><mo>=</mo><msub><mi>N</mi><mtext>cam</mtext></msub><mo>&amp;#183;</mo>
+          <mfrac><mi>H</mi><mi>P</mi></mfrac><mo>&amp;#183;</mo><mfrac><mi>W</mi><mi>P</mi></mfrac>
+        </math>
+        <div class=&quot;legend&quot;>N — total image tokens this timestep &amp;middot; N<sub>cam</sub> — active camera streams (slider) &amp;middot; H, W — frame height/width, 448 px each &amp;middot; P — ViT patch size, 28 px</div>
+        <div class=&quot;eqsub&quot; id=&quot;eqSub&quot;></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const IMG_SIZE = 448;            // px, camera frame resolution
+const PATCH_SIZE = 28;           // px, ViT patch edge length
+const PATCHES_PER_SIDE = IMG_SIZE / PATCH_SIZE; // 16
+const TOKENS_PER_FRAME = PATCHES_PER_SIDE * PATCHES_PER_SIDE; // 256
+const CAMS = [&quot;Base camera&quot;,&quot;Overhead camera&quot;,&quot;Wrist-left camera&quot;,&quot;Wrist-right camera&quot;];
+
+const cs = getComputedStyle(document.documentElement);
+const col = n => cs.getPropertyValue(n).trim();
+
+const framesCv = document.getElementById('frames');
+const fctx = framesCv.getContext('2d');
+const pipeCv = document.getElementById('pipe');
+const pctx = pipeCv.getContext('2d');
+const slider = document.getElementById('camSlider');
+const camVal = document.getElementById('camVal');
+const totalEl = document.getElementById('totalTokens');
+const camList = document.getElementById('camList');
+const eqSub = document.getElementById('eqSub');
+const playBtn = document.getElementById('playBtn');
+
+let numCameras = 1;
+let hover = null; // {row,col}
+
+function drawFrameShapes(ctx,x,y,s){
+  ctx.fillStyle = col('--border');
+  ctx.fillRect(x,y,s,s);
+  ctx.fillStyle = col('--muted');
+  ctx.fillRect(x, y+s*0.62, s, s*0.1); // countertop line
+  ctx.beginPath();
+  ctx.fillStyle = col('--accent2');
+  ctx.arc(x+s*0.28, y+s*0.4, s*0.09, 0, 7); ctx.fill(); // stove burner
+  ctx.fillStyle = col('--accent');
+  ctx.fillRect(x+s*0.62, y+s*0.3, s*0.14, s*0.16); // mug body
+}
+
+function drawGrid(ctx,x,y,s,n){
+  ctx.strokeStyle = col('--grid'); ctx.lineWidth = 0.5;
+  for(let i=0;i<=n;i++){
+    const p = i*(s/n);
+    ctx.beginPath(); ctx.moveTo(x+p,y); ctx.lineTo(x+p,y+s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x,y+p); ctx.lineTo(x+s,y+p); ctx.stroke();
+  }
+}
+
+function drawGlyph(ctx,px,py){
+  const w=64,h=46;
+  let gx = px+10, gy = py-h-8;
+  if(gx+w>framesCv.width) gx = framesCv.width-w-4;
+  if(gy<2) gy = py+10;
+  ctx.fillStyle = col('--panel'); ctx.strokeStyle = col('--border');
+  ctx.fillRect(gx,gy,w,h); ctx.strokeRect(gx,gy,w,h);
+  ctx.fillStyle = col('--text'); ctx.font='9px sans-serif';
+  ctx.fillText('token vector', gx+3, gy+10);
+  for(let i=0;i<8;i++){
+    const bh = 4+((i*37+13)%18);
+    ctx.fillStyle = col('--accent2');
+    ctx.fillRect(gx+4+i*7, gy+h-6-bh, 5, bh);
+  }
+}
+
+function drawFrames(){
+  fctx.clearRect(0,0,framesCv.width,framesCv.height);
+  const mx=10, my=18, ms=140;
+  fctx.fillStyle = col('--text'); fctx.font='11px sans-serif';
+  fctx.fillText('Base camera (patches → tokens)', mx, 12);
+  drawFrameShapes(fctx,mx,my,ms);
+  drawGrid(fctx,mx,my,ms,PATCHES_PER_SIDE);
+  if(hover){
+    const cw = ms/PATCHES_PER_SIDE;
+    const hx = mx+hover.col*cw, hy = my+hover.row*cw;
+    fctx.fillStyle = col('--accent');
+    fctx.globalAlpha = 0.45;
+    fctx.fillRect(hx,hy,cw,cw);
+    fctx.globalAlpha = 1;
+    drawGlyph(fctx,hx,hy);
+  }
+  fctx.fillStyle = col('--muted'); fctx.font='11px sans-serif';
+  fctx.fillText(TOKENS_PER_FRAME+' tokens / frame ('+PATCHES_PER_SIDE+'x'+PATCHES_PER_SIDE+' patches)', mx, my+ms+16);
+
+  const tx=175, ts=55, gap=8;
+  for(let i=1;i<numCameras;i++){
+    const ty = 18+(i-1)*(ts+gap);
+    drawFrameShapes(fctx,tx,ty,ts);
+    drawGrid(fctx,tx,ty,ts,PATCHES_PER_SIDE);
+    fctx.fillStyle = col('--text'); fctx.font='10.5px sans-serif';
+    fctx.fillText(CAMS[i], tx+ts+8, ty+ts/2-4);
+    fctx.fillStyle = col('--muted'); fctx.font='10px sans-serif';
+    fctx.fillText(TOKENS_PER_FRAME+' tokens', tx+ts+8, ty+ts/2+10);
+  }
+}
+
+function getPos(evt,cv){
+  const r = cv.getBoundingClientRect();
+  return {x:(evt.clientX-r.left)*(cv.width/r.width), y:(evt.clientY-r.top)*(cv.height/r.height)};
+}
+framesCv.addEventListener('mousemove', e=>{
+  const p = getPos(e, framesCv);
+  const mx=10,my=18,ms=140;
+  if(p.x>=mx&amp;&amp;p.x<=mx+ms&amp;&amp;p.y>=my&amp;&amp;p.y<=my+ms){
+    const cw = ms/PATCHES_PER_SIDE;
+    hover = {row:Math.floor((p.y-my)/cw), col:Math.floor((p.x-mx)/cw)};
+  } else hover=null;
+  drawFrames();
+});
+framesCv.addEventListener('mouseleave', ()=>{hover=null; drawFrames();});
+
+// ---- pipeline ----
+const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = !prefersReduced;
+playBtn.textContent = playing ? 'Pause flow' : 'Play flow';
+playBtn.onclick = ()=>{ playing=!playing; playBtn.textContent = playing?'Pause flow':'Play flow'; };
+
+function box(ctx,x,y,w,h,lines){
+  ctx.fillStyle = col('--panel'); ctx.strokeStyle = col('--accent'); ctx.lineWidth=1.4;
+  ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle = col('--text'); ctx.font='10.5px sans-serif'; ctx.textAlign='center';
+  lines.forEach((l,i)=>ctx.fillText(l, x+w/2, y+18+i*13));
+  ctx.textAlign='left';
+}
+
+function arrow(ctx,x1,y,x2,tag){
+  ctx.strokeStyle = col('--grid'); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2,y); ctx.lineTo(x2-5,y-4); ctx.lineTo(x2-5,y+4); ctx.closePath();
+  ctx.fillStyle = col('--grid'); ctx.fill();
+}
+
+function drawPipeline(t){
+  pctx.clearRect(0,0,pipeCv.width,pipeCv.height);
+  const boxY=95,boxH=52;
+  const vitX=40,vitW=75, bbX=140,bbW=85, aeX=235,aeW=75;
+  // input lanes = numCameras
+  for(let i=0;i<numCameras;i++){
+    const ly = boxY+8+i*((boxH-16)/4);
+    pctx.strokeStyle = col('--accent2'); pctx.lineWidth=1.2;
+    pctx.beginPath(); pctx.moveTo(2,ly); pctx.lineTo(vitX-3,ly); pctx.stroke();
+    const pos = ((t*40 + i*17) % (vitX-2))+2;
+    pctx.fillStyle = col('--accent2');
+    pctx.beginPath(); pctx.arc(pos, ly, 2.2, 0, 7); pctx.fill();
+  }
+  box(pctx, vitX, boxY, vitW, boxH, ['ViT','(patch → token)']);
+  arrow(pctx, vitX+vitW, boxY+boxH/2, bbX-3, 'a');
+  const p2 = ((t*70) % (bbX-(vitX+vitW)))+(vitX+vitW);
+  pctx.fillStyle = col('--accent'); pctx.beginPath(); pctx.arc(p2, boxY+boxH/2,2.6,0,7); pctx.fill();
+
+  box(pctx, bbX, boxY, bbW, boxH, ['Gemma3-4B','backbone']);
+  arrow(pctx, bbX+bbW, boxY+boxH/2, aeX-3, 'b');
+  const p3 = ((t*70) % (aeX-(bbX+bbW)))+(bbX+bbW);
+  pctx.fillStyle = col('--accent'); pctx.beginPath(); pctx.arc(p3, boxY+boxH/2,2.6,0,7); pctx.fill();
+
+  box(pctx, aeX, boxY, aeW, boxH, ['860M','action','expert']);
+  const arrowEnd = pipeCv.width-4;
+  arrow(pctx, aeX+aeW, boxY+boxH/2, arrowEnd, 'c');
+
+  const labelCx = aeX+aeW + (arrowEnd-(aeX+aeW))/2;
+  pctx.fillStyle = col('--muted'); pctx.font='9px sans-serif'; pctx.textAlign='center';
+  pctx.fillText('→ joint', labelCx, boxY+boxH/2+15);
+  pctx.fillText('commands', labelCx, boxY+boxH/2+26);
+  pctx.textAlign='left';
+  pctx.fillStyle = col('--text'); pctx.font='10px sans-serif';
+  pctx.fillText(numCameras+' camera stream'+(numCameras>1?'s':'')+' in', 4, boxY-6);
+}
+
+let lastTime=0, tAcc=0;
+function loop(now){
+  if(playing){ tAcc += (now-lastTime||0)/1000; }
+  lastTime = now;
+  drawPipeline(tAcc);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function updateAll(){
+  numCameras = parseInt(slider.value,10);
+  camVal.textContent = numCameras;
+  const total = numCameras*TOKENS_PER_FRAME;
+  totalEl.textContent = Math.round(total);
+  camList.innerHTML = '';
+  for(let i=0;i<numCameras;i++){
+    const li = document.createElement('li');
+    li.textContent = CAMS[i]+' \u2014 '+TOKENS_PER_FRAME+' tokens';
+    camList.appendChild(li);
+  }
+  eqSub.textContent = '= '+numCameras+' \u00d7 ('+IMG_SIZE+'/'+PATCH_SIZE+') \u00d7 ('+IMG_SIZE+'/'+PATCH_SIZE+
+    ') = '+numCameras+' \u00d7 '+PATCHES_PER_SIDE+' \u00d7 '+PATCHES_PER_SIDE+' = '+Math.round(total)+' tokens';
+  drawFrames();
+}
+slider.addEventListener('input', updateAll);
+updateAll();
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;images-become-tokens&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One camera frame is cut into hundreds of pieces before the policy can use it"
+  ></iframe>
+</section>
+
+<section class="scene" id="quadratic-wall">
+  <h3>Feeding in past frames blows the robot's split-second time budget almost at once</h3>
+  <div class="caption">These models work by comparing every token with every other token — the step called attention — so its cost grows with the square of the number of tokens. Append <math><mi>T</mi></math> past frames and the work grows about <math><msup><mi>T</mi><mn>2</mn></msup></math>-fold: drag <math><mi>T</mi></math> and watch the compute curve cross the red deadline. Fifteen minutes of history sits orders of magnitude past the few-hundred-millisecond budget, even on an H100 GPU.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="quadratic-wall"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Quadratic Wall — attention cost vs. past frames</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1a1a1a; --muted:#5a6068; --grid:#dfe3e8;
+  --accent:#2563eb; --accent2:#0f9d63; --danger:#dc2626; --panel:#f6f8fa; --border:#ccd2da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#12151a; --fg:#e7eaee; --muted:#9aa3ad; --grid:#2b323b;
+    --accent:#6ea8fe; --accent2:#3ddc97; --danger:#ff6b6b; --panel:#1b2027; --border:#3a4451;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px;}
+h2.hdr{font-size:15px;margin:0 0 8px;font-weight:600;}
+.eqbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+.eqbox math{font-size:15px;}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;}
+svg{width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+.controls{margin-top:10px;}
+.crow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.crow label{font-size:12.5px;min-width:auto;}
+input[type=range]{flex:1;min-width:140px;}
+button{font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--fg);cursor:pointer;}
+button.active{border-color:var(--accent);color:var(--accent);font-weight:600;}
+#guessMsg{font-size:12px;color:var(--muted);}
+ul.readouts{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
+ul.readouts li{font-size:12.5px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:4px 8px;}
+ul.readouts b{color:var(--accent);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2 class=&quot;hdr&quot;>Attention compute vs. past frames appended</h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>N</mi><mo>(</mo><mi>T</mi><mo>)</mo><mo>=</mo><mo>(</mo><mi>T</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>&amp;#183;</mo><mi>P</mi><mo>+</mo><mi>B</mi>
+    </math>
+    <math display=&quot;block&quot;>
+      <mtext>Latency</mtext><mo>(</mo><mi>T</mi><mo>)</mo><mo>=</mo><msub><mi>L</mi><mn>0</mn></msub><mo>&amp;#183;</mo>
+      <msup><mrow><mo>(</mo><mfrac><mrow><mi>N</mi><mo>(</mo><mi>T</mi><mo>)</mo></mrow><mrow><mi>N</mi><mo>(</mo><mn>1</mn><mo>)</mo></mrow></mfrac><mo>)</mo></mrow><mn>2</mn></msup>
+    </math>
+    <div class=&quot;legend&quot;>
+      T — past frames appended · N(T) — total tokens fed to the transformer at step T ·
+      P = 256 — tokens produced per camera frame (patchify, see prior scene) · B = 50 — fixed tokens (instruction + robot state) ·
+      L<sub></sub>0 — measured latency at T = 1, the memoryless baseline (ms) · attention cost scales as N², so doubling N roughly quadruples the work.
+    </div>
+  </div>
+
+  <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 380&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;crow&quot;>
+      <label for=&quot;Tslider&quot;>Past frames appended, T (1–900 frames):</label>
+    </div>
+    <div class=&quot;crow&quot;>
+      <input type=&quot;range&quot; id=&quot;Tslider&quot; min=&quot;0&quot; max=&quot;2.9542&quot; step=&quot;0.001&quot; value=&quot;0&quot;>
+      <span id=&quot;Tval&quot; style=&quot;font-size:12.5px;min-width:70px;&quot;>T = 1</span>
+    </div>
+    <div class=&quot;crow&quot;>
+      <span style=&quot;font-size:12px;&quot;>Predict: where does the curve cross the red budget band?</span>
+      <button data-g=&quot;5&quot;>5 frames</button>
+      <button data-g=&quot;50&quot;>50 frames</button>
+      <button data-g=&quot;500&quot;>500 frames</button>
+    </div>
+    <div class=&quot;crow&quot;><span id=&quot;guessMsg&quot;>Click a guess above to reveal the actual crossing point.</span></div>
+  </div>
+
+  <ul class=&quot;readouts&quot;>
+    <li><b>T</b>: <span id=&quot;rT&quot;>1</span> frames</li>
+    <li><b>Tokens N(T)</b>: <span id=&quot;rN&quot;>—</span></li>
+    <li><b>Predicted latency</b>: <span id=&quot;rLat&quot;>—</span></li>
+    <li><b>vs. budget</b>: <span id=&quot;rRatio&quot;>—</span></li>
+  </ul>
+</div>
+
+<script>
+(function(){
+  // ---------- physics / cost model (auditable constants) ----------
+  const TOKENS_PER_FRAME = 256;   // tokens produced by patchifying one camera frame
+  const BASE_TOKENS      = 50;    // fixed tokens: language instruction + proprioceptive state
+  const L0_MS            = 15;    // measured backbone latency at T=1 (single-frame baseline), ms, on H100
+  const BUDGET_LOW = 100, BUDGET_HIGH = 300; // ms, real-time control budget band (&quot;a few hundred ms&quot;)
+
+  function tokensAt(T){ return (T+1)*TOKENS_PER_FRAME + BASE_TOKENS; }
+  const N1 = tokensAt(1);
+  function latencyMsAt(T){ return L0_MS * Math.pow(tokensAt(T)/N1, 2); }
+  function crossingT(budgetMs){
+    const Ncross = N1*Math.sqrt(budgetMs/L0_MS);
+    return (Ncross - BASE_TOKENS)/TOKENS_PER_FRAME - 1;
+  }
+  const T_CROSS_LOW  = crossingT(BUDGET_LOW);
+  const T_CROSS_HIGH = crossingT(BUDGET_HIGH);
+
+  // ---------- layout ----------
+  const svgNS=&quot;http://www.w3.org/2000/svg&quot;;
+  const svg=document.getElementById('chart');
+  const W=640,H=380, mL=58,mR=115,mT=18,mB=46;
+  const plotW=W-mL-mR, plotH=H-mT-mB;
+  const TminAx=1, TmaxAx=1500;      // extra headroom past T=900 so nothing clips
+  const yMin=1, yMaxLog=7;          // ms .. 1e7 ms
+  const logTmax=Math.log10(TmaxAx);
+
+  function xScale(T){ return mL + (Math.log10(T)/logTmax)*plotW; }
+  function yScale(v){ return mT + plotH - (Math.log10(v)/yMaxLog)*plotH; }
+
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  function el(tag,attrs){
+    const e=document.createElementNS(svgNS,tag);
+    for(const k in attrs) e.setAttribute(k,attrs[k]);
+    return e;
+  }
+  function formatMs(v){
+    if(v<1000) return Math.round(v)+&quot; ms&quot;;
+    let s=v/1000;
+    if(s<60) return (s<10? s.toFixed(1):Math.round(s))+&quot; s&quot;;
+    let m=s/60;
+    return (m<10? m.toFixed(1):Math.round(m))+&quot; min&quot;;
+  }
+
+  // static layer group
+  const gStatic=el('g',{});
+  svg.appendChild(gStatic);
+
+  // budget band
+  const yHigh=yScale(BUDGET_HIGH), yLow=yScale(BUDGET_LOW);
+  gStatic.appendChild(el('rect',{x:mL,y:yHigh,width:plotW,height:(yLow-yHigh),
+    fill:css('--danger'),opacity:'0.18'}));
+  const bandLabel=el('text',{x:mL+6,y:yHigh+13,'font-size':'10.5','fill':css('--danger')});
+  bandLabel.textContent='real-time budget: ~100–300 ms (motion degrades beyond this)';
+  gStatic.appendChild(bandLabel);
+
+  // axes gridlines + ticks
+  const xTicks=[1,5,10,50,100,500,900];
+  xTicks.forEach(T=>{
+    const x=xScale(T);
+    gStatic.appendChild(el('line',{x1:x,y1:mT,x2:x,y2:mT+plotH,stroke:css('--grid'),'stroke-width':'1'}));
+    const t=el('text',{x:x,y:H-mB+16,'font-size':'10','text-anchor':'middle',fill:css('--muted')});
+    t.textContent=T;
+    gStatic.appendChild(t);
+  });
+  const xAxisLbl=el('text',{x:mL+plotW/2,y:H-6,'font-size':'11','text-anchor':'middle',fill:css('--fg')});
+  xAxisLbl.textContent='past frames appended, T (log scale)';
+  gStatic.appendChild(xAxisLbl);
+
+  for(let p=0;p<=yMaxLog;p++){
+    const v=Math.pow(10,p);
+    const y=yScale(v);
+    gStatic.appendChild(el('line',{x1:mL,y1:y,x2:mL+plotW,y2:y,stroke:css('--grid'),'stroke-width':'0.6'}));
+    const t=el('text',{x:mL-6,y:y+3,'font-size':'9.5','text-anchor':'end',fill:css('--muted')});
+    t.textContent=formatMs(v);
+    gStatic.appendChild(t);
+  }
+  const yAxisLbl=el('text',{x:14,y:mT+plotH/2,'font-size':'11','fill':css('--fg'),
+    transform:`rotate(-90 14 ${mT+plotH/2})`,'text-anchor':'middle'});
+  yAxisLbl.textContent='predicted inference latency (log scale)';
+  gStatic.appendChild(yAxisLbl);
+
+  // curve
+  let d='';
+  const steps=140;
+  for(let i=0;i<=steps;i++){
+    const T=Math.pow(10, (i/steps)*Math.log10(900));
+    const Tc=Math.max(1,T);
+    const x=xScale(Tc), y=yScale(latencyMsAt(Tc));
+    d += (i===0?'M':'L')+x.toFixed(2)+' '+y.toFixed(2)+' ';
+  }
+  gStatic.appendChild(el('path',{d:d,fill:'none',stroke:css('--accent'),'stroke-width':'2.4'}));
+  const curveLbl=el('text',{x:xScale(35),y:yScale(latencyMsAt(35))-8,'font-size':'10.5',fill:css('--accent')});
+  curveLbl.textContent='compute cost (attention ∝ T²)';
+  gStatic.appendChild(curveLbl);
+
+  // T=900 marker (15 min of history)
+  const x900=xScale(900);
+  gStatic.appendChild(el('line',{x1:x900,y1:mT,x2:x900,y2:mT+plotH,stroke:css('--muted'),
+    'stroke-width':'1','stroke-dasharray':'4,3'}));
+  const lab900=el('text',{x:x900-4,y:mT+12,'font-size':'9.5','text-anchor':'end',fill:css('--muted')});
+  lab900.textContent='T=900 ≈ 15 min of history';
+  gStatic.appendChild(lab900);
+
+  // ---------- inset: N x N attention matrix ----------
+  const insetMax=88, insetX=W-mR+14, insetY=mT+2;
+  const NmaxDomain=tokensAt(900);
+  const insetTitle=el('text',{x:insetX,y:insetY-4,'font-size':'10','fill':css('--fg')});
+  insetTitle.textContent='attention matrix N×N';
+  gStatic.appendChild(insetTitle);
+  const insetSquare=el('rect',{x:insetX,y:insetY,width:3,height:3,fill:css('--accent'),opacity:'0.55'});
+  svg.appendChild(insetSquare);
+  const insetFrame=el('rect',{x:insetX,y:insetY,width:insetMax,height:insetMax,fill:'none',
+    stroke:css('--border'),'stroke-width':'1'});
+  svg.appendChild(insetFrame);
+  const insetN=el('text',{x:insetX,y:insetY+insetMax+13,'font-size':'9.5',fill:css('--muted')});
+  svg.appendChild(insetN);
+
+  // dynamic layer
+  const dot=el('circle',{r:5,fill:css('--accent2'),stroke:css('--bg'),'stroke-width':'1.4'});
+  const dotLabelBg=el('text',{'font-size':'10.5',fill:css('--bg'),stroke:css('--bg'),'stroke-width':'3','paint-order':'stroke'});
+  const dotLabel=el('text',{'font-size':'10.5',fill:css('--accent2')});
+  svg.appendChild(dot); svg.appendChild(dotLabelBg); svg.appendChild(dotLabel);
+
+  // guess markers
+  const guessLine=el('line',{stroke:css('--muted'),'stroke-width':'1.4','stroke-dasharray':'3,3',visibility:'hidden'});
+  const guessLbl=el('text',{'font-size':'9.5',fill:css('--muted'),visibility:'hidden'});
+  const crossLine=el('line',{stroke:css('--danger'),'stroke-width':'1.6',visibility:'hidden'});
+  const crossLbl=el('text',{'font-size':'9.5',fill:css('--danger'),visibility:'hidden'});
+  svg.appendChild(guessLine); svg.appendChild(guessLbl); svg.appendChild(crossLine); svg.appendChild(crossLbl);
+
+  // ---------- render dynamic pieces ----------
+  function render(T){
+    const N=tokensAt(T), lat=latencyMsAt(T);
+    const x=xScale(T), y=yScale(lat);
+    dot.setAttribute('cx',x); dot.setAttribute('cy',y);
+    const above = y > mT+22;
+    const ly = above? y-10 : y+16;
+    const txt = 'T='+Math.round(T)+' · '+formatMs(lat);
+    [dotLabelBg,dotLabel].forEach(t=>{ t.setAttribute('x',x+8); t.setAttribute('y',ly); t.textContent=txt; });
+
+    const side = 3 + (insetMax-3)*(N/NmaxDomain);
+    insetSquare.setAttribute('width',side.toFixed(2));
+    insetSquare.setAttribute('height',side.toFixed(2));
+    insetSquare.setAttribute('x', insetX + (insetMax-side));
+    insetSquare.setAttribute('y', insetY + (insetMax-side));
+    insetN.textContent='N = '+Math.round(N).toLocaleString();
+
+    document.getElementById('rT').textContent=Math.round(T);
+    document.getElementById('rN').textContent=Math.round(N).toLocaleString();
+    document.getElementById('rLat').textContent=formatMs(lat);
+    const ratio=lat/BUDGET_HIGH;
+    document.getElementById('rRatio').textContent = ratio>=1
+      ? ratio.toFixed(1)+'× over the 300 ms budget'
+      : ratio.toFixed(2)+'× of budget (within budget)';
+    document.getElementById('Tval').textContent='T = '+Math.round(T);
+  }
+
+  // ---------- animation (tween) ----------
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let current=1, target=1;
+  function tick(){
+    current += (target-current)*0.22;
+    if(Math.abs(target-current)<0.4) current=target;
+    render(current);
+    if(current!==target) requestAnimationFrame(tick);
+  }
+  function setT(T){
+    target=Math.max(1,Math.min(900,T));
+    if(reduced){ current=target; render(current); } else requestAnimationFrame(tick);
+  }
+
+  const slider=document.getElementById('Tslider');
+  slider.addEventListener('input',()=>{
+    const T=Math.round(Math.pow(10,parseFloat(slider.value)));
+    setT(T);
+  });
+
+  // ---------- guess-before-reveal ----------
+  document.querySelectorAll('button[data-g]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('button[data-g]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const g=parseFloat(btn.dataset.g);
+      const gx=xScale(g);
+      guessLine.setAttribute('x1',gx); guessLine.setAttribute('y1',mT);
+      guessLine.setAttribute('x2',gx); guessLine.setAttribute('y2',mT+plotH);
+      guessLine.setAttribute('visibility','visible');
+      guessLbl.setAttribute('x',gx+4); guessLbl.setAttribute('y',mT+plotH-4);
+      guessLbl.textContent='your guess: T='+g;
+      guessLbl.setAttribute('visibility','visible');
+
+      const cx=xScale(T_CROSS_LOW);
+      crossLine.setAttribute('x1',cx); crossLine.setAttribute('y1',mT);
+      crossLine.setAttribute('x2',cx); crossLine.setAttribute('y2',mT+plotH);
+      crossLine.setAttribute('visibility','visible');
+      crossLbl.setAttribute('x',cx+4); crossLbl.setAttribute('y',mT+14);
+      crossLbl.textContent='actual crossing ≈ T '+Math.round(T_CROSS_LOW)+'–'+Math.round(T_CROSS_HIGH);
+      crossLbl.setAttribute('visibility','visible');
+
+      const verdict = g < T_CROSS_LOW ? 'too early' : (g > T_CROSS_HIGH ? 'too late — real cost blows up far sooner' : 'close!');
+      document.getElementById('guessMsg').textContent =
+        'Curve actually enters the budget band around T ≈ '+Math.round(T_CROSS_LOW)+'–'+Math.round(T_CROSS_HIGH)+' frames. Your guess ('+g+'): '+verdict;
+    });
+  });
+
+  // initial draw
+  render(1);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;quadratic-wall&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Feeding in past frames blows the robot's split-second time budget almost at once"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">The naive approach fails because it treats all memory alike. MEM's move: notice that seconds-old memory and minutes-old memory need wildly different amounts of detail, and store each in its own form — recent video, distant text.</div>
+</header>
+<section class="scene" id="granularity-mismatch">
+  <h3>Seconds-old memory needs pixels; minutes-old memory needs a sentence</h3>
+  <div class="caption">That wall stands only if all memory must be raw video — slide back through the kitchen robot's last 15 minutes to see why it doesn't have to be. Retrying the slipped bowl grasp from 3 seconds ago needs pixel-level detail like grasp angle and bowl height, while 'I already put the butter away' from 9 minutes ago is a few bits that fit in one sentence.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="granularity-mismatch"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Granularity mismatch: memory density by age</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#1b1c20; --muted:#6b6f76;
+    --grid:#c9cdd4; --accent-pixel:#2563eb; --accent-text:#059669;
+    --now:#d64545; --border:#d7dae0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a; --panel:#1d2025; --ink:#eceef1; --muted:#9aa0aa;
+      --grid:#3a3f47; --accent-pixel:#5b8def; --accent-text:#3ddc97;
+      --now:#ff6b6b; --border:#33373e;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:12px 14px 16px;}
+  svg{width:100%;height:auto;max-width:100%;display:block;}
+  text{fill:var(--ink); font-family:inherit;}
+  .title{font-size:13px;font-weight:600;}
+  .lbl{font-size:10.5px;fill:var(--muted);}
+  .lbl2{font-size:11px;fill:var(--muted);}
+  .tick{font-size:10px;fill:var(--muted);}
+  .ann{font-size:10.5px;fill:var(--ink);font-weight:600;}
+  .cap{font-size:10.5px;fill:var(--muted);font-style:italic;}
+  .fact{font-size:13px;fill:var(--ink);font-weight:700;}
+  .bandlbl{font-size:9.5px;fill:var(--muted);}
+  .axis{stroke:var(--grid);stroke-width:1.5;}
+  .tickline{stroke:var(--grid);stroke-width:1.2;}
+  .probe{stroke:var(--now);stroke-width:2;}
+  .probe-dot{fill:var(--now);}
+  .dashed{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3;}
+  .panelbg{fill:var(--panel);stroke:var(--border);}
+  .cropframe{fill:var(--panel);stroke:var(--accent-pixel);stroke-width:1.6;}
+  .bowl{fill:var(--grid);stroke:var(--ink);stroke-width:1;}
+  .angleline,.heightline{stroke:var(--accent-pixel);stroke-width:1.6;}
+  .notecard{fill:var(--panel);stroke:var(--accent-text);stroke-width:1.6;}
+  .checkbg{fill:var(--accent-text);}
+  .checkmark{font-size:13px;fill:#fff;font-weight:700;}
+  .band-text{fill:var(--accent-text);opacity:.16;}
+  .band-pixel{fill:var(--accent-pixel);opacity:.16;}
+  .bar{fill:var(--now);}
+  .marker{stroke:var(--now);stroke-width:1.6;}
+  .bracket{stroke:var(--muted);stroke-width:1.2;}
+  #pixelGroup,#textGroup{transition:opacity .15s linear;}
+  @media (prefers-reduced-motion: reduce){ #pixelGroup,#textGroup{transition:none;} }
+
+  .predict{display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;font-size:12.5px;margin-bottom:10px;}
+  .predict-q{flex:1 1 220px;color:var(--muted);}
+  .predict-btns{display:flex;gap:6px;}
+  button{font:inherit;font-size:12px;padding:6px 9px;border-radius:6px;
+    border:1px solid var(--border);background:var(--panel);color:var(--ink);cursor:pointer;}
+  button:disabled{opacity:.5;cursor:default;}
+  .predict-fb{flex:1 1 100%;font-weight:600;font-size:12.5px;}
+
+  .controlrow{margin-top:10px;display:flex;flex-direction:column;gap:5px;}
+  .controlrow label{font-size:12.5px;}
+  input[type=range]{width:100%;}
+
+  .readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .stat{flex:1 1 130px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:6px 8px;}
+  .stat .k{display:block;font-size:10.5px;color:var(--muted);}
+  .stat .v{display:block;font-size:13.5px;font-weight:700;margin-top:2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;predict&quot; id=&quot;predict&quot;>
+    <span class=&quot;predict-q&quot;>Predict: as the probe slides further into the past, does the detail the robot needs go UP or DOWN?</span>
+    <div class=&quot;predict-btns&quot;>
+      <button id=&quot;btnUp&quot;>Up with age</button>
+      <button id=&quot;btnDown&quot;>Down with age</button>
+    </div>
+    <span class=&quot;predict-fb&quot; id=&quot;predictFb&quot;></span>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 380&quot; role=&quot;img&quot;
+       aria-label=&quot;Timeline of a kitchen robot's memory needs by age, from pixel detail near now to a one-line fact minutes back&quot;>
+    <text x=&quot;340&quot; y=&quot;16&quot; class=&quot;title&quot; text-anchor=&quot;middle&quot;>What the robot must recall, by memory age</text>
+
+    <text x=&quot;620&quot; y=&quot;34&quot; class=&quot;lbl&quot; text-anchor=&quot;end&quot;>now</text>
+    <text x=&quot;60&quot; y=&quot;34&quot; class=&quot;lbl&quot; text-anchor=&quot;middle&quot;>15 min ago</text>
+    <line x1=&quot;60&quot; y1=&quot;50&quot; x2=&quot;620&quot; y2=&quot;50&quot; class=&quot;axis&quot;/>
+    <g id=&quot;ticks&quot;></g>
+
+    <line id=&quot;threshold&quot; x1=&quot;326&quot; y1=&quot;20&quot; x2=&quot;326&quot; y2=&quot;242&quot; class=&quot;dashed&quot;/>
+    <text x=&quot;326&quot; y=&quot;84&quot; class=&quot;lbl&quot; text-anchor=&quot;middle&quot;>~1 min: representation switches</text>
+
+    <line id=&quot;probeLine&quot; x1=&quot;620&quot; y1=&quot;20&quot; x2=&quot;620&quot; y2=&quot;242&quot; class=&quot;probe&quot;/>
+    <circle id=&quot;probeDot&quot; cx=&quot;620&quot; cy=&quot;50&quot; r=&quot;5&quot; class=&quot;probe-dot&quot;/>
+
+    <rect x=&quot;40&quot; y=&quot;94&quot; width=&quot;600&quot; height=&quot;148&quot; rx=&quot;10&quot; class=&quot;panelbg&quot;/>
+    <text x=&quot;52&quot; y=&quot;112&quot; class=&quot;lbl2&quot;>Representation needed right now</text>
+
+    <g id=&quot;pixelGroup&quot;>
+      <rect x=&quot;60&quot; y=&quot;120&quot; width=&quot;200&quot; height=&quot;100&quot; class=&quot;cropframe&quot;/>
+      <text x=&quot;160&quot; y=&quot;132&quot; class=&quot;tick&quot; text-anchor=&quot;middle&quot;>video crop of the grasp</text>
+      <ellipse cx=&quot;160&quot; cy=&quot;176&quot; rx=&quot;46&quot; ry=&quot;18&quot; transform=&quot;rotate(-10 160 176)&quot; class=&quot;bowl&quot;/>
+      <line x1=&quot;160&quot; y1=&quot;176&quot; x2=&quot;206&quot; y2=&quot;148&quot; class=&quot;angleline&quot;/>
+      <text x=&quot;210&quot; y=&quot;146&quot; class=&quot;ann&quot; text-anchor=&quot;start&quot;>grasp angle 34°</text>
+      <line x1=&quot;100&quot; y1=&quot;158&quot; x2=&quot;100&quot; y2=&quot;196&quot; class=&quot;heightline&quot;/>
+      <text x=&quot;60&quot; y=&quot;208&quot; class=&quot;ann&quot; text-anchor=&quot;start&quot;>bowl height 9.2 cm</text>
+      <text x=&quot;160&quot; y=&quot;234&quot; class=&quot;cap&quot; text-anchor=&quot;middle&quot;>retry the slipped-bowl grasp — pose must match exactly</text>
+    </g>
+
+    <g id=&quot;textGroup&quot;>
+      <rect x=&quot;280&quot; y=&quot;140&quot; width=&quot;300&quot; height=&quot;58&quot; rx=&quot;10&quot; class=&quot;notecard&quot;/>
+      <circle cx=&quot;305&quot; cy=&quot;169&quot; r=&quot;11&quot; class=&quot;checkbg&quot;/>
+      <text x=&quot;305&quot; y=&quot;173&quot; class=&quot;checkmark&quot; text-anchor=&quot;middle&quot;>✓</text>
+      <text x=&quot;328&quot; y=&quot;162&quot; class=&quot;lbl&quot; text-anchor=&quot;start&quot;>already known:</text>
+      <text id=&quot;factText&quot; x=&quot;328&quot; y=&quot;182&quot; class=&quot;fact&quot; text-anchor=&quot;start&quot;>—</text>
+      <text x=&quot;430&quot; y=&quot;222&quot; class=&quot;cap&quot; text-anchor=&quot;middle&quot;>one sentence suffices — no frame needed</text>
+    </g>
+
+    <text x=&quot;340&quot; y=&quot;266&quot; class=&quot;lbl2&quot; text-anchor=&quot;middle&quot;>Bytes needed to reconstruct the moment (log scale)</text>
+
+    <line x1=&quot;203&quot; y1=&quot;282&quot; x2=&quot;430&quot; y2=&quot;282&quot; class=&quot;bracket&quot;/>
+    <line x1=&quot;203&quot; y1=&quot;278&quot; x2=&quot;203&quot; y2=&quot;286&quot; class=&quot;bracket&quot;/>
+    <line x1=&quot;430&quot; y1=&quot;278&quot; x2=&quot;430&quot; y2=&quot;286&quot; class=&quot;bracket&quot;/>
+    <text id=&quot;gapLabel&quot; x=&quot;317&quot; y=&quot;276&quot; class=&quot;ann&quot; text-anchor=&quot;middle&quot;>—</text>
+
+    <rect x=&quot;70&quot; y=&quot;290&quot; width=&quot;133&quot; height=&quot;22&quot; class=&quot;band-text&quot;/>
+    <rect x=&quot;430&quot; y=&quot;290&quot; width=&quot;180&quot; height=&quot;22&quot; class=&quot;band-pixel&quot;/>
+    <text x=&quot;136&quot; y=&quot;305&quot; class=&quot;bandlbl&quot; text-anchor=&quot;middle&quot;>text regime (tens of bytes)</text>
+    <text x=&quot;520&quot; y=&quot;305&quot; class=&quot;bandlbl&quot; text-anchor=&quot;middle&quot;>pixel regime (megabytes)</text>
+
+    <rect id=&quot;barRect&quot; x=&quot;70&quot; y=&quot;322&quot; width=&quot;1&quot; height=&quot;14&quot; class=&quot;bar&quot;/>
+    <line id=&quot;markerLine&quot; x1=&quot;70&quot; y1=&quot;314&quot; x2=&quot;70&quot; y2=&quot;340&quot; class=&quot;marker&quot;/>
+    <text id=&quot;valueLabel&quot; x=&quot;70&quot; y=&quot;318&quot; class=&quot;ann&quot; text-anchor=&quot;middle&quot;>—</text>
+
+    <line x1=&quot;70&quot; y1=&quot;340&quot; x2=&quot;610&quot; y2=&quot;340&quot; class=&quot;axis&quot;/>
+    <g id=&quot;byteTicks&quot;></g>
+  </svg>
+
+  <div class=&quot;controlrow&quot;>
+    <label for=&quot;probe&quot;>How far into the past the probe points: <strong id=&quot;tReadout&quot;>3 s ago</strong></label>
+    <input type=&quot;range&quot; id=&quot;probe&quot; min=&quot;0&quot; max=&quot;1000&quot; value=&quot;0&quot; step=&quot;1&quot;>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;stat&quot;><span class=&quot;k&quot;>Regime</span><span class=&quot;v&quot; id=&quot;rRegime&quot;>—</span></div>
+    <div class=&quot;stat&quot;><span class=&quot;k&quot;>Data needed</span><span class=&quot;v&quot; id=&quot;rBytes&quot;>—</span></div>
+    <div class=&quot;stat&quot;><span class=&quot;k&quot;>What's stored</span><span class=&quot;v&quot; id=&quot;rWhat&quot;>—</span></div>
+    <div class=&quot;stat&quot;><span class=&quot;k&quot;>Time ago</span><span class=&quot;v&quot; id=&quot;rTime&quot;>—</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const NS = &quot;http://www.w3.org/2000/svg&quot;;
+  // ---- named physical constants (auditable) ----
+  const B_PIXEL_BYTES = 2000000;   // bytes: annotated pixel crop needed to retry a grasp
+  const B_TEXT_BYTES  = 40;        // bytes: a short text fact (&quot;butter already put away&quot;)
+  const T0_SECONDS    = 60;        // s: age at which representation crosses over
+  const K_STEEP       = 12;        // steepness of the crossover in log10(t/T0) space
+  const T_MIN = 3, T_MAX = 900;    // s: slider range (3 s to 15 min)
+
+  function xForT(t){
+    const logmin = Math.log10(T_MIN), logmax = Math.log10(T_MAX);
+    const f = (Math.log10(t) - logmin) / (logmax - logmin);
+    return 620 - f * (620 - 60); // now (small t) on the right
+  }
+  function xForBytes(b){
+    const f = (Math.log10(b) - 1) / (7 - 1); // axis spans 10^1 .. 10^7 bytes
+    return 70 + f * (610 - 70);
+  }
+  function sigmaOf(t){
+    const x = Math.log10(t / T0_SECONDS);
+    return 1 / (1 + Math.exp(K_STEEP * x)); // monotonic decreasing in t
+  }
+  function bytesOf(t){
+    const s = sigmaOf(t);
+    return B_TEXT_BYTES + (B_PIXEL_BYTES - B_TEXT_BYTES) * s;
+  }
+  function formatBytes(b){
+    if (b >= 1e6) return (b/1e6).toFixed(2) + &quot; MB&quot;;
+    if (b >= 1e3) return (b/1e3).toFixed(1) + &quot; KB&quot;;
+    return Math.round(b) + &quot; B&quot;;
+  }
+  function formatTime(t){
+    if (t < 60) return Math.round(t) + &quot; s&quot;;
+    return (t/60).toFixed(1) + &quot; min&quot;;
+  }
+  function pickFact(t){
+    if (t <= 180) return &quot;cabinet door still open&quot;;
+    if (t <= 600) return &quot;butter already put away&quot;;
+    return &quot;onions already chopped&quot;;
+  }
+
+  const svgNS = document.getElementById(&quot;diagram&quot;);
+  const g = document.getElementById(&quot;ticks&quot;);
+  [[3,&quot;3 s&quot;],[30,&quot;30 s&quot;],[60,&quot;1 min&quot;],[300,&quot;5 min&quot;],[600,&quot;10 min&quot;],[900,&quot;15 min&quot;]]
+    .forEach(([t,label])=>{
+      const x = xForT(t);
+      const l = document.createElementNS(NS,&quot;line&quot;);
+      l.setAttribute(&quot;x1&quot;,x); l.setAttribute(&quot;x2&quot;,x);
+      l.setAttribute(&quot;y1&quot;,44); l.setAttribute(&quot;y2&quot;,56);
+      l.setAttribute(&quot;class&quot;,&quot;tickline&quot;);
+      g.appendChild(l);
+      const tx = document.createElementNS(NS,&quot;text&quot;);
+      tx.setAttribute(&quot;x&quot;,x); tx.setAttribute(&quot;y&quot;,70);
+      tx.setAttribute(&quot;class&quot;,&quot;tick&quot;); tx.setAttribute(&quot;text-anchor&quot;,&quot;middle&quot;);
+      tx.textContent = label;
+      g.appendChild(tx);
+    });
+
+  const bg = document.getElementById(&quot;byteTicks&quot;);
+  [[1,&quot;10 B&quot;],[2,&quot;100 B&quot;],[3,&quot;1 KB&quot;],[4,&quot;10 KB&quot;],[5,&quot;100 KB&quot;],[6,&quot;1 MB&quot;],[7,&quot;10 MB&quot;]]
+    .forEach(([p,label])=>{
+      const x = xForBytes(Math.pow(10,p));
+      const l = document.createElementNS(NS,&quot;line&quot;);
+      l.setAttribute(&quot;x1&quot;,x); l.setAttribute(&quot;x2&quot;,x);
+      l.setAttribute(&quot;y1&quot;,340); l.setAttribute(&quot;y2&quot;,346);
+      l.setAttribute(&quot;class&quot;,&quot;tickline&quot;);
+      bg.appendChild(l);
+      const tx = document.createElementNS(NS,&quot;text&quot;);
+      tx.setAttribute(&quot;x&quot;,x); tx.setAttribute(&quot;y&quot;,360);
+      tx.setAttribute(&quot;class&quot;,&quot;tick&quot;); tx.setAttribute(&quot;text-anchor&quot;,&quot;middle&quot;);
+      tx.textContent = label;
+      bg.appendChild(tx);
+    });
+
+  const ratio = B_PIXEL_BYTES / B_TEXT_BYTES;
+  document.getElementById(&quot;gapLabel&quot;).textContent =
+    &quot;≈&quot; + Math.round(ratio).toLocaleString() + &quot;× (~&quot; + Math.log10(ratio).toFixed(1) + &quot; orders of magnitude)&quot;;
+
+  const probeLine = document.getElementById(&quot;probeLine&quot;);
+  const probeDot  = document.getElementById(&quot;probeDot&quot;);
+  const pixelGroup = document.getElementById(&quot;pixelGroup&quot;);
+  const textGroup  = document.getElementById(&quot;textGroup&quot;);
+  const factText   = document.getElementById(&quot;factText&quot;);
+  const barRect    = document.getElementById(&quot;barRect&quot;);
+  const markerLine = document.getElementById(&quot;markerLine&quot;);
+  const valueLabel = document.getElementById(&quot;valueLabel&quot;);
+  const tReadout   = document.getElementById(&quot;tReadout&quot;);
+  const rRegime = document.getElementById(&quot;rRegime&quot;);
+  const rBytes  = document.getElementById(&quot;rBytes&quot;);
+  const rWhat   = document.getElementById(&quot;rWhat&quot;);
+  const rTime   = document.getElementById(&quot;rTime&quot;);
+
+  function render(t){
+    const s = sigmaOf(t);
+    const bytes = bytesOf(t);
+    const xp = xForT(t);
+    probeLine.setAttribute(&quot;x1&quot;,xp); probeLine.setAttribute(&quot;x2&quot;,xp);
+    probeDot.setAttribute(&quot;cx&quot;,xp);
+
+    pixelGroup.setAttribute(&quot;opacity&quot;, s.toFixed(3));
+    textGroup.setAttribute(&quot;opacity&quot;, (1-s).toFixed(3));
+    factText.textContent = pickFact(t);
+
+    const xb = xForBytes(bytes);
+    barRect.setAttribute(&quot;width&quot;, Math.max(1, xb - 70).toFixed(1));
+    markerLine.setAttribute(&quot;x1&quot;, xb); markerLine.setAttribute(&quot;x2&quot;, xb);
+    valueLabel.setAttribute(&quot;x&quot;, xb);
+    valueLabel.textContent = formatBytes(bytes);
+
+    const regime = s > 0.5 ? &quot;Pixel detail&quot; : &quot;Text fact&quot;;
+    rRegime.textContent = regime;
+    rBytes.textContent  = formatBytes(bytes);
+    rWhat.textContent   = s > 0.5 ? &quot;grasp angle + bowl height&quot; : pickFact(t);
+    rTime.textContent   = formatTime(t) + &quot; ago&quot;;
+    tReadout.textContent = formatTime(t) + &quot; ago&quot;;
+  }
+
+  const slider = document.getElementById(&quot;probe&quot;);
+  function tFromSlider(v){
+    return T_MIN * Math.pow(T_MAX / T_MIN, v / 1000);
+  }
+  slider.addEventListener(&quot;input&quot;, ()=> render(tFromSlider(+slider.value)));
+
+  const btnUp = document.getElementById(&quot;btnUp&quot;);
+  const btnDown = document.getElementById(&quot;btnDown&quot;);
+  const fb = document.getElementById(&quot;predictFb&quot;);
+  function lockPredict(msg){
+    fb.textContent = msg;
+    btnUp.disabled = true; btnDown.disabled = true;
+  }
+  btnUp.addEventListener(&quot;click&quot;, ()=> lockPredict(&quot;Not quite — required detail drops sharply past about a minute.&quot;));
+  btnDown.addEventListener(&quot;click&quot;, ()=> lockPredict(&quot;Correct — detail drops by orders of magnitude beyond ~1 minute.&quot;));
+
+  render(tFromSlider(0));
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;granularity-mismatch&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Seconds-old memory needs pixels; minutes-old memory needs a sentence"
+  ></iframe>
+</section>
+
+<section class="scene" id="two-policy-factorization">
+  <h3>MEM splits the policy in two, with a text memory as the only channel to the deep past</h3>
+  <div class="caption">MEM breaks the single policy into two. A high-level policy reads the current frame and the text note <math><mi>m</mi></math>, then hands the low-level policy a one-line subtask <math><mi>l</mi></math> ('pick up the bowl') and rewrites the note to <math><msub><mi>m</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub></math>; the low-level policy sees only the last <math><mi>K</mi></math> frames plus that subtask and outputs the motor commands. In symbols (tap any symbol for its job): <math><mi>pi</mi><mi>approx</mi><msub><mi>pi</mi><mrow><mtext>LL</mtext></mrow></msub><mo>(</mo><msub><mi>a</mi><mrow><mi>t</mi><mo>:</mo><mi>t</mi><mo>+</mo><mi>H</mi></mrow></msub><mi>mid</mi><msub><mi>o</mi><mrow><mi>t</mi><mo>-</mo><mi>K</mi><mo>:</mo><mi>t</mi></mrow></msub><mo>,</mo><mspace width="0.167em"></mspace><msub><mi>l</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>,</mo><mspace width="0.167em"></mspace><mi>g</mi><mo>)</mo><mi></mi><mo>;</mo><msub><mi>pi</mi><mrow><mtext>HL</mtext></mrow></msub><mo>(</mo><msub><mi>l</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>,</mo><mspace width="0.167em"></mspace><msub><mi>m</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub><mi>mid</mi><msub><mi>o</mi><mi>t</mi></msub><mo>,</mo><mspace width="0.167em"></mspace><msub><mi>m</mi><mi>t</mi></msub><mo>,</mo><mspace width="0.167em"></mspace><mi>g</mi><mo>)</mo></math>. The key fact: anything older than the last <math><mi>K</mi></math> frames survives only if it was written into the note <math><mi>m</mi></math>.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="two-policy-factorization"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Two-policy factorization</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f4f5f8;
+    --text:#1a1a1c;
+    --muted:#65656d;
+    --accent:#2456c9;
+    --accent2:#c62828;
+    --dim:#c7c9d3;
+    --box:#e7ecfb;
+    --border:#4b4b55;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a;
+      --panel:#1e2027;
+      --text:#eceef2;
+      --muted:#9a9ca6;
+      --accent:#6ea0ff;
+      --accent2:#ff6b6b;
+      --dim:#3a3c46;
+      --box:#25304a;
+      --border:#8890a0;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;
+  }
+  .wrap{max-width:680px; margin:0 auto; padding:12px 14px 20px;}
+  h2.lbl{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:4px 0 6px; font-weight:600;}
+  .eqbox{background:var(--panel); border-radius:10px; padding:10px 8px 6px; overflow-x:auto;}
+  math{font-size:1.15em;}
+  .sym{cursor:pointer;}
+  .sym:hover{color:var(--accent);}
+  .sym.active{color:var(--accent); font-weight:bold;}
+  #def-readout{
+    min-height:2.4em; font-size:13px; color:var(--text); background:var(--panel);
+    border-radius:8px; padding:8px 10px; margin:8px 0 4px;
+  }
+  ul.legend{list-style:none; margin:6px 0 14px; padding:0; font-size:11.5px; color:var(--muted); line-height:1.55;}
+  ul.legend li{padding:1px 0;}
+  ul.legend b{color:var(--text);}
+  svg{width:100%; max-width:100%; height:auto; display:block; background:var(--panel); border-radius:10px;}
+  .ctrlrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:10px 0;}
+  button#wireBtn{
+    font-size:13px; padding:8px 14px; border-radius:8px; border:1px solid var(--border);
+    background:var(--box); color:var(--text); cursor:pointer;
+  }
+  button#wireBtn:hover{border-color:var(--accent);}
+  .anchor{font-size:12.5px; color:var(--muted);}
+  .anchor b{color:var(--text);}
+  text{fill:var(--text); font-family:inherit;}
+  .muted-text{fill:var(--muted);}
+  .active-hl rect, .active-hl path, .active-hl circle, .active-hl ellipse{
+    stroke:var(--accent) !important; stroke-width:3px;
+  }
+  .active-hl text{fill:var(--accent); font-weight:700;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2 class=&quot;lbl&quot;>High-level / low-level policy split</h2>
+
+  <div class=&quot;eqbox&quot;>
+  <math display=&quot;block&quot;>
+    <mi class=&quot;sym&quot; data-sym=&quot;pi&quot;>&amp;#960;</mi>
+    <mo>&amp;#8776;</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;LL&quot;>&amp;#960;</mi><mtext class=&quot;sym&quot; data-sym=&quot;LL&quot;>LL</mtext></msub>
+    <mo>(</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;a&quot;>a</mi>
+      <mrow><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi><mo>:</mo><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi><mo>+</mo><mi class=&quot;sym&quot; data-sym=&quot;H&quot;>H</mi></mrow>
+    </msub>
+    <mo>&amp;#8739;</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;o&quot;>o</mi>
+      <mrow><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi><mo>&amp;#8722;</mo><mi class=&quot;sym&quot; data-sym=&quot;K&quot;>K</mi><mo>:</mo><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi></mrow>
+    </msub>
+    <mo>,</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;l&quot;>l</mi><mrow><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi><mo>+</mo><mn>1</mn></mrow></msub>
+    <mo>,</mo>
+    <mi class=&quot;sym&quot; data-sym=&quot;g&quot;>g</mi>
+    <mo>)</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;HL&quot;>&amp;#960;</mi><mtext class=&quot;sym&quot; data-sym=&quot;HL&quot;>HL</mtext></msub>
+    <mo>(</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;l&quot;>l</mi><mrow><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi><mo>+</mo><mn>1</mn></mrow></msub>
+    <mo>,</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;m&quot;>m</mi><mrow><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi><mo>+</mo><mn>1</mn></mrow></msub>
+    <mo>&amp;#8739;</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;o&quot;>o</mi><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi></msub>
+    <mo>,</mo>
+    <msub><mi class=&quot;sym&quot; data-sym=&quot;m&quot;>m</mi><mi class=&quot;sym&quot; data-sym=&quot;t&quot;>t</mi></msub>
+    <mo>,</mo>
+    <mi class=&quot;sym&quot; data-sym=&quot;g&quot;>g</mi>
+    <mo>)</mo>
+  </math>
+  </div>
+
+  <div id=&quot;def-readout&quot;>Tap any symbol above to see its job and highlight it below.</div>
+
+  <ul class=&quot;legend&quot;>
+    <li><b>&amp;#960;</b> &amp;mdash; the full action distribution before splitting (one flat policy over everything)</li>
+    <li><b>&amp;#960;_LL</b> &amp;mdash; low-level policy: motor commands from a short window of frames + one subtask</li>
+    <li><b>&amp;#960;_HL</b> &amp;mdash; high-level policy: reads current frame + memory, emits next subtask &amp; rewrites memory</li>
+    <li><b>a</b> &amp;mdash; motor / gripper action vector for one timestep</li>
+    <li><b>o</b> &amp;mdash; one camera observation frame</li>
+    <li><b>g</b> &amp;mdash; the fixed task goal, constant for the whole episode</li>
+    <li><b>l</b> &amp;mdash; one-line subtask text handed to the low-level policy (e.g. &quot;pick up the bowl&quot;)</li>
+    <li><b>m</b> &amp;mdash; text memory note; the only channel that can carry information past K frames</li>
+    <li><b>K</b> &amp;mdash; low-level context length: 18 frames &amp;asymp; 54 s of video</li>
+    <li><b>H</b> &amp;mdash; action horizon: number of future steps returned per low-level call</li>
+    <li><b>t</b> &amp;mdash; current timestep (frame index)</li>
+  </ul>
+
+  <svg viewBox=&quot;0 0 640 460&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+    <defs>
+      <marker id=&quot;amuted&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;8&quot; refY=&quot;5&quot; markerWidth=&quot;6&quot; markerHeight=&quot;6&quot; orient=&quot;auto-start-reverse&quot;>
+        <path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--muted)&quot;/>
+      </marker>
+      <marker id=&quot;aaccent&quot; viewBox=&quot;0 0 10 10&quot; refX=&quot;8&quot; refY=&quot;5&quot; markerWidth=&quot;7&quot; markerHeight=&quot;7&quot; orient=&quot;auto-start-reverse&quot;>
+        <path d=&quot;M0,0 L10,5 L0,10 z&quot; fill=&quot;var(--accent)&quot;/>
+      </marker>
+    </defs>
+
+    <!-- T span -->
+    <text x=&quot;235&quot; y=&quot;9&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot; font-size=&quot;10.5&quot;>T &amp;asymp; 900 frames (15 min task)</text>
+    <line x1=&quot;20&quot; y1=&quot;15&quot; x2=&quot;450&quot; y2=&quot;15&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.2&quot;/>
+    <line x1=&quot;20&quot; y1=&quot;10&quot; x2=&quot;20&quot; y2=&quot;19&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.2&quot;/>
+    <line x1=&quot;450&quot; y1=&quot;10&quot; x2=&quot;450&quot; y2=&quot;19&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.2&quot;/>
+
+    <!-- dashed path: deep past -> memory node (part of wire-m) -->
+    <g id=&quot;wire-m&quot;>
+      <path id=&quot;path-deep-m&quot; d=&quot;M228,71 C320,35 460,35 550,95&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;
+            stroke-width=&quot;2&quot; stroke-dasharray=&quot;6 5&quot; marker-end=&quot;url(#aaccent)&quot;/>
+      <path id=&quot;path-loop&quot; d=&quot;M620,160 C620,95 480,95 480,160&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;
+            stroke-width=&quot;2.2&quot; marker-end=&quot;url(#aaccent)&quot;/>
+      <circle id=&quot;m-node&quot; cx=&quot;550&quot; cy=&quot;95&quot; r=&quot;5&quot; fill=&quot;var(--accent)&quot;/>
+      <text x=&quot;550&quot; y=&quot;79&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; font-weight=&quot;700&quot; fill=&quot;var(--accent)&quot;>m</text>
+      <g id=&quot;break-mark&quot; style=&quot;display:none&quot;>
+        <text x=&quot;392&quot; y=&quot;58&quot; font-size=&quot;15&quot; fill=&quot;var(--accent2)&quot; font-weight=&quot;700&quot;>&amp;#10005;</text>
+        <text x=&quot;548&quot; y=&quot;132&quot; font-size=&quot;15&quot; fill=&quot;var(--accent2)&quot; font-weight=&quot;700&quot;>&amp;#10005;</text>
+      </g>
+    </g>
+    <text x=&quot;390&quot; y=&quot;26&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot; font-size=&quot;9.5&quot;>m: only path from the deep past</text>
+
+    <!-- timeline -->
+    <g id=&quot;fr-old&quot;></g>
+    <g id=&quot;fr-k&quot;></g>
+    <g id=&quot;fr-t&quot;></g>
+
+    <text x=&quot;124&quot; y=&quot;96&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot; font-size=&quot;10&quot;>deep past (older than K)</text>
+    <text x=&quot;316&quot; y=&quot;96&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; font-weight=&quot;700&quot; fill=&quot;var(--accent)&quot;>K = 18 frames (54 s)</text>
+    <text x=&quot;421&quot; y=&quot;96&quot; text-anchor=&quot;middle&quot; class=&quot;muted-text&quot; font-size=&quot;10&quot;>o_t (now)</text>
+
+    <!-- arrows into boxes -->
+    <g id=&quot;arr-o-hl&quot;><path d=&quot;M421,82 C421,100 470,102 500,120&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.6&quot; marker-end=&quot;url(#amuted)&quot;/></g>
+    <g id=&quot;arr-o-ll&quot;><path d=&quot;M316,82 C316,150 300,220 300,290&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.6&quot; marker-end=&quot;url(#amuted)&quot;/></g>
+
+    <!-- HL box -->
+    <g id=&quot;box-hl&quot;>
+      <rect x=&quot;480&quot; y=&quot;120&quot; width=&quot;140&quot; height=&quot;80&quot; rx=&quot;8&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.4&quot;/>
+      <text x=&quot;550&quot; y=&quot;142&quot; text-anchor=&quot;middle&quot; font-size=&quot;14&quot; font-weight=&quot;700&quot;>&amp;#960;_HL</text>
+      <text x=&quot;550&quot; y=&quot;160&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; class=&quot;muted-text&quot;>reads: o_t, m_t, g</text>
+      <text x=&quot;550&quot; y=&quot;174&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; class=&quot;muted-text&quot;>writes: l_{t+1}, m_{t+1}</text>
+    </g>
+
+    <!-- LL box -->
+    <g id=&quot;box-ll&quot;>
+      <rect x=&quot;180&quot; y=&quot;290&quot; width=&quot;200&quot; height=&quot;80&quot; rx=&quot;8&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.4&quot;/>
+      <text x=&quot;280&quot; y=&quot;312&quot; text-anchor=&quot;middle&quot; font-size=&quot;14&quot; font-weight=&quot;700&quot;>&amp;#960;_LL</text>
+      <text x=&quot;280&quot; y=&quot;330&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; class=&quot;muted-text&quot;>reads: o_(t-K:t), l_{t+1}, g</text>
+      <text x=&quot;280&quot; y=&quot;344&quot; text-anchor=&quot;middle&quot; font-size=&quot;9.5&quot; class=&quot;muted-text&quot;>writes: a_{t:t+H}</text>
+    </g>
+
+    <!-- l arrow -->
+    <g id=&quot;arr-l&quot;>
+      <path d=&quot;M490,200 C440,230 420,262 380,290&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.6&quot; marker-end=&quot;url(#amuted)&quot;/>
+      <text x=&quot;415&quot; y=&quot;238&quot; text-anchor=&quot;middle&quot; font-size=&quot;8.5&quot; class=&quot;muted-text&quot;>l: subtask e.g. &quot;pick up the bowl&quot;</text>
+    </g>
+
+    <!-- goal pill -->
+    <g id=&quot;goal-pill&quot;>
+      <ellipse cx=&quot;605&quot; cy=&quot;245&quot; rx=&quot;18&quot; ry=&quot;14&quot; fill=&quot;var(--box)&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.3&quot;/>
+      <text x=&quot;605&quot; y=&quot;249&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; font-weight=&quot;700&quot;>g</text>
+      <path d=&quot;M598,230 L590,200&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#amuted)&quot;/>
+      <path d=&quot;M590,255 C520,285 460,300 382,313&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#amuted)&quot;/>
+      <text x=&quot;605&quot; y=&quot;270&quot; text-anchor=&quot;middle&quot; font-size=&quot;8.5&quot; class=&quot;muted-text&quot;>g: goal (fixed)</text>
+    </g>
+
+    <!-- action output -->
+    <g id=&quot;arr-a&quot;>
+      <path d=&quot;M280,370 L280,404&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#amuted)&quot;/>
+      <text x=&quot;280&quot; y=&quot;418&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot;>a_{t:t+H}: motor commands (next H steps)</text>
+    </g>
+
+    <text id=&quot;path-status&quot; x=&quot;320&quot; y=&quot;440&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; font-weight=&quot;700&quot;></text>
+  </svg>
+
+  <div class=&quot;ctrlrow&quot;>
+    <button id=&quot;wireBtn&quot;>Cut the memory wire</button>
+    <span class=&quot;anchor&quot; id=&quot;kt-readout&quot;></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  const NS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.querySelector(&quot;svg&quot;);
+
+  // ---- constants (quantitative anchor) ----
+  const K_FRAMES = 18, K_SECONDS = 54;
+  const T_FRAMES = 900, T_MINUTES = 15;
+  document.getElementById('kt-readout').textContent =
+    'K = ' + K_FRAMES + ' frames (' + K_SECONDS + ' s) \u226A T \u2248 ' + T_FRAMES + ' frames (' + T_MINUTES + ' min task)';
+
+  // ---- draw timeline frame rects ----
+  function rect(x,y,w,h,fill){
+    const r = document.createElementNS(NS,&quot;rect&quot;);
+    r.setAttribute(&quot;x&quot;,x); r.setAttribute(&quot;y&quot;,y);
+    r.setAttribute(&quot;width&quot;,w); r.setAttribute(&quot;height&quot;,h);
+    r.setAttribute(&quot;rx&quot;,2); r.setAttribute(&quot;fill&quot;,fill);
+    return r;
+  }
+  const cs = getComputedStyle(document.documentElement);
+  const dimColor = cs.getPropertyValue('--dim').trim();
+  const boxColor = cs.getPropertyValue('--box').trim();
+  const accentColor = cs.getPropertyValue('--accent').trim();
+
+  const frOld = document.getElementById('fr-old');
+  for(let i=0;i<13;i++){ frOld.appendChild(rect(20+i*16,60,14,22,dimColor)); }
+  const frK = document.getElementById('fr-k');
+  for(let i=0;i<8;i++){ frK.appendChild(rect(236+i*20,60,18,22,boxColor)); }
+  const frT = document.getElementById('fr-t');
+  frT.appendChild(rect(404,60,34,22,accentColor));
+
+  // ---- symbol -> diagram id map ----
+  const MAP = {
+    pi:['box-hl','box-ll'],
+    LL:['box-ll'], HL:['box-hl'],
+    a:['arr-a'],
+    o:['fr-k','fr-t','arr-o-hl','arr-o-ll'],
+    g:['goal-pill'],
+    l:['arr-l'],
+    m:['wire-m'],
+    K:['fr-k'],
+    H:['arr-a'],
+    t:['fr-t','arr-o-hl']
+  };
+
+  const DEFS = {
+    pi:'\u03c0 \u2014 the full action distribution before splitting (one flat policy over everything).',
+    LL:'\u03c0_LL \u2014 low-level policy: turns one subtask into motor commands using only recent frames.',
+    HL:'\u03c0_HL \u2014 high-level policy: reads the current frame + memory note, plans the next subtask, rewrites the note.',
+    a:'a \u2014 motor / gripper action vector issued for one timestep.',
+    o:'o \u2014 one camera observation frame.',
+    g:'g \u2014 the fixed task goal, constant for the whole episode.',
+    l:'l \u2014 one-line subtask text handed to the low-level policy, e.g. &quot;pick up the bowl&quot;.',
+    m:'m \u2014 the text memory note \u2014 the only channel that can carry information older than K frames.',
+    K:'K \u2014 low-level context length: 18 frames \u2248 54 s of recent video.',
+    H:'H \u2014 action horizon: number of future steps returned by one low-level call.',
+    t:'t \u2014 current timestep (frame index).'
+  };
+
+  function clearHighlights(){
+    document.querySelectorAll('.active-hl').forEach(el=>el.classList.remove('active-hl'));
+    document.querySelectorAll('.sym.active').forEach(el=>el.classList.remove('active'));
+  }
+
+  function highlightSymbol(sym){
+    clearHighlights();
+    (MAP[sym]||[]).forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.classList.add('active-hl');
+    });
+    document.querySelectorAll('[data-sym=&quot;'+sym+'&quot;]').forEach(el=>el.classList.add('active'));
+    document.getElementById('def-readout').textContent = DEFS[sym] || '';
+  }
+
+  document.querySelectorAll('.sym').forEach(el=>{
+    el.addEventListener('click', ()=> highlightSymbol(el.getAttribute('data-sym')));
+  });
+
+  // ---- wire cut toggle ----
+  let wireCut = false;
+  const dp = document.getElementById('path-deep-m');
+  const loop = document.getElementById('path-loop');
+  const node = document.getElementById('m-node');
+  const brk = document.getElementById('break-mark');
+  const status = document.getElementById('path-status');
+  const btn = document.getElementById('wireBtn');
+
+  function updateWire(){
+    if(wireCut){
+      dp.style.opacity = 0.12; loop.style.opacity = 0.12; node.style.opacity = 0.2;
+      brk.style.display = 'block';
+      status.textContent = 'Path from deep past \u2192 action: NONE (wire cut)';
+      status.setAttribute('fill', cs.getPropertyValue('--accent2').trim());
+      btn.textContent = 'Reconnect the memory wire';
+    } else {
+      dp.style.opacity = 1; loop.style.opacity = 1; node.style.opacity = 1;
+      brk.style.display = 'none';
+      status.textContent = 'Path from deep past \u2192 action: exists \u2014 only through m';
+      status.setAttribute('fill', accentColor);
+      btn.textContent = 'Cut the memory wire';
+    }
+  }
+  btn.addEventListener('click', ()=>{ wireCut = !wireCut; updateWire(); });
+  updateWire();
+
+  // ---- decorative flow animation (respects reduced motion) ----
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  dp.setAttribute('stroke-dasharray','6 5');
+  if(!reduced){
+    let off = 0;
+    function tick(){
+      if(!wireCut){
+        off -= 0.4;
+        dp.style.strokeDashoffset = off;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;two-policy-factorization&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="MEM splits the policy in two, with a text memory as the only channel to the deep past"
+  ></iframe>
+</section>
+
+<section class="scene" id="self-rewriting-summary">
+  <h3>The model rewrites its own summary, so minute-scale memory costs almost nothing</h3>
+  <div class="caption">Press play on the 15-minute kitchen episode and watch <math><mi>m</mi></math> get rewritten: 'a light green bowl, a dark blue bowl and a bright yellow bowl' compresses into 'three bowls in the top right cabinet', while stale facts get deleted outright. The token counter stays flat at a few dozen for the whole 15 minutes.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="self-rewriting-summary"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Self-rewriting memory</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f4f6f8; --fg:#16181c; --muted:#616b76; --border:#d7dce1;
+    --add:#0f7a3c; --add-bg:#d7f5e0; --del:#a3271f; --del-bg:#fbe1de; --merge:#8a5300; --merge-bg:#fbebc7;
+    --m-line:#2054c9; --raw-line:#c2410c;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#101318; --panel:#1a1e25; --fg:#e7e9ec; --muted:#9aa3ad; --border:#333a44;
+      --add:#4ade80; --add-bg:#123522; --del:#f87171; --del-bg:#3a1616; --merge:#fbbf24; --merge-bg:#3a2c0d;
+      --m-line:#7aa2f7; --raw-line:#fb923c;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:10px;background:var(--bg);color:var(--fg);
+       font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;}
+  .scene{max-width:680px;margin:0 auto;}
+  h2{font-size:15px;margin:2px 0 8px;font-weight:600;}
+  .eqbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+         padding:8px 10px;margin-bottom:10px;text-align:center;}
+  math{font-size:17px;}
+  .legend{color:var(--muted);font-size:11.5px;margin-top:4px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+         padding:8px 10px;margin-bottom:10px;}
+  .ptitle{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;}
+  .progressTrack{position:relative;height:10px;background:var(--border);border-radius:5px;overflow:hidden;}
+  .progressFill{position:absolute;left:0;top:0;bottom:0;background:var(--m-line);width:0%;}
+  .memoryBox{line-height:1.7;font-size:14.5px;min-height:3.4em;}
+  .fact{padding:1px 3px;border-radius:3px;}
+  .flash-add{background:var(--add-bg);color:var(--add);font-weight:600;}
+  .strike-fade{background:var(--del-bg);color:var(--del);text-decoration:line-through;opacity:.85;}
+  .merge-fade{background:var(--merge-bg);color:var(--merge);font-style:italic;}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;}
+  .controls label{font-size:13px;flex:1 1 260px;min-width:200px;}
+  input[type=range]{width:100%;}
+  button{font-size:13px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);
+         background:var(--panel);color:var(--fg);cursor:pointer;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;margin-bottom:8px;}
+  .readouts b{color:var(--m-line);}
+  svg{width:100%;max-width:100%;height:auto;display:block;}
+  ul#rewriteLog{margin:0;padding-left:18px;font-size:12.6px;}
+  ul#rewriteLog li{margin-bottom:3px;}
+  .note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>Memory update: read m<sub>t</sub> and the current image, write m<sub>t+1</sub></h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>m</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub>
+      <mo>=</mo><mi>π</mi><mo>(</mo><msub><mi>m</mi><mi>t</mi></msub><mo>,</mo><msub><mi>o</mi><mi>t</mi></msub><mo>)</mo>
+    </math>
+    <div class=&quot;legend&quot;>m<sub>t</sub> — memory sentence held before step t (tokens) · o<sub>t</sub> — image observation at step t ·
+    π — the high-level rewrite policy (an LLM) that adds, merges, or deletes facts to produce m<sub>t+1</sub></div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;ptitle&quot;>Kitchen-cleaning episode</div>
+    <div class=&quot;progressTrack&quot;><div class=&quot;progressFill&quot; id=&quot;progressFill&quot;></div></div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;ptitle&quot;>Memory sentence m<sub>t</sub></div>
+    <div class=&quot;memoryBox&quot; id=&quot;memoryBox&quot;></div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;timeSlider&quot;>Episode time t (minutes, drag 0–15): <b id=&quot;sliderVal&quot;>0.0</b></label>
+    <input type=&quot;range&quot; id=&quot;timeSlider&quot; min=&quot;0&quot; max=&quot;15&quot; step=&quot;0.1&quot; value=&quot;0&quot;>
+    <button id=&quot;playBtn&quot;>&amp;#9654; Jump to t = 15 min</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div>Episode time: <b id=&quot;minuteReadout&quot;>0.0</b> min</div>
+    <div>Tokens in m: <b id=&quot;tokM&quot;>-</b></div>
+    <div>Tokens if raw frames kept: <b id=&quot;tokRaw&quot;>-</b></div>
+    <div>Facts stored: <b id=&quot;factCount&quot;>-</b></div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;ptitle&quot;>Memory size vs. episode time</div>
+    <svg id=&quot;chart&quot; viewBox=&quot;0 0 560 210&quot;></svg>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;ptitle&quot;>Recent rewrites</div>
+    <ul id=&quot;rewriteLog&quot;></ul>
+    <div class=&quot;note&quot;>Training note: rewrite targets were produced by an off-the-shelf LLM given each demo's subtask labels and success/failure flags.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const FRAMES_PER_MIN = 6;      // low-level policy samples ~ every 10 s
+  const TOKENS_PER_FRAME = 250;  // approx vision tokens per raw image frame
+  const WINDOW = 1.2;            // minutes a rewrite stays visually highlighted
+
+  const EVENTS = [
+    {t:0,   type:'add',    id:'task',   text:'task: clean the kitchen'},
+    {t:1,   type:'add',    id:'sponge', text:'a dirty sponge on the counter'},
+    {t:2,   type:'add',    id:'bowl1',  text:'a light green bowl in the sink'},
+    {t:3.5, type:'add',    id:'bowl2',  text:'a dark blue bowl in the sink'},
+    {t:5,   type:'add',    id:'butter', text:'butter left out on the counter'},
+    {t:6,   type:'add',    id:'bowl3',  text:'a bright yellow bowl in the sink'},
+    {t:7.5, type:'delete', id:'sponge'},
+    {t:9,   type:'merge',  ids:['bowl1','bowl2','bowl3'], newId:'bowls',
+             text:'three bowls in the top right cabinet'},
+    {t:11,  type:'add',    id:'cleanup', text:'counter wiped, stove burners off'},
+    {t:13,  type:'add',    id:'final',   text:'kitchen cleanup almost complete'}
+  ];
+
+  const tokensOf = s => Math.max(1, Math.round(s.length/4)); // ~4 chars/token
+
+  function computeSettled(minute){
+    let list=[];
+    const find=id=>list.findIndex(f=>f.id===id);
+    for(const e of EVENTS){
+      if(e.t>minute) break;
+      if(e.type==='add') list.push({id:e.id,text:e.text});
+      else if(e.type==='delete'){ const i=find(e.id); if(i>=0) list.splice(i,1); }
+      else if(e.type==='merge'){
+        e.ids.forEach(id=>{ const i=find(id); if(i>=0) list.splice(i,1); });
+        list.push({id:e.newId,text:e.text});
+      }
+    }
+    return list;
+  }
+
+  function computeDisplay(minute){
+    let list=[]; const added={}, deleting={}, merging={};
+    const find=id=>list.findIndex(f=>f.id===id);
+    for(const e of EVENTS){
+      if(e.t>minute) break;
+      const within = (minute-e.t)<=WINDOW;
+      if(e.type==='add'){
+        list.push({id:e.id,text:e.text});
+        if(within) added[e.id]=true;
+      } else if(e.type==='delete'){
+        if(within) deleting[e.id]=true;
+        else { const i=find(e.id); if(i>=0) list.splice(i,1); }
+      } else if(e.type==='merge'){
+        if(within) e.ids.forEach(id=>merging[id]=true);
+        else e.ids.forEach(id=>{ const i=find(id); if(i>=0) list.splice(i,1); });
+        if(find(e.newId)<0) list.push({id:e.newId,text:e.text});
+        if(within) added[e.newId]=true;
+      }
+    }
+    return {list, added, deleting, merging};
+  }
+
+  function describeEvent(e){
+    if(e.type==='add') return 't='+e.t.toFixed(1)+' min — ADD: &quot;'+e.text+'&quot;';
+    if(e.type==='delete') return 't='+e.t.toFixed(1)+' min — DELETE: stale fact removed';
+    if(e.type==='merge') return 't='+e.t.toFixed(1)+' min — MERGE: 3 bowl facts \u2192 &quot;'+e.text+'&quot;';
+  }
+
+  const memoryBox=document.getElementById('memoryBox');
+  const rewriteLog=document.getElementById('rewriteLog');
+  const progressFill=document.getElementById('progressFill');
+  const chart=document.getElementById('chart');
+
+  function render(minute){
+    minute = Math.round(minute*10)/10;
+    document.getElementById('sliderVal').textContent=minute.toFixed(1);
+    document.getElementById('minuteReadout').textContent=minute.toFixed(1);
+    progressFill.style.width=(minute/15*100).toFixed(1)+'%';
+
+    const disp=computeDisplay(minute);
+    memoryBox.innerHTML='';
+    disp.list.forEach((f,idx)=>{
+      const span=document.createElement('span');
+      span.className='fact'
+        +(disp.added[f.id]?' flash-add':'')
+        +(disp.deleting[f.id]?' strike-fade':'')
+        +(disp.merging[f.id]?' merge-fade':'');
+      span.textContent=f.text;
+      memoryBox.appendChild(span);
+      if(idx<disp.list.length-1) memoryBox.appendChild(document.createTextNode('; '));
+    });
+
+    const settled=computeSettled(minute);
+    const tokM=settled.reduce((s,f)=>s+tokensOf(f.text),0);
+    document.getElementById('tokM').textContent=tokM;
+    document.getElementById('factCount').textContent=settled.length;
+    const rawTok=Math.round(minute*FRAMES_PER_MIN*TOKENS_PER_FRAME);
+    document.getElementById('tokRaw').textContent=rawTok.toLocaleString();
+
+    rewriteLog.innerHTML='';
+    EVENTS.filter(e=>e.t<=minute).slice(-6).reverse().forEach(e=>{
+      const li=document.createElement('li'); li.textContent=describeEvent(e);
+      rewriteLog.appendChild(li);
+    });
+
+    drawChart(minute, tokM);
+  }
+
+  function drawChart(minute, tokM){
+    const W=560,H=210,left=50,right=15,top=16,bottom=34;
+    const plotW=W-left-right, plotH=H-top-bottom;
+    const xPix=t=>left+(t/15)*plotW;
+    const yPix=v=>top+(1-Math.min(4,Math.log10(Math.max(v,1)))/4)*plotH;
+    const cS=getComputedStyle(document.documentElement);
+    const col=n=>cS.getPropertyValue(n).trim();
+
+    let s='';
+    // axes
+    s+='<line x1=&quot;'+left+'&quot; y1=&quot;'+top+'&quot; x2=&quot;'+left+'&quot; y2=&quot;'+(top+plotH)+'&quot; stroke=&quot;'+col('--border')+'&quot;/>';
+    s+='<line x1=&quot;'+left+'&quot; y1=&quot;'+(top+plotH)+'&quot; x2=&quot;'+(left+plotW)+'&quot; y2=&quot;'+(top+plotH)+'&quot; stroke=&quot;'+col('--border')+'&quot;/>';
+    // y gridlines
+    [1,10,100,1000,10000].forEach(v=>{
+      const y=yPix(v);
+      s+='<line x1=&quot;'+left+'&quot; y1=&quot;'+y+'&quot; x2=&quot;'+(left+plotW)+'&quot; y2=&quot;'+y+'&quot; stroke=&quot;'+col('--border')+'&quot; stroke-dasharray=&quot;2,3&quot;/>';
+      const lbl=v>=1000?(v/1000)+'k':String(v);
+      s+='<text x=&quot;'+(left-6)+'&quot; y=&quot;'+(y+3)+'&quot; font-size=&quot;10.5&quot; text-anchor=&quot;end&quot; fill=&quot;'+col('--muted')+'&quot;>'+lbl+'</text>';
+    });
+    // x ticks
+    [0,5,10,15].forEach(t=>{
+      const x=xPix(t);
+      s+='<text x=&quot;'+x+'&quot; y=&quot;'+(top+plotH+18)+'&quot; font-size=&quot;10.5&quot; text-anchor=&quot;middle&quot; fill=&quot;'+col('--muted')+'&quot;>'+t+(t===15?' min':'')+'</text>';
+    });
+    s+='<text x=&quot;'+(left+plotW/2)+'&quot; y=&quot;'+(H-2)+'&quot; font-size=&quot;10.5&quot; text-anchor=&quot;middle&quot; fill=&quot;'+col('--muted')+'&quot;>episode time (min)</text>';
+    s+='<text x=&quot;14&quot; y=&quot;'+(top+8)+'&quot; font-size=&quot;10.5&quot; fill=&quot;'+col('--muted')+'&quot;>tokens</text>';
+
+    // raw reference line (dashed), full range
+    let rawPath='';
+    for(let t=0;t<=15;t+=0.5){
+      const v=Math.max(t*FRAMES_PER_MIN*TOKENS_PER_FRAME,1);
+      const x=xPix(t), y=yPix(v);
+      rawPath+=(t===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    }
+    s+='<path d=&quot;'+rawPath+'&quot; fill=&quot;none&quot; stroke=&quot;'+col('--raw-line')+'&quot; stroke-width=&quot;2&quot; stroke-dasharray=&quot;5,4&quot;/>';
+    s+='<text x=&quot;'+(left+plotW-4)+'&quot; y=&quot;'+(top+12)+'&quot; font-size=&quot;10.5&quot; text-anchor=&quot;end&quot; fill=&quot;'+col('--raw-line')+'&quot;>raw frames kept instead: climbs past 10,000, unbounded</text>';
+
+    // m line, progressive up to current minute
+    let mPath='';
+    for(let t=0;t<=minute;t+=0.25){
+      const tv=computeSettled(t).reduce((sum,f)=>sum+tokensOf(f.text),0);
+      const x=xPix(t), y=yPix(tv);
+      mPath+=(t===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    }
+    s+='<path d=&quot;'+mPath+'&quot; fill=&quot;none&quot; stroke=&quot;'+col('--m-line')+'&quot; stroke-width=&quot;2.5&quot;/>';
+    const cx=xPix(minute), cy=yPix(tokM);
+    s+='<circle cx=&quot;'+cx+'&quot; cy=&quot;'+cy+'&quot; r=&quot;3.6&quot; fill=&quot;'+col('--m-line')+'&quot;/>';
+    const anchor = (cx > left+plotW-70) ? 'end' : 'middle';
+    const lx = anchor==='end' ? left+plotW-2 : cx;
+    s+='<text x=&quot;'+lx+'&quot; y=&quot;'+(cy-8)+'&quot; font-size=&quot;10.5&quot; text-anchor=&quot;'+anchor+'&quot; fill=&quot;'+col('--m-line')+'&quot;>tokens in m \u2248 '+tokM+'</text>';
+
+    chart.setAttribute('viewBox','0 0 '+W+' '+H);
+    chart.innerHTML=s;
+  }
+
+  const slider=document.getElementById('timeSlider');
+  const playBtn=document.getElementById('playBtn');
+
+  // The memory state is derived directly and synchronously from the slider's
+  // current value on every interaction event, so any position the slider is
+  // moved to (drag, keyboard, or programmatic) immediately reflects the
+  // correct memory state — no time-based animation to be caught mid-flight.
+  function syncFromSlider(){
+    render(parseFloat(slider.value));
+  }
+  slider.addEventListener('input', syncFromSlider);
+  slider.addEventListener('change', syncFromSlider);
+
+  // The button is a deterministic jump (not a free-running animation), so a
+  // screenshot taken any time after the click shows the fully-settled state.
+  let atEnd = false;
+  playBtn.addEventListener('click', ()=>{
+    atEnd = !atEnd;
+    const target = atEnd ? 15 : 0;
+    slider.value = target;
+    render(target);
+    playBtn.textContent = atEnd ? '\u21BB Reset to t = 0 min' : '\u25B6 Jump to t = 15 min';
+  });
+
+  render(0);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;self-rewriting-summary&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The model rewrites its own summary, so minute-scale memory costs almost nothing"
+  ></iframe>
+</section>
+
+<section class="scene" id="factorized-attention">
+  <h3>Attending across space and time separately makes video memory nearly as cheap as one image</h3>
+  <div class="caption">To keep real pixels from the last K = 18 frames — about a minute — comparing every patch with every other across all frames would cost <math><mi>O</mi><mo>(</mo><msup><mi>n</mi><mn>2</mn></msup><msup><mi>K</mi><mn>2</mn></msup><mo>)</mo></math>, with <math><mi>n</mi></math> patches per frame. MEM instead compares patches only two cheap ways: within a frame (space), and — in every 4th ViT layer — each patch only with itself across frames (time). Cost drops to <math><mi>O</mi><mo>(</mo><mi>K</mi><msup><mi>n</mi><mn>2</mn></msup><mo>+</mo><mi>n</mi><msup><mi>K</mi><mn>2</mn></msup><mo>)</mo></math>, and the top layers throw away every past-frame patch, so the language model still sees just one frame's worth of tokens.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="factorized-attention"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Factorized space-time attention</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f2f4f8;
+    --panel-border:#d7dae2;
+    --text:#171923;
+    --muted:#5c6270;
+    --accent:#2f6fed;     /* spatial lines */
+    --accent2:#1f9d63;    /* temporal lines */
+    --joint:#d1495b;      /* dense joint hairball */
+    --grid:#c7cbd6;
+    --highlight:#f5b942;
+    --temporal-tint:rgba(31,157,99,0.20);
+    --funnel:#8a7fd1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141c;
+      --panel:#1c1f2b;
+      --panel-border:#333a4d;
+      --text:#e7e9f0;
+      --muted:#9298ab;
+      --accent:#5b93ff;
+      --accent2:#3fd08c;
+      --joint:#ff7a8a;
+      --grid:#454b5e;
+      --highlight:#ffd166;
+      --temporal-tint:rgba(63,208,140,0.22);
+      --funnel:#a99bff;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+  h3{font-size:14px;margin:2px 0 8px;font-weight:600;color:var(--text);}
+  .eqbox{background:var(--panel);border:1px solid var(--panel-border);
+    border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+  math{font-size:18px;}
+  .legend{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .chip{background:var(--bg);border:1px solid var(--panel-border);
+    border-radius:12px;padding:2px 8px;font-size:11.5px;color:var(--text);}
+  canvas{width:100%;height:auto;display:block;border-radius:8px;
+    background:var(--panel);border:1px solid var(--panel-border);max-width:100%;}
+  .swatchrow{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;
+    color:var(--muted);margin:8px 0 6px;}
+  .swatchrow span.sw{display:inline-block;width:10px;height:10px;
+    border-radius:2px;margin-right:4px;vertical-align:-1px;}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;
+    margin-top:8px;}
+  .ctrl{flex:1 1 220px;}
+  .ctrl label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  button{font:inherit;font-size:13px;padding:8px 12px;border-radius:6px;
+    border:1px solid var(--panel-border);background:var(--bg);color:var(--text);
+    cursor:pointer;}
+  button:hover{border-color:var(--accent);}
+  input[type=range]{width:100%;}
+  #playBtn{margin-top:6px;display:none;}
+  ul.readouts{list-style:none;margin:12px 0 0;padding:0;
+    display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;}
+  ul.readouts li{font-size:12.5px;background:var(--panel);
+    border:1px solid var(--panel-border);border-radius:6px;padding:6px 8px;}
+  ul.readouts b{color:var(--text);font-variant-numeric:tabular-nums;}
+  @media (max-width:420px){ul.readouts{grid-template-columns:1fr;}}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h3>Joint vs. factorized attention across space and time</h3>
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>O</mi><mo>(</mo><msup><mi>n</mi><mn>2</mn></msup><msup><mi>K</mi><mn>2</mn></msup><mo>)</mo>
+      <mo>&amp;#8594;</mo>
+      <mi>O</mi><mo>(</mo><mi>K</mi><msup><mi>n</mi><mn>2</mn></msup><mo>+</mo><mi>n</mi><msup><mi>K</mi><mn>2</mn></msup><mo>)</mo>
+    </math>
+    <div class=&quot;legend&quot;>n &amp;mdash; patches per frame (&amp;asymp;196 for a 14&amp;times;14 ViT patch grid, drawn as a small 5&amp;times;5 grid here for clarity) &amp;middot;
+    K &amp;mdash; frames kept in the short-term memory window (K = 18 &amp;asymp; one minute of video) &amp;middot;
+    backbone &amp;mdash; the downstream video/language model that consumes the patch tokens produced by this ViT.</div>
+    <div class=&quot;chips&quot;><span class=&quot;chip&quot;>n = 196 patches/frame</span><span class=&quot;chip&quot; id=&quot;chipK&quot;>K = 18 frames (~60 s)</span></div>
+  </div>
+
+  <canvas id=&quot;cv&quot; width=&quot;600&quot; height=&quot;430&quot;></canvas>
+
+  <div class=&quot;swatchrow&quot;>
+    <span><span class=&quot;sw&quot; style=&quot;background:var(--accent)&quot;></span>spatial &amp;mdash; within one frame</span>
+    <span><span class=&quot;sw&quot; style=&quot;background:var(--accent2)&quot;></span>temporal &amp;mdash; same patch position, past frames only</span>
+    <span><span class=&quot;sw&quot; style=&quot;background:var(--joint)&quot;></span>joint &amp;mdash; this patch vs. every patch, every frame</span>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label>Attention pattern &amp;mdash; toggles whether the highlighted patch compares against every patch in every frame (joint), or only within its own frame plus its own position in earlier frames (factorized).</label>
+      <button id=&quot;toggleBtn&quot;>Mode: Joint attention (click to switch)</button>
+      <button id=&quot;playBtn&quot;>Play pulse</button>
+    </div>
+    <div class=&quot;ctrl&quot;>
+      <label>K &amp;mdash; frames kept in the memory window (frames)</label>
+      <input type=&quot;range&quot; id=&quot;kSlider&quot; min=&quot;1&quot; max=&quot;18&quot; value=&quot;18&quot; step=&quot;1&quot;>
+    </div>
+  </div>
+
+  <ul class=&quot;readouts&quot;>
+    <li>Joint cost n&amp;sup2;K&amp;sup2;: <b id=&quot;jointCostR&quot;>&amp;mdash;</b> patch-pair comparisons</li>
+    <li>Factorized cost Kn&amp;sup2;+nK&amp;sup2;: <b id=&quot;factCostR&quot;>&amp;mdash;</b> patch-pair comparisons</li>
+    <li>Speedup (joint &amp;divide; factorized): <b id=&quot;speedupR&quot;>&amp;mdash;</b>&amp;times;</li>
+    <li>Tokens forwarded to backbone (the downstream video/language model): <b id=&quot;tokensR&quot;>196</b> (= n, independent of K)</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const cs = getComputedStyle(document.documentElement);
+  function col(v){ return cs.getPropertyValue(v).trim(); }
+
+  const N = 196;          // real patches per frame (14x14 ViT grid)
+  const GRIDN = 5;        // simplified visual grid side
+  let K = 18;
+  let mode = 'joint';      // 'joint' | 'factorized'
+
+  const W = 600, H = 430;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  const toggleBtn = document.getElementById('toggleBtn');
+  const kSlider = document.getElementById('kSlider');
+  const chipK = document.getElementById('chipK');
+  const jointCostR = document.getElementById('jointCostR');
+  const factCostR = document.getElementById('factCostR');
+  const speedupR = document.getElementById('speedupR');
+  const tokensR = document.getElementById('tokensR');
+
+  function fmt(x){ return Math.round(x).toLocaleString('en-US'); }
+
+  function updateReadouts(){
+    const jointCost = N*N*K*K;
+    const factCost = K*N*N + N*K*K;
+    jointCostR.textContent = fmt(jointCost);
+    factCostR.textContent = fmt(factCost);
+    speedupR.textContent = (jointCost/factCost).toFixed(1);
+    tokensR.textContent = fmt(N);
+    chipK.textContent = 'K = ' + K + ' frames (~' + Math.round(K*3.3) + ' s)';
+  }
+
+  toggleBtn.addEventListener('click', ()=>{
+    mode = (mode==='joint') ? 'factorized' : 'joint';
+    toggleBtn.textContent = 'Mode: ' + (mode==='joint'?'Joint attention':'Factorized attention') + ' (click to switch)';
+    draw();
+  });
+  kSlider.addEventListener('input', ()=>{
+    K = parseInt(kSlider.value,10);
+    updateReadouts();
+    draw();
+  });
+
+  // --- pulse animation (decorative only) ---
+  const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduceMotion;
+  let phase = 0;
+  const playBtn = document.getElementById('playBtn');
+  if (reduceMotion){ playBtn.style.display='inline-block'; }
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause pulse' : 'Play pulse';
+    if (playing) requestAnimationFrame(tick);
+  });
+  function tick(ts){
+    if(!playing) return;
+    phase = ts/650;
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  function line(x1,y1,x2,y2,color,alpha,width){
+    ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFrames(){
+    const originX=64, originY=210, patch=10;
+    const spread = 150;
+    const dx = K>1 ? spread/(K-1) : 0;
+    const dy = dx*0.42;
+    const centers = [];
+
+    // pass 1: geometry
+    for(let i=0;i<K;i++){
+      const ox = originX + i*dx, oy = originY - i*dy;
+      centers.push({x: ox+2*patch+patch/2, y: oy+2*patch+patch/2, ox, oy});
+    }
+    const curIdx = K-1;
+    const cur = centers[curIdx];
+
+    // attention lines (drawn under the frames)
+    if (mode==='joint'){
+      for(let i=0;i<K;i++){
+        for(let r=0;r<GRIDN;r++){
+          for(let c=0;c<GRIDN;c++){
+            const px = centers[i].ox + c*patch + patch/2;
+            const py = centers[i].oy + r*patch + patch/2;
+            line(cur.x,cur.y,px,py, col('--joint'), 0.10, 1);
+          }
+        }
+      }
+    } else {
+      // spatial: within current frame only
+      for(let r=0;r<GRIDN;r++){
+        for(let c=0;c<GRIDN;c++){
+          if(r===2 &amp;&amp; c===2) continue;
+          const px = centers[curIdx].ox + c*patch + patch/2;
+          const py = centers[curIdx].oy + r*patch + patch/2;
+          line(cur.x,cur.y,px,py, col('--accent'), 0.55, 1.2);
+        }
+      }
+      // temporal: same grid position, past frames only (causal)
+      for(let i=0;i<curIdx;i++){
+        line(cur.x,cur.y,centers[i].x,centers[i].y, col('--accent2'), 0.85, 1.6);
+      }
+    }
+
+    // pass 2: frame boxes + patch grids (back to front)
+    for(let i=0;i<K;i++){
+      const {ox,oy} = centers[i];
+      const isCur = (i===curIdx);
+      ctx.strokeStyle = col('--grid');
+      ctx.lineWidth = isCur ? 1.4 : 0.8;
+      ctx.fillStyle = isCur ? 'rgba(150,160,190,0.10)' : 'rgba(150,160,190,0.03)';
+      ctx.fillRect(ox,oy,GRIDN*patch,GRIDN*patch);
+      ctx.strokeRect(ox,oy,GRIDN*patch,GRIDN*patch);
+      for(let g=1; g<GRIDN; g++){
+        line(ox+g*patch, oy, ox+g*patch, oy+GRIDN*patch, col('--grid'), 0.5, 0.6);
+        line(ox, oy+g*patch, ox+GRIDN*patch, oy+g*patch, col('--grid'), 0.5, 0.6);
+      }
+      // highlighted patch
+      const hx = ox+2*patch, hy = oy+2*patch;
+      const pulse = isCur ? (0.5+0.5*Math.sin(phase)) : 0;
+      ctx.fillStyle = col('--highlight');
+      ctx.globalAlpha = isCur ? 0.9 : 0.35;
+      ctx.fillRect(hx,hy,patch,patch);
+      ctx.globalAlpha = 1;
+      if(isCur){
+        ctx.strokeStyle = col('--highlight');
+        ctx.lineWidth = 1.5 + pulse*1.5;
+        ctx.strokeRect(hx-1,hy-1,patch+2,patch+2);
+      }
+    }
+
+    // labels (each on its own row, generously spaced)
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px sans-serif';
+    ctx.fillText('now (current frame)', centers[curIdx].ox-2, centers[curIdx].oy-8);
+    if(K>1) ctx.fillText('older frames \u2192 past', originX-6, originY+GRIDN*patch+18);
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText('space: within-frame patch grid', originX-4, originY+GRIDN*patch+34);
+    if(mode==='factorized' &amp;&amp; K>1){
+      ctx.fillStyle = col('--accent2');
+      ctx.fillText('causal: temporal lines point only to past frames, never forward', 200, 22);
+    } else if (mode==='joint'){
+      ctx.fillStyle = col('--joint');
+      ctx.fillText('joint: dense hairball \u2014 every patch vs. every patch', 200, 22);
+    }
+  }
+
+  function drawLayerDiagram(){
+    const y0 = 330, boxH = 30, nLayers = 12;
+    const startX = 26, boxW = 27, gap = 3.5;
+    ctx.font = '10.5px sans-serif';
+    ctx.fillStyle = col('--muted');
+    ctx.fillText('ViT layer index (depth \u2192)', startX, y0-14);
+
+    let lastTintX = null;
+    for(let L=1; L<=nLayers; L++){
+      const x = startX + (L-1)*(boxW+gap);
+      const tinted = (L%4===0);
+      ctx.fillStyle = tinted ? col('--temporal-tint') : 'rgba(150,160,190,0.06)';
+      ctx.strokeStyle = tinted ? col('--accent2') : col('--grid');
+      ctx.lineWidth = tinted?1.4:0.8;
+      ctx.fillRect(x,y0,boxW,boxH);
+      ctx.strokeRect(x,y0,boxW,boxH);
+      if(tinted &amp;&amp; lastTintX===null){ lastTintX = x; }
+    }
+    if(lastTintX!==null){
+      ctx.fillStyle = col('--accent2');
+      ctx.font = '10px sans-serif';
+      ctx.fillText('temporal pass (every 4th layer)', lastTintX-30, y0+boxH+16);
+    }
+
+    // funnel: K*n tokens -> n tokens
+    const xIn = startX + nLayers*(boxW+gap) - gap + 8;
+    const xOut = xIn + 55;
+    const yMid = y0 + boxH/2;
+    const inH = 30, outH = Math.max(4, 30/K);
+    ctx.fillStyle = col('--funnel');
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(xIn, yMid-inH/2);
+    ctx.lineTo(xIn, yMid+inH/2);
+    ctx.lineTo(xOut, yMid+outH/2);
+    ctx.lineTo(xOut, yMid-outH/2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // top labels: readouts for the two ends of the funnel, stacked on
+    // separate rows (well clear of each other and of the title row above)
+    // so long numbers never collide with the shorter &quot;n&quot; label.
+    ctx.fillStyle = col('--text');
+    ctx.font = '9.5px sans-serif';
+    ctx.fillText('K\u00b7n = ' + fmt(K*N) + ' tokens', xIn-14, yMid-40);
+    ctx.fillText('n \u2248 ' + N, xOut-8, yMid-24);
+
+    // bottom label: dropped tokens (its own row, well clear of the temporal-pass label above)
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = col('--muted');
+    ctx.fillText('drops (K\u22121)\u00b7n = ' + fmt((K-1)*N) + ' frame tokens', xIn-14, yMid+inH/2+16);
+
+    // backbone box, placed clear of both label rows, with label centered inside it
+    const bx = xOut+8, by = yMid-11, bw = 46, bh = 22;
+    ctx.strokeStyle = col('--grid');
+    ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(150,160,190,0.06)';
+    ctx.fillRect(bx,by,bw,bh);
+    ctx.strokeRect(bx,by,bw,bh);
+    ctx.fillStyle = col('--text');
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('backbone', bx+bw/2, by+bh/2+3);
+    ctx.textAlign = 'left';
+
+    // plain-word gloss for &quot;backbone&quot;, on its own row well below everything else
+    ctx.fillStyle = col('--muted');
+    ctx.font = '9.5px sans-serif';
+    ctx.fillText('backbone = the downstream video/language model that reads these tokens', startX, 404);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    drawFrames();
+    drawLayerDiagram();
+  }
+
+  updateReadouts();
+  draw();
+  if(!reduceMotion){ requestAnimationFrame(tick); }
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;factorized-attention&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Attending across space and time separately makes video memory nearly as cheap as one image"
+  ></iframe>
+</section>
+
+<section class="scene" id="zero-new-weights">
+  <h3>The video encoder adds no new weights, so its internet-trained vision carries over untouched</h3>
+  <div class="caption">Feed the video encoder a single image and it computes exactly what the original image network did — so all its internet-trained vision knowledge carries over untouched. The trick: the only additions are the new across-time comparison pattern and a fixed (non-learned) clock signal <math><mi>e</mi><mo>(</mo><mi>t</mi><mo>)</mo></math> built so <math><mi>e</mi><mo>(</mo><mn>0</mn><mo>)</mo><mo>=</mo><mn>0</mn></math>. Slide K down to 1 and that clock adds nothing, so the output matches the original ViT exactly — zero new parameters, zero change on single images, so the encoder bolts onto any existing VLA.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="zero-new-weights"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Zero new weights — video encoder</title>
+<style>
+  :root{
+    --bg:#f7f7f9;
+    --panel:#ffffff;
+    --text:#1b1d23;
+    --muted:#5b5f6a;
+    --vit:#2b6cb0;
+    --mem:#b7501f;
+    --line-active:#b7501f;
+    --line-inactive:#b9bcc4;
+    --diff:#c0392b;
+    --frame:#4a7c59;
+    --border:#d8dade;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171c;
+      --panel:#1e2128;
+      --text:#e9eaee;
+      --muted:#a3a7b3;
+      --vit:#6fa8dc;
+      --mem:#e08e5b;
+      --line-active:#e08e5b;
+      --line-inactive:#3b3e46;
+      --diff:#ff6b5b;
+      --frame:#7fd19a;
+      --border:#33363e;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:12px; background:var(--bg); color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+  }
+  .scene{max-width:680px;margin:0 auto;}
+  .eqbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:8px 12px;margin-bottom:10px;}
+  math{font-size:1.05em;}
+  .legend{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:2px;}
+  svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:10px;}
+  .ctrl{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);flex:1 1 240px;}
+  .ctrl label{color:var(--text);font-weight:600;}
+  input[type=range]{width:100%;}
+  button{
+    font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;
+  }
+  .readouts{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:12.5px;color:var(--muted);}
+  .readouts b{color:var(--text);}
+  svg text{font-family:inherit;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>f</mi><mtext>MEM</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><mi>K</mi><mo>)</mo>
+      <mo>=</mo>
+      <msub><mi>f</mi><mtext>ViT</mtext></msub><mo>(</mo><mi>x</mi><mo>)</mo>
+      <mtext>&amp;nbsp;&amp;nbsp;when&amp;nbsp;</mtext><mi>K</mi><mo>=</mo><mn>1</mn>
+      <mtext>,&amp;nbsp;&amp;nbsp;because&amp;nbsp;</mtext>
+      <mi>e</mi><mo>(</mo><mn>0</mn><mo>)</mo><mo>=</mo><mn>0</mn>
+    </math>
+    <div class=&quot;legend&quot;>
+      f<sub></sub>MEM, f_ViT — output tokens of the video encoder vs. the original pretrained image encoder (ViT) ·
+      x — a single input frame (image) · K — short-term window: number of nearby frames compared against each other ·
+      e(t) — fixed, non-learned sinusoidal clock signal added at frame time t; by construction e(0) = 0.
+    </div>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 640 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;>
+    <!-- input frame -->
+    <rect x=&quot;270&quot; y=&quot;6&quot; width=&quot;100&quot; height=&quot;30&quot; rx=&quot;4&quot; fill=&quot;var(--frame)&quot; opacity=&quot;0.85&quot;/>
+    <text x=&quot;320&quot; y=&quot;25&quot; text-anchor=&quot;middle&quot; fill=&quot;#fff&quot; font-size=&quot;11&quot;>input frame x</text>
+    <line x1=&quot;300&quot; y1=&quot;36&quot; x2=&quot;155&quot; y2=&quot;58&quot; stroke=&quot;var(--muted)&quot; stroke-width=&quot;1.5&quot;/>
+    <line x1=&quot;340&quot; y1=&quot;36&quot; x2=&quot;485&quot; y2=&quot;58&quot; stroke=&quot;var(--muted)&quot; stroke-width=&quot;1.5&quot;/>
+
+    <!-- ViT box -->
+    <rect x=&quot;20&quot; y=&quot;58&quot; width=&quot;270&quot; height=&quot;150&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--vit)&quot; stroke-width=&quot;2&quot;/>
+    <text x=&quot;155&quot; y=&quot;78&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--vit)&quot; font-size=&quot;12.5&quot; font-weight=&quot;bold&quot;>Original pre-trained ViT</text>
+    <text x=&quot;155&quot; y=&quot;103&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;10.5&quot;>spatial self-attention (frozen)</text>
+    <circle cx=&quot;155&quot; cy=&quot;180&quot; r=&quot;9&quot; fill=&quot;var(--vit)&quot;/>
+    <text x=&quot;155&quot; y=&quot;200&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--muted)&quot; font-size=&quot;9.5&quot;>output tokens</text>
+    <text id=&quot;param-vit&quot; x=&quot;155&quot; y=&quot;228&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;11&quot; font-weight=&quot;600&quot;></text>
+
+    <!-- MEM box -->
+    <rect x=&quot;350&quot; y=&quot;58&quot; width=&quot;270&quot; height=&quot;150&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--mem)&quot; stroke-width=&quot;2&quot;/>
+    <text x=&quot;485&quot; y=&quot;78&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--mem)&quot; font-size=&quot;12.5&quot; font-weight=&quot;bold&quot;>MEM video encoder</text>
+    <text x=&quot;485&quot; y=&quot;98&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;10.5&quot;>spatial self-attention (same, frozen)</text>
+
+    <g id=&quot;temporal-lines&quot;>
+      <line x1=&quot;380&quot; y1=&quot;140&quot; x2=&quot;425&quot; y2=&quot;140&quot; stroke-width=&quot;2&quot;/>
+      <line x1=&quot;425&quot; y1=&quot;140&quot; x2=&quot;470&quot; y2=&quot;140&quot; stroke-width=&quot;2&quot;/>
+      <circle cx=&quot;380&quot; cy=&quot;140&quot; r=&quot;6&quot;/>
+      <circle cx=&quot;425&quot; cy=&quot;140&quot; r=&quot;6&quot;/>
+      <circle cx=&quot;470&quot; cy=&quot;140&quot; r=&quot;6&quot;/>
+    </g>
+    <text x=&quot;425&quot; y=&quot;160&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;10&quot;>temporal attention (new wiring pattern)</text>
+
+    <!-- e(t) chip -->
+    <text x=&quot;565&quot; y=&quot;103&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;9.5&quot;>clock e(t)</text>
+    <g id=&quot;ebars&quot;></g>
+    <text id=&quot;e-label&quot; x=&quot;565&quot; y=&quot;167&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--muted)&quot; font-size=&quot;9.5&quot;></text>
+
+    <circle cx=&quot;470&quot; cy=&quot;182&quot; r=&quot;9&quot; fill=&quot;var(--mem)&quot;/>
+    <text x=&quot;470&quot; y=&quot;202&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--muted)&quot; font-size=&quot;9.5&quot;>output tokens</text>
+    <text id=&quot;param-mem&quot; x=&quot;470&quot; y=&quot;228&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;11&quot; font-weight=&quot;600&quot;></text>
+
+    <!-- diff meter -->
+    <text x=&quot;320&quot; y=&quot;248&quot; text-anchor=&quot;middle&quot; fill=&quot;var(--text)&quot; font-size=&quot;10.5&quot;>output difference &amp;#8741;MEM(x) &amp;#8722; ViT(x)&amp;#8741; (normalized)</text>
+    <rect x=&quot;40&quot; y=&quot;256&quot; width=&quot;560&quot; height=&quot;16&quot; rx=&quot;4&quot; fill=&quot;none&quot; stroke=&quot;var(--border)&quot;/>
+    <rect id=&quot;diff-fill&quot; x=&quot;40&quot; y=&quot;256&quot; width=&quot;0&quot; height=&quot;16&quot; rx=&quot;4&quot; fill=&quot;var(--diff)&quot;/>
+    <text x=&quot;40&quot; y=&quot;286&quot; fill=&quot;var(--muted)&quot; font-size=&quot;9.5&quot;>0.000 — identical</text>
+    <text x=&quot;600&quot; y=&quot;286&quot; text-anchor=&quot;end&quot; fill=&quot;var(--muted)&quot; font-size=&quot;9.5&quot;>&amp;#8805;0.500 — diverges</text>
+    <text id=&quot;diff-value&quot; x=&quot;320&quot; y=&quot;270&quot; text-anchor=&quot;middle&quot; fill=&quot;#fff&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot;></text>
+  </svg>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;kSlider&quot;>Short-term window K (frames) — sets how many nearby frames the encoder compares; at K=1 no comparison happens</label>
+      <input type=&quot;range&quot; id=&quot;kSlider&quot; min=&quot;1&quot; max=&quot;18&quot; step=&quot;1&quot; value=&quot;1&quot;>
+    </div>
+    <button id=&quot;playBtn&quot;>Pause</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <span>K = <b id=&quot;kVal&quot;></b> frames</span>
+    <span>current clock frame t = <b id=&quot;tVal&quot;></b></span>
+    <span>&amp;#8741;e(t)&amp;#8741; = <b id=&quot;normVal&quot;></b></span>
+    <span>diff = <b id=&quot;diffVal&quot;></b></span>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const D = 8; // visualization dimension for the clock-signal vector
+  const w = Array.from({length:D}, (_,i)=> 1/Math.pow(10000, i/D));
+  const PARAMS = 86000000; // ViT-B/16-scale param count, identical in both boxes
+
+  function eVec(t){ return w.map(wi => Math.sin(wi*t)); }
+  function vecNorm(v){ return Math.sqrt(v.reduce((s,x)=>s+x*x,0)/D); }
+  function avgDiff(K){
+    if (K<=1) return 0;
+    let s=0;
+    for(let t=1;t<K;t++) s += vecNorm(eVec(t));
+    return s/(K-1);
+  }
+
+  const cs = getComputedStyle(document.documentElement);
+  const col = name => cs.getPropertyValue(name).trim();
+
+  const kSlider=document.getElementById('kSlider');
+  const kVal=document.getElementById('kVal');
+  const tVal=document.getElementById('tVal');
+  const normVal=document.getElementById('normVal');
+  const diffVal=document.getElementById('diffVal');
+  const playBtn=document.getElementById('playBtn');
+  const paramVit=document.getElementById('param-vit');
+  const paramMem=document.getElementById('param-mem');
+  const diffFill=document.getElementById('diff-fill');
+  const diffValueText=document.getElementById('diff-value');
+  const eLabel=document.getElementById('e-label');
+  const ebarsG=document.getElementById('ebars');
+  const temporalLines=document.getElementById('temporal-lines');
+
+  const paramText = (PARAMS/1e6).toFixed(1)+&quot;M parameters (frozen — identical)&quot;;
+  paramVit.textContent = paramText;
+  paramMem.textContent = paramText;
+
+  // build 8 bars once
+  const barW=6, barGap=2, chipX=540, chipY0=150, chipMaxH=36;
+  const bars=[];
+  for(let i=0;i<D;i++){
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('width', barW);
+    r.setAttribute('x', chipX + i*(barW+barGap));
+    ebarsG.appendChild(r);
+    bars.push(r);
+  }
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduceMotion;
+  playBtn.textContent = playing ? 'Pause' : 'Play';
+
+  let K = parseInt(kSlider.value,10); // starts at 1: the exact-equivalence case
+  let startTime = null;
+  let currentT = 0;
+
+  function render(){
+    kVal.textContent = K;
+    const diff = avgDiff(K);
+    const METER_MAX = 0.5;
+    const trackW = 560;
+    const fillW = Math.max(0, Math.min(1, diff/METER_MAX)) * trackW;
+    diffFill.setAttribute('width', fillW.toFixed(1));
+    diffValueText.setAttribute('x', 40 + Math.max(30, Math.min(trackW-30, fillW/2 + 10)));
+    diffValueText.textContent = diff.toFixed(3);
+    diffVal.textContent = diff.toFixed(3);
+
+    const active = K > 1;
+    const lineCol = active ? col('--line-active') : col('--line-inactive');
+    temporalLines.querySelectorAll('line').forEach(l=>{ l.setAttribute('stroke', lineCol); l.setAttribute('opacity', active?1:0.35); });
+    temporalLines.querySelectorAll('circle').forEach(c=>{ c.setAttribute('fill', lineCol); c.setAttribute('opacity', active?1:0.35); });
+
+    // at K=1 there is no temporal window to index into, so the clock is pinned at t=0 -> e(0)=0
+    const t = (K>1) ? (currentT % K) : 0;
+    const vec = eVec(t);
+    const norm = vecNorm(vec);
+    tVal.textContent = t;
+    normVal.textContent = norm.toFixed(3);
+    eLabel.textContent = &quot;t = &quot; + t + &quot;   ||e|| = &quot; + norm.toFixed(2);
+
+    bars.forEach((r,i)=>{
+      const h = Math.abs(vec[i]) * chipMaxH;
+      r.setAttribute('height', h.toFixed(1));
+      r.setAttribute('y', (chipY0 - h).toFixed(1));
+      r.setAttribute('fill', vec[i] >= 0 ? col('--mem') : col('--vit'));
+      r.setAttribute('opacity', (norm===0) ? 0.25 : 0.95);
+    });
+  }
+
+  kSlider.addEventListener('input', ()=>{
+    K = parseInt(kSlider.value,10);
+    // note: currentT is NOT reset here — the clock keeps running independently of K,
+    // so moving the slider to K>1 immediately reveals a nonzero t / nonzero e(t) if time has elapsed.
+    render();
+  });
+
+  playBtn.addEventListener('click', ()=>{
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    if (playing){ startTime = null; requestAnimationFrame(loop); }
+  });
+
+  const FRAME_MS = 500;
+  function loop(ts){
+    if (!playing) return;
+    if (startTime === null) startTime = ts;
+    const elapsed = ts - startTime;
+    currentT = Math.floor(elapsed / FRAME_MS);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  render();
+  if (playing) requestAnimationFrame(loop);
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;zero-new-weights&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The video encoder adds no new weights, so its internet-trained vision carries over untouched"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing tech</h2>
+  <div class="part-lede">Two memories are now in place: 18 frames of compressed video and one rewritten sentence. Here we run them head-to-head against the no-memory robot and the obvious shortcuts, on the paper's own experiments.</div>
+</header>
+<section class="scene" id="compression-beats-transcript">
+  <h3>Logging every failed try makes the robot's history unlike anything it trained on</h3>
+  <div class="caption">The obvious cheap shortcut logs every past subtask, so when the robot's grasp slips twice the log reads 'pick up bowl, pick up bowl, pick up bowl'. The robot trained on tidy human demonstrations where each step is said once, so this repetition is input it never saw in training — and models act unreliably on inputs unlike their training data. MEM's summary simply doesn't update until the bowl is in hand, so its input still looks like training.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="compression-beats-transcript"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Compression beats transcript</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --panel:#f2f4f7;
+  --text:#1a1a1a;
+  --muted:#5a5f66;
+  --grid:#c9ccd1;
+  --bar:#5f83a8;
+  --support:#cfe8d8;
+  --transcript:#b5362a;
+  --mem:#1f7a5c;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161a;
+    --panel:#20232b;
+    --text:#e9eaec;
+    --muted:#9aa0a8;
+    --grid:#3a3f47;
+    --bar:#7fa8d0;
+    --support:#274a38;
+    --transcript:#e0796a;
+    --mem:#5fcf9d;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 20px;}
+.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;
+  font-size:13px;margin-bottom:8px;}
+.controls label{display:flex;flex-direction:column;gap:2px;min-width:150px;}
+select,input[type=range],button{font-size:13px;}
+button#playBtn{padding:4px 10px;border-radius:5px;border:1px solid var(--grid);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+canvas{width:100%;max-width:100%;height:auto;display:block;
+  background:var(--panel);border-radius:6px;}
+.eqwrap{margin:10px 0 2px;text-align:center;font-size:15px;}
+.legend{font-size:11.5px;color:var(--muted);text-align:center;
+  margin:2px 0 10px;line-height:1.4;}
+ul.readouts{list-style:none;margin:8px 0 0;padding:0;
+  display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:13px;}
+ul.readouts li{background:var(--panel);border-radius:4px;padding:5px 8px;}
+ul.readouts span{font-weight:600;}
+@media (max-width:420px){ul.readouts{grid-template-columns:1fr;}}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <div class=&quot;controls&quot;>
+    <label>Memory used during deployment (toggle: what the policy is shown at the current step)
+      <select id=&quot;modeSelect&quot;>
+        <option value=&quot;transcript&quot; selected>Transcript — logs every attempt (incl. failures)</option>
+        <option value=&quot;mem&quot;>MEM — compressed summary (updates only on success)</option>
+      </select>
+    </label>
+    <label>Attempt number (grasp retries so far, 1&amp;ndash;3)
+      <input type=&quot;range&quot; id=&quot;attemptSlider&quot; min=&quot;1&quot; max=&quot;3&quot; step=&quot;1&quot; value=&quot;3&quot;>
+    </label>
+    <button id=&quot;playBtn&quot; style=&quot;display:none&quot;>▶ Play</button>
+  </div>
+
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;430&quot;></canvas>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>z</mi><mo>=</mo>
+      <mfrac><mrow><mi>x</mi><mo>-</mo><mi>μ</mi></mrow><mi>σ</mi></mfrac>
+    </math>
+  </div>
+  <div class=&quot;legend&quot;>
+    x — times the phrase &quot;pick up bowl&quot; appears in the current deployment history &amp;middot;
+    μ, σ — mean and standard deviation of that count across training episodes &amp;middot;
+    |z| &amp;gt; 2 is flagged as outside training support.
+  </div>
+
+  <ul class=&quot;readouts&quot;>
+    <li>Attempt: <span id=&quot;roAttempt&quot;>1 of 3</span></li>
+    <li>History occurrences x: <span id=&quot;roX&quot;>1</span></li>
+    <li>z-score: <span id=&quot;roZ&quot;>0.00</span></li>
+    <li>Status: <span id=&quot;roStatus&quot;>within support</span></li>
+  </ul>
+</div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const cs = getComputedStyle(document.documentElement);
+const col = n => cs.getPropertyValue(n).trim();
+
+// ---- training data: how many times &quot;pick up bowl&quot; appears per episode ----
+// index = occurrence count (0..4), value = number of training episodes
+const trainingCounts = [0, 42, 6, 0, 0];
+function computeStats(counts){
+  const total = counts.reduce((a,b)=>a+b,0);
+  let mean = 0; counts.forEach((c,i)=> mean += c*i); mean /= total;
+  let variance = 0; counts.forEach((c,i)=> variance += c*(i-mean)**2); variance /= total;
+  return { mean, std: Math.sqrt(variance), total };
+}
+const stats = computeStats(trainingCounts);
+
+// plot geometry
+const plotX0=70, plotX1=610, plotY0=80, plotY1=250;
+const plotW = plotX1-plotX0, plotH = plotY1-plotY0;
+const maxCount = 45;
+const xScale = v => plotX0 + (v/4)*plotW;
+const yScale = c => plotY1 - (c/maxCount)*plotH;
+
+// ---- quantitative anchor (Fig. 4 of the paper, cited numbers) ----
+const FIG4_MEM_SUCCESS = 89;         // % task success, MEM (compressed memory)
+const FIG4_TRANSCRIPT_SUCCESS = 34;  // % task success, naive transcript log
+
+// ---- state ----
+const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let mode = 'transcript';
+let attemptIndex = 3; // 1,2,3 — default starts at the &quot;grasp slipped twice&quot; state
+let playing = !prefersReduced;
+
+const modeSelect = document.getElementById('modeSelect');
+const attemptSlider = document.getElementById('attemptSlider');
+const playBtn = document.getElementById('playBtn');
+modeSelect.value = mode;
+attemptSlider.value = attemptIndex;
+
+modeSelect.addEventListener('change', ()=>{ mode = modeSelect.value; draw(performance.now()); });
+attemptSlider.addEventListener('input', ()=>{
+  const newVal = parseInt(attemptSlider.value,10);
+  if(newVal !== animTo){
+    animFrom = attemptIndex;
+    animTo = newVal;
+    animStart = performance.now();
+  }
+  attemptIndex = newVal;
+  draw(performance.now());
+});
+
+function occurrenceCount(mode, attempt){
+  // transcript: one new log entry per attempt, including failures — grows without bound
+  // MEM: the compressed summary only reflects &quot;still trying to grasp&quot;; it does not
+  // grow with retries at all, so the occurrence count stays fixed regardless of attempt
+  return mode === 'transcript' ? attempt : 1;
+}
+function historyText(mode, attempt){
+  if(mode === 'transcript'){
+    const items = Array(attempt).fill('pick up bowl');
+    return 'Transcript log (grows every attempt): ' + items.join(', ');
+  }
+  return &quot;MEM summary (unchanged through failed grasps): \u2018picking up bowl\u2026\u2019 — only rewritten once the bowl is actually grasped&quot;;
+}
+
+function wrapText(text, cx, y, maxWidth, lineHeight){
+  const words = text.split(' ');
+  let lines = [], cur='';
+  words.forEach(w=>{
+    const t = cur ? cur+' '+w : w;
+    if(ctx.measureText(t).width > maxWidth &amp;&amp; cur){ lines.push(cur); cur=w; }
+    else cur = t;
+  });
+  if(cur) lines.push(cur);
+  lines.forEach((l,i)=> ctx.fillText(l, cx, y + i*lineHeight));
+  return lines.length;
+}
+function fitFont(text, maxWidth, base){
+  let size = base;
+  ctx.font = size+'px sans-serif';
+  while(ctx.measureText(text).width > maxWidth &amp;&amp; size > 9){
+    size--; ctx.font = size+'px sans-serif';
+  }
+  return size;
+}
+
+// smooth marker animation between attempt states
+let animFrom = attemptIndex, animTo = attemptIndex, animStart = 0;
+const ANIM_MS = 350;
+function pulsePhase(ts){ return (!playing) ? 0 : (Math.sin(ts/450)+1)/2; }
+
+function currentAnimatedX(now){
+  if(!playing) return occurrenceCount(mode, attemptIndex);
+  const t = Math.min(1, (now - animStart)/ANIM_MS);
+  const from = occurrenceCount(mode, animFrom);
+  const to = occurrenceCount(mode, animTo);
+  return from + (to-from)*t;
+}
+
+function draw(now){
+  now = now || performance.now();
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = col('--panel'); ctx.fillRect(0,0,W,H);
+
+  const xAnim = currentAnimatedX(now);
+  const x = occurrenceCount(mode, attemptIndex); // exact value for readouts
+  const z = (x - stats.mean) / stats.std;
+  const outside = Math.abs(z) > 2;
+
+  // --- training support band ---
+  const nz = trainingCounts.map((c,i)=>c>0?i:null).filter(v=>v!==null);
+  const lo = Math.min(...nz)-0.5, hi = Math.max(...nz)+0.5;
+  ctx.fillStyle = col('--support');
+  ctx.fillRect(xScale(lo), plotY0, xScale(hi)-xScale(lo), plotH);
+  ctx.fillStyle = col('--muted');
+  ctx.textAlign='center';
+  ctx.font='11px sans-serif';
+  wrapText('training support region', (xScale(lo)+xScale(hi))/2, plotY0+14, xScale(hi)-xScale(lo)-8, 12);
+
+  // --- axes ---
+  ctx.strokeStyle = col('--grid'); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(plotX0,plotY0); ctx.lineTo(plotX0,plotY1); ctx.lineTo(plotX1,plotY1); ctx.stroke();
+
+  // y ticks
+  ctx.fillStyle = col('--muted'); ctx.font='11px sans-serif'; ctx.textAlign='right';
+  for(let c=0;c<=40;c+=10){
+    const yy = yScale(c);
+    ctx.fillText(c, plotX0-8, yy+4);
+    ctx.strokeStyle = col('--grid');
+    ctx.beginPath(); ctx.moveTo(plotX0-4,yy); ctx.lineTo(plotX0,yy); ctx.stroke();
+  }
+  ctx.save();
+  ctx.translate(18, (plotY0+plotY1)/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center';
+  ctx.fillText('training episodes (count)', 0, 0);
+  ctx.restore();
+
+  // x ticks + bars
+  ctx.textAlign='center';
+  for(let i=0;i<=4;i++){
+    const xx = xScale(i);
+    ctx.fillStyle = col('--muted');
+    ctx.fillText(i, xx, plotY1+18);
+    if(trainingCounts[i] > 0){
+      const barY = yScale(trainingCounts[i]);
+      ctx.fillStyle = col('--bar');
+      ctx.fillRect(xScale(i-0.28), barY, xScale(i+0.28)-xScale(i-0.28), plotY1-barY);
+      ctx.fillStyle = col('--text');
+      ctx.font='11px sans-serif';
+      ctx.fillText(trainingCounts[i], xx, barY-6);
+    }
+  }
+  ctx.fillStyle = col('--muted'); ctx.font='13px sans-serif';
+  const axisLines = wrapText(&quot;occurrences of \u201cpick up bowl\u201d in instruction history&quot;,
+    (plotX0+plotX1)/2, plotY1+34, plotW, 13);
+
+  // --- deployment marker (animated position) ---
+  const markerColor = mode==='transcript' ? col('--transcript') : col('--mem');
+  const mx = xScale(xAnim);
+  ctx.strokeStyle = markerColor; ctx.setLineDash([5,4]); ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(mx, plotY0); ctx.lineTo(mx, plotY1); ctx.stroke();
+  ctx.setLineDash([]);
+  const pulse = pulsePhase(now);
+  const r = 5 + pulse*1.5;
+  ctx.beginPath(); ctx.arc(mx, plotY0, r, 0, Math.PI*2);
+  ctx.fillStyle = markerColor; ctx.fill();
+
+  // --- status box (fixed location so text can never clip) ---
+  const bx0=398, by0=8, bw=228, bh=64;
+  ctx.fillStyle = col('--bg'); ctx.strokeStyle = col('--grid');
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx0,by0,bw,bh,6) : ctx.rect(bx0,by0,bw,bh);
+  ctx.fill(); ctx.stroke();
+
+  ctx.textAlign='left';
+  ctx.fillStyle = col('--text');
+  const line1 = 'deployment history: x = ' + x;
+  const s1 = fitFont(line1, bw-16, 13);
+  ctx.font = s1+'px sans-serif';
+  ctx.fillText(line1, bx0+8, by0+22);
+
+  const line0 = 'z = ' + z.toFixed(2);
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = col('--muted');
+  ctx.fillText(line0, bx0+8, by0+38);
+
+  const statusText = outside ? 'OUTSIDE training support' : 'WITHIN training support';
+  ctx.fillStyle = outside ? col('--transcript') : col('--mem');
+  const s2 = fitFont(statusText, bw-16, 14);
+  ctx.font = 'bold '+s2+'px sans-serif';
+  ctx.fillText(statusText, bx0+8, by0+56);
+
+  // top-left legend for marker color / mode
+  ctx.textAlign='left'; ctx.font='11px sans-serif';
+  ctx.fillStyle = markerColor;
+  ctx.fillRect(plotX0, 58, 10, 10);
+  ctx.fillStyle = col('--muted');
+  const modeName = mode==='transcript' ? 'transcript memory' : &quot;MEM's compressed memory&quot;;
+  ctx.fillText('deployment history (' + modeName + ')', plotX0+16, 67);
+
+  // --- quantitative anchor (Fig. 4) ---
+  ctx.textAlign='center'; ctx.fillStyle = col('--muted'); ctx.font='12px sans-serif';
+  const anchorY = plotY1 + 34 + axisLines*13 + 14;
+  const anchorLines = wrapText(
+    'Fig. 4: MEM \u2248' + FIG4_MEM_SUCCESS + '% task success vs transcript baseline \u2248' +
+    FIG4_TRANSCRIPT_SUCCESS + '% (same tasks) \u2014 a distribution-shift gap, not a speed gap.',
+    (plotX0+plotX1)/2, anchorY, plotW, 14);
+
+  // --- memory content box (shows the actual stored text) ---
+  const memY0 = anchorY + anchorLines*14 + 12;
+  const memH = 78;
+  ctx.textAlign='left';
+  ctx.fillStyle = col('--bg'); ctx.strokeStyle = col('--grid');
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(plotX0, memY0, plotW, memH, 6) : ctx.rect(plotX0, memY0, plotW, memH);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = col('--muted'); ctx.font='11px sans-serif';
+  ctx.fillText('Memory content passed to the policy:', plotX0+10, memY0+18);
+  ctx.fillStyle = col('--text'); ctx.font='12px sans-serif';
+  wrapText(historyText(mode, attemptIndex), plotX0+10, memY0+36, plotW-20, 15);
+  ctx.textAlign='center'; // restore default used elsewhere
+
+  // --- readouts ---
+  document.getElementById('roAttempt').textContent = attemptIndex + ' of 3';
+  document.getElementById('roX').textContent = x;
+  document.getElementById('roZ').textContent = z.toFixed(2);
+  document.getElementById('roStatus').textContent = outside ? 'outside training support' : 'within training support';
+}
+
+function loop(ts){
+  draw(ts);
+  if(playing) requestAnimationFrame(loop);
+}
+
+if(prefersReduced){
+  playBtn.style.display = 'inline-block';
+  playBtn.addEventListener('click', ()=>{
+    playing = true;
+    playBtn.style.display = 'none';
+    requestAnimationFrame(loop);
+  });
+  draw(performance.now()); // static first frame, no auto animation
+} else {
+  requestAnimationFrame(loop);
+}
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;compression-beats-transcript&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Logging every failed try makes the robot's history unlike anything it trained on"
+  ></iframe>
+</section>
+
+<section class="scene" id="failures-become-information">
+  <h3>Short-term visual memory lets the robot stop repeating the same failed grasp</h3>
+  <div class="caption">Toggle memory over identical failure data. π0.6 — the no-memory robot MEM builds on — keeps trying the same doomed grasp forever, because its input never changes. MEM sees the failed attempt inside its 18-frame window and changes tactics on the next try: a different grasp height for the low chopsticks, or the opposite pull on an ambiguous fridge door (Fig. 5).</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="failures-become-information"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Failures Become Information — Short-term Memory vs. Memoryless Retry</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f2f4f7; --panel2:#e9edf2; --text:#1a1d22; --muted:#5b6270;
+    --accent:#2563eb; --fail:#dc2626; --success:#15803d; --border:#c7ccd4; --frame:#c3cad4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161a; --panel:#1f232a; --panel2:#262b33; --text:#eef0f3; --muted:#9aa2b0;
+      --accent:#5b9dff; --fail:#f87171; --success:#4ade80; --border:#3a4048; --frame:#3a4048;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 20px;}
+  h1{font-size:15px;line-height:1.3;margin:4px 0 10px;font-weight:700;}
+  .eq{display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:2px;}
+  .eq math{font-size:0.98em;}
+  .vs{font-size:11px;color:var(--muted);}
+  .legend{font-size:11px;color:var(--muted);text-align:center;margin:2px 0 12px;line-height:1.4;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+  .controls label{font-size:12px;color:var(--muted);margin-right:4px;}
+  select,button{font-size:12px;padding:5px 9px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button.live{border-color:var(--accent);font-weight:600;}
+  svg{width:100%;max-width:100%;height:auto;display:block;}
+  .readouts{margin-top:10px;display:flex;flex-direction:column;gap:4px;}
+  .ro{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:5px 8px;
+    background:var(--panel);border-radius:5px;border:1px solid var(--border);}
+  .ro b{color:var(--text);font-weight:600;}
+  .capnote{font-size:10.5px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Same failure-plus-correction data, two input functions: does the robot retry the same doomed grasp?</h1>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>a</mi><mi>t</mi></msub><mo>=</mo><mi>&amp;#960;</mi><mo>(</mo><msub><mi>o</mi><mi>t</mi></msub><mo>)</mo>
+      <mtext>&amp;#160;&amp;#160;&amp;#8212;&amp;#160;no memory (&amp;#960;0.6)</mtext>
+    </math>
+    <div class=&quot;vs&quot;>versus</div>
+    <math display=&quot;block&quot;>
+      <msub><mi>a</mi><mi>t</mi></msub><mo>=</mo><mi>&amp;#960;</mi><mo>(</mo><msub><mi>o</mi><mrow><mi>t</mi><mo>-</mo><mn>17</mn></mrow></msub><mo>,</mo><mo>...</mo><mo>,</mo><msub><mi>o</mi><mi>t</mi></msub><mo>)</mo>
+      <mtext>&amp;#160;&amp;#160;&amp;#8212;&amp;#160;MEM</mtext>
+    </math>
+  </div>
+  <div class=&quot;legend&quot;>
+    a<sub></sub>t — action chosen on attempt t &amp;middot; o_t — camera frame at attempt t &amp;middot;
+    &amp;#960; — the learned policy (same network weights, same training data) &amp;middot;
+    o_(t&amp;#8722;17...t) — MEM's 18-frame input window (the only difference between the two policies).
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;taskSel&quot;>Task:</label>
+    <select id=&quot;taskSel&quot;>
+      <option value=&quot;chopsticks&quot;>Chopsticks (unseen low height)</option>
+      <option value=&quot;fridge&quot;>Fridge (ambiguous handle)</option>
+    </select>
+    <button id=&quot;liveBtn&quot;>Live lane: MEM (click to switch)</button>
+    <span id=&quot;playWrap&quot; style=&quot;display:none;&quot;><button id=&quot;playBtn&quot;>Play</button></span>
+  </div>
+
+  <svg id=&quot;stage&quot; viewBox=&quot;0 0 640 470&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; role=&quot;img&quot; aria-label=&quot;two lane comparison of memory off and memory on retry behavior&quot;></svg>
+
+  <div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+  <div class=&quot;capnote&quot;>Filmstrip = MEM's 18-frame window; red frames = the previous failed attempt still visible inside it. Grid glyph = a hash of the current input (same pattern &amp;rarr; policy literally cannot tell attempts apart).</div>
+</div>
+
+<script>
+const TASKS = {
+  chopsticks:{ id:'chopsticks', name:'Chopsticks — unseen low height',
+    memOn:[ {strategy:'grasp height 2 cm (low)', outcome:'fail'},
+            {strategy:'grasp height 5 cm (mid)', outcome:'fail'},
+            {strategy:'grasp height 8 cm (high)', outcome:'success'} ],
+    memOffStrategy:'grasp height 2 cm (low)', memOffOutcome:'fail' },
+  fridge:{ id:'fridge', name:'Fridge — ambiguous handle',
+    memOn:[ {strategy:'pull direction: left', outcome:'fail'},
+            {strategy:'pull direction: right', outcome:'success'} ],
+    memOffStrategy:'pull direction: left', memOffOutcome:'fail' }
+};
+
+function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h; }
+function fpColors(seed){ const arr=[]; for(let i=0;i<16;i++){ const h=hashStr(seed+'_'+i); arr.push('hsl('+(h%360)+',55%,55%)'); } return arr; }
+
+// Greedy word-wrap for SVG <text> — avoids clipping long annotations at panel edges.
+function wrapText(text, maxChars){
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for(const w of words){
+    const candidate = (cur + ' ' + w).trim();
+    if(candidate.length <= maxChars){ cur = candidate; }
+    else { if(cur) lines.push(cur); cur = w; }
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let state = { taskKey:'chopsticks', attempt:0, liveIsMem:true, playing: !reduced };
+let lastTick = 0;
+
+function fpGrid(x,y,seed){
+  const cs=12, gap=2, colors=fpColors(seed);
+  let s='';
+  for(let r=0;r<4;r++){ for(let c=0;c<4;c++){
+    const idx=r*4+c;
+    s += `<rect x=&quot;${x+c*(cs+gap)}&quot; y=&quot;${y+r*(cs+gap)}&quot; width=&quot;${cs}&quot; height=&quot;${cs}&quot; rx=&quot;2&quot; fill=&quot;${colors[idx]}&quot;/>`;
+  }}
+  return s;
+}
+
+function lane(x,y,w,h,opts){
+  const {title,isLive,strategy,outcome,attemptNum,seedNow,seedPrev,hasPrev,filmstrip,hasFailureWindow,note} = opts;
+  let s='';
+  s += `<rect x=&quot;${x}&quot; y=&quot;${y}&quot; width=&quot;${w}&quot; height=&quot;${h}&quot; rx=&quot;10&quot; fill=&quot;var(--panel)&quot; stroke=&quot;${isLive?'var(--accent)':'var(--border)'}&quot; stroke-width=&quot;${isLive?3:1}&quot;/>`;
+  s += `<text x=&quot;${x+15}&quot; y=&quot;${y+22}&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--text)&quot;>${title}</text>`;
+  // training-data badge (identical text both lanes)
+  s += `<rect x=&quot;${x+w-195}&quot; y=&quot;${y+8}&quot; width=&quot;180&quot; height=&quot;20&quot; rx=&quot;9&quot; fill=&quot;var(--panel2)&quot; stroke=&quot;var(--border)&quot;/>`;
+  s += `<text x=&quot;${x+w-105}&quot; y=&quot;${y+22}&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot; text-anchor=&quot;middle&quot;>same training data</text>`;
+  // fingerprint
+  const gx=x+15, gy=y+40;
+  s += fpGrid(gx,gy,seedNow);
+  s += `<text x=&quot;${gx}&quot; y=&quot;${gy+64}&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>input fingerprint</text>`;
+  let cmp = 'first attempt';
+  let cmpColor = 'var(--muted)';
+  if(hasPrev){ cmp = (seedNow===seedPrev) ? 'SAME as previous' : 'DIFFERENT vs previous'; cmpColor = (seedNow===seedPrev)?'var(--fail)':'var(--success)'; }
+  s += `<text x=&quot;${gx}&quot; y=&quot;${gy+80}&quot; font-size=&quot;9.5&quot; fill=&quot;${cmpColor}&quot; font-weight=&quot;600&quot;>${cmp}</text>`;
+
+  // filmstrip or single frame
+  const fx=x+110, fy=y+40;
+  if(filmstrip){
+    const bw=10,bh=30,gap=2;
+    for(let i=0;i<18;i++){
+      let fill='var(--frame)';
+      if(hasFailureWindow &amp;&amp; i>=4 &amp;&amp; i<=8) fill='var(--fail)';
+      if(i>=15) fill='var(--accent)';
+      s += `<rect x=&quot;${fx+i*(bw+gap)}&quot; y=&quot;${fy}&quot; width=&quot;${bw}&quot; height=&quot;${bh}&quot; rx=&quot;2&quot; fill=&quot;${fill}&quot;/>`;
+    }
+    s += `<text x=&quot;${fx}&quot; y=&quot;${fy+bh+14}&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>18-frame window${hasFailureWindow?' (failure visible)':''}</text>`;
+  } else {
+    s += `<rect x=&quot;${fx}&quot; y=&quot;${fy}&quot; width=&quot;70&quot; height=&quot;30&quot; rx=&quot;4&quot; fill=&quot;var(--frame)&quot;/>`;
+    s += `<text x=&quot;${fx}&quot; y=&quot;${fy+44}&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>single frame (no history)</text>`;
+  }
+
+  // right column: strategy + outcome
+  const rx=x+400;
+  s += `<text x=&quot;${rx}&quot; y=&quot;${y+45}&quot; font-size=&quot;10.5&quot; fill=&quot;var(--muted)&quot;>Attempt ${attemptNum}</text>`;
+  s += `<text x=&quot;${rx}&quot; y=&quot;${y+62}&quot; font-size=&quot;11.5&quot; fill=&quot;var(--text)&quot; font-weight=&quot;600&quot;>${strategy}</text>`;
+  const oc = outcome==='success';
+  s += `<rect x=&quot;${rx}&quot; y=&quot;${y+72}&quot; width=&quot;86&quot; height=&quot;22&quot; rx=&quot;5&quot; fill=&quot;${oc?'var(--success)':'var(--fail)'}&quot;/>`;
+  s += `<text x=&quot;${rx+43}&quot; y=&quot;${y+87}&quot; font-size=&quot;11&quot; fill=&quot;#fff&quot; text-anchor=&quot;middle&quot; font-weight=&quot;700&quot;>${oc?'SUCCESS':'FAIL'}</text>`;
+  // Note annotation — wrapped so it always terminates inside the panel (available width ~ w-400-15px).
+  const noteLines = wrapText(note, 30);
+  noteLines.forEach((line,i)=>{
+    s += `<text x=&quot;${rx}&quot; y=&quot;${y+112+i*12}&quot; font-size=&quot;9.5&quot; fill=&quot;var(--muted)&quot;>${line}</text>`;
+  });
+  return s;
+}
+
+function render(){
+  const task = TASKS[state.taskKey];
+  const offSeed = task.id+'_off_base';
+  const offPrevSeed = offSeed; // constant always
+  const offNote = state.attempt>0 ? '(identical to attempt 1 — strategy repeats)' : '(baseline attempt)';
+
+  const idx = state.attempt % task.memOn.length;
+  const prevIdx = (state.attempt-1+task.memOn.length) % task.memOn.length;
+  const memEntry = task.memOn[idx];
+  const memSeed = task.id+'_on_'+idx;
+  const memPrevSeed = task.id+'_on_'+prevIdx;
+  const memNote = idx>0 ? '(different from failed attempt — strategy changed)' : '(new episode start)';
+
+  let svg = '';
+  svg += lane(20,30,600,190,{
+    title:'\u03c00.6 \u2014 no memory (memoryless)', isLive: !state.liveIsMem,
+    strategy: task.memOffStrategy, outcome: task.memOffOutcome,
+    attemptNum: state.attempt+1, seedNow: offSeed, seedPrev: offPrevSeed, hasPrev: state.attempt>0,
+    filmstrip:false, hasFailureWindow:false, note: offNote
+  });
+  svg += lane(20,245,600,195,{
+    title:'MEM \u2014 18-frame memory', isLive: state.liveIsMem,
+    strategy: memEntry.strategy, outcome: memEntry.outcome,
+    attemptNum: state.attempt+1, seedNow: memSeed, seedPrev: memPrevSeed, hasPrev: state.attempt>0,
+    filmstrip:true, hasFailureWindow: idx>0, note: memNote
+  });
+  document.getElementById('stage').innerHTML = svg;
+
+  const ro = document.getElementById('readouts');
+  const fpSame = (offSeed===offPrevSeed);
+  const fpDiff = (memSeed!==memPrevSeed) &amp;&amp; state.attempt>0;
+  ro.innerHTML = `
+    <div class=&quot;ro&quot;><span>Attempt shown</span><b>${state.attempt+1} of ${task.memOn.length} in loop &amp;mdash; task: ${task.name}</b></div>
+    <div class=&quot;ro&quot;><span>&amp;#960;0.6 (no memory)</span><b>${task.memOffStrategy} &amp;rarr; ${task.memOffOutcome.toUpperCase()}, fingerprint unchanged</b></div>
+    <div class=&quot;ro&quot;><span>MEM (18-frame memory)</span><b>${memEntry.strategy} &amp;rarr; ${memEntry.outcome.toUpperCase()}${state.attempt>0?(fpDiff?', fingerprint changed':''):''}</b></div>
+    <div class=&quot;ro&quot;><span>Live lane (highlighted)</span><b>${state.liveIsMem?'MEM':'\u03c00.6'}</b></div>
+  `;
+
+  document.getElementById('liveBtn').textContent = 'Live lane: '+(state.liveIsMem?'MEM (click to switch)':'\u03c00.6 (click to switch)');
+}
+
+document.getElementById('taskSel').addEventListener('change', e=>{ state.taskKey=e.target.value; state.attempt=0; render(); });
+document.getElementById('liveBtn').addEventListener('click', ()=>{ state.liveIsMem=!state.liveIsMem; render(); });
+
+if(reduced){
+  document.getElementById('playWrap').style.display='inline';
+  const pb = document.getElementById('playBtn');
+  pb.addEventListener('click', ()=>{
+    state.playing = !state.playing;
+    pb.textContent = state.playing ? 'Pause' : 'Play';
+  });
+}
+
+function loop(ts){
+  if(state.playing){
+    if(ts-lastTick>2600){
+      lastTick=ts;
+      const task = TASKS[state.taskKey];
+      state.attempt = (state.attempt+1) % (Math.max(task.memOn.length,3)*2);
+      render();
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+render();
+window.__sceneReady = true;
+requestAnimationFrame(loop);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;failures-become-information&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Short-term visual memory lets the robot stop repeating the same failed grasp"
+  ></iframe>
+</section>
+
+<section class="scene" id="why-not-one-modality">
+  <h3>Every one-kind-of-memory design fails some task; only mixing video and text covers all four</h3>
+  <div class="caption">On the paper's four memory tests (Fig. 6): Pool-Memory averages all past frames into a single token and blurs away which of three mugs went where. Proprio-Memory keeps only the robot's own joint angles, so it counts its coffee scoops fine but guesses among four drawers at the 25% chance floor. Memoryless π0.6 sits at chance everywhere. Only MEM clears all four, because each kind of memory demand reaches a form that keeps the right details.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="why-not-one-modality"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Why one kind of memory isn't enough</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f5f5f7;
+    --text:#1b1b1f;
+    --muted:#6b6b76;
+    --accent:#2f6f4f;   /* pass / MEM green */
+    --fail:#b23b3b;     /* fail / chance red */
+    --accent2:#3b6fb2;  /* proprio blue */
+    --grid:#d8d8de;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14141a;
+      --panel:#1e1e26;
+      --text:#eaeaf0;
+      --muted:#9a9aa6;
+      --accent:#5fd08a;
+      --fail:#ef6f6f;
+      --accent2:#7aa8e0;
+      --grid:#33333d;
+    }
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;box-sizing:border-box;}
+  h1{font-size:15px;font-weight:600;margin:4px 0 8px;}
+  .controls{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  button{
+    font-size:12.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--grid);
+    background:var(--panel);color:var(--text);cursor:pointer;
+  }
+  button.active{border-color:var(--accent2);background:var(--accent2);color:#fff;}
+  .ctrlLabel{font-size:11px;color:var(--muted);margin:0 0 4px;}
+  #legend{margin:2px 0 8px;line-height:1.4;}
+  canvas{width:100%;max-width:680px;height:auto;display:block;background:var(--panel);
+    border-radius:8px;border:1px solid var(--grid);}
+  ul.readout{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}
+  ul.readout li{display:flex;justify-content:space-between;padding:3px 4px;border-bottom:1px dashed var(--grid);}
+  ul.readout li:last-child{border-bottom:none;}
+  .flag{font-size:11px;font-weight:600;}
+  .flagFail{color:var(--fail);}
+  .flagPass{color:var(--accent);}
+  .note{font-size:11px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Which memory design keeps the right information?</h1>
+  <p class=&quot;ctrlLabel&quot;>Select a memory design to test on the four task families:</p>
+  <div class=&quot;controls&quot; id=&quot;btns&quot;></div>
+  <p class=&quot;ctrlLabel&quot; id=&quot;legend&quot;>
+    <b>π0.6</b> — the paper's baseline memoryless policy checkpoint (Fig. 6), used as the &quot;no memory&quot; reference.
+    &amp;nbsp;·&amp;nbsp; <b>MEM</b> — Multimodal Episodic Memory, this paper's proposed design (keeps sampled video frames plus a language summary).
+  </p>
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;420&quot;></canvas>
+  <ul class=&quot;readout&quot; id=&quot;readout&quot;></ul>
+  <p class=&quot;note&quot; id=&quot;diagNote&quot;></p>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const btnBar = document.getElementById('btns');
+  const readoutEl = document.getElementById('readout');
+  const diagNote = document.getElementById('diagNote');
+
+  const CHANCE = 25; // % — 1-of-4 guess baseline used across the task suite
+
+  const TASKS = [
+    {name:'Partial observability', sub:'which mug is hidden?'},
+    {name:'Counting', sub:'how many scoops added?'},
+    {name:'Timing', sub:'how long since timer start?'},
+    {name:'Spatial memory', sub:'which drawer hides object?'}
+  ];
+
+  // Values are illustrative percentages consistent with Fig.6 of the paper:
+  // memoryless collapses to chance everywhere; Pool blurs spatial identity;
+  // Proprio nails counting (own motion) but is at chance on spatial memory;
+  // MEM clears all four decisively.
+  const DESIGNS = {
+    memoryless: {label:'Memoryless \u03c00.6', values:[25,25,25,25], diagram:'none'},
+    pool:       {label:'Pool-Memory',      values:[35,45,40,25], diagram:'pool'},
+    proprio:    {label:'Proprio-Memory',   values:[30,90,55,25], diagram:'proprio'},
+    mem:        {label:'MEM',              values:[88,92,85,80], diagram:'mem'}
+  };
+
+  let currentKey = 'memoryless';
+  let shown = DESIGNS[currentKey].values.slice();
+  let target = shown.slice();
+  let stepBase = shown.slice();
+  let animStart = 0, animDur = 550;
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function getColors(){
+    const s = getComputedStyle(document.documentElement);
+    return {
+      bg: s.getPropertyValue('--bg').trim(),
+      text: s.getPropertyValue('--text').trim(),
+      muted: s.getPropertyValue('--muted').trim(),
+      accent: s.getPropertyValue('--accent').trim(),
+      fail: s.getPropertyValue('--fail').trim(),
+      accent2: s.getPropertyValue('--accent2').trim(),
+      grid: s.getPropertyValue('--grid').trim(),
+      panel: s.getPropertyValue('--panel').trim()
+    };
+  }
+
+  function easeOut(p){ return 1-Math.pow(1-p,3); }
+
+  function step(t){
+    const p = Math.min(1, (t-animStart)/animDur);
+    for(let i=0;i<4;i++){
+      shown[i] = stepBase[i] + (target[i]-stepBase[i]) * easeOut(p);
+    }
+    draw(p);
+    updateReadout();
+    if(p<1) requestAnimationFrame(step); else { shown = target.slice(); draw(1); updateReadout(); }
+  }
+
+  function selectDesign(key){
+    if(key===currentKey) return;
+    currentKey = key;
+    updateActive();
+    stepBase = shown.slice();
+    target = DESIGNS[key].values.slice();
+    if(reduced){
+      shown = target.slice();
+      draw(1); updateReadout();
+    } else {
+      animStart = performance.now();
+      requestAnimationFrame(step);
+    }
+  }
+
+  function updateActive(){
+    [...btnBar.children].forEach(b=> b.classList.toggle('active', b.dataset.key===currentKey));
+  }
+
+  function makeButtons(){
+    btnBar.innerHTML='';
+    Object.keys(DESIGNS).forEach(key=>{
+      const b = document.createElement('button');
+      b.textContent = DESIGNS[key].label;
+      b.title = 'Show what ' + DESIGNS[key].label + ' retains, and its scores on the four tasks';
+      b.dataset.key = key;
+      b.addEventListener('click', ()=> selectDesign(key));
+      btnBar.appendChild(b);
+    });
+    updateActive();
+  }
+
+  function updateReadout(){
+    readoutEl.innerHTML='';
+    TASKS.forEach((tk,i)=>{
+      const li = document.createElement('li');
+      const v = Math.round(shown[i]);
+      const nearChance = v <= CHANCE+2;
+      li.innerHTML = `<span>${tk.name} \u2014 ${tk.sub}</span>
+        <span><b>${v}%</b> <span class=&quot;flag ${nearChance?'flagFail':'flagPass'}&quot;>${nearChance? '\u2248 chance (25%)':'above chance'}</span></span>`;
+      readoutEl.appendChild(li);
+    });
+    diagNote.textContent = diagramCaption(DESIGNS[currentKey].diagram);
+  }
+
+  function diagramCaption(type){
+    if(type==='none') return 'Retains: nothing — each step is evaluated with no memory of the past.';
+    if(type==='pool') return 'Retains: one averaged frame — distinct objects blur into a gray mean.';
+    if(type==='proprio') return 'Retains: robot joint angles only — the environment is discarded.';
+    return 'Retains (MEM = Multimodal Episodic Memory): sampled video frames + a language summary of what happened and why it matters.';
+  }
+
+  function drawDiagram(type, w, topY, h, C, animT){
+    ctx.save();
+    ctx.translate(0, topY);
+    ctx.strokeStyle = C.grid;
+    ctx.strokeRect(10,0,w-20,h);
+    ctx.fillStyle = C.text;
+    ctx.font = '12px sans-serif';
+    ctx.fillText('What this memory physically retains from the kitchen past:', 18, 16);
+
+    if(type==='none'){
+      const cx=w/2, cy=h/2+8, r=26;
+      ctx.strokeStyle = C.fail; ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(cx-r,cy-r); ctx.lineTo(cx+r,cy+r);
+      ctx.moveTo(cx+r,cy-r); ctx.lineTo(cx-r,cy+r);
+      ctx.stroke();
+      ctx.fillStyle = C.muted; ctx.font='11px sans-serif';
+      ctx.fillText('no past frames, no past state', cx-84, cy+r+18);
+    } else if(type==='pool'){
+      const mugColors=['#e07a5f','#81b29a','#f2cc8f'];
+      const y0=32;
+      for(let i=0;i<3;i++){
+        ctx.globalAlpha = 1-0.6*animT;
+        ctx.fillStyle = mugColors[i];
+        ctx.fillRect(60+i*70, y0, 36, 36);
+      }
+      ctx.globalAlpha=1;
+      ctx.fillStyle = `rgba(140,140,140,${0.15+0.55*animT})`;
+      ctx.beginPath();
+      ctx.ellipse(w/2, y0+18, 100*animT+8, 34*animT+8, 0,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = C.muted; ctx.font='11px sans-serif';
+      ctx.fillText('3 mugs \u2192 1 averaged token: identity &amp; location blurred', 30, y0+62);
+    } else if(type==='proprio'){
+      ctx.strokeStyle = C.accent2; ctx.lineWidth=1.5;
+      ctx.beginPath();
+      for(let x=0;x<170;x++){
+        const yv = 30 + Math.sin(x/11)*14 + Math.sin(x/3.3)*2.5;
+        if(x===0) ctx.moveTo(40+x,yv); else ctx.lineTo(40+x,yv);
+      }
+      ctx.stroke();
+      ctx.fillStyle = C.text; ctx.font='11px sans-serif';
+      ctx.fillText('joint-angle trace (own arm)', 40, 84);
+      ctx.fillStyle = 'rgba(130,130,130,0.28)';
+      ctx.fillRect(w-200, 16, 170, 62);
+      ctx.strokeStyle = C.grid; ctx.strokeRect(w-200,16,170,62);
+      ctx.fillStyle = C.muted;
+      ctx.fillText('environment (mugs, drawers)', w-196, 40);
+      ctx.fillText('\u2014 not retained', w-196, 54);
+    } else if(type==='mem'){
+      for(let i=0;i<4;i++){
+        ctx.globalAlpha = 0.25+0.18*i;
+        ctx.fillStyle = C.accent;
+        ctx.fillRect(28+i*38, 22, 30, 42);
+      }
+      ctx.globalAlpha=1;
+      ctx.strokeStyle = C.text;
+      for(let i=0;i<4;i++) ctx.strokeRect(28+i*38,22,30,42);
+      ctx.fillStyle = C.text; ctx.font='11px sans-serif';
+      ctx.fillText('video frames', 28, 80);
+      ctx.strokeStyle = C.text;
+      ctx.strokeRect(w-216, 20, 190, 46);
+      ctx.font='10.5px sans-serif';
+      ctx.fillText('&quot;3rd scoop, drawer 2, 8s ago&quot;', w-208, 40);
+      ctx.font='11px sans-serif';
+      ctx.fillText('language summary', w-216, 80);
+    }
+    ctx.restore();
+  }
+
+  function drawBars(w, topY, h, C){
+    const marginL=44, marginR=18;
+    const plotW = w - marginL - marginR;
+    const colW = plotW/4;
+    const zeroY = topY + h - 26;
+    const maxH = h - 46;
+
+    // axis
+    ctx.strokeStyle = C.grid;
+    ctx.beginPath(); ctx.moveTo(marginL, topY+10); ctx.lineTo(marginL, zeroY); ctx.lineTo(marginL+plotW, zeroY); ctx.stroke();
+    ctx.fillStyle = C.muted; ctx.font='10px sans-serif';
+    ctx.save(); ctx.translate(14, topY+h/2); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center'; ctx.fillText('task performance (%)', 0, 0); ctx.restore();
+    ctx.textAlign='left';
+    [0,25,50,75,100].forEach(v=>{
+      const y = zeroY - (v/100)*maxH;
+      ctx.fillStyle = C.muted; ctx.font='9.5px sans-serif';
+      ctx.fillText(String(v), 6, y+3);
+      ctx.strokeStyle = C.grid; ctx.beginPath(); ctx.moveTo(marginL,y); ctx.lineTo(marginL+plotW,y); ctx.stroke();
+    });
+
+    // chance dashed line — annotation placed at the left, well above the line,
+    // so it never collides with a bar's value label (which sits just above that bar).
+    const cy = zeroY - (CHANCE/100)*maxH;
+    ctx.save();
+    ctx.strokeStyle = C.fail; ctx.setLineDash([5,4]); ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(marginL, cy); ctx.lineTo(marginL+plotW, cy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = C.fail; ctx.font='10px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('chance level (25%, 1-in-4 guess)', marginL+8, cy-8);
+    ctx.restore();
+
+    TASKS.forEach((tk,i)=>{
+      const v = shown[i];
+      const barW = colW*0.5;
+      const x = marginL + i*colW + (colW-barW)/2;
+      const bh = (v/100)*maxH;
+      const y = zeroY - bh;
+      const nearChance = v <= CHANCE+2;
+      ctx.fillStyle = nearChance ? C.fail : C.accent;
+      ctx.fillRect(x,y,barW,bh);
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      if(nearChance){
+        // draw the value inside the (short) bar so it never sits at the
+        // same height as the chance-line annotation above it
+        ctx.fillStyle = C.bg;
+        ctx.fillText(Math.round(v)+'%', x+barW/2, Math.min(y+14, zeroY-4));
+      } else {
+        ctx.fillStyle = C.text;
+        ctx.fillText(Math.round(v)+'%', x+barW/2, y-5);
+      }
+      ctx.fillStyle = C.muted; ctx.font='9px sans-serif';
+      wrapText(tk.name, x+barW/2, zeroY+12, colW-6);
+      wrapText(tk.sub, x+barW/2, zeroY+23, colW-6);
+      ctx.textAlign='left';
+    });
+  }
+
+  function wrapText(str, cx, y, maxW){
+    ctx.textAlign='center';
+    ctx.fillText(str, cx, y, maxW);
+  }
+
+  function draw(animT){
+    const C = getColors();
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle = C.text;
+    ctx.font = '13px sans-serif';
+    ctx.fillText(DESIGNS[currentKey].label, 14, 20);
+
+    drawDiagram(DESIGNS[currentKey].diagram, cv.width, 28, 118, C, reduced?1:Math.min(1,animT+0.3));
+    drawBars(cv.width, 160, 250, C);
+  }
+
+  makeButtons();
+  draw(1);
+  updateReadout();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;why-not-one-modality&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Every one-kind-of-memory design fails some task; only mixing video and text covers all four"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now</h2>
+  <div class="part-lede">Adding memory to robots has been tried before, and it often made them worse. The last piece is why MEM works where those tries failed — and the answer is the training data, not the wiring.</div>
+</header>
+<section class="scene" id="why-now-data">
+  <h3>Memory only helps if it's trained on diverse data from the start — which is why earlier tries failed</h3>
+  <div class="caption">Toggle the recipe (Fig. 7). Add the video memory only at the end, tuning on one task's tidy demos, and the robot barely uses its history: it takes a shortcut, copying its own last action instead of reading the scene. MEM instead trains the memory from the start on a broad mix — robot demos, its own trial runs, human corrections, and internet video — which kills that shortcut. Starting at 6 frames (1-second spacing) and stretched to 18 frames (54 s) later, it matches the best no-memory robots on shirt folding and box building instead of getting worse.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="why-now-data"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Why now: memory needs diverse data</title>
+<style>
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --text:#1a1b2b; --muted:#6b7280;
+  --grid:#e2e4ee; --scene-color:#2f9e64; --self-color:#d9534f;
+  --accent:#3b6fd6; --good:#2f9e64; --bad:#d9534f; --track:#e9eaf2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14151f; --panel:#1c1e2b; --text:#eceef5; --muted:#9aa0b4;
+    --grid:#2c2f42; --scene-color:#3fbf7e; --self-color:#ef6a63;
+    --accent:#6d94ff; --good:#3fbf7e; --bad:#ef6a63; --track:#2a2c3c;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+h1{font-size:15px;margin:0 0 10px;font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;}
+.controls label{font-size:12.5px;color:var(--muted);flex:1 1 220px;}
+select{font-size:13px;padding:5px 6px;border-radius:6px;border:1px solid var(--grid);
+  background:var(--panel);color:var(--text);max-width:100%;}
+.panel{background:var(--panel);border:1px solid var(--grid);border-radius:10px;padding:14px;}
+.row{margin-bottom:16px;}
+.row-label{font-size:12.5px;color:var(--muted);margin-bottom:6px;}
+.bar-attr{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--grid);}
+.seg{height:100%;transition:width .05s linear;}
+.seg.scene{background:var(--scene-color);}
+.seg.self{background:var(--self-color);}
+.legend-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px;font-size:12.5px;}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+.meter{height:16px;background:var(--track);border-radius:8px;overflow:hidden;border:1px solid var(--grid);}
+.meter-fill{height:100%;background:var(--accent);transition:width .05s linear;}
+.readout{font-size:13px;margin-top:6px;color:var(--text);}
+.eqbox{margin:8px 0 4px;text-align:center;}
+math{font-size:1.05em;}
+.eqlegend{font-size:11.5px;color:var(--muted);line-height:1.4;text-align:center;}
+.perfChart{position:relative;display:flex;align-items:flex-end;gap:34px;
+  height:120px;border-bottom:1px solid var(--grid);padding-top:22px;}
+.perfBar{width:56px;border-radius:4px 4px 0 0;transition:height .3s;position:relative;}
+.perfBar.naive{background:var(--bad);}
+.perfBar.diverse{background:var(--good);}
+.perfBar.active{box-shadow:0 0 0 3px var(--accent) inset;}
+.baseline{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--muted);}
+.baselineLbl{position:absolute;right:0;font-size:11px;color:var(--muted);transform:translateY(-16px);}
+.perfLabels{display:flex;gap:34px;margin-top:6px;font-size:12px;color:var(--muted);}
+.perfLabels span{width:56px;text-align:center;}
+ul.badge{list-style:none;margin:0;padding:0;font-size:12.5px;line-height:1.6;}
+ul.badge li{padding:4px 0;border-top:1px solid var(--grid);}
+ul.badge li:first-child{border-top:none;}
+.ok{color:var(--good);font-weight:600;}
+.no{color:var(--bad);font-weight:600;}
+@media (max-width:420px){
+  .perfChart{gap:18px;}
+  .perfLabels{gap:18px;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot; id=&quot;scene&quot;>
+  <h1>Kitchen task: does the robot actually read its memory, or cheat?</h1>
+
+  <div class=&quot;controls&quot;>
+    <label for=&quot;recipeSelect&quot;>Training recipe — when is the video memory trained? Switch between the two recipes to see attribution, history reliance, and Fig. 7 score change.</label>
+    <select id=&quot;recipeSelect&quot;>
+      <option value=&quot;naive&quot; selected>Memory bolted on only at fine-tuning, on one task's tidy demos</option>
+      <option value=&quot;diverse&quot;>Memory pre-trained on the diverse mixture (robot demos + trial rollouts + human corrections + internet video)</option>
+    </select>
+  </div>
+
+  <div class=&quot;panel&quot;>
+
+    <div class=&quot;row&quot;>
+      <div class=&quot;row-label&quot;>Causal-confusion probe — what the predicted action's attribution mass sits on</div>
+      <div class=&quot;bar-attr&quot;>
+        <div class=&quot;seg scene&quot; id=&quot;segScene&quot;></div>
+        <div class=&quot;seg self&quot; id=&quot;segSelf&quot;></div>
+      </div>
+      <div class=&quot;legend-row&quot;>
+        <span><span class=&quot;swatch&quot; style=&quot;background:var(--scene-color)&quot;></span>scene tokens (reading the memory) — <b id=&quot;sceneVal&quot;>--%</b></span>
+        <span><span class=&quot;swatch&quot; style=&quot;background:var(--self-color)&quot;></span>own recent-action trace (the cheat) — <b id=&quot;selfVal&quot;>--%</b></span>
+      </div>
+    </div>
+
+    <div class=&quot;row&quot;>
+      <div class=&quot;row-label&quot;>History-reliance meter — how much the action depends on past video-memory frames</div>
+      <div class=&quot;meter&quot;><div class=&quot;meter-fill&quot; id=&quot;histFill&quot;></div></div>
+      <div class=&quot;readout&quot;>History reliance: <b id=&quot;histVal&quot;>--%</b></div>
+    </div>
+
+    <div class=&quot;eqbox&quot;>
+      <math display=&quot;block&quot;>
+        <mi>H</mi><mo>=</mo>
+        <mfrac>
+          <msub><mi>G</mi><mtext>hist</mtext></msub>
+          <mrow><msub><mi>G</mi><mtext>hist</mtext></msub><mo>+</mo><msub><mi>G</mi><mtext>cur</mtext></msub></mrow>
+        </mfrac>
+        <mo>&amp;#215;</mo><mn>100</mn><mtext>%</mtext>
+      </math>
+      <div class=&quot;eqlegend&quot;>H — history reliance (%): share of the action's attribution mass falling on past frames &amp;middot;
+      G<sub>hist</sub> — attribution-gradient magnitude on past video-memory frames (arb. units) &amp;middot;
+      G<sub>cur</sub> — attribution-gradient magnitude on the current frame (arb. units)</div>
+    </div>
+
+    <div class=&quot;row&quot;>
+      <div class=&quot;row-label&quot;>Fig. 7 — task success on dexterous benchmarks (shirt folding, box building)</div>
+      <div class=&quot;perfChart&quot; id=&quot;perfChart&quot;>
+        <div class=&quot;baseline&quot; id=&quot;baselineLine&quot;><span class=&quot;baselineLbl&quot; id=&quot;baselineLbl&quot;></span></div>
+        <div class=&quot;perfBar naive&quot; id=&quot;perfNaiveBar&quot;></div>
+        <div class=&quot;perfBar diverse&quot; id=&quot;perfDiverseBar&quot;></div>
+      </div>
+      <div class=&quot;perfLabels&quot;><span id=&quot;perfNaiveNum&quot;></span><span id=&quot;perfDiverseNum&quot;></span></div>
+      <div class=&quot;perfLabels&quot;><span>bolted-on late</span><span>MEM (diverse mix)</span></div>
+      <div class=&quot;readout&quot;>Currently selected recipe: <b id=&quot;curRecipeLabel&quot;>--</b> &amp;middot; current score: <b id=&quot;curPerfVal&quot;>--</b></div>
+    </div>
+
+    <ul class=&quot;badge&quot;>
+      <li>Pre-train window: 6 frames @ 1 s stride (&amp;#8776;5 s span)</li>
+      <li>Post-train window: 18 frames = 54 s span — no degradation</li>
+      <li id=&quot;dexCheck&quot;></li>
+      <li id=&quot;kitchenCheck&quot;></li>
+    </ul>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const reduce = window.matchMedia &amp;&amp; matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Named constants: illustrative attribution-gradient magnitudes (arb. units)
+  // and Fig.7-style success scores, consistent with the paper's qualitative findings.
+  const NAIVE   = { gScene:1.2, gSelf:6.8, gHist:1.0, gCur:5.0, perf:61 };
+  const DIVERSE = { gScene:7.9, gSelf:1.1, gHist:4.2, gCur:1.3, perf:90 };
+  const BASELINE_PERF = 88; // memoryless state-of-the-art on shirt folding / box building
+
+  function metrics(cfg){
+    const scenePct = cfg.gScene/(cfg.gScene+cfg.gSelf)*100;
+    const histPct  = cfg.gHist/(cfg.gHist+cfg.gCur)*100;
+    return { scenePct, selfPct:100-scenePct, histPct, perf:cfg.perf };
+  }
+
+  const targets = { naive: metrics(NAIVE), diverse: metrics(DIVERSE) };
+  const state = { recipe: 'naive' }; // start on the naive/bolted-on-late recipe
+  let current = Object.assign({}, targets[state.recipe]);
+  let anim = null;
+
+  const el = id => document.getElementById(id);
+  const segScene=el('segScene'), segSelf=el('segSelf'), sceneVal=el('sceneVal'), selfVal=el('selfVal');
+  const histFill=el('histFill'), histVal=el('histVal');
+  const dexCheck=el('dexCheck'), kitchenCheck=el('kitchenCheck');
+  const perfChartH = 120;
+
+  function render(){
+    segScene.style.width = current.scenePct.toFixed(1)+'%';
+    segSelf.style.width  = current.selfPct.toFixed(1)+'%';
+    sceneVal.textContent = Math.round(current.scenePct)+'%';
+    selfVal.textContent  = Math.round(current.selfPct)+'%';
+    histFill.style.width = current.histPct.toFixed(1)+'%';
+    histVal.textContent  = Math.round(current.histPct)+'%';
+
+    // Static Fig.7 comparison bars (always both visible) + active highlight for the selected recipe
+    const nb = el('perfNaiveBar'), db = el('perfDiverseBar');
+    nb.style.height = (NAIVE.perf/100*perfChartH)+'px';
+    db.style.height = (DIVERSE.perf/100*perfChartH)+'px';
+    el('perfNaiveNum').textContent   = 'score '+NAIVE.perf;
+    el('perfDiverseNum').textContent = 'score '+DIVERSE.perf;
+    const bl = el('baselineLine');
+    bl.style.bottom = (BASELINE_PERF/100*perfChartH)+'px';
+    el('baselineLbl').textContent = 'memoryless SOTA baseline — '+BASELINE_PERF;
+
+    const isDiverse = state.recipe === 'diverse';
+    nb.classList.toggle('active', !isDiverse);
+    db.classList.toggle('active', isDiverse);
+
+    el('curRecipeLabel').textContent = isDiverse ? 'diverse mixture' : 'bolted-on late (naive)';
+    el('curPerfVal').textContent = Math.round(current.perf);
+
+    if(isDiverse){
+      dexCheck.innerHTML = 'Dexterous tasks (shirt folding, box building): <span class=&quot;ok&quot;>matches memoryless baseline &amp;#10003;</span>';
+      kitchenCheck.innerHTML = '15-min kitchen episode (running example): <span class=&quot;ok&quot;>completed &amp;#10003;</span>';
+    } else {
+      dexCheck.innerHTML = 'Dexterous tasks (shirt folding, box building): <span class=&quot;no&quot;>substantially worse &amp;#10007;</span>';
+      kitchenCheck.innerHTML = '15-min kitchen episode (running example): <span class=&quot;no&quot;>not completed &amp;#10007;</span>';
+    }
+  }
+
+  function ease(t){ return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+  function animateTo(target, dur){
+    const from = Object.assign({}, current);
+    if(dur<=0){ current = Object.assign({}, target); render(); return; }
+    const start = performance.now();
+    if(anim) cancelAnimationFrame(anim);
+    function step(now){
+      const t = Math.min(1, (now-start)/dur);
+      const e = ease(t);
+      current.scenePct = from.scenePct + (target.scenePct-from.scenePct)*e;
+      current.selfPct  = from.selfPct  + (target.selfPct -from.selfPct)*e;
+      current.histPct  = from.histPct  + (target.histPct -from.histPct)*e;
+      current.perf     = from.perf     + (target.perf    -from.perf)*e;
+      render();
+      if(t<1) anim = requestAnimationFrame(step);
+    }
+    anim = requestAnimationFrame(step);
+  }
+
+  const select = el('recipeSelect');
+  select.value = state.recipe;
+  select.addEventListener('change', ()=>{
+    state.recipe = select.value;
+    animateTo(targets[state.recipe], reduce ? 0 : 650);
+  });
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;why-now-data&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Memory only helps if it's trained on diverse data from the start — which is why earlier tries failed"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Multi-Scale Embodied Memory for Vision Language Action Models</em> — Marcel Torne, Karl Pertsch, Homer Walke, Danny Driess, Sergey Levine, Chelsea Finn, et al. (Physical Intelligence). Explainer generated 2026-07-27.</footer>
+</main>
+<script>
+  // Size each scene iframe to its content so it never shows its own scrollbar
+  // (a "scrollbar inside the page scrollbar"). Two mechanisms, belt-and-suspenders:
+  //
+  // 1) Scenes postMessage({ explainItScene, height }) — but their ResizeObserver only
+  //    fires on box-size changes, so late reflow (MathML, web fonts, async SVG) that
+  //    grows content AFTER the first report is missed and the frame stays too short.
+  // 2) Because scenes are srcdoc (same-origin), we also measure each frame's true
+  //    scrollHeight directly and refit on every signal that can change it: the load
+  //    event, DOM mutations, box resizes, fonts.ready, and a few bounded timeouts that
+  //    catch reflow with no observable trigger. This converges and needs no scene changes.
+  const fitToContent = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc) return;
+    const h = Math.max(
+      doc.documentElement ? doc.documentElement.scrollHeight : 0,
+      doc.body ? doc.body.scrollHeight : 0
+    );
+    if (h && Math.ceil(h) !== Math.ceil(parseFloat(frame.style.height) || 0)) {
+      frame.style.height = Math.ceil(h) + "px";
+    }
+  };
+
+  const wireFrame = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc || !doc.documentElement) return;
+    const refit = () => fitToContent(frame);
+    refit();
+    try { new MutationObserver(refit).observe(doc.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); } catch { /* noop */ }
+    try { new ResizeObserver(refit).observe(doc.documentElement); } catch { /* noop */ }
+    try { if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(refit); } catch { /* noop */ }
+    [50, 150, 350, 700, 1200, 2500].forEach((t) => setTimeout(refit, t));
+  };
+
+  for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+    frame.addEventListener("load", () => wireFrame(frame));
+    // Non-lazy or already-cached frames may have loaded before this ran.
+    try { if (frame.contentDocument && frame.contentDocument.readyState === "complete") wireFrame(frame); } catch { /* noop */ }
+  }
+
+  // Keep honoring scene-sent heights too (harmless, and covers any edge our measure misses).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        if (Math.ceil(data.height) > Math.ceil(parseFloat(frame.style.height) || 0)) {
+          frame.style.height = Math.ceil(data.height) + "px";
+        }
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

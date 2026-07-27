@@ -1,0 +1,316 @@
+{
+  "title": "Physical Intelligence's MEM: Giving Robots a Memory",
+  "hook": "The AI that runs today's best robots sees only the current camera frame — nothing it did a second ago. So a robot that just dropped a bowl sees the same scene as one that never tried, and repeats the mistake forever. Why not feed in the whole video history? Because the computer work grows with the square of the video's length, and the robot has only a few hundred milliseconds to pick its next move. Physical Intelligence's MEM keeps two memories instead — compressed video for the last minute, plus a short text note the robot rewrites itself for everything older — and that lets one robot clean a kitchen for 15 minutes straight.",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Before the fix, the problem. We follow one robot on one job — cleaning an entire kitchen, a 15-minute task — and see what the program controlling it actually is, what it computes each step, and why simply feeding it the past video runs past the robot's split-second time budget."
+    },
+    {
+      "title": "The new technology",
+      "lede": "The naive approach fails because it treats all memory alike. MEM's move: notice that seconds-old memory and minutes-old memory need wildly different amounts of detail, and store each in its own form — recent video, distant text."
+    },
+    {
+      "title": "Why it beats existing tech",
+      "lede": "Two memories are now in place: 18 frames of compressed video and one rewritten sentence. Here we run them head-to-head against the no-memory robot and the obvious shortcuts, on the paper's own experiments."
+    },
+    {
+      "title": "Why now",
+      "lede": "Adding memory to robots has been tried before, and it often made them worse. The last piece is why MEM works where those tries failed — and the answer is the training data, not the wiring."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "policy-is-a-function",
+      "conceptId": "policy-as-function",
+      "part": "The basic building blocks",
+      "title": "The robot's controller sees only the current frame — the past is invisible to it",
+      "teaches": "A policy — the function \\(\\pi(a \\mid o, g)\\) that controls the robot — maps the current camera view \\(o\\) and the goal \\(g\\) to motor commands, so anything outside the current frame is invisible to it.",
+      "requires": [],
+      "caption": "Our running example: one robot cleaning a whole kitchen. Its policy — the function \\(\\pi\\) that picks the actions — reads only the current camera frame \\(o_t\\) and the text goal \\(g\\), then outputs joint commands for the next \\(H\\) steps (the action horizon it commits to). Step past the dropped bowl: frame 4 is identical to frame 1, so \\(\\pi\\) repeats the same doomed grasp.",
+      "visualMetaphor": "A horizontal filmstrip of kitchen frames with the robot arm reaching for a bowl. Below it, a box labeled 'policy π' with two input arrows (current frame o_t, goal text g = \"clean the kitchen\") and one output arrow (arrow glyphs for joint commands). A step button advances time. Predict-before-reveal: after the bowl slips at frame 3, a prompt asks 'what does the policy do next?' — then stepping shows the input frame at t=4 is pixel-identical to t=1, and the output action vector shown below is byte-identical, looping forever. Frames outside the current one are dimmed to near-black to make 'invisible to the policy' literal.",
+      "animatedVariable": {
+        "name": "timestep t",
+        "control": "buttons",
+        "range": "t = 1 … 8 (grasp, slip, retry, slip, retry, …)",
+        "whatChangesOnScreen": "The highlighted frame advances; the policy box's input and output readouts update; after the slip, both readouts snap back to their t=1 values and a 'loop' badge appears."
+      },
+      "quantitativeAnchor": "The policy emits action chunks tens of times per second; the kitchen task it must finish runs ~15 minutes, roughly 900 seconds of decisions.",
+      "physicsChecks": [
+        "At every timestep, exactly one frame is bright (the input); all others are dimmed — the cause of amnesia is visible, not asserted.",
+        "The action readout at t=4 equals the readout at t=1 character-for-character once the scene resets after the slip.",
+        "The goal g stays constant across all timesteps while o_t changes — only o_t drives the differences in output."
+      ]
+    },
+    {
+      "id": "images-become-tokens",
+      "conceptId": "vla-anatomy",
+      "part": "The basic building blocks",
+      "title": "One camera frame is cut into hundreds of pieces before the policy can use it",
+      "teaches": "A VLA converts each image into a grid of patch tokens using a vision transformer, and every later step's cost is counted per token.",
+      "requires": [
+        "policy-is-a-function"
+      ],
+      "caption": "This policy is a vision-language-action model (VLA): an AI built on a network already trained on internet images and text, then taught to output robot actions. It cuts each 448×448 kitchen frame into small patches, and a vision transformer (ViT) turns each patch into a list of numbers called a token. Those tokens feed a Gemma3-4B language model and an 860M-parameter action network; drag across the four cameras to tally thousands of tokens per single timestep.",
+      "visualMetaphor": "Left: the kitchen frame from scene 1 with a patch grid overlaid; hovering a patch highlights its token, a small vector glyph. Center: tokens flowing as a stream into three labeled stages — 'ViT (patch → token)', 'Gemma3-4B backbone', '860M action expert → joint commands'. Right: a running token counter. A slider adds cameras one at a time (wrist-left, wrist-right, base, overhead); the counter multiplies visibly. Label under the counter: 'attention operates on ALL of these tokens'.",
+      "animatedVariable": {
+        "name": "number of camera streams",
+        "control": "slider",
+        "range": "1 to 4 cameras",
+        "whatChangesOnScreen": "Additional frames with patch grids appear, the token stream thickens, and the token counter scales linearly — hundreds of tokens per image, thousands per timestep at 4 cameras."
+      },
+      "quantitativeAnchor": "448×448 images, hundreds of patch tokens per image per camera; backbone is Gemma3-4B with an 860M-parameter flow-matching action expert.",
+      "physicsChecks": [
+        "Token count scales linearly with camera count: 4 cameras shows exactly 4× the tokens of 1 camera.",
+        "The patch grid geometry matches the counter: patches per frame × frames = displayed token count.",
+        "The pipeline order is fixed and labeled: image → patches → ViT tokens → backbone → action expert, with no arrows skipping stages."
+      ]
+    },
+    {
+      "id": "quadratic-wall",
+      "conceptId": "attention-cost",
+      "part": "The basic building blocks",
+      "title": "Feeding in past frames blows the robot's split-second time budget almost at once",
+      "teaches": "Attention cost grows as the square of the token count, so stacking T past frames multiplies the work by roughly T² and exceeds the robot's real-time budget within a few timesteps.",
+      "requires": [
+        "images-become-tokens"
+      ],
+      "caption": "These models work by comparing every token with every other token — the step called attention — so its cost grows with the square of the number of tokens. Append \\(T\\) past frames and the work grows about \\(T^2\\)-fold: drag \\(T\\) and watch the compute curve cross the red deadline. Fifteen minutes of history sits orders of magnitude past the few-hundred-millisecond budget, even on an H100 GPU.",
+      "visualMetaphor": "An interactive chart: x-axis = number of past frames T appended, y-axis = inference latency (log scale), with a horizontal red band labeled 'real-time budget: a few hundred ms — beyond this the robot's motion visibly degrades'. A quadratic curve rises as the reader drags T. Predict-before-reveal: before dragging, the reader clicks a guess (5 / 50 / 500 frames) for where the curve crosses red. A faint marker far off the right edge at T=900 is labeled '15 minutes of history'. Inset: an n×n attention matrix that grows as T increases, its area shading to convey the T² blowup.",
+      "animatedVariable": {
+        "name": "past frames appended, T",
+        "control": "slider",
+        "range": "T = 1 to 900 frames (log-spaced)",
+        "whatChangesOnScreen": "The latency curve extends and crosses the red budget band after only a few frames; the attention-matrix inset grows quadratically in area; at T=900 the readout shows the deficit in orders of magnitude."
+      },
+      "quantitativeAnchor": "Per Fig. 1: naively appending past frames to the π0.6 backbone exceeds the real-time threshold after only a few timesteps on an NVIDIA H100; 15 minutes ≈ 900 frames is off by orders of magnitude.",
+      "physicsChecks": [
+        "Latency is monotonically increasing in T and visibly super-linear (doubling T more than doubles latency).",
+        "The curve crosses the red budget band at single-digit T, matching Fig. 1's 'a few timesteps'.",
+        "The attention-matrix inset's side length scales linearly with token count while its area scales quadratically.",
+        "At T=1 the latency sits comfortably below the red band (the memoryless baseline is real-time — that's why it exists)."
+      ]
+    },
+    {
+      "id": "granularity-mismatch",
+      "conceptId": "memory-granularity-mismatch",
+      "part": "The new technology",
+      "title": "Seconds-old memory needs pixels; minutes-old memory needs a sentence",
+      "teaches": "The information a robot needs from its past differs by orders of magnitude in density across timescales, so one representation cannot serve both.",
+      "requires": [
+        "quadratic-wall"
+      ],
+      "caption": "That wall stands only if all memory must be raw video — slide back through the kitchen robot's last 15 minutes to see why it doesn't have to be. Retrying the slipped bowl grasp from 3 seconds ago needs pixel-level detail like grasp angle and bowl height, while 'I already put the butter away' from 9 minutes ago is a few bits that fit in one sentence.",
+      "visualMetaphor": "A timeline slider spanning 15 minutes, 'now' at the right. As the reader drags a probe left, a panel shows what the robot needs from that moment. Within ~1 minute of now: a full-resolution crop with annotated grasp angle and bowl height, and a byte meter reading megabytes. Beyond a minute: the frame fades and is replaced by a one-line text fact ('butter is in the fridge', 'cabinet door still open') with a byte meter reading tens of bytes. Predict-before-reveal: before dragging past the 1-minute mark, the reader is asked whether the needed detail goes up or down with age. The byte meter's log scale makes the orders-of-magnitude gap the visual punchline.",
+      "animatedVariable": {
+        "name": "how far back in the past the probe points",
+        "control": "slider",
+        "range": "3 seconds to 15 minutes ago",
+        "whatChangesOnScreen": "The panel switches from annotated pixels to a one-line text fact around the ~1-minute mark, and the byte meter drops by several orders of magnitude on its log scale."
+      },
+      "quantitativeAnchor": "Required information density differs by orders of magnitude: pixel detail (megabytes per frame) for second-scale memory vs. a few dozen text tokens for minute-scale facts like 'butter already added'.",
+      "physicsChecks": [
+        "Needed detail is monotonically non-increasing as the probe moves further into the past.",
+        "The byte meter shows at least a 4-order-of-magnitude gap between the pixel regime and the text regime.",
+        "Both regimes reference the same kitchen episode from earlier scenes (slipped bowl at seconds scale, butter at minutes scale)."
+      ]
+    },
+    {
+      "id": "two-policy-factorization",
+      "conceptId": "hierarchical-factorization",
+      "part": "The new technology",
+      "title": "MEM splits the policy in two, with a text memory as the only channel to the deep past",
+      "teaches": "The action distribution factors into a high-level policy that maintains a text memory and issues subtasks, and a low-level policy that sees only a short window of K recent frames.",
+      "requires": [
+        "granularity-mismatch"
+      ],
+      "caption": "MEM breaks the single policy into two. A high-level policy reads the current frame and the text note \\(m\\), then hands the low-level policy a one-line subtask \\(l\\) ('pick up the bowl') and rewrites the note to \\(m_{t+1}\\); the low-level policy sees only the last \\(K\\) frames plus that subtask and outputs the motor commands. In symbols (tap any symbol for its job): \\(\\pi \\approx \\pi_{\\text{LL}}(a_{t:t+H} \\mid o_{t-K:t},\\, l_{t+1},\\, g)\\; \\pi_{\\text{HL}}(l_{t+1},\\, m_{t+1} \\mid o_t,\\, m_t,\\, g)\\). The key fact: anything older than the last \\(K\\) frames survives only if it was written into the note \\(m\\).",
+      "visualMetaphor": "An equation scene: the factorization rendered large, each symbol a tappable chip. Tapping highlights its home in a diagram below: π_HL is a box reading the current frame o_t, memory sentence m_t, and goal g, emitting a subtask l ('pick up the bowl') and updated memory m_{t+1}; π_LL is a box reading the last K frames plus l and emitting joint commands a over horizon H. A thin glowing wire labeled 'm: the only path from the deep past' connects π_HL's output back to its own input at the next step. A toggle 'cut the wire' zeroes m and shows the deep past (frames older than K, drawn dimmed to the left) become unreachable — no path from them to the action.",
+      "animatedVariable": {
+        "name": "the memory wire m",
+        "control": "toggle",
+        "range": "wire connected / wire cut",
+        "whatChangesOnScreen": "With the wire cut, every path from frames older than K to the action output disappears from the diagram; with it connected, exactly one path exists — through the sentence m."
+      },
+      "quantitativeAnchor": "The low-level window is K ≪ T: K = 18 frames (54 seconds) at deployment versus T ≈ 900 frames for the full 15-minute kitchen task.",
+      "physicsChecks": [
+        "Every symbol in the displayed equation (a, o, g, l, m, K, H, t) has a tappable definition; none appears only in the diagram.",
+        "With the wire cut, no arrow connects any frame older than K to the action output; with it connected, exactly one such path exists and it passes through m.",
+        "π_LL's input region covers only the last K frames of the timeline; π_HL's covers only the current frame plus m and g."
+      ]
+    },
+    {
+      "id": "self-rewriting-summary",
+      "conceptId": "language-memory-update",
+      "part": "The new technology",
+      "title": "The model rewrites its own summary, so minute-scale memory costs almost nothing",
+      "teaches": "At each high-level step the model reads memory \\(m_t\\) plus the current image and emits \\(m_{t+1}\\), actively adding, merging, and deleting facts so the memory stays a few dozen tokens no matter how long the task runs.",
+      "requires": [
+        "two-policy-factorization"
+      ],
+      "caption": "Press play on the 15-minute kitchen episode and watch \\(m\\) get rewritten: 'a light green bowl, a dark blue bowl and a bright yellow bowl' compresses into 'three bowls in the top right cabinet', while stale facts get deleted outright. The token counter stays flat at a few dozen for the whole 15 minutes.",
+      "visualMetaphor": "A split view: top, the kitchen episode playing as a filmstrip with a progress bar over 15 minutes; bottom, the memory sentence m_t rendered as text that visibly edits itself at each high-level step — insertions flash green, deletions strike through and fade, merges animate three phrases collapsing into one. A side gauge compares 'tokens in m' (a few dozen, flat line over time) against 'tokens if we kept raw frames instead' (a line climbing off the chart). Callout on the training side: the rewrite targets were manufactured by an off-the-shelf LLM given each demo's subtask annotations and success/failure flags. IMPLEMENTATION REQUIREMENTS (a prior build failed QA — the memory never visibly changed and the slider stuck near 0): the memory sentence box IS the point of this scene and MUST change with the slider. Key the memory state directly to slider position (not a free-running play animation whose frame cannot be screenshotted): at the default position (minute 0) it holds only the starting task fact; at the slider MAXIMUM (~15 min) it shows the final rewritten memory AND a populated 'recent rewrites' log. Across the sweep, visibly show at least one ADD (a new phrase flashes green), one MERGE (three phrases collapse into one, e.g. three separately-seen bowls -> 'three bowls in the top-right cabinet'), and one DELETE (a superseded phrase strikes through and fades). A fact added around minute 5 (the butter fact) must still be present in the memory at minute 14. The minute readout MUST equal the slider value (it must read ~15 at max, not 0.6). No reset-dependent or mid-animation-only state.",
+      "animatedVariable": {
+        "name": "episode time",
+        "control": "slider",
+        "range": "0 to 15 minutes of the kitchen-cleaning episode",
+        "whatChangesOnScreen": "As the slider advances, the memory sentence box visibly mutates — phrases are added, merged, and deleted — while the 'tokens in m' line stays flat and the 'raw frames' comparison line climbs out of frame. The minute readout tracks the slider."
+      },
+      "quantitativeAnchor": "A summary sentence is a few dozen tokens versus thousands of image tokens per timestep; the paper's example compression: three individually described bowls → 'three bowls in the top right cabinet'.",
+      "physicsChecks": [
+        "The 'tokens in m' curve is bounded (roughly flat) across the full 15 minutes; the raw-history comparison curve grows linearly without bound.",
+        "At least one visible deletion and one visible merge occur during playback — the memory is not append-only.",
+        "The memory at minute 14 still contains the butter fact written around minute 5, demonstrating survival through many rewrites.",
+        "At the slider maximum the minute readout reads ~15 and the memory box shows its fully-rewritten final state with several rewrites logged — not the initial single task fact."
+      ]
+    },
+    {
+      "id": "factorized-attention",
+      "conceptId": "factorized-video-attention",
+      "part": "The new technology",
+      "title": "Attending across space and time separately makes video memory nearly as cheap as one image",
+      "teaches": "Restricting temporal attention to same-position patches across frames, in every 4th ViT layer, gives dense multi-second video memory at near single-image cost.",
+      "requires": [
+        "two-policy-factorization",
+        "quadratic-wall"
+      ],
+      "caption": "To keep real pixels from the last K = 18 frames — about a minute — comparing every patch with every other across all frames would cost \\(O(n^2K^2)\\), with \\(n\\) patches per frame. MEM instead compares patches only two cheap ways: within a frame (space), and — in every 4th ViT layer — each patch only with itself across frames (time). Cost drops to \\(O(Kn^2 + nK^2)\\), and the top layers throw away every past-frame patch, so the language model still sees just one frame's worth of tokens.",
+      "visualMetaphor": "An equation-plus-mechanism scene. Top: the cost transformation O(n²K²) → O(Kn² + nK²) with n ('patches per frame') and K ('frames in the short-term window') defined in chips. Center: K kitchen frames stacked in 3D. Toggling 'joint' draws attention lines from one highlighted patch to every patch in every frame (a dense hairball); toggling 'factorized' redraws only two clean line sets — within-frame lines (spatial) and a single straight line through the same patch position across frames (temporal, with a causal mask arrow showing no lines point toward the future). Bottom: a layer diagram of the ViT with every 4th layer tinted 'temporal pass here', and a funnel at the top layers where K−1 frames' tokens visibly drop away, leaving n tokens for the backbone.",
+      "animatedVariable": {
+        "name": "attention pattern",
+        "control": "toggle",
+        "range": "joint attention / factorized attention",
+        "whatChangesOnScreen": "The attention-line count collapses from the full n·K cross product to within-frame plus along-timeline lines, and the live cost readout drops from n²K² to Kn² + nK² for the current n and K."
+      },
+      "quantitativeAnchor": "For n in the hundreds and K = 18, the factorized cost \\(Kn^2 + nK^2\\) is smaller than joint \\(n^2K^2\\) by roughly a factor of K ≈ 18 on the dominant term; temporal passes run in every 4th ViT layer.",
+      "physicsChecks": [
+        "In factorized mode, the highlighted patch's temporal lines connect only same-grid-position patches, and none point to frames later than the current one (causal mask visible).",
+        "The live cost readout satisfies factorized < joint for every K ≥ 2, and the two readouts coincide in the K = 1 limit's dominant behavior.",
+        "The token funnel outputs exactly n tokens to the backbone regardless of K — the downstream token count matches the memoryless single-frame case."
+      ]
+    },
+    {
+      "id": "zero-new-weights",
+      "conceptId": "zero-new-parameters",
+      "part": "The new technology",
+      "title": "The video encoder adds no new weights, so its internet-trained vision carries over untouched",
+      "teaches": "Because the temporal encoding satisfies \\(e(0) = 0\\), the modified encoder computes exactly the original pre-trained ViT's function on single images, so internet-scale visual knowledge is inherited unchanged.",
+      "requires": [
+        "factorized-attention"
+      ],
+      "caption": "Feed the video encoder a single image and it computes exactly what the original image network did — so all its internet-trained vision knowledge carries over untouched. The trick: the only additions are the new across-time comparison pattern and a fixed (non-learned) clock signal \\(e(t)\\) built so \\(e(0) = 0\\). Slide K down to 1 and that clock adds nothing, so the output matches the original ViT exactly — zero new parameters, zero change on single images, so the encoder bolts onto any existing VLA.",
+      "visualMetaphor": "Two encoder boxes side by side processing the same kitchen frame: 'original pre-trained ViT' and 'MEM's video encoder'. Between them, a diff meter comparing their output tokens. A slider sets K. At K=1, the time-encoding chip shows e(0)=0 feeding zeros into the temporal path, the temporal attention lines gray out, and the diff meter reads exactly 0. Raising K lights the temporal paths and the diff meter moves off zero (they now compute different, richer things). A parameter counter under each box reads the same number, labeled 'no new weights — only a new wiring pattern and a fixed clock signal'.",
+      "animatedVariable": {
+        "name": "short-term window K",
+        "control": "slider",
+        "range": "K = 1 to 18 frames",
+        "whatChangesOnScreen": "At K=1 the diff meter pins to exactly zero and temporal paths gray out; for K>1 temporal paths activate and the outputs diverge, while the parameter counters never change."
+      },
+      "quantitativeAnchor": "New learned parameters added for video: 0. The temporal encoding is fixed sinusoidal with e(0) = 0, guaranteeing exact equivalence to the pre-trained ViT at K = 1.",
+      "physicsChecks": [
+        "The diff meter reads exactly zero at K=1 and nonzero for any K>1.",
+        "Both parameter counters display the identical value at every K setting.",
+        "The e(t) chip shows a zero vector at t=0 and nonzero vectors for t>0."
+      ]
+    },
+    {
+      "id": "compression-beats-transcript",
+      "conceptId": "compression-fixes-distribution-shift",
+      "part": "Why it beats existing tech",
+      "title": "Logging every failed try makes the robot's history unlike anything it trained on",
+      "teaches": "A raw log of past instructions drifts off the training distribution the moment the robot retries a step, while a compressed summary that ignores failed attempts keeps deployment histories statistically like training histories.",
+      "requires": [
+        "self-rewriting-summary"
+      ],
+      "caption": "The obvious cheap shortcut logs every past subtask, so when the robot's grasp slips twice the log reads 'pick up bowl, pick up bowl, pick up bowl'. The robot trained on tidy human demonstrations where each step is said once, so this repetition is input it never saw in training — and models act unreliably on inputs unlike their training data. MEM's summary simply doesn't update until the bowl is in hand, so its input still looks like training.",
+      "visualMetaphor": "Two-column comparison over the same kitchen rollout with two grasp failures. Left column 'training demos': a histogram of instruction histories, where each subtask appears roughly once per episode. Right column 'deployment': the live history under the selected memory type. A toggle switches between 'transcript memory' and 'MEM's compressed memory'. Under transcript, the deployment history ('pick up bowl' ×3) is drawn as a point falling far outside the training histogram's support, flagged 'never seen in training'; under MEM, the memory sentence is unchanged through both failures and the deployment point lands inside the histogram. A results strip cites Fig. 4: the transcript baseline performs significantly worse, not just slower. IMPLEMENTATION REQUIREMENT (a prior build clipped text at the canvas edge): every status/label string — including the longer 'OUTSIDE training support' — MUST fit fully inside the canvas. Wrap, shrink, or reposition the label so no text is cut off at any edge in either toggle state.",
+      "animatedVariable": {
+        "name": "memory representation",
+        "control": "toggle",
+        "range": "transcript of all past instructions / MEM's compressed summary",
+        "whatChangesOnScreen": "The deployment history point jumps from outside the training distribution's support (transcript) to inside it (compressed), and the memory panel shows repetition versus no-update through the two failed grasps."
+      },
+      "quantitativeAnchor": "Fig. 4: the naive log-based memory is significantly worse than MEM's compressed memory on the same tasks — the gap is a distribution-shift effect, not a compute effect.",
+      "physicsChecks": [
+        "Under the transcript toggle, the memory grows by one entry per attempt including failures; under MEM, it is unchanged across failed attempts and updates only on success.",
+        "The deployment-history marker lies outside the training histogram's support only in transcript mode.",
+        "The same rollout (identical frames and failure timing) is used under both toggle states — only the memory representation differs."
+      ]
+    },
+    {
+      "id": "failures-become-information",
+      "conceptId": "in-context-adaptation",
+      "part": "Why it beats existing tech",
+      "title": "Short-term visual memory lets the robot stop repeating the same failed grasp",
+      "teaches": "With recent failures visible in its input, the policy learns 'that strategy just failed — try another', while a memoryless policy's post-failure state is indistinguishable from its pre-failure state.",
+      "requires": [
+        "factorized-attention",
+        "policy-is-a-function"
+      ],
+      "caption": "Toggle memory over identical failure data. π0.6 — the no-memory robot MEM builds on — keeps trying the same doomed grasp forever, because its input never changes. MEM sees the failed attempt inside its 18-frame window and changes tactics on the next try: a different grasp height for the low chopsticks, or the opposite pull on an ambiguous fridge door (Fig. 5).",
+      "visualMetaphor": "A two-lane replay of the chopsticks task, both lanes fine-tuned on the same failure-plus-correction data. Top lane 'memoryless π0.6': after each failed grasp, an input-state fingerprint (a small hash-like glyph of the observation) is shown identical before and after failure, and the sampled strategy repeats. Bottom lane 'MEM': the 18-frame filmstrip input visibly contains the failed attempt, the fingerprint differs from the pre-failure one, and the next grasp comes in at a different annotated height. A toggle switches which lane is live; a side tab swaps the task to the fridge (wrong-direction pull → reversed pull). Predict-before-reveal: before toggling, the reader guesses whether identical training data can produce different retry behavior.",
+      "animatedVariable": {
+        "name": "short-term visual memory",
+        "control": "toggle",
+        "range": "memory off (π0.6) / memory on (MEM, 18-frame window)",
+        "whatChangesOnScreen": "With memory off, the attempt-N strategy annotation equals attempt 1's on every retry; with memory on, each retry's strategy annotation differs from the previously failed one, and the failure frames are visibly present in the input strip."
+      },
+      "quantitativeAnchor": "Fig. 5: on the chopsticks (unseen low height) and ambiguous-fridge tasks, MEM adapts across attempts while memoryless π0.6, fine-tuned on identical correction data, repeats the failed strategy.",
+      "physicsChecks": [
+        "In memory-off mode, the observation fingerprint before and after a failure is identical; in memory-on mode it differs, and the difference (failure frames in the input strip) is visible.",
+        "In memory-on mode, no retry repeats the exact strategy annotation of the immediately preceding failed attempt.",
+        "Both lanes display the same training-data badge, making 'same data, different input state' explicit."
+      ]
+    },
+    {
+      "id": "why-not-one-modality",
+      "conceptId": "single-modality-tradeoffs",
+      "part": "Why it beats existing tech",
+      "title": "Every one-kind-of-memory design fails some task; only mixing video and text covers all four",
+      "teaches": "Averaged-frame and proprioception-only memories each preserve the wrong information for at least one memory demand, while MEM routes each demand to the representation that keeps the right bits.",
+      "requires": [
+        "failures-become-information",
+        "compression-beats-transcript"
+      ],
+      "caption": "On the paper's four memory tests (Fig. 6): Pool-Memory averages all past frames into a single token and blurs away which of three mugs went where. Proprio-Memory keeps only the robot's own joint angles, so it counts its coffee scoops fine but guesses among four drawers at the 25% chance floor. Memoryless π0.6 sits at chance everywhere. Only MEM clears all four, because each kind of memory demand reaches a form that keeps the right details.",
+      "visualMetaphor": "A grid: rows = memory designs (memoryless π0.6, Pool-Memory, Proprio-Memory, MEM), columns = the four task families (partial observability, counting, timing, spatial memory — each with a one-line concrete example like 'which drawer did the person hide the object in?'). Buttons select a row; selecting it animates a mini-diagram of what that memory physically retains from the kitchen past — Pool shows three mug images averaging into one gray smear, Proprio shows a joint-angle trace with the environment grayed out entirely, MEM shows the filmstrip + sentence pair. The row's bar heights fill in per column, with a dashed 'chance' line at 25% on the drawer task.",
+      "animatedVariable": {
+        "name": "memory design under test",
+        "control": "buttons",
+        "range": "memoryless π0.6 / Pool-Memory / Proprio-Memory / MEM",
+        "whatChangesOnScreen": "The retained-information mini-diagram changes to show what that design keeps (smear / joints-only / video+text), and its per-task bars fill in — each non-MEM row has at least one bar at or near the chance line."
+      },
+      "quantitativeAnchor": "Fig. 6: Proprio-Memory picks among four drawers at 25% chance on the spatial-memory task; memoryless π0.6 reduces to chance across the suite; MEM is the only design performing well on all four task families.",
+      "physicsChecks": [
+        "Each non-MEM row shows at least one bar at or below the dashed chance line, and the failing column matches the information its mini-diagram visibly lacks (e.g., Proprio fails exactly where the environment matters).",
+        "The chance line sits at 25% on the four-drawer task and MEM's bar clears it decisively.",
+        "MEM's row has no bar at chance in any column."
+      ]
+    },
+    {
+      "id": "why-now-data",
+      "conceptId": "pretraining-memory-and-causal-confusion",
+      "part": "Why now",
+      "title": "Memory only helps if it's trained on diverse data from the start — which is why earlier tries failed",
+      "teaches": "Prior history-conditioned policies degraded because homogeneous demos let the network cheat by copying its recent actions; MEM's diverse pre-training mixture breaks that shortcut and makes the memory actually get used.",
+      "requires": [
+        "why-not-one-modality",
+        "zero-new-weights"
+      ],
+      "caption": "Toggle the recipe (Fig. 7). Add the video memory only at the end, tuning on one task's tidy demos, and the robot barely uses its history: it takes a shortcut, copying its own last action instead of reading the scene. MEM instead trains the memory from the start on a broad mix — robot demos, its own trial runs, human corrections, and internet video — which kills that shortcut. Starting at 6 frames (1-second spacing) and stretched to 18 frames (54 s) later, it matches the best no-memory robots on shirt folding and box building instead of getting worse.",
+      "visualMetaphor": "A recipe panel with a toggle: 'memory added only at fine-tuning' vs 'memory pre-trained on the diverse mixture (robot demos + policy rollouts + corrections + internet video)'. Below, two linked readouts on the kitchen task: (1) a history-reliance meter showing how much the policy's output actually depends on past frames, and (2) a causal-confusion probe — an attribution strip over the input showing whether the action is driven by scene tokens or by the policy's own recent-action trace. Under the naive recipe, attribution mass sits on the recent-action trace (the cheat, made visible); under the full recipe, it shifts to scene tokens. A side badge shows the window schedule: pre-train 6 frames @ 1 s stride → post-train 18 frames = 54 s, with a checkmark that dexterous benchmarks (shirt folding, box building) match the memoryless baseline.",
+      "animatedVariable": {
+        "name": "training recipe",
+        "control": "toggle",
+        "range": "memory bolted on at fine-tuning only / memory pre-trained on the diverse data mixture",
+        "whatChangesOnScreen": "The attribution strip's mass moves from the copy-my-own-actions trace to the scene tokens, the history-reliance meter rises, and the Fig. 7 performance bar climbs from 'substantially worse' to full MEM level."
+      },
+      "quantitativeAnchor": "Fig. 7: video memory added only at post-training is substantially worse at exploiting history; MEM pre-trains at 6 frames (1 s stride) and extends to 18 frames (54 s) at post-training without degradation, while matching memoryless state-of-the-art on shirt folding and box building.",
+      "physicsChecks": [
+        "The naive-recipe state shows attribution concentrated on the recent-action trace, and the diverse-recipe state shows it concentrated on scene tokens — the cheat and its cure are both visible.",
+        "The performance bar under the diverse recipe strictly exceeds the naive recipe's, and the dexterous-task badge shows parity (not regression) versus the memoryless baseline.",
+        "The window schedule displays 6 frames pre-train → 18 frames (54 s) post-train, and the 15-minute kitchen episode from scene 1 is marked 'completed' only under the full recipe — closing the loop on the running example."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "paper": {
+    "title": "Multi-Scale Embodied Memory for Vision Language Action Models",
+    "authors": [
+      "Marcel Torne",
+      "Karl Pertsch",
+      "Homer Walke",
+      "Danny Driess",
+      "Sergey Levine",
+      "Chelsea Finn",
+      "et al. (Physical Intelligence)"
+    ],
+    "oneSentenceClaim": "Robot AI policies usually see only the current camera frame, so they forget what they just did. This work gives robots two memories: a compressed video memory for the last minute and a written text log for long stretches. The combined system lets one robot finish 15-minute tasks like cleaning a whole kitchen.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "Linear algebra (matrix-vector products, dot products)",
+    "Basic probability notation, e.g. conditional distributions p(a|o)",
+    "Big-O notation for computational cost",
+    "General idea that neural networks are trained by fitting input-output examples"
+  ],
+  "concepts": [
+    {
+      "id": "policy-as-function",
+      "name": "A robot policy is a learned function from observations to actions",
+      "whyItMatters": "Everything in the paper is a modification of the inputs to this one function; you cannot follow the memory argument without knowing what the function maps.",
+      "coreMechanism": "A policy π(a|o, g) is a neural network that, tens of times per second, takes the robot's current sensor observation o (camera images, joint angles) and a goal g stated in text, and outputs a short chunk of motor commands a (target joint positions for the next fraction of a second). It is trained by imitation: given thousands of human teleoperation demonstrations, the network is fit so that in each recorded situation it reproduces the human's actions. Whatever is not in the input o is invisible to the policy — a memoryless policy conditioned only on the current frame literally cannot know what happened one second ago.",
+      "keyEquation": "\\pi(a_{t:t+H} \\mid o_t, g)",
+      "foundational": true
+    },
+    {
+      "id": "vla-anatomy",
+      "name": "Vision-Language-Action models: images become tokens, tokens become actions",
+      "whyItMatters": "The paper's cost analysis and both memory mechanisms operate on the token stream inside a VLA, so the token pipeline is the object being engineered.",
+      "coreMechanism": "A VLA starts from a pre-trained vision-language model (here Gemma3-4B). Each 448×448 camera image is cut into a grid of small patches; a Vision Transformer (ViT) encodes each patch into a vector ('token'). These image tokens, plus text tokens for the goal, are fed into a large transformer backbone, whose output conditions an action head (an 860M-parameter flow-matching 'expert') that emits continuous motor commands. Reusing internet-pre-trained weights is why VLAs generalize — but it also fixes the architecture you must stay compatible with when adding memory.",
+      "misconception": "The VLA does not 'see a picture' holistically; it processes hundreds of patch tokens per image per camera, and the compute bill is proportional to how many tokens you push through it.",
+      "foundational": true
+    },
+    {
+      "id": "attention-cost",
+      "name": "Attention cost scales quadratically, and robots have a hard latency budget",
+      "whyItMatters": "This is the physical constraint that makes naive memory (just feed in all past frames) impossible, and thus motivates the entire paper.",
+      "coreMechanism": "In a transformer, every token computes a dot-product 'attention' score against every other token, so cost grows as the square of token count. Four camera streams × hundreds of patches per image means even one timestep is thousands of tokens; stacking T past frames multiplies tokens by T and attention cost by roughly T². Meanwhile a manipulating robot must produce its next action chunk within a few hundred milliseconds or its motion visibly degrades. Figure 1 shows that naively appending past frames to the π0.6 backbone blows past this real-time threshold after only a few timesteps, even on an NVIDIA H100 GPU — 15 minutes of history is off by orders of magnitude.",
+      "keyFigureRef": "Fig. 1",
+      "foundational": true
+    },
+    {
+      "id": "memory-granularity-mismatch",
+      "name": "Short-term and long-term robot memory need different information densities",
+      "whyItMatters": "This is the paper's central insight: no single representation fits both regimes, so the right architecture is mixed-modal.",
+      "coreMechanism": "Short-horizon memory (seconds) must be pixel-dense: to re-attempt a slipped grasp or see through a self-occlusion, the robot needs precise spatial detail — grasp angle, object height — that only recent images contain. Long-horizon memory (minutes) is the opposite: 'I already added the butter' or 'the cabinet is still open' is a few bits of semantic information, and storing raw video for 15 minutes to preserve it is absurdly wasteful. Because the required bit-rate differs by orders of magnitude across timescales, MEM assigns each regime its natural modality: compressed video for seconds, natural-language text for minutes."
+    },
+    {
+      "id": "hierarchical-factorization",
+      "name": "Factoring the policy into a high-level planner and a low-level controller",
+      "whyItMatters": "This factorization is the mathematical trick that lets a small observation window K stand in for the full history T without losing minute-scale context.",
+      "coreMechanism": "Instead of one policy conditioned on T past observations, MEM writes the action distribution as a product of two policies. The high-level policy π_HL looks at the current observation, the goal, and a text memory m_t, and outputs both the next subtask instruction l (e.g. 'pick up the bowl') and an updated memory m_{t+1}. The low-level policy π_LL then produces motor commands from only a short window of K ≪ T recent observations plus that subtask. All information older than K seconds must survive by being written into m — the text memory is the bottleneck through which the past flows, which is exactly what makes long horizons tractable.",
+      "keyEquation": "\\pi \\approx \\pi_{\\text{LL}}(a_{t:t+H} \\mid o_{t-K:t}, l_{t+1}, g)\\; \\pi_{\\text{HL}}(l_{t+1}, m_{t+1} \\mid o_t, m_t, g)"
+    },
+    {
+      "id": "language-memory-update",
+      "name": "Language memory: the model rewrites its own running summary",
+      "whyItMatters": "This is the mechanism enabling 15-minute tasks — the headline capability — with essentially constant compute regardless of elapsed time.",
+      "coreMechanism": "The memory m_t is a sentence like 'I placed a plate in the cabinet and moved to the counter.' At each high-level step the model reads m_t plus the current image and emits m_{t+1}, deciding for itself when to add, merge, or delete information (e.g. compressing 'a light green bowl, a dark blue bowl and a bright yellow bowl' into 'three bowls in the top right cabinet'). Training data for these rewrites is manufactured automatically: an off-the-shelf LLM is given a demonstration's subtask annotations plus success/failure flags and asked to produce minimal summaries, which then supervise the high-level policy. Because a summary sentence is a few dozen tokens versus thousands per image, minute-scale memory costs almost nothing at inference time.",
+      "misconception": "The memory is not a transcript appended to forever; it is actively compressed and pruned each step, and the paper shows this pruning — not just the language format — is what makes it work."
+    },
+    {
+      "id": "compression-fixes-distribution-shift",
+      "name": "Why compressed memory beats a raw instruction log: train–test distribution shift",
+      "whyItMatters": "This is the paper's most subtle ablation result: it explains why the obvious baseline (concatenate all past subtask instructions) is significantly worse, not just slower.",
+      "coreMechanism": "Training data comes from near-optimal human demos, so any subtask instruction appears roughly once per episode ('pick up bowl' → 'place bowl'). A deployed policy, however, fails and retries, producing histories like 'pick up bowl' → 'pick up bowl' → 'pick up bowl' that never occur in training — the naive log-based memory then feeds the policy inputs from outside its training distribution and performance degrades. MEM's compressed memory sidesteps this: since a failed attempt changes nothing semantically, the summary simply doesn't update until the bowl is actually picked up, so deployment-time histories look statistically like training-time histories. Fewer bits carried forward means fewer ways for the state to drift off-distribution.",
+      "keyFigureRef": "Fig. 4"
+    },
+    {
+      "id": "factorized-video-attention",
+      "name": "Space-time factorized attention: video encoding for the cost of images",
+      "whyItMatters": "This is the engineering breakthrough that makes dense multi-second visual memory fit inside the real-time latency budget.",
+      "coreMechanism": "Joint attention over all patches of K frames costs O(n²K²) for n patches per frame — hopeless. MEM instead keeps the standard ViT but, in every 4th layer, adds a second attention pass where each patch attends only to the same patch position across timesteps (with a causal mask, so no peeking at the future). This factorization drops cost to O(Kn² + nK²): spatial attention within frames plus temporal attention along each patch's timeline, never the full cross product. In the upper layers, tokens from all past timesteps are discarded, so the backbone downstream receives exactly as many tokens as a memoryless single-frame VLA — the temporal information has been squeezed into the current frame's tokens.",
+      "keyEquation": "\\mathcal{O}(n^2K^2) \\;\\rightarrow\\; \\mathcal{O}(Kn^2 + nK^2)",
+      "keyFigureRef": "Fig. 2"
+    },
+    {
+      "id": "zero-new-parameters",
+      "name": "The video encoder adds no new weights, so pre-trained vision transfers intact",
+      "whyItMatters": "This design choice is why MEM can bolt onto any existing VLA and inherit its internet-scale visual knowledge instead of retraining vision from scratch.",
+      "coreMechanism": "Video capability is added purely by changing the attention pattern and adding a fixed (non-learned) sinusoidal encoding of the time index t. The temporal encoding is defined so that e(0) = 0, which means for a single-frame input (K = 1) the modified encoder computes exactly the same function as the original pre-trained ViT. The encoder therefore initializes from the VLM's existing weights with zero behavioral change on single images, and training merely teaches the existing weights to also exploit the new temporal attention paths."
+    },
+    {
+      "id": "in-context-adaptation",
+      "name": "Short-term memory turns failures into strategy switches",
+      "whyItMatters": "This shows memory improves even tasks that superficially don't need it — a memoryless policy can only repeat the same mistake, because each attempt looks identical to it.",
+      "coreMechanism": "Two probe tasks: grasping flat chopsticks on a table at an unseen low height (frequent mis-grasps) and opening a fridge whose hinge side is visually ambiguous (wrong-direction pulls). Training data consists of failed attempts followed by human corrections, with the failure kept inside the model's short-term visual memory during training. The fine-tuned MEM policy thus learns the rule 'if my recent frames show a failed grasp at height h, try a different height,' whereas the memoryless π0.6 fine-tuned on identical data re-samples the same doomed strategy forever — its input state after a failure is indistinguishable from its input state before it.",
+      "keyFigureRef": "Fig. 5"
+    },
+    {
+      "id": "single-modality-tradeoffs",
+      "name": "Why prior single-modality memories each fail somewhere",
+      "whyItMatters": "The comparison suite is the evidence that mixed-modal memory is necessary, not just one clever option among equals.",
+      "coreMechanism": "Pool-Memory averages all past frame encodings into one token: cheap, but averaging destroys long-range distinctions, so it fails at tracking which of three coffee mugs went where or how many groceries remain in a bag. Proprio-Memory stores only past joint-angle states: it can recall the robot's own motion (helpful for counting coffee scoops) but is blind to the environment, so it guesses among four drawers at 25% chance when asked where a person hid an object. The memoryless π0.6 baseline reduces to random chance on all of these. Only MEM performs well across partial observability, counting, timing, and spatial-memory tasks simultaneously, because different memory demands are routed to the representation that preserves the right information.",
+      "keyFigureRef": "Fig. 6"
+    },
+    {
+      "id": "pretraining-memory-and-causal-confusion",
+      "name": "Memory must be pre-trained on diverse data, or it is weak and brittle",
+      "whyItMatters": "This result explains both why MEM works when prior memory-equipped policies degraded, and warns that memory architecture alone is insufficient without matching training data.",
+      "coreMechanism": "An ablation that adds the video encoder only during task-specific post-training — starting from the same pre-trained π0.6 — is substantially worse at exploiting history: the ability to read temporal context must itself be learned at scale. MEM pre-trains with 6 frames at 1-second stride on a mixture of robot demos, policy rollouts, corrections, and internet video, then stretches the window to 18 frames (54 s) in post-training without breaking. The same data diversity defuses 'causal confusion,' the classic failure where a policy with history cheats by copying its own recent actions instead of looking at the scene; varied optimality, speeds, and control frequencies in training break that shortcut, so MEM matches memoryless state-of-the-art on dexterous tasks (shirt folding, box building) instead of regressing.",
+      "keyFigureRef": "Fig. 7",
+      "misconception": "Prior work often found that adding history *hurts* imitation policies (the network copies past actions rather than perceiving); the paper argues this is a data-diversity problem, not an inherent flaw of memory."
+    }
+  ]
+}

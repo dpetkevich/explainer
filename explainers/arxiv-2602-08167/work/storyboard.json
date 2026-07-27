@@ -1,0 +1,316 @@
+{
+  "title": "How Robots Learn Which Thoughts Are Worth Thinking",
+  "hook": "Robot AIs can now write out their reasoning in plain text — 'the target is the red pepper; move the gripper left' — before moving an arm. But unlike a math problem, a robot's thoughts have no answer key. So today's systems force the robot to recite rigid templates. Those templates are mostly noise, and they add seconds of lag to every motion. This paper found a way for the robot to grade its own thoughts, using nothing but the probability it assigns to what a human expert actually did. The result: a robot that succeeds more often while thinking half as much.",
+  "parts": [
+    {
+      "title": "A robot that acts by writing tokens",
+      "lede": "Meet the running example — a robot arm told to 'put the pepper in the basket' — and see why, for this kind of AI, every possible action has a computable probability. That single fact powers everything that follows; the part ends on the problem it can't yet solve."
+    },
+    {
+      "title": "Let the model grade its own thoughts",
+      "lede": "We ended Part 1 stuck: there is no answer key for a robot's reasoning. This part builds one out of the model's own probabilities — treat the right thought as a hidden variable, propose candidates in hindsight, and weigh each by how much it helps predict the expert's action."
+    },
+    {
+      "title": "The filtered diet wins",
+      "lede": "The refinement loop hands us a new training set: one self-selected reasoning trace per demonstration. Now we retrain the pepper-task robot on it and put it head-to-head against the no-reasoning and recite-everything baselines from Part 1, using the paper's real numbers."
+    },
+    {
+      "title": "Why now, and what it unlocks",
+      "lede": "The same self-grading loop, run unchanged on a robot arm, four legged robots, and a self-driving car, discovers a different reasoning diet for each body — something no hand-written template could. Because it needs zero external labels, it scales with nothing but logged demonstrations."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "vla-action-tokens",
+      "conceptId": "vla-behavioral-cloning",
+      "part": "A robot that acts by writing tokens",
+      "title": "For this robot, acting means predicting tokens — so every action has an exact probability",
+      "teaches": "A vision-language-action model outputs motor commands as discrete tokens, so it can assign a computable log-probability \\(\\log p(A|C)\\) to any candidate action, including the expert's.",
+      "requires": [],
+      "caption": "A VLA is a language model that sees a camera image plus an instruction — here, 'put the pepper in the basket' — and emits action tokens. C is what it sees; A is the expert's 7 action tokens — step through them and watch \\(\\log p(A|C)\\) accumulate.",
+      "visualMetaphor": "Left: a camera frame showing a red pepper, a basket, and a robot gripper, plus the task string as input context \\(C\\). Right: a strip of 7 empty token slots that decode into a drawn 10-step arm trajectory on the image. Below each filled slot, a probability bar; a running total displays \\(\\log p(A|C)\\) as the sum of per-token log-probabilities. Predict-before-reveal: before stepping, the reader is asked 'can the model score an action it did NOT choose itself?' — then a second candidate trajectory (a wrong swipe toward the bowl) is fed in and gets its own, much lower, log-probability, revealing that any action can be scored.",
+      "animatedVariable": {
+        "name": "token position",
+        "control": "buttons",
+        "range": "token 1 through token 7, then 'score a different action'",
+        "whatChangesOnScreen": "Each button press fills the next token slot, extends the drawn trajectory by a segment, adds that token's log-probability bar, and updates the running sum; the final button swaps in a wrong trajectory and shows its lower total."
+      },
+      "quantitativeAnchor": "7 discrete tokens encode a 10-step arm trajectory; training is behavioral cloning — maximize \\(\\log p(A|C)\\) over expert demonstrations, with no trial-and-error reward.",
+      "physicsChecks": [
+        "Every per-token log-probability is ≤ 0 and the running total equals their sum.",
+        "The expert trajectory's total \\(\\log p(A|C)\\) is visibly higher than the wrong candidate's.",
+        "The drawn trajectory grows by exactly one segment per token step, never retroactively changing earlier segments."
+      ]
+    },
+    {
+      "id": "cot-scratchpad",
+      "conceptId": "cot-as-computation",
+      "part": "A robot that acts by writing tokens",
+      "title": "Text written before the action changes the action's probability — for better or worse",
+      "teaches": "A reasoning trace \\(Z\\) emitted before the action tokens shifts the prediction from \\(p(A|C)\\) to \\(p(A|C,Z)\\), which can raise the expert action's probability but always costs inference time.",
+      "requires": [
+        "vla-action-tokens"
+      ],
+      "caption": "Now that every action has a score \\(\\log p(A|C)\\), watch what happens to that score when the model writes thoughts first. Predict before toggling: does more text always help?",
+      "visualMetaphor": "Same pepper scene and token strip as before, but a reasoning panel now sits between the image and the action tokens. A three-way toggle switches the panel between: (1) empty — no reasoning; (2) a short trace 'target: red pepper; move gripper left'; (3) a verbose template trace listing every object and justifying each step. Two gauges respond: \\(\\log p(A_{expert}|C,Z)\\) and per-step inference time. The short trace raises the gauge; the verbose trace raises time past 5 s and drops the probability gauge below the short trace's level — the surprise the prediction sets up.",
+      "animatedVariable": {
+        "name": "reasoning trace",
+        "control": "toggle",
+        "range": "none / short / verbose template",
+        "whatChangesOnScreen": "The reasoning panel's text changes; the expert-action log-probability gauge and the inference-time gauge move; with the verbose trace, an annotation notes the arm physically lags — grasped objects can slip during >5 s of generation."
+      },
+      "quantitativeAnchor": "Verbose template traces push inference above 5 seconds per control step on real hardware.",
+      "physicsChecks": [
+        "Inference time is strictly increasing with trace length across the three toggle states.",
+        "The short trace shows higher \\(\\log p(A_{expert}|C,Z)\\) than no reasoning; the verbose trace shows lower than the short trace.",
+        "The action tokens are visibly generated after the reasoning text, making the conditioning order the visible cause."
+      ]
+    },
+    {
+      "id": "grounding-gap",
+      "conceptId": "grounding-gap-circularity",
+      "part": "A robot that acts by writing tokens",
+      "title": "There is no answer key for a robot's thoughts",
+      "teaches": "Math and code reasoning can be verified against a final answer, but robot reasoning has no cheap verifier — so current systems fall back on rigid templates that are provably full of irrelevant content.",
+      "requires": [
+        "cot-scratchpad"
+      ],
+      "caption": "The last scene showed some thoughts help and some hurt — but how would we know which, in advance? Toggle between a math problem and our pepper task to see why the usual trick fails.",
+      "visualMetaphor": "Split panel. Left: a math word problem whose reasoning trace ends in '= 42', which a green checkmark verifier instantly grades against the known answer. Right: the pepper task's template trace — a numbered list of 12 visible objects (bowl, plate, cup, ...) of which exactly 1 (the pepper) matters — ending in action tokens and a gray question mark: grading requires running the robot. A counter under the right panel shows the baseline statistic: across template-generated traces, only 0.03% mention exclusively task-relevant objects. A circular-arrow diagram below names the chicken-and-egg: good policy needs good reasoning data; identifying good reasoning needs a good policy.",
+      "animatedVariable": {
+        "name": "domain",
+        "control": "toggle",
+        "range": "math problem / pepper task",
+        "whatChangesOnScreen": "The verifier icon flips between a checkmark (answer key exists) and a question mark (no oracle); the irrelevant objects in the robot trace highlight in red one by one."
+      },
+      "quantitativeAnchor": "In the template baseline's traces, only 0.03% mention exclusively task-relevant objects.",
+      "physicsChecks": [
+        "The math side always displays a definite pass/fail; the robot side never does.",
+        "11 of the 12 listed objects on the robot side highlight red (irrelevant), matching the 0.03% statistic's spirit.",
+        "The circular diagram has no external entry point — visually closing the loop the paper must break."
+      ]
+    },
+    {
+      "id": "reasoning-as-latent",
+      "conceptId": "reasoning-as-latent-variable",
+      "part": "Let the model grade its own thoughts",
+      "title": "Treat the right thought as a hidden variable between seeing and acting",
+      "teaches": "The paper models context \\(C\\) → latent reasoning \\(Z\\) → action \\(A\\), where \\(Z\\) is assembled from a menu of reasoning primitives, turning 'which thoughts help?' into 'which \\(Z\\) maximizes the evidence \\(\\log p(A|C)\\)?'",
+      "requires": [
+        "grounding-gap"
+      ],
+      "caption": "Since no external oracle exists, the paper turns inward: the good thought becomes a hidden variable \\(Z\\) to be inferred from the expert's action itself. Build candidate thoughts for the pepper task by toggling primitives — short reusable snippets like 'list the visible objects' or 'state the gripper position' — on and off.",
+      "visualMetaphor": "A three-node graphical model drawn left to right: \\(C\\) (the pepper camera frame + task string) → \\(Z\\) (a composable text box) → \\(A\\) (the 7 action tokens). Below \\(Z\\), a menu of labeled chips — Plan, Visible Objects, Subtask, Move, Gripper Position, Affordances, Explain — each of which, when toggled on, inserts its text into \\(Z\\). Above the diagram, the intractable target is written out: \\(\\log p(A|C) = \\log \\int p(A|C,Z)\\,p(Z|C)\\,dZ\\), with the integral annotated 'over every possible piece of text — uncountable, uncomputable directly'. A faint cloud of ghost traces behind \\(Z\\) makes the size of that space visible.",
+      "animatedVariable": {
+        "name": "primitive chips",
+        "control": "toggle",
+        "range": "each of 7 primitives independently on/off",
+        "whatChangesOnScreen": "The \\(Z\\) box's text recomposes from the active chips; a counter shows 2^7 = 128 on/off combinations, while the ghost cloud reminds the reader the true space (arbitrary wordings) is far larger."
+      },
+      "quantitativeAnchor": "The reasoning trace is assembled from a menu of candidate primitives (plan, visible objects, subtask, move description, gripper position, affordances, explanations), each written out as text by a foundation model.",
+      "physicsChecks": [
+        "The arrow structure never changes: \\(A\\) always depends on both \\(C\\) and \\(Z\\); \\(Z\\) depends only on \\(C\\).",
+        "Toggling any chip changes only the \\(Z\\) box's contents, not \\(C\\) or \\(A\\).",
+        "The integral expression stays on screen with the annotation that it cannot be computed directly — motivating the next scene."
+      ]
+    },
+    {
+      "id": "dropout-two-modes",
+      "conceptId": "dropout-warmstart-dual-model",
+      "part": "Let the model grade its own thoughts",
+      "title": "One model, two habits: predict thoughts forward, and explain actions in hindsight",
+      "teaches": "Randomly dropping primitives (action-blind, rate \\(d\\)) manufactures diverse training traces, and one model trained in two conditioning modes yields both the deployable prior \\(p(Z,A|C)\\) and a hindsight posterior \\(q(Z|C,A)\\) that proposes thoughts given the answer.",
+      "requires": [
+        "reasoning-as-latent"
+      ],
+      "caption": "To search the space of thoughts we need candidates and a way to score them; this initial finetuning pass builds both from the same demonstrations. Slide the dropout rate \\(d\\) and watch the trace variety it creates.",
+      "visualMetaphor": "Top: for one pepper demonstration, the 7 primitive chips each pass through an animated coin flip — kept with probability \\(1−d\\), grayed out otherwise — producing a stack of M varied synthetic traces, from empty to exhaustive. Bottom: one shared model box with two input wirings, side by side. Mode p (prior): sees \\(C\\), writes \\(Z\\), then \\(A\\) — labeled 'the robot we will deploy'. Mode q (posterior): sees \\(C\\) AND the correct \\(A\\), writes \\(Z\\) — labeled 'the hindsight explainer'. Predict-before-reveal prompt: 'why let a model peek at the answer?' — answer revealed on hover: hindsight proposals are far more likely to be useful thoughts, exactly what we need to sample. A banner notes the crucial symmetry: the coin flip never looks at \\(A\\), so both modes assign the same probability \\(1−d\\) to any primitive appearing.",
+      "animatedVariable": {
+        "name": "dropout rate d",
+        "control": "slider",
+        "range": "0.2 to 0.5",
+        "whatChangesOnScreen": "The fraction of grayed-out chips per synthetic trace changes; at d = 0.5 roughly half the chips survive each flip and the trace stack spans empty to full; the \\(1−d\\) label on both model modes updates in lockstep."
+      },
+      "quantitativeAnchor": "Dropout rates d = 0.2–0.5 are used across the paper's experiments; both \\(p\\) and \\(q\\) assign probability \\(1−d\\) to any primitive's inclusion — verified empirically in the paper.",
+      "physicsChecks": [
+        "At any slider position, the expected kept-fraction of chips visually matches \\(1−d\\).",
+        "The coin-flip animation has no wire from \\(A\\) — the action-blindness of dropout is visible, not asserted.",
+        "The two mode labels always display identical \\(1−d\\) values, foreshadowing the cancellation in the proposition scene."
+      ]
+    },
+    {
+      "id": "importance-weight-equation",
+      "conceptId": "importance-sampling",
+      "part": "Let the model grade its own thoughts",
+      "title": "The weight w = p/q is a self-computed quality score for a thought",
+      "teaches": "The importance weight \\(w(Z) = \\frac{p(Z,A|C)}{q(Z|C,A)}\\) corrects for sampling thoughts from the hindsight explainer instead of the true posterior, and it is large exactly when trace \\(Z\\) makes the expert action look probable.",
+      "requires": [
+        "dropout-two-modes"
+      ],
+      "caption": "We can now sample plausible thoughts from \\(q\\) — but \\(q\\) peeked at the answer, so its samples need correcting. This one equation is the correction, and every symbol in it is a number our two model modes can already compute.",
+      "visualMetaphor": "An equation scene: \\(w(Z_k) = \\frac{p(Z_k, A \\mid C)}{q(Z_k \\mid C, A)}\\) rendered large, with each symbol wired by a labeled line to its meaning — \\(Z_k\\): the k-th candidate thought (a text trace for the pepper task); \\(A\\): the expert's 7 action tokens; \\(C\\): image + task string; numerator: 'how probable the forward robot finds this thought AND the expert action together' (dimensionless probability); denominator: 'how eagerly the hindsight explainer proposed this thought' (dimensionless probability). A toggle highlights numerator vs denominator, each highlight accompanied by a one-line intuition: samples \\(q\\) over-produces get down-weighted, samples \\(q\\) under-produces get up-weighted, so the weighted average is unbiased — the \\(q\\)'s cancel inside the integral from the latent-variable scene.",
+      "animatedVariable": {
+        "name": "equation part highlight",
+        "control": "toggle",
+        "range": "numerator / denominator",
+        "whatChangesOnScreen": "The highlighted term glows along with its wired explanation and the corresponding model mode (p-mode or q-mode) from the previous scene; the intuition line beneath swaps accordingly."
+      },
+      "quantitativeAnchor": "\\(w(Z_k) = \\frac{p(Z_k, A \\mid C)}{q(Z_k \\mid C, A)}\\) — both numerator and denominator are exact token-level probabilities the model computes itself.",
+      "physicsChecks": [
+        "Every symbol in the equation has a visible label; no symbol appears unexplained.",
+        "The numerator highlight points at p-mode and the denominator highlight at q-mode from the prior scene, keeping the two-modes link visible.",
+        "The stated direction is checkable: raising \\(p(A|C,Z)\\) in the example raises \\(w\\); raising \\(q\\)'s eagerness lowers \\(w\\)."
+      ]
+    },
+    {
+      "id": "resample-refine",
+      "conceptId": "iwae-sir-refinement",
+      "part": "Let the model grade its own thoughts",
+      "title": "Sample K thoughts, weigh them, keep one — and more samples provably get closer to the truth",
+      "teaches": "For each demonstration, draw K candidate traces from \\(q\\), compute their weights, and resample one \\(Z^*\\) proportionally — a procedure whose evidence bound tightens monotonically as K grows (\\(\\mathcal{L}_{K+1} \\ge \\mathcal{L}_K\\)), converging to the true posterior over useful thoughts.",
+      "requires": [
+        "importance-weight-equation"
+      ],
+      "caption": "With the weight defined, refinement is a weighted lottery: draw K hindsight thoughts and keep one with probability proportional to its weight. \\(\\mathcal{L}_K\\) is a guaranteed lower estimate of \\(\\log p(A|C)\\), and it can only rise as K grows. Before sliding K up, predict which candidate wins for the pepper demo.",
+      "visualMetaphor": "A row of K cards, each a candidate trace for the same pepper demonstration (some verbose with object lists, some terse like 'grip pepper, lift, move left to basket'), each with a horizontal weight bar computed from the previous scene's formula. A roulette wheel below has slice areas proportional to the weights; pressing play spins it and stamps the winner \\(Z^*\\) into a growing 'refined dataset' tray. The reveal: a short, action-focused card carries the fattest bar — length isn't quality. A side chart plots the paper's evidence-bound ordering \\(\\mathcal{L}_1 \\le \\mathcal{L}_4 \\le \\mathcal{L}_{16} \\le \\log p(A)\\), with the empirical echo annotated: on the driving benchmark, collision rate falls monotonically with K and saturates near K = 16.",
+      "animatedVariable": {
+        "name": "number of candidates K",
+        "control": "slider",
+        "range": "1 to 16",
+        "whatChangesOnScreen": "More candidate cards appear with their weight bars; the roulette wheel gains slices; the side chart's bound marker climbs toward the \\(\\log p(A)\\) ceiling and flattens near K = 16."
+      },
+      "quantitativeAnchor": "K = 4–16 candidates in the paper's experiments; \\(\\mathcal{L}_K = \\mathbb{E}\\left[\\log\\frac{1}{K}\\sum_k \\frac{p(Z_k,A)}{q(Z_k|A)}\\right] \\le \\log p(A)\\), and driving collision rate decreases with K, saturating around K = 16.",
+      "physicsChecks": [
+        "The bound curve is monotone non-decreasing in K and never crosses the \\(\\log p(A)\\) ceiling line.",
+        "Roulette slice areas are visually proportional to the weight bars at every K.",
+        "At K = 1 the wheel is a single slice (no selection happens), correctly showing K = 1 recovers plain sampling from \\(q\\).",
+        "The winning card across many spins is most often the high-weight terse trace, not the longest one."
+      ]
+    },
+    {
+      "id": "kl-yardstick",
+      "conceptId": "kl-divergence-figure-of-merit",
+      "part": "Let the model grade its own thoughts",
+      "title": "KL divergence is the yardstick for 'how wrong is my policy'",
+      "teaches": "\\(D_{KL}(p_{data}\\|p_{model}) \\ge 0\\) measures the gap between what the expert does and what the policy would do, and shrinking it is identical to raising the average log-probability the model assigns to expert actions.",
+      "requires": [
+        "resample-refine"
+      ],
+      "caption": "Before we can prove the lottery selects the right thoughts, we need one yardstick for error in the policy — the model's rule mapping what it sees to an action. Drag the model's action distribution toward the expert's and watch the divergence fall to zero.",
+      "visualMetaphor": "An equation scene plus one small interactive. The equation \\(D_{KL}(p_{data}\\|p_{model}) = -H(p_{data}) - \\mathbb{E}_{A\\sim p_{data}}[\\log p_{model}(A)]\\) rendered with wired labels: \\(p_{data}\\) — the expert's distribution over pepper-grasp trajectories; \\(p_{model}\\) — the robot's; \\(H(p_{data})\\) — the expert's entropy, a constant we can't change. The annotation draws the key consequence in words: since the entropy term is fixed, minimizing KL ⇔ maximizing the familiar \\(\\log p(A|C)\\) from scene 1. Below, two overlaid bell-like curves over a 1-D slice of trajectory space (approach angle to the pepper), with a live KL readout; a slider shifts the model curve.",
+      "animatedVariable": {
+        "name": "model distribution offset",
+        "control": "slider",
+        "range": "far from expert to exactly matching",
+        "whatChangesOnScreen": "The model curve slides toward the expert curve; the KL readout decreases monotonically and hits exactly 0 when the curves coincide; the average \\(\\log p_{model}(A_{expert})\\) readout rises in lockstep."
+      },
+      "quantitativeAnchor": "\\(D_{KL} \\ge 0\\) always, with equality only when \\(p_{model} = p_{data}\\); the expert entropy \\(H(p_{data})\\) is constant, so KL and expert-action log-likelihood differ by a fixed offset.",
+      "physicsChecks": [
+        "KL readout is never negative anywhere on the slider.",
+        "KL is exactly 0 only at perfect overlap, and increases monotonically with offset.",
+        "The KL readout and the average log-probability readout always move in opposite directions by matching amounts."
+      ]
+    },
+    {
+      "id": "weights-are-benefit",
+      "conceptId": "weights-equal-information-benefit",
+      "part": "Let the model grade its own thoughts",
+      "title": "The lottery weights measure exactly how much a thought shrinks the policy's KL gap",
+      "teaches": "Because action-blind dropout makes the prior and posterior terms cancel, the log-ratio of average weights with vs without a primitive equals its information benefit \\(\\Delta\\mathcal{I}_R\\) — the KL reduction it buys — with zero external labels.",
+      "requires": [
+        "kl-yardstick",
+        "dropout-two-modes",
+        "resample-refine"
+      ],
+      "caption": "Here is the paper's proposition, and it hinges on the fact that dropout in the initial finetuning was random and never saw the action. Because of that, two terms cancel exactly — step through the cancellation and watch what's left.",
+      "visualMetaphor": "A derivation cascade in three button-stepped stages for a primitive R (say, 'Gripper Position') on the pepper task. Stage 1: the weight ratio \\(\\frac{\\mathbb{E}[w \\mid Z \\ni R]}{\\mathbb{E}[w \\mid Z \\not\\ni R]}\\) expanded into prior, posterior, and likelihood factors. Stage 2: the prior term \\(p(Z_R|C)\\) and posterior term \\(q(Z_R|C,A)\\) both light up with the value \\(1−d\\) from the warmstart scene and strike through — cancelled, with a callback arrow to the coin flip that never saw \\(A\\). Stage 3: only the likelihood ratio \\(\\frac{p(A|C,Z_R)}{p(A|C,Z_{\\emptyset R})}\\) remains; taking logs and averaging over expert actions yields \\(\\Delta\\mathcal{I}_R\\), glossed as 'the KL drop from scene 8 when the thought includes R'. Beside the cascade, a live bar chart: each primitive's log-preference in the refined dataset = \\(\\Delta\\mathcal{I}_R + \\log\\frac{1−d}{d}\\); helpful primitives (Gripper Position, Move) rise above the dashed dropout baseline, distracting ones (full object lists, verbose Explain) sink below, useless ones sit on it. A footnote misconception-buster: the weight never judges whether text is true or eloquent — only whether conditioning on it raises the expert action's probability. IMPLEMENTATION REQUIREMENT (a prior build only showed the cancellation during an ephemeral animation QA could not screenshot): the DEFAULT initial state must already render the cancellation statically — both the prior term \\(p(Z_R|C)\\) and the posterior term \\(q(Z_R|C,A)\\) displayed equal to \\(1-d\\) and struck through, with the surviving likelihood ratio beneath — so a first-time reader sees WHY the \\(q\\) term disappears without any interaction. Do not gate this step behind a play/expand button whose intermediate frame cannot be captured.",
+      "animatedVariable": {
+        "name": "derivation stage",
+        "control": "buttons",
+        "range": "expand / cancel / conclude",
+        "whatChangesOnScreen": "The cancellation is shown by default (both \\(1-d\\) terms struck through and the \\(q\\) term gone); the stage buttons replay the derivation and then activate the bar chart, sorting primitives above and below the dropout baseline."
+      },
+      "quantitativeAnchor": "\\(\\mathbb{E}_{A\\sim p_{data}}\\left[\\log\\frac{\\mathbb{E}[w \\mid Z\\in\\mathcal{Z}_R]}{\\mathbb{E}[w \\mid Z\\notin\\mathcal{Z}_R]}\\right] = \\Delta\\mathcal{I}_R\\); refined-dataset log-preference decomposes as \\(\\Delta\\mathcal{I}_R + \\log\\frac{1−d}{d}\\).",
+      "physicsChecks": [
+        "The two struck-through terms display identical values \\(1−d\\) before cancelling, with a visible callback to the action-blind coin flip.",
+        "After cancellation, no \\(q\\) term remains anywhere in the expression.",
+        "Primitives with \\(\\Delta\\mathcal{I}_R > 0\\) plot above the dashed baseline, \\(\\Delta\\mathcal{I}_R < 0\\) below, \\(\\Delta\\mathcal{I}_R = 0\\) exactly on it."
+      ]
+    },
+    {
+      "id": "bootstrap-results",
+      "conceptId": "bootstrap-efficiency",
+      "part": "The filtered diet wins",
+      "title": "Retraining on self-selected thoughts beats both baselines — while thinking half as much",
+      "teaches": "A fresh policy retrained on the resampled traces \\(Z^*\\) improves LIBERO-90 success from 75.9% (no reasoning) and 78.6% (all primitives) to 79.5–80.3% while cutting generated tokens from 256.8 to 129.3 and real-robot latency from >5 s to ≈3 s.",
+      "requires": [
+        "weights-are-benefit",
+        "cot-scratchpad"
+      ],
+      "caption": "The proposition said the lottery keeps only KL-shrinking thoughts; now retrain the pepper-task robot on them and face the two baselines from Part 1 on LIBERO-90, a suite of 90 simulated tabletop manipulation tasks. Predict first: does halving the reasoning cost any success?",
+      "visualMetaphor": "A grouped bar chart with three model columns — 'no reasoning' (75.9%), 'all primitives' (the template baseline, 78.6%), and 'refined' (79.5–80.3%, drawn as a bar with the range marked) — on the LIBERO-90 manipulation benchmark, the pepper task's home suite. A metric toggle re-renders the same three columns as average generated tokens (—, 256.8, 129.3) and as real WidowX per-step inference time (fastest, >5 s, ≈3 s), with an inset photo-style annotation: at >5 s the grasped pepper can slip from control lag. A bonus panel: because some warmstart traces were empty, the refined model zero-shot supports 'action forcing' — suppress reasoning entirely at test time and still act. IMPLEMENTATION REQUIREMENT (a prior build hid the token metric behind a 3-way metric toggle that QA could not fully capture): show all THREE meters — task success rate, tokens generated per step, and per-step latency — SIMULTANEOUSLY and always visible. Do NOT place metrics behind a toggle. The buttons switch only the POLICY (no reasoning / all primitives / refined); all three meters update together for the selected policy, so the token-halving (256.8 → 129.3, vs 10.0 for no reasoning) is visible with no extra clicks.",
+      "animatedVariable": {
+        "name": "metric shown",
+        "control": "buttons",
+        "range": "success rate / tokens generated / inference latency",
+        "whatChangesOnScreen": "The three bars re-scale to the selected metric with axis and units swapping; the refined column is tallest on success and roughly half the template column's height on tokens."
+      },
+      "quantitativeAnchor": "LIBERO-90 success: 75.9% → 78.6% → 79.5–80.3%; average generated tokens: 256.8 → 129.3; real-robot per-step inference: >5 s → ≈3 s.",
+      "physicsChecks": [
+        "On the success metric, the refined bar is strictly the tallest of the three.",
+        "On the tokens metric, refined ≈ half of the all-primitives bar (129.3 vs 256.8), and the no-reasoning column shows near zero.",
+        "Bar orderings are consistent across screenshots: more success does not come with more tokens for the refined model — the trade-off visibly breaks."
+      ]
+    },
+    {
+      "id": "pruned-distractors",
+      "conceptId": "embodiment-specific-distributions",
+      "part": "The filtered diet wins",
+      "title": "The filter keeps action-relevant thoughts, prunes junk, and that buys robustness",
+      "teaches": "Refinement measurably reshapes the reasoning diet — Visible Objects drops to ~20% frequency, exclusively task-relevant mentions jump from 0.03% to >25%, an injected junk primitive is cut to 36.7% — and the retrained model holds steady on cluttered scenes where the template baseline degrades 31%.",
+      "requires": [
+        "bootstrap-results",
+        "grounding-gap"
+      ],
+      "caption": "Where did the gains come from? Compare the reasoning diet before and after refinement. Then toggle on a cluttered scene unlike the training demos: a model that never learned to attend to distractors doesn't degrade there.",
+      "visualMetaphor": "Left: a per-primitive frequency chart with before/after paired bars for the pepper-task arm — Move and Gripper Position stay high, Visible Objects collapses to ~20%, and the verbose Explain primitives are heavily cut (the refined model prunes redundant justifications). A callout ties to the earlier statistic: exclusively task-relevant object mentions rise from 0.03% to >25%. Right: the pepper scene rendered twice — clean, then cluttered with extra distractor objects — with success bars for the template baseline vs the refined model; toggling clutter drops the baseline bar by 31% while the refined bar barely moves, because its attention (highlighted image regions) stays on the pepper and basket.",
+      "animatedVariable": {
+        "name": "scene clutter",
+        "control": "toggle",
+        "range": "clean scene / cluttered out-of-distribution scene",
+        "whatChangesOnScreen": "Distractor objects populate the image; the template baseline's success bar falls 31% and its attention highlights scatter across distractors; the refined model's bar and highlights stay fixed on the pepper and basket."
+      },
+      "quantitativeAnchor": "On cluttered out-of-distribution scenes the all-primitives template baseline degrades 31% (Fig. 7a) while the refined model holds. In the refined training distribution (Fig. 4a) Move and Gripper Position stay high and Visible Objects settles to ~20%; object-criticality rises from 0.03% to >25% (Fig. 5) — fewer objects listed, but the right ones.",
+      "physicsChecks": [
+        "Toggling to the cluttered scene drops the template baseline success bar materially (about −31%) while the refined model bar stays within a small band.",
+        "Under clutter, the template baseline attention highlights scatter onto distractor objects while the refined model attention stays on the pepper and basket.",
+        "In the frequency chart, Move and Gripper Position remain among the tallest bars and Visible Objects sits near 20%, with the 0.03% → >25% criticality callout beside the refined model listing fewer but task-relevant objects."
+      ]
+    },
+    {
+      "id": "embodiment-diets",
+      "conceptId": "embodiment-specific-distributions",
+      "part": "Why now, and what it unlocks",
+      "title": "Different bodies discover different thoughts — with no labels, from logged demos alone",
+      "teaches": "The identical self-grading loop discovers distinct optimal reasoning mixes for an arm, legged robots, and a driving VLA — 28%, 101%, and 21% headline gains respectively — which is exactly why no universal template could work and why label-free bootstrapping scales.",
+      "requires": [
+        "pruned-distractors",
+        "weights-are-benefit"
+      ],
+      "caption": "Everything so far ran on one arm and one pepper. Press the embodiment buttons: the same algorithm, unchanged, prescribes a different reasoning diet for each body. Over the no-reasoning baseline, the gains in task success are arm +28%, legs +101%, wheels +21% — no universal best template exists, which is why a self-grading filter had to replace hand-written ones.",
+      "visualMetaphor": "Three switchable columns of primitive-frequency bars, one per embodiment, each with a small icon and its headline number. Arm (the pepper task, our spine): keeps concise Move and Gripper Position, prunes Explain and object lists — 28% relative gain. Legged robots (four body types): Affordances — glossed inline as 'which terrain is steppable' — dominates; counterfactuals are dropped — 101% gain. Driving VLA: goals and constraints concentrate; collision rate falls 0.38% → 0.30%, a 21% cut. A closing strip states the enabling conditions in three bullets: actions are tokens, so \\(p(A|C,Z)\\) is exact and free; hindsight proposers \\(q\\) are just the same VLM re-wired; the whole loop consumes only logged expert demonstrations — no robot rollouts, no human ratings — so every existing demonstration dataset becomes reasoning-refinement fuel. IMPLEMENTATION REQUIREMENT (a prior build used the unglossed abbreviation VLA): the first on-screen appearance of VLA must be glossed as vision-language-action model (e.g. the driving tab reads 'Driving policy' with a one-line note 'VLA = vision-language-action model'); never show a bare VLA without a plain-word expansion.",
+      "animatedVariable": {
+        "name": "embodiment",
+        "control": "buttons",
+        "range": "robot arm / legged robots / driving VLA",
+        "whatChangesOnScreen": "The frequency bars re-rank to that embodiment's discovered diet, the icon and headline gain swap (28% / 101% / 21%), and the dominant primitive is highlighted with its one-line gloss."
+      },
+      "quantitativeAnchor": "Relative gains: manipulation 28%, legged locomotion 101%, driving 21% (collision rate 0.38% → 0.30%); the same algorithm and hyperparameter recipe across all three.",
+      "physicsChecks": [
+        "The top-ranked primitive differs across the three embodiments (Move/Gripper vs Affordances vs goals-and-constraints) — no single ordering repeats.",
+        "The driving column's collision numbers satisfy the stated 21% relative reduction (0.38% → 0.30%).",
+        "The closing strip lists exactly the label-free inputs (logged demos only) with no reward or human-rating source anywhere in the diagram."
+      ]
+    }
+  ]
+}

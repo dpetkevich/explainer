@@ -1,0 +1,348 @@
+{
+  "title": "How SimToolReal Works: One Robot Policy for Every Tool",
+  "hook": "A robot picks up a hammer it has never seen, spins it upright between its fingers, and drives a peg. That sounds like it needs task-specific training for every tool. SimToolReal shows it needs exactly one skill: move an object to a target pose. Train one network in simulation to push thousands of random fake tools to millions of random poses. Then hammering, sweeping, and pancake-flipping all fall out for free, because each one is just a sequence of poses for the tool to visit. This explainer follows a single 331-gram mallet from 'physically impossible for a standard gripper' to 'handled with no practice on that tool, by one network.'",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "One concrete task anchors everything: pick up a 331 g mallet lying flat on a table, rotate it upright, and strike. We first see why the standard gripper physically can't do it, why trial-and-error learning in simulation is the only viable way to control the hand that can, and why that learning approach then hits a wall: it seems to need a hand-written reward for every task."
+    },
+    {
+      "title": "The new technology",
+      "lede": "The wall falls with one reframing: from the mallet's point of view, hammering is nothing but a sequence of poses to reach. This part builds SimToolReal piece by piece on that idea — the universal goal, the one reward, the fake tools, the deliberately hostile simulation, the deliberately blind observations, and the single human video that supplies goals at test time."
+    },
+    {
+      "title": "Why it beats existing tech",
+      "lede": "With the full system in hand, we return to the alternatives from Part 1 — copying the human's hand motion, or grasping once and moving only the arm — and watch both fail on a task that requires rotating the tool inside the hand. Then we test whether the generalist gives up anything against policies trained on exactly one task."
+    },
+    {
+      "title": "Why now",
+      "lede": "The object-centric idea is simple; making it learnable at all took two training-time inventions that only pay off at massive simulation scale. We end with the result that makes the whole recipe scalable: the score on random fake-tool goals predicts real tool-use performance, so improving the cheap objective is the same as improving the robot."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "mallet-defeats-gripper",
+      "conceptId": "grasp-mechanics-force-closure",
+      "part": "The basic building blocks",
+      "title": "A two-jaw gripper physically cannot hold a swinging mallet",
+      "teaches": "Torques about the grip axis of a parallel-jaw gripper are resisted only by friction, which is bounded, while a five-fingered hand resists them geometrically with wrapped contacts.",
+      "requires": [],
+      "caption": "Meet the running example: the 331 g mallet from DexToolBench, the paper's benchmark of 24 real tool tasks. Nearly all of its mass sits in the head. Slide the grip force up. The friction torque ceiling \\(τ_{max} = μ·F·r\\) (handle radius r ≈ 1 cm) never reaches the torque a strike puts on the handle, so the mallet twists out of the jaws.",
+      "visualMetaphor": "Side-view diagram of a mallet handle pinched by two flat jaws along one axis. The head's weight and a strike impulse produce a red torque arrow about the grip axis. A bar chart compares 'torque the strike demands' (fixed red bar) against 'friction torque available' (blue bar that grows with the grip-force slider). Predict-before-reveal: 'How hard would you have to squeeze to hold this? Slide and find out.' At max squeeze the blue bar still falls short. A toggle swaps in a five-fingered hand wrapping the handle: contact-normal arrows now point directly against the torque, and the red-vs-blue comparison is replaced by 'resisted by geometry.'",
+      "animatedVariable": {
+        "name": "gripper squeeze force",
+        "control": "slider",
+        "range": "0 to 60 N, plus a two-jaw / five-finger toggle",
+        "whatChangesOnScreen": "The friction-torque bar grows linearly with squeeze force but never crosses the strike-torque line; toggling to the five-finger hand shows contact normals opposing the torque directly and the mallet holding firm."
+      },
+      "quantitativeAnchor": "331 g mallet with mass concentrated in the head; training later applies random torques up to 0.5 Nm — more than friction alone can absorb at realistic grip forces.",
+      "physicsChecks": [
+        "Friction torque increases linearly with the grip-force slider (μ·F·r), starting at zero.",
+        "At maximum slider value the friction bar remains visibly below the strike-torque line — the gripper never wins.",
+        "In five-finger mode, contact-normal arrows are drawn opposing the applied torque, making the geometric resistance visible rather than asserted.",
+        "The torque arrow's direction reverses if the strike direction is flipped, and the wrapped contacts still oppose it."
+      ]
+    },
+    {
+      "id": "policy-learns-by-trial",
+      "conceptId": "goal-conditioned-rl-policy",
+      "part": "The basic building blocks",
+      "title": "Nobody programs 29 joints — a policy learns them by trial and error in simulation",
+      "teaches": "A policy is a trainable function from sensed state plus a goal to motor commands, and reinforcement learning in a physics simulator lets it discover finger motions no engineer specifies.",
+      "requires": [
+        "mallet-defeats-gripper"
+      ],
+      "caption": "The hand that can hold the mallet has 22 joints, plus 7 in the arm — 29 in total, far too many to script. One tempting shortcut is to copy a human's hand motion joint by joint; hold that thought, because it returns as a baseline in Part 3. Instead, a policy — a neural network mapping sensed state and a goal to joint position targets — learns the joints by trial and error. 24,576 simulated copies of the robot try actions at once, and gradient updates make reward-earning actions more likely.",
+      "visualMetaphor": "Left: a labeled block diagram — inputs (joint angles, mallet pose, goal) flow into a box labeled 'policy π', which outputs 29 joint targets. Right: a zoomable grid of tiny simulated table-and-arm environments (24,576 of them, rendered as a dense mosaic), most dropping the mallet early on. A play-pause control advances training; a reward curve below rises as more mosaic tiles turn green (successful lifts). An annotation answers the obvious alternative: teleoperated human demonstrations fail here because operators feel no forces and human fingers don't map onto this hand.",
+      "animatedVariable": {
+        "name": "training time",
+        "control": "play-pause",
+        "range": "0 to billions of simulated timesteps",
+        "whatChangesOnScreen": "Early in training the mosaic is mostly red (drops and fumbles); as the reward curve climbs, tiles flip green and the featured environment shows the hand discovering a stable grasp on its own."
+      },
+      "quantitativeAnchor": "29 degrees of freedom (22-DoF hand + 7-DoF arm); 24,576 parallel simulated environments.",
+      "physicsChecks": [
+        "The reward curve is monotone-ish increasing with training time; the fraction of green tiles increases with it.",
+        "At timestep 0 the policy's actions are visibly random flailing, not a scripted motion.",
+        "The diagram shows the policy's output is joint position targets, not object positions — the network commands the robot, physics moves the mallet."
+      ]
+    },
+    {
+      "id": "one-reward-per-task-wall",
+      "conceptId": "object-centric-reduction",
+      "part": "The basic building blocks",
+      "title": "Trial-and-error learning needs a score — and every task seems to need its own",
+      "teaches": "The scalar reward defines the task, so the naive path to many tools is one hand-engineered reward per task, which does not scale.",
+      "requires": [
+        "policy-learns-by-trial"
+      ],
+      "caption": "The policy only learns what the reward pays for — so what pays for hammering? Flip through the tasks. The reward definition changes every time:\n- hammering rewards impact force at a target point\n- sweeping rewards debris crossing a line\n- pancake-flipping rewards a 180° rotation mid-air\nEach task demands its own hand-written reward. Each needs its own training run and its own debugging. That's the wall.",
+      "visualMetaphor": "Three panels, selected by buttons: mallet striking a peg, brush sweeping debris, spatula flipping a pancake. Under each, a 'reward function' card written in plain terms, visibly different in structure across tasks. A counter tallies 'policies to train: 1 per task per tool.' Predict-before-reveal prompt at the bottom: 'Is there one quantity all three tasks share? Look at what the TOOL does, not what the hand does.' The three tool trajectories are faintly overlaid as motion trails, hinting at the answer.",
+      "animatedVariable": {
+        "name": "task selection",
+        "control": "buttons",
+        "range": "hammer / sweep / flip",
+        "whatChangesOnScreen": "The scene swaps the tool, the demonstrated motion, and — crucially — the entire reward card, showing that the objective itself must be re-engineered per task."
+      },
+      "physicsChecks": [
+        "Each button press changes the reward card's structure, not just its numbers — the point is qualitative re-engineering.",
+        "The 'policies to train' counter increments per task, visualizing the scaling failure.",
+        "The faint tool-motion trails are drawn in the tool's frame for all three tasks, foreshadowing the shared structure."
+      ]
+    },
+    {
+      "id": "tool-use-is-pose-sequence",
+      "conceptId": "object-centric-reduction",
+      "part": "The new technology",
+      "title": "From the tool's point of view, every task is the same task: reach a sequence of poses",
+      "teaches": "All tool use reduces to moving the object through a sequence of 6D poses, so one goal-conditioned policy trained on random poses covers every task.",
+      "requires": [
+        "one-reward-per-task-wall"
+      ],
+      "caption": "Here is the shared quantity the last scene hinted at: the tool's 6D pose — its 3D position plus 3D orientation. Hammering is just the mallet visiting poses \\(g^1, g^2, ..., g^K\\), so the policy trains on exactly one objective: \\(a_t = π_θ(s_t, o_t, φ, g)\\). Its inputs are the robot's own joint readings \\(s_t\\) (proprioception), the current mallet pose \\(o_t\\), a grasp-region box \\(φ\\), and one goal pose \\(g\\). Reach the goal; whenever the pose distance drops below ε = 2 cm, advance to the next.",
+      "visualMetaphor": "Equation scene. Top: the equation \\(a_t = π_θ(s_t, o_t, φ, g)\\) with each symbol pinned to a labeled callout on a 3D scene — s_t points at the robot's joints, o_t at the mallet, φ at a wireframe box around the handle, g at a ghost mallet floating at the goal pose. Below, a strip of ghost mallets g¹…gᴷ traces a hammer swing. A toggle switches 'robot view' (hand and arm visible, motions look complicated) to 'tool view' (only the mallet and its ghost sequence — suddenly simple). Step buttons move through goals; a distance readout d shrinks, and when d < 2 cm the current ghost flashes and the next one activates. A side note: training goals are random poses, with consecutive goals differing by up to 90° of rotation.",
+      "animatedVariable": {
+        "name": "goal index k",
+        "control": "buttons",
+        "range": "g¹ through gᴷ along the hammering trajectory, plus robot-view/tool-view toggle",
+        "whatChangesOnScreen": "The active ghost pose changes, the live distance readout d counts down as the mallet approaches, and the goal advances exactly when d crosses 2 cm — the mechanism of the whole system, made visible."
+      },
+      "quantitativeAnchor": "Goal-advance threshold ε = 2 cm; training goals include rotation jumps up to 90° between consecutive poses.",
+      "physicsChecks": [
+        "The goal index never advances while d ≥ 2 cm and always advances the frame d drops below it.",
+        "In tool view, the hammer, sweep, and flip trajectories from the previous scene all render as the same kind of object — a pose sequence — with no per-task structure.",
+        "Every symbol in the equation has a visible callout; no symbol appears unlabeled.",
+        "The robot's finger motion in robot view differs from the human's — only the mallet's pose sequence is matched, not the hand motion."
+      ]
+    },
+    {
+      "id": "progress-only-reward",
+      "conceptId": "progress-only-reward",
+      "part": "The new technology",
+      "title": "One reward replaces all task rewards: pay only for new progress toward the goal pose",
+      "teaches": "Pose distance is measured as the worst mismatch among 4 keypoints rigidly attached to the object, and reward is paid only for beating the best distance achieved so far, plus a one-time success bonus.",
+      "requires": [
+        "tool-use-is-pose-sequence"
+      ],
+      "caption": "Now that every task is 'reach pose g,' one reward suffices: \\(r_{goal} = \\max(d^* - d, 0) + B_{succ}·𝕀[d < ε]\\). Here \\(d = \\max_i ‖o_{t,i} - g_i‖\\) is the worst of 4 keypoints attached to the mallet, \\(d^*\\) is the best distance achieved so far this episode, and \\(B_{succ} = 1000\\) pays once at success. Drag the mallet around and watch: hovering near the goal earns exactly zero — only beating your own record pays.",
+      "visualMetaphor": "Equation scene plus a sandbox. The equation sits on top with each term labeled: progress term, success bonus, keypoint distance. Below, a draggable mallet and a ghost goal mallet; 4 keypoint dots (corners of an elongated 0.14 × 0.03 × 0.03 m box) are drawn on both, with lines connecting each pair and the longest line highlighted red — that's d. A ratchet marker on a distance bar shows d* (best so far). Predict-before-reveal: 'Park the mallet 3 cm from the goal and wiggle it. What does it earn?' Answer: zero — the reward ticker only fires when d dips below the ratchet. Rotating the mallet about its long axis (roll) barely moves the keypoints; tilting it (pitch/yaw) moves them a lot — the elongated box makes pointing accuracy matter more than roll, exactly right for a mallet.",
+      "animatedVariable": {
+        "name": "mallet pose (drag position, rotate orientation)",
+        "control": "slider",
+        "range": "free 2D drag plus a rotation dial; d from ~30 cm down to 0",
+        "whatChangesOnScreen": "The red worst-keypoint line and the d readout update live; the reward ticker fires only when d beats the ratcheted d*, and a +1000 flash fires exactly once when d < 2 cm."
+      },
+      "quantitativeAnchor": "B_succ = 1000; success threshold ε = 2 cm; keypoint box 0.14 × 0.03 × 0.03 m.",
+      "physicsChecks": [
+        "Moving the mallet toward the goal and back yields reward on the approach only if it sets a new best d*; retreating and re-approaching over old ground pays zero.",
+        "d is visibly the maximum keypoint mismatch: the highlighted red line always connects the worst-matched pair.",
+        "Roll about the long axis changes d much less than an equal-angle pitch or yaw, because the box is elongated along that axis.",
+        "The +1000 bonus fires exactly once per episode, at the first frame d < 2 cm."
+      ]
+    },
+    {
+      "id": "fake-tools-cover-real-ones",
+      "conceptId": "procedural-primitive-tools",
+      "part": "The new technology",
+      "title": "The policy never trains on a real mallet — random handle-plus-head shapes cover it anyway",
+      "teaches": "Aggressively randomizing a crude two-part template (handle + perpendicular head, random sizes and densities) makes real tools interpolations within the training distribution, not extrapolations beyond it.",
+      "requires": [
+        "tool-use-is-pose-sequence"
+      ],
+      "caption": "The one reward needs objects to practice on — and the answer is not 3D scans of real tools. Hit 'randomize' and generate training objects from a template. Each is a handle (5–30 cm long, 1–4 cm thick, density 300–600 kg/m³) welded to a perpendicular head (1–15 cm × 0.5–12 cm, density 300–2000 kg/m³, up to metal). Then reveal where the real 331 g mallet lands in this space: comfortably inside the cloud.",
+      "visualMetaphor": "Left: a 3D viewport showing the current procedural object — box or capsule handle plus box or capsule head — with its center of mass marked, regenerated on each button press. Right: a scatter plot with axes 'handle length' vs 'center-of-mass offset toward the head'; every generated object adds a gray dot, building a cloud. Predict-before-reveal: 'Where will the real mallet land — inside or outside?' A reveal button drops a red star for the real mallet inside the cloud, plus stars for a marker and a spatula, also inside. Annotation: simple primitives also simulate fast and stably, which is what makes 24,576 parallel environments feasible.",
+      "animatedVariable": {
+        "name": "procedural sample",
+        "control": "buttons",
+        "range": "regenerate: handle 5–30 cm × 1–4 cm at 300–600 kg/m³; head 1–15 cm × 0.5–12 cm at 300–2000 kg/m³",
+        "whatChangesOnScreen": "A new random tool-like object appears with shifted proportions and center of mass, and a new dot lands on the scatter plot; after ~30 presses the cloud visibly spans the region where the real tools' stars sit."
+      },
+      "quantitativeAnchor": "Handle density 300–600 kg/m³ (wood/plastic) vs head density 300–2000 kg/m³ (up to metal) — the asymmetry that shifts centers of mass toward the head, like a real mallet.",
+      "physicsChecks": [
+        "The center-of-mass marker moves toward the head when head density or head size is sampled high — never toward the empty end of the handle.",
+        "All sampled dimensions stay within the stated ranges across many regenerations.",
+        "The real mallet's star falls inside the convex region of the sampled cloud, not on its fringe.",
+        "Generated objects are always exactly two primitives at a perpendicular joint — the template never grows extra parts."
+      ]
+    },
+    {
+      "id": "simulation-harder-than-reality",
+      "conceptId": "sim-to-real-gap",
+      "part": "The new technology",
+      "title": "Training deliberately makes simulation worse than reality, so reality is easy",
+      "teaches": "Domain randomization — sampling noise, delays, and physical perturbations every episode — makes the policy indifferent to the ways simulation is wrong, which is what zero-shot transfer requires.",
+      "requires": [
+        "fake-tools-cover-real-ones"
+      ],
+      "caption": "A policy trained on those primitives in one clean simulated world would still fail on hardware. Real friction, latency, and sensing never match the simulator — the sim-to-real gap. So every episode randomizes the world. Flip the perturbations on:\n- pose estimates corrupted by up to 1 cm and 5°\n- pose readings delayed up to 10 timesteps\n- actions delayed up to 3 timesteps\n- table height shifted ±1 cm\n- random 5 N forces and 0.5 Nm torques yanking the held mallet\nA policy that survives all of this treats the real world as one more sample from the distribution.",
+      "visualMetaphor": "A side-by-side comparison of two simulated hands, each holding a procedural mallet under the SAME randomized perturbation, shown as a STATIC end state (no transient animation, no trigger button). A static red 5 N shove arrow strikes each mallet, and a lagging, jittering 'sensed pose' ghost sits offset from the true mallet. LEFT panel — fragile (clean-trained) policy: the mallet has been knocked loose and lies dropped below the hand, labeled 'dropped after the 5 N shove'. RIGHT panel — robust (randomized-trained) policy: the fingers have tightened and re-centered the handle, mallet retained, labeled 'held — the shoves taught it a stable grasp'. A master toggle 'perturbations' switches between the clean world (both panels hold the mallet, the ghost coincides with the true pose, no shove arrow) and the randomized world (the dropped-vs-held contrast). IMPLEMENTATION REQUIREMENT (two prior builds failed because the shove was a transient event or hidden behind a trigger button that QA could not capture): render the fragile-drop vs robust-hold contrast as a STATIC end state that is fully visible in a single screenshot the moment perturbations are on — do not require any click, timed animation, or shove-trigger, and do not leave both panels 'holding steady'.",
+      "animatedVariable": {
+        "name": "perturbations on/off",
+        "control": "toggle",
+        "range": "clean world ↔ randomized world (1 cm/5° pose noise, 10-step observation delay, 3-step action delay, ±1 cm table, 5 N / 0.5 Nm shove)",
+        "whatChangesOnScreen": "Toggling to the randomized world adds the static shove arrow and decouples the sensed-pose ghost, and the two panels diverge to their end states: the left (fragile) mallet is shown dropped, the right (robust) mallet is shown held."
+      },
+      "quantitativeAnchor": "Perturbations up to 5 N of force and 0.5 Nm of torque on the held object — the same 0.5 Nm that defeated the two-jaw gripper's friction budget in the first scene.",
+      "physicsChecks": [
+        "In the clean world both panels hold the mallet and the sensed-pose ghost coincides with the true pose, with no shove arrow shown.",
+        "In the randomized world the left (fragile) panel shows the mallet dropped while the right (robust) panel shows it retained — the contrast is visible in a single static view with no interaction.",
+        "The sensed-pose ghost in the randomized world lags by a bounded offset (≤ 1 cm, ≤ 5°) and delay (≤ 10 timesteps).",
+        "The shove is drawn as a static 5 N arrow at each mallet, and perturbation magnitudes never exceed their stated bounds."
+      ]
+    },
+    {
+      "id": "blind-on-purpose",
+      "conceptId": "minimal-observation-lstm",
+      "part": "The new technology",
+      "title": "The policy is nearly blind on purpose: it sees a pose, a box, and remembers the rest",
+      "teaches": "Restricting observations to what real perception can reliably deliver — pose, goal, a coarse grasp box, proprioception — and adding recurrent memory lets one network run identically on simulated primitives and real tools.",
+      "requires": [
+        "simulation-harder-than-reality"
+      ],
+      "caption": "Surviving a noisy world is half the transfer story; the other half is never depending on inputs reality can't provide. The policy receives only proprioception (29 joint positions and velocities, plus fingertip positions), the mallet's 6D pose, the goal pose, and one coarse 3D bounding box over the handle. No images, no mesh, no mass, no friction. An LSTM — a recurrent network that carries memory across timesteps — fills the gap. Watch its estimate of the mallet's heft sharpen after each shove, the way you'd shake an unfamiliar hammer to feel it.",
+      "visualMetaphor": "A two-column ledger. 'What the policy sees': proprioception, object 6D pose, goal pose, handle bounding-box keypoints relative to the palm — each drawn on the 3D scene. 'What it never sees': camera image, exact mesh, mass, friction, center of mass — rendered and then struck through. Below, a memory demo with a toggle: a plot of the network's implicit estimate of head mass over time (decoded from its hidden state). With memory ON, each interaction event (a lift, a shove) visibly narrows the estimate toward the true 331 g; with memory OFF (hidden state zeroed each step), the estimate stays flat and wrong, and the simulated grasp is correspondingly clumsier. Predict-before-reveal: 'Less input sounds like a handicap — before toggling, guess which version transfers to a real camera.'",
+      "animatedVariable": {
+        "name": "memory on/off",
+        "control": "toggle",
+        "range": "LSTM hidden state carried across time ↔ zeroed every step",
+        "whatChangesOnScreen": "With memory on, the mass-estimate band contracts after each interaction event and the grip adapts; with memory off, the band never contracts and the hand over- or under-grips the head-heavy mallet."
+      },
+      "quantitativeAnchor": "Observation vector: 29 joint positions and velocities plus fingertip positions, one 6D object pose, one 6D goal pose, one bounding box — and nothing else.",
+      "physicsChecks": [
+        "The mass-estimate band only narrows at moments of physical interaction (lift, shove), never while the mallet sits untouched — inference comes from action, not from seeing.",
+        "With memory off, the estimate is time-invariant, confirming that adaptation lives entirely in the recurrent state.",
+        "Every input in the 'sees' column is drawn on the 3D scene; every struck-through item is absent from it.",
+        "The bounding box is coarse (a wireframe around the whole handle), never a detailed mesh."
+      ]
+    },
+    {
+      "id": "one-video-becomes-goals",
+      "conceptId": "video-to-goals-pipeline",
+      "part": "The new technology",
+      "title": "One human video supplies everything the policy needs: a goal sequence and a grasp box",
+      "teaches": "Off-the-shelf perception models convert a single RGB-D video of a human using the tool into exactly the pose sequence and bounding box the policy was trained to consume, with zero task-specific training.",
+      "requires": [
+        "tool-use-is-pose-sequence",
+        "blind-on-purpose"
+      ],
+      "caption": "The policy consumes goal poses and a grasp box — so at deployment, one RGB-D video (color plus per-pixel depth) of a human hammering supplies both. Step through the pipeline. First, a 3D mesh is reconstructed from the first frame; the depth map fixes its true metric scale. Second, the handle is segmented from the head to define the grasp box. Third, a pose tracker follows the mallet through the video, yielding the goal sequence \\(g^1...g^K\\) at 3 Hz. At run time the same tracker feeds the live pose at 30 Hz. Fittingly, this is now the weakest link: 43.7% of real-world failures were tracking losses, not manipulation errors.",
+      "visualMetaphor": "A horizontal pipeline diagram with step buttons, each stage lighting up on the running mallet example: (1) a video frame plus its depth map → reconstructed 3D mallet mesh (labeled 'metric scale from depth'); (2) the mesh split into handle (highlighted, becomes the bounding box φ) and head; (3) the video playing with a tracked 6D pose overlay, emitting a strip of ghost goal poses (labeled '3 Hz, trimmed to start once the mallet lifts 10 cm'); (4) the live robot loop, tracker running at 30 Hz feeding o_t back to the policy. A final annotation panel: failure breakdown pie with the 43.7% tracking-loss slice highlighted, with icons for its causes — occlusion, symmetry, low contrast. IMPLEMENTATION REQUIREMENT (a prior build hung QA — the screenshot timed out at 30s because the page never settled): the scene MUST reach a stable, fully-painted state within ~1 second and stay there. Do NOT run any perpetual or looping animation, requestAnimationFrame loop, playing video, or long-running timer that keeps the page repainting. Represent the 'video playing' and the 'live 30 Hz loop' as STATIC labeled diagrams — a filmstrip of a few frames with the 6D-pose overlay drawn on, and a closed-loop diagram labeled '30 Hz' — not continuous motion. Any motion must be short and self-completing (< 1s) or advanced only by the stage buttons, and on load all four stages may be shown at rest so the end state is screenshot-able.",
+      "animatedVariable": {
+        "name": "pipeline stage",
+        "control": "buttons",
+        "range": "4 stages: reconstruct mesh → segment handle → track poses from video → track live at run time",
+        "whatChangesOnScreen": "Each press lights the next stage and renders its concrete output on the mallet — mesh, wireframe grasp box, ghost goal strip, then the closed live loop."
+      },
+      "quantitativeAnchor": "Goal trajectory downsampled to 3 Hz; live pose tracking at 30 Hz; 43.7% of real-world failures were pose-tracking losses.",
+      "physicsChecks": [
+        "The outputs of stages 2 and 3 are exactly the inputs φ and g¹…gᴷ defined in the equation scene — same symbols, same rendering.",
+        "The goal strip begins only after the mallet has lifted 10 cm in the video, never at the resting pose.",
+        "The live loop runs at a visibly higher rate (30 Hz pose updates) than the goal strip's 3 Hz spacing.",
+        "No stage takes task-specific training data as input — every box is labeled 'off-the-shelf'."
+      ]
+    },
+    {
+      "id": "baselines-cannot-rotate-in-hand",
+      "conceptId": "why-baselines-fail",
+      "part": "Why it beats existing tech",
+      "title": "Copying the hand or locking the grasp both fail — the tool must rotate inside the hand",
+      "teaches": "Kinematic retargeting ignores contact forces and never grasps, and fixed-grasp planning cannot reorient the tool without in-hand motion, which is why SimToolReal's learned in-hand rotation wins by 37%.",
+      "requires": [
+        "one-video-becomes-goals",
+        "mallet-defeats-gripper"
+      ],
+      "caption": "Two standard alternatives skip learning entirely. The first is the shortcut shelved in Part 1: kinematic retargeting, which geometrically copies the human's finger and wrist trajectory onto the robot. The second grasps once, then optimizes an arm-only trajectory with the grip fixed. Run both on the same video-derived goals. The tool starts sideways and needs a 90° rotation:\n- retargeting never establishes a stable grasp, because geometry says nothing about forces — 0% success on this task\n- the fixed-grasp planner grabs once, then finds no collision-free arm path that rotates the tool while tracking the goals; it hits the table or misses the poses\nSimToolReal rotates the tool between its fingers, decoupling tool orientation from arm orientation. It succeeds where both fail — part of its 37% overall improvement.",
+      "visualMetaphor": "Three side-by-side simulated runs of the same task (tool lying sideways, ghost goals requiring a 90° reorientation), selected by buttons. Retargeting: the robot hand mimes the human motion in the air while the tool never leaves the table — a 'contact force: 0 N' readout makes the cause visible. Fixed grasp: the tool is held rigidly; a sweep of candidate arm paths renders, each one flagged red where it either collides with the table or exceeds pose error — the feasibility set is visibly empty. SimToolReal: fingers walk the handle, the tool rotates 90° within the palm while the wrist barely moves, goals tick off one by one. A human-hand inset notes: this is why you regrip a hammer after picking it up instead of contorting your arm.",
+      "animatedVariable": {
+        "name": "method selection",
+        "control": "buttons",
+        "range": "kinematic retargeting / fixed grasp + trajectory optimization / SimToolReal",
+        "whatChangesOnScreen": "The same goal sequence plays under each method: no contact and no lift, then an empty set of feasible arm paths, then finger-gait rotation with goals advancing."
+      },
+      "quantitativeAnchor": "Retargeting: 0% success on both variants of the brush task; SimToolReal succeeds in both, and beats fixed-grasp and motion-copying baselines by 37% overall.",
+      "physicsChecks": [
+        "In the retargeting run, the contact-force readout stays at 0 N and the tool's pose never changes — the failure cause is visible, not asserted.",
+        "In the fixed-grasp run, every candidate arm path is flagged with a specific violation (table collision or pose error), and the tool's orientation relative to the palm never changes.",
+        "In the SimToolReal run, the tool rotates ~90° relative to the palm while the wrist orientation changes far less — decoupling made visible.",
+        "All three runs consume the identical goal-pose strip from the previous scene."
+      ]
+    },
+    {
+      "id": "generalist-vs-specialists",
+      "conceptId": "generalist-beats-specialists",
+      "part": "Why it beats existing tech",
+      "title": "The generalist matches each specialist at home — and specialists shatter one step away",
+      "teaches": "Training on thousands of random shapes and goals costs nothing on any single task but buys all the generalization, because the specialist memorizes an instance while the generalist learns the skill.",
+      "requires": [
+        "baselines-cannot-rotate-in-hand"
+      ],
+      "caption": "The claim to test: the generalist ties each specialist on its own task, and the specialist fails under any change to trajectory or object. The fairest possible rival is a specialist: same architecture, same reward, but trained on exactly one tool and one trajectory. Predict before pressing: does the specialist win on its home task? Press through the three conditions:\n- home task: they tie\n- change only the trajectory: the specialist tracks just the first few lift-off goals\n- change only the object instance (red brush → blue brush): it collapses further\nThe generalist barely moves across all three.",
+      "visualMetaphor": "A paired bar chart (task progress: fraction of goal poses reached) with two bars per condition — specialist vs SimToolReal — and buttons selecting the condition: 'same object + same trajectory', 'same object + new trajectory', 'new object instance + same trajectory'. Above the chart, small renders show exactly what changed (a different ghost-goal strip, or a recolored/reshaped brush). The predict-before-reveal moment is explicit for condition 1. A footer panel grounds it in hardware: 120 real-robot rollouts across 24 unseen tasks, with a small clip-strip showing the same recovery behavior — regrasping a dropped tool — appearing across different tools.",
+      "animatedVariable": {
+        "name": "evaluation condition",
+        "control": "buttons",
+        "range": "home task / new trajectory / new object instance",
+        "whatChangesOnScreen": "The specialist's bar drops sharply as the condition steps away from its training slice; the generalist's bar stays roughly level across all three."
+      },
+      "quantitativeAnchor": "6 specialist policies trained; SimToolReal evaluated zero-shot; real-world validation: 120 rollouts across 24 unseen tool tasks.",
+      "physicsChecks": [
+        "In condition 1 the two bars are approximately equal — the generalist gives up essentially nothing on the specialist's home turf.",
+        "The specialist's bar strictly decreases from condition 1 to 2 to 3; the generalist's bar stays approximately constant.",
+        "The render above the chart changes only the one factor named by the button — trajectory or object instance, never both.",
+        "The specialist's partial progress in condition 2 corresponds to early lift-off goals only, shown by which ghosts are ticked."
+      ]
+    },
+    {
+      "id": "training-at-24576-environments",
+      "conceptId": "rl-training-at-scale",
+      "part": "Why now",
+      "title": "Two training tricks keep learning alive at 24,576 environments — remove either and it collapses",
+      "teaches": "SAPG splits the environments into blocks driven by diverse policies whose experience is fused into a leader, and a privileged critic (discarded at deployment) guides the deliberately blind actor — ablate either and training reward collapses.",
+      "requires": [
+        "policy-learns-by-trial",
+        "blind-on-purpose"
+      ],
+      "caption": "Everything so far assumed the 24,576-environment training run actually learns — at this scale, plain training does not. Two fixes are load-bearing; toggle each off and watch the reward curve collapse (Fig. 8):\n- SAPG splits the environments into blocks of 4,096, each driven by its own policy for exploration diversity. A leader policy learns from all of their experience, with each sample's gradient reweighted to correct for coming from a different policy than the leader. Without this, one policy's experience goes redundant and exploration saturates.\n- The critic — the training-time network that estimates 'how good is this state?' — gets privileged, noise-free simulator state: exact velocities, true pose, grasp status. The actor (the policy itself, the network that acts) sees only noisy, delayed observations, which make value estimation nearly impossible. The critic is discarded before deployment, so no privileged data ever reaches the robot.",
+      "visualMetaphor": "Left: an architecture diagram — the environment mosaic from the earlier training scene, now partitioned into 6 colored blocks of 4,096, each feeding its own small policy, with importance-weighted arrows converging on a 'leader' policy. Below it, an actor/critic split: the actor's input list (the impoverished observation ledger from the blind-on-purpose scene) beside the critic's input list (ground-truth simulator state, stamped 'training only — discarded at deployment'). Right: a training-reward chart with two ablation toggles; flipping 'no SAPG' or 'no privileged critic' overlays the corresponding collapsed curve in red against the healthy curve.",
+      "animatedVariable": {
+        "name": "ablation toggles",
+        "control": "toggle",
+        "range": "full method / no SAPG / no privileged critic",
+        "whatChangesOnScreen": "Each ablation overlays a reward curve that flattens or collapses, while the full method's curve keeps rising — the diagram dims the removed component so cause and effect are linked."
+      },
+      "quantitativeAnchor": "24,576 environments split into blocks of 4,096, each with its own exploration policy.",
+      "physicsChecks": [
+        "Both ablated curves end far below the full method's curve, matching the qualitative collapse in Fig. 8.",
+        "The critic's privileged inputs are visually stamped as training-only, and the deployment box contains the actor alone.",
+        "The block partition sums correctly: 6 × 4,096 = 24,576.",
+        "Toggling an ablation dims exactly the corresponding diagram component while its red curve appears."
+      ]
+    },
+    {
+      "id": "training-curve-predicts-reality",
+      "conceptId": "objective-predicts-generalization",
+      "part": "Why now",
+      "title": "Getting better at fake-tool goal-reaching IS getting better at real tool use",
+      "teaches": "Across training checkpoints, reward on random goals with procedural primitives and zero-shot progress on held-out real tool tasks rise in lockstep, validating that the cheap universal objective is a reliable proxy for downstream capability.",
+      "requires": [
+        "training-at-24576-environments",
+        "generalist-vs-specialists"
+      ],
+      "caption": "The final test of the object-centric bet compares two curves with no obvious reason to agree. One is reward on random poses with fake handle-plus-head objects; the other is task progress on held-out DexToolBench tools the network never trained on, following human-demonstrated trajectories. Scrub the checkpoint slider: they rise in lockstep. Different objects, different goal structure, same curve. The randomized primitive curriculum covers the skill space real tool use draws from — scaling the cheap objective directly buys real capability.",
+      "visualMetaphor": "A dual-axis chart versus environment steps: blue curve = training-objective reward (random goals, procedural primitives), orange curve = zero-shot DexToolBench task progress (real tool meshes, human-demonstrated pose sequences). A checkpoint slider moves a vertical cursor; at each position, two inset panels show that checkpoint's behavior — left inset: the policy manipulating a random primitive to a random pose; right inset: the same frozen network executing the mallet-hammering goal sequence from the video pipeline. Predict-before-reveal: 'The test distribution differs in both objects and goals — do you expect the orange curve to lag, plateau, or track?' The lockstep tracking is the reveal. A closing annotation: this is why one network handles 24 unseen real tasks 37% better than prior methods — and why the next bottleneck is perception (the 43.7% tracking-loss slice), not manipulation.",
+      "animatedVariable": {
+        "name": "training checkpoint",
+        "control": "slider",
+        "range": "early training to final checkpoint (environment steps)",
+        "whatChangesOnScreen": "The cursor sweeps both curves rising together, and the two insets improve in tandem — clumsy on both early, fluent on both late, never fluent on one and clumsy on the other."
+      },
+      "quantitativeAnchor": "Final system: 24 unseen real-world tool tasks, 120 rollouts, 37% improvement over fixed-grasp and motion-copying baselines — all from a policy that never saw a real tool in training.",
+      "physicsChecks": [
+        "Both curves are increasing over the slider's range and their ranks across checkpoints match — no checkpoint is high on one curve and low on the other.",
+        "The insets' qualitative competence (grasp acquired, goals ticking) visibly co-varies with the curves at every cursor position.",
+        "Axis labels state the distribution mismatch explicitly: primitives + random poses on one curve, real meshes + demonstrated trajectories on the other.",
+        "The closing annotation's numbers (24 tasks, 120 rollouts, 37%, 43.7%) match those established in earlier scenes."
+      ]
+    }
+  ]
+}

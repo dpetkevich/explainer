@@ -1,0 +1,3341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Robots Learn Which Thoughts Are Worth Thinking</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How Robots Learn Which Thoughts Are Worth Thinking</h1>
+  <p class="hook">Robot AIs can now write out their reasoning in plain text — 'the target is the red pepper; move the gripper left' — before moving an arm. But unlike a math problem, a robot's thoughts have no answer key. So today's systems force the robot to recite rigid templates. Those templates are mostly noise, and they add seconds of lag to every motion. This paper found a way for the robot to grade its own thoughts, using nothing but the probability it assigns to what a human expert actually did. The result: a robot that succeeds more often while thinking half as much.</p>
+  <p class="page-links"><a href="https://arxiv.org/html/2602.08167" target="_blank" rel="noopener noreferrer">Self-Supervised Bootstrapping of Action-Predictive Embodied Reasoning (R&amp;B-EnCoRe)</a><span class="sep"> · </span><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.1.0 · Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations</span></p>
+
+
+<header class="part">
+  <h2>A robot that acts by writing tokens</h2>
+  <div class="part-lede">Meet the running example — a robot arm told to 'put the pepper in the basket' — and see why, for this kind of AI, every possible action has a computable probability. That single fact powers everything that follows; the part ends on the problem it can't yet solve.</div>
+</header>
+<section class="scene" id="vla-action-tokens">
+  <h3>For this robot, acting means predicting tokens — so every action has an exact probability</h3>
+  <div class="caption">A VLA is a language model that sees a camera image plus an instruction — here, 'put the pepper in the basket' — and emits action tokens. C is what it sees; A is the expert's 7 action tokens — step through them and watch <math><mi>log</mi><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>)</mo></math> accumulate.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="vla-action-tokens"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>VLA action tokens</title>
+<style>
+  :root{
+    --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1a; --muted:#6b6f76;
+    --accent:#2563eb; --wrong:#c65a1e; --pepper:#c1272d; --basket:#8a5a35;
+    --bowl:#3d7ea6; --grip:#555555; --slotbg:#eef0f3; --slotfill:#dfe6f5;
+    --border:#cccccc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171c; --panel:#1e2128; --text:#e8e8ea; --muted:#9aa0aa;
+      --accent:#6fa2ff; --wrong:#ff9a52; --pepper:#ff6b6b; --basket:#c9975f;
+      --bowl:#6fb8e0; --grip:#bbbbbb; --slotbg:#2a2e37; --slotfill:#31405c;
+      --border:#3a3f4a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:10px;display:flex;flex-wrap:wrap;gap:10px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:10px;flex:1 1 300px;min-width:290px;}
+  canvas{width:100%;max-width:320px;height:auto;display:block;margin:0 auto;}
+  .instr{font-size:12px;color:var(--muted);margin-top:6px;text-align:center;}
+  .prompt{font-size:12px;margin-top:8px;padding:6px;border:1px dashed var(--border);
+    border-radius:6px;color:var(--text);min-height:34px;}
+  math{font-size:16px;}
+  .math-wrap{text-align:center;margin:2px 0 4px;}
+  ul.legend{list-style:none;margin:2px 0 8px;padding:0;font-size:11px;color:var(--muted);}
+  ul.legend li{margin:1px 0;}
+  .strip-title{font-size:11px;color:var(--muted);margin:6px 0 2px;}
+  .tokenstrip,.wrongrow{display:flex;gap:4px;justify-content:space-between;}
+  .slot{flex:1 1 0;text-align:center;}
+  .bar-box{height:44px;display:flex;align-items:flex-end;justify-content:center;
+    background:var(--slotbg);border-radius:3px;}
+  .bar{width:60%;background:var(--accent);border-radius:2px 2px 0 0;}
+  .wrongrow .bar{background:var(--wrong);}
+  .slot .dim{font-size:9px;color:var(--muted);margin-top:2px;}
+  .slot .val{font-size:10px;}
+  .slot .lp{font-size:9px;color:var(--muted);}
+  .readouts{margin-top:8px;font-size:12px;line-height:1.6;}
+  .readouts b{color:var(--text);}
+  .controls{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;}
+  .slider-wrap{flex:1 1 100%;}
+  .slider-wrap label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
+  input[type=&quot;range&quot;]{width:100%;}
+  button{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button:disabled{opacity:0.5;cursor:default;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;320&quot; height=&quot;230&quot;></canvas>
+    <div class=&quot;instr&quot;>Instruction (part of context <i>C</i>): &quot;put the pepper in the basket&quot;</div>
+    <div class=&quot;prompt&quot; id=&quot;prompt&quot;></div>
+  </div>
+  <div class=&quot;panel&quot;>
+    <div class=&quot;math-wrap&quot;>
+      <math display=&quot;block&quot;>
+        <mrow>
+          <mi>log</mi><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>)</mo>
+          <mo>=</mo>
+          <munderover><mo>&amp;#8721;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mn>7</mn></munderover>
+          <mi>log</mi><mi>p</mi><mo>(</mo><msub><mi>a</mi><mi>i</mi></msub><mo>|</mo><mi>C</mi><mo>,</mo>
+          <msub><mi>a</mi><mrow><mo>&amp;lt;</mo><mi>i</mi></mrow></msub><mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <ul class=&quot;legend&quot;>
+      <li><b>A</b> — the full action: 7 tokens a<sub>1</sub>…a<sub>7</sub></li>
+      <li><b>C</b> — context: camera image + instruction text</li>
+      <li><b>a<sub>i</sub></b> — the i-th action token (an integer bin, 0–255)</li>
+      <li><b>a<sub>&amp;lt;i</sub></b> — all tokens generated before token i</li>
+      <li><b>p</b> — probability the model assigns, from its output distribution</li>
+    </ul>
+    <div class=&quot;strip-title&quot;>Expert action tokens a (7 dims of a 7‑DoF end-effector command)</div>
+    <div class=&quot;tokenstrip&quot; id=&quot;tokenstrip&quot;></div>
+    <div class=&quot;strip-title&quot; id=&quot;wrongTitle&quot; style=&quot;display:none;&quot;>Alternative candidate a′ (wrong swipe toward bowl)</div>
+    <div class=&quot;wrongrow&quot; id=&quot;wrongrow&quot;></div>
+    <div class=&quot;readouts&quot;>
+      <div>Tokens revealed: <b id=&quot;rTok&quot;>0/7</b></div>
+      <div>This token's log p(a<sub>i</sub>|C): <b id=&quot;rCur&quot;>—</b></div>
+      <div>Running total log p(A|C): <b id=&quot;rTotal&quot;>0.00</b></div>
+      <div>Alternative total log p(A′|C): <b id=&quot;rAlt&quot;>—</b></div>
+    </div>
+    <div class=&quot;controls&quot;>
+      <div class=&quot;slider-wrap&quot;>
+        <label for=&quot;stepSlider&quot;>Reveal step (0 = nothing shown, 1–7 = reveal expert tokens one by one, 8 = score the wrong swipe action)</label>
+        <input type=&quot;range&quot; id=&quot;stepSlider&quot; min=&quot;0&quot; max=&quot;8&quot; step=&quot;1&quot; value=&quot;0&quot;>
+      </div>
+      <button id=&quot;btnReset&quot;>Reset</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const cs = getComputedStyle(document.documentElement);
+  const col = n => cs.getPropertyValue(n).trim();
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- toy VLA token model ----
+  const V = 256;          // vocabulary size: bins per action dimension
+  const SIGMA = 6;        // bins: spread of the model's predicted distribution
+  const DIMS   = ['\u0394x','\u0394y','\u0394z','roll','pitch','yaw','grip'];
+  const MU     = [190,200,140,120,130,110, 40]; // model's predicted mean bin per dim
+  const EXPERT = [188,203,137,118,133,107, 35]; // expert demo tokens (near MU)
+  const WRONG  = [ 60, 50,200,225, 25,240,205]; // wrong-candidate tokens (far from MU)
+
+  function logProbToken(x, mu, sigma){
+    let Z = 0;
+    for (let b = 0; b < V; b++){
+      Z += Math.exp(-((b-mu)*(b-mu))/(2*sigma*sigma));
+    }
+    return -((x-mu)*(x-mu))/(2*sigma*sigma) - Math.log(Z);
+  }
+  const logpExpert = EXPERT.map((x,i)=>logProbToken(x, MU[i], SIGMA));
+  const logpWrong  = WRONG.map((x,i)=>logProbToken(x, MU[i], SIGMA));
+  const BARMAX = 0.07; // reference peak probability, for bar scaling only
+
+  // ---- scene geometry (fixed points, camera-frame pixel coords) ----
+  const start   = {x:30,  y:40};
+  const pepperP = {x:90,  y:120};
+  const basketP = {x:265, y:55};
+  const bowlP   = {x:265, y:185};
+  const wrongCtl= {x:150, y:170};
+
+  function bez(p0,pc,p2,t){
+    const u=1-t;
+    return {x:u*u*p0.x+2*u*t*pc.x+t*t*p2.x, y:u*u*p0.y+2*u*t*pc.y+t*t*p2.y};
+  }
+  const expertPts=[start], wrongPts=[start];
+  for(let k=1;k<=7;k++){
+    expertPts.push(bez(start,pepperP,basketP,k/7));
+    wrongPts.push(bez(start,wrongCtl,bowlP,k/7));
+  }
+
+  const state = {step:0, expertFrac:0, wrongFrac:0, showWrong:false};
+
+  // ---- canvas drawing ----
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  function pathPoint(pts, frac){
+    const full = Math.min(6, Math.floor(frac));
+    const t = frac - full;
+    const a = pts[full], b = pts[Math.min(7, full+1)];
+    return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t};
+  }
+  function drawPath(pts, frac, color, dashed){
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.setLineDash(dashed ? [5,4] : []);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    const full = Math.min(7, Math.floor(frac));
+    for(let i=1;i<=full;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    if(full<7){ const p = pathPoint(pts, frac); ctx.lineTo(p.x,p.y); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function drawScene(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = col('--muted');
+    ctx.strokeStyle = col('--border');
+    ctx.lineWidth = 1;
+    ctx.strokeRect(5,5,310,190);
+    ctx.fillText('camera view — context C', 10, 18);
+
+    // pepper
+    ctx.fillStyle = col('--pepper');
+    ctx.beginPath(); ctx.arc(pepperP.x,pepperP.y,11,0,7); ctx.fill();
+    ctx.fillStyle = col('--muted'); ctx.fillText('pepper', pepperP.x-18, pepperP.y+26);
+
+    // basket
+    ctx.strokeStyle = col('--basket'); ctx.lineWidth=2.5;
+    ctx.beginPath();
+    ctx.moveTo(basketP.x-20,basketP.y-14); ctx.lineTo(basketP.x-16,basketP.y+14);
+    ctx.lineTo(basketP.x+16,basketP.y+14); ctx.lineTo(basketP.x+20,basketP.y-14);
+    ctx.stroke();
+    ctx.fillStyle = col('--basket'); ctx.fillText('basket — target', basketP.x-46, basketP.y-20);
+
+    // bowl
+    ctx.strokeStyle = col('--bowl'); ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.ellipse(bowlP.x,bowlP.y,20,10,0,0,Math.PI,false); ctx.stroke();
+    ctx.fillStyle = col('--bowl'); ctx.fillText('bowl — distractor', bowlP.x-48, bowlP.y+24);
+
+    // expert path
+    if(state.expertFrac>0){
+      drawPath(expertPts, state.expertFrac, col('--accent'), state.showWrong);
+      ctx.fillStyle = col('--accent');
+      ctx.fillText('expert action path', 10, 178);
+    }
+    // wrong path
+    if(state.showWrong &amp;&amp; state.wrongFrac>0){
+      drawPath(wrongPts, state.wrongFrac, col('--wrong'), false);
+      ctx.fillStyle = col('--wrong');
+      ctx.fillText('wrong swipe path', 160, 178);
+    }
+    // gripper marker at current tip
+    const tipSrc = state.showWrong ? wrongPts : expertPts;
+    const tipFrac = state.showWrong ? state.wrongFrac : state.expertFrac;
+    const tip = tipFrac>0 ? pathPoint(tipSrc, tipFrac) : start;
+    ctx.fillStyle = col('--grip');
+    ctx.fillRect(tip.x-5,tip.y-5,10,10);
+    ctx.fillText('gripper', tip.x-14, tip.y-9);
+  }
+
+  // ---- token strips ----
+  const tsEl = document.getElementById('tokenstrip');
+  const wrEl = document.getElementById('wrongrow');
+  const wrTitle = document.getElementById('wrongTitle');
+
+  function slotHTML(dim, val, lp, revealed){
+    const p = revealed ? Math.exp(lp) : 0;
+    const pct = Math.max(2, Math.min(100, (p/BARMAX)*100));
+    return '<div class=&quot;slot&quot;>'+
+      '<div class=&quot;bar-box&quot;><div class=&quot;bar&quot; style=&quot;height:'+(revealed?pct:0)+'%&quot;></div></div>'+
+      '<div class=&quot;val&quot;>'+(revealed? val : '?')+'</div>'+
+      '<div class=&quot;dim&quot;>'+dim+'</div>'+
+      '<div class=&quot;lp&quot;>'+(revealed? lp.toFixed(2) : '')+'</div>'+
+      '</div>';
+  }
+  function renderTokens(){
+    let h='';
+    for(let i=0;i<7;i++) h += slotHTML(DIMS[i], EXPERT[i], logpExpert[i], i<Math.min(state.step,7));
+    tsEl.innerHTML = h;
+    if(state.step>=8){
+      let h2=''; for(let i=0;i<7;i++) h2 += slotHTML(DIMS[i], WRONG[i], logpWrong[i], true);
+      wrEl.innerHTML = h2; wrTitle.style.display='block';
+    } else { wrEl.innerHTML=''; wrTitle.style.display='none'; }
+  }
+
+  // ---- readouts ----
+  const rTok=document.getElementById('rTok'), rCur=document.getElementById('rCur'),
+        rTotal=document.getElementById('rTotal'), rAlt=document.getElementById('rAlt');
+  const promptEl = document.getElementById('prompt');
+  const slider = document.getElementById('stepSlider'), btnReset=document.getElementById('btnReset');
+
+  function cumExpert(n){ let s=0; for(let i=0;i<n;i++) s+=logpExpert[i]; return s; }
+  function totalWrong(){ let s=0; for(let i=0;i<7;i++) s+=logpWrong[i]; return s; }
+
+  function updateReadouts(){
+    const revealed = Math.min(state.step,7);
+    rTok.textContent = state.step>=8 ? 'comparing actions' : revealed+'/7';
+    rCur.textContent = (state.step>=1 &amp;&amp; state.step<=7) ? logpExpert[state.step-1].toFixed(2) : '—';
+    rTotal.textContent = cumExpert(revealed).toFixed(2);
+    rAlt.textContent = state.step>=8 ? totalWrong().toFixed(2) : '—';
+    if(state.step>=8){
+      promptEl.textContent = 'Yes — the model can score ANY token sequence: same distribution, evaluated at a different candidate a\u2032. The wrong swipe gets an exact, but much lower, log p(A\u2032|C).';
+    } else if(state.step===0){
+      promptEl.textContent = 'Predict first: can this model assign a probability to an action it did not choose itself? Drag the slider to reveal the 7 tokens, then keep going to score a wrong action.';
+    } else {
+      promptEl.textContent = 'Stepping through the expert action. Keep sliding to token 7, then to 8 to score a different (wrong) candidate action.';
+    }
+  }
+
+  function animateValue(key, from, to, duration, cb){
+    if(reduceMotion){ state[key]=to; drawScene(); if(cb) cb(); return; }
+    const t0 = performance.now();
+    function step(now){
+      const t = Math.min(1, (now-t0)/duration);
+      state[key] = from + (to-from)*t;
+      drawScene();
+      if(t<1) requestAnimationFrame(step); else { state[key]=to; drawScene(); if(cb) cb(); }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function setStep(target){
+    target = Math.max(0, Math.min(8, target));
+    state.step = target;
+    state.showWrong = target>=8;
+    const exTarget = Math.min(target,7);
+    const wrTarget = state.showWrong ? 7 : 0;
+    animateValue('expertFrac', state.expertFrac, exTarget, 300, ()=>{ drawScene(); });
+    animateValue('wrongFrac', state.wrongFrac, wrTarget, 300, ()=>{ drawScene(); });
+    renderTokens(); updateReadouts();
+  }
+
+  slider.addEventListener('input', ()=>{
+    setStep(parseInt(slider.value,10));
+  });
+
+  btnReset.addEventListener('click', ()=>{
+    slider.value = 0;
+    state.expertFrac=0; state.wrongFrac=0; state.showWrong=false; state.step=0;
+    drawScene(); renderTokens(); updateReadouts();
+  });
+
+  // init
+  drawScene(); renderTokens(); updateReadouts();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;vla-action-tokens&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="For this robot, acting means predicting tokens — so every action has an exact probability"
+  ></iframe>
+</section>
+
+<section class="scene" id="cot-scratchpad">
+  <h3>Text written before the action changes the action's probability — for better or worse</h3>
+  <div class="caption">Now that every action has a score <math><mi>log</mi><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>)</mo></math>, watch what happens to that score when the model writes thoughts first. Predict before toggling: does more text always help?</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="cot-scratchpad"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Reasoning traces and action probability</title>
+<style>
+:root{
+  --bg:#f7f5f0; --panel:#ffffff; --panel-border:#d8d3c8;
+  --text:#1d1b16; --muted:#6b6558; --accent:#1f6f5c; --accent2:#a6402a;
+  --red:#c0392b; --green:#3a7d44; --gauge-bg:#e4e0d5; --gauge-fill:#2e7d6b;
+  --gauge-fill-warn:#a6402a; --write:#f2d98d;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15140f; --panel:#211f18; --panel-border:#3a3627;
+    --text:#eee8db; --muted:#a49b86; --accent:#4fb59a; --accent2:#e07850;
+    --red:#e0685a; --green:#63b76e; --gauge-bg:#332f22; --gauge-fill:#4fb59a;
+    --gauge-fill-warn:#e07850; --write:#5a4d22;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+h1{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600;}
+.diagram{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;}
+.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;
+  padding:8px 10px;transition:box-shadow .2s,border-color .2s;}
+.panel-title{font-size:11px;color:var(--muted);margin-bottom:5px;letter-spacing:.2px;}
+.context-panel{flex:0 0 170px;max-width:100%;}
+.context-svg{width:100%;height:auto;display:block;max-width:100%;}
+.col{flex:1 1 300px;min-width:220px;display:flex;flex-direction:column;gap:6px;}
+.arrow-mid{align-self:center;font-size:20px;color:var(--muted);padding-top:40px;}
+.arrow-down{text-align:center;font-size:12px;color:var(--muted);margin:-2px 0;}
+.reasoning-panel .panel-text{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;
+  line-height:1.4;min-height:34px;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+.reasoning-panel.active-write, .action-panel.active-write{border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--write) inset;}
+.token-strip{display:flex;gap:5px;flex-wrap:wrap;}
+.token{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;background:var(--gauge-bg);
+  border:1px solid var(--panel-border);border-radius:4px;padding:2px 6px;}
+.gauges{margin-top:14px;display:flex;flex-direction:column;gap:14px;}
+.gauge-label{font-size:12px;margin-bottom:4px;}
+.gauge-track{position:relative;}
+.gauge-svg{width:100%;max-width:100%;height:20px;display:block;}
+.gauge-bg-r{fill:var(--gauge-bg);}
+.gauge-fill-r{fill:var(--gauge-fill);}
+.gauge-fill-r.warn{fill:var(--gauge-fill-warn);}
+.gauge-line{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:3,2;}
+.gauge-scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:2px;}
+.gauge-value{font-size:13px;font-weight:600;margin-top:2px;}
+.gauge-note{font-size:11px;color:var(--muted);margin-top:2px;}
+.gauge-note.warn{color:var(--accent2);font-weight:600;}
+.eq-block{margin-top:16px;background:var(--panel);border:1px solid var(--panel-border);
+  border-radius:8px;padding:8px 10px;}
+math{font-size:15px;display:block;text-align:center;margin:4px 0;max-width:100%;}
+.legend{font-size:10.8px;color:var(--muted);line-height:1.5;margin-top:2px;}
+.controls{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.toggle-group{display:flex;border:1px solid var(--panel-border);border-radius:6px;overflow:hidden;}
+.toggle-group button{border:none;background:var(--panel);color:var(--text);font-size:12px;
+  padding:7px 10px;cursor:pointer;border-right:1px solid var(--panel-border);}
+.toggle-group button:last-child{border-right:none;}
+.toggle-group button.active{background:var(--accent);color:#fff;}
+#replayBtn{font-size:12px;padding:7px 10px;border:1px solid var(--panel-border);
+  background:var(--panel);color:var(--text);border-radius:6px;cursor:pointer;}
+.ctrl-caption{font-size:10.8px;color:var(--muted);width:100%;}
+ul.readout-list{margin:6px 0 0;padding-left:0;list-style:none;font-size:11.5px;color:var(--muted);}
+ul.readout-list li{margin:1px 0;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<h1>Same expert action A — different conditioning text Z written before it</h1>
+
+<div class=&quot;diagram&quot;>
+  <div class=&quot;panel context-panel&quot;>
+    <div class=&quot;panel-title&quot;>camera view — context C</div>
+    <svg class=&quot;context-svg&quot; viewBox=&quot;0 0 170 110&quot;>
+      <rect x=&quot;4&quot; y=&quot;70&quot; width=&quot;162&quot; height=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--panel-border)&quot;/>
+      <circle cx=&quot;55&quot; cy=&quot;60&quot; r=&quot;20&quot; fill=&quot;var(--red)&quot;/>
+      <circle cx=&quot;118&quot; cy=&quot;55&quot; r=&quot;17&quot; fill=&quot;var(--green)&quot;/>
+      <path d=&quot;M55 20 L62 40 L48 40 Z&quot; fill=&quot;var(--muted)&quot;/>
+      <rect x=&quot;52&quot; y=&quot;12&quot; width=&quot;6&quot; height=&quot;10&quot; fill=&quot;var(--muted)&quot;/>
+    </svg>
+  </div>
+  <div class=&quot;arrow-mid&quot;>&amp;#8594;</div>
+  <div class=&quot;col&quot;>
+    <div class=&quot;panel reasoning-panel&quot; id=&quot;reasoningPanel&quot;>
+      <div class=&quot;panel-title&quot;>reasoning trace Z — written first (full text shown, grows the box)</div>
+      <div class=&quot;panel-text&quot; id=&quot;reasoningText&quot;></div>
+    </div>
+    <div class=&quot;arrow-down&quot;>&amp;#8595; conditions the next tokens</div>
+    <div class=&quot;panel action-panel&quot; id=&quot;actionPanel&quot;>
+      <div class=&quot;panel-title&quot;>action tokens A — written after, given Z</div>
+      <div class=&quot;token-strip&quot; id=&quot;tokenStrip&quot;></div>
+    </div>
+  </div>
+</div>
+
+<div class=&quot;gauges&quot;>
+  <div class=&quot;gauge&quot;>
+    <div class=&quot;gauge-label&quot;>log p(A<sub>expert</sub> | C, Z) — expert-action log-probability (nats)</div>
+    <div class=&quot;gauge-track&quot;>
+      <svg class=&quot;gauge-svg&quot; viewBox=&quot;0 0 300 20&quot; preserveAspectRatio=&quot;none&quot;>
+        <rect class=&quot;gauge-bg-r&quot; x=&quot;0&quot; y=&quot;0&quot; width=&quot;300&quot; height=&quot;20&quot;/>
+        <rect class=&quot;gauge-fill-r&quot; id=&quot;logpFillRect&quot; x=&quot;0&quot; y=&quot;0&quot; width=&quot;0&quot; height=&quot;20&quot;/>
+        <line class=&quot;gauge-line&quot; id=&quot;logpBaseLine&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;0&quot; y2=&quot;20&quot;/>
+      </svg>
+    </div>
+    <div class=&quot;gauge-scale&quot;><span>-6.0</span><span>0.0 nats</span></div>
+    <div class=&quot;gauge-value&quot; id=&quot;logpValue&quot;>-4.00 nats</div>
+    <div class=&quot;gauge-note&quot;>dashed line = no-reasoning baseline (<span id=&quot;baseValLabel&quot;>-4.00</span> nats)</div>
+  </div>
+  <div class=&quot;gauge&quot;>
+    <div class=&quot;gauge-label&quot;>inference time per control step (s)</div>
+    <div class=&quot;gauge-track&quot;>
+      <svg class=&quot;gauge-svg&quot; viewBox=&quot;0 0 300 20&quot; preserveAspectRatio=&quot;none&quot;>
+        <rect class=&quot;gauge-bg-r&quot; x=&quot;0&quot; y=&quot;0&quot; width=&quot;300&quot; height=&quot;20&quot;/>
+        <rect class=&quot;gauge-fill-r&quot; id=&quot;timeFillRect&quot; x=&quot;0&quot; y=&quot;0&quot; width=&quot;0&quot; height=&quot;20&quot;/>
+        <line class=&quot;gauge-line&quot; x1=&quot;214.3&quot; y1=&quot;0&quot; x2=&quot;214.3&quot; y2=&quot;20&quot;/>
+      </svg>
+    </div>
+    <div class=&quot;gauge-scale&quot;><span>0 s</span><span>7 s</span></div>
+    <div class=&quot;gauge-value&quot; id=&quot;timeValue&quot;>0.30 s</div>
+    <div class=&quot;gauge-note&quot;>dashed line = 5 s risk threshold</div>
+    <div class=&quot;gauge-note warn&quot; id=&quot;lagNote&quot; style=&quot;visibility:hidden;&quot;>&amp;#9888; &amp;gt;5 s: a grasped object can slip while the model keeps generating text</div>
+  </div>
+</div>
+
+<div class=&quot;eq-block&quot;>
+  <math display=&quot;block&quot;>
+    <mrow><mi>L</mi><mo>(</mo><mi>Z</mi><mo>)</mo><mo>=</mo>
+    <msub><mi>L</mi><mn>0</mn></msub><mo>+</mo><mi>g</mi>
+    <mo>&amp;#8722;</mo><mi>d</mi><mo>&amp;#183;</mo><mo>(</mo><mi>n</mi><mo>&amp;#8722;</mo>
+    <msub><mi>n</mi><mtext>short</mtext></msub><mo>)</mo></mrow>
+  </math>
+  <div class=&quot;legend&quot;>L(Z) — log p(A<sub>expert</sub>|C,Z), nats &amp;middot; L₀ — no-reasoning baseline, −4.00 nats &amp;middot;
+  g — probability gain from stating target &amp;amp; move once Z is non-empty, +2.00 nats &amp;middot;
+  d — attention-dilution penalty per extra token beyond the short trace, 0.018 nats/token &amp;middot;
+  n, n<sub>short</sub> — token count of current trace and of the short trace</div>
+  <math display=&quot;block&quot;>
+    <mrow><mi>T</mi><mo>=</mo><msub><mi>t</mi><mtext>base</mtext></msub><mo>+</mo>
+    <msub><mi>t</mi><mtext>token</mtext></msub><mo>&amp;#183;</mo><mi>n</mi></mrow>
+  </math>
+  <div class=&quot;legend&quot;>T — inference time per control step (s) &amp;middot; t<sub>base</sub> — fixed decode overhead, 0.30 s &amp;middot;
+  t<sub>token</sub> — time per generated token, 0.05 s &amp;middot; n — token count of trace Z (0 for no reasoning)</div>
+</div>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;ctrl-caption&quot;>Switch what the model writes before acting — this does not change action A, only the text conditioning it.</div>
+  <div class=&quot;toggle-group&quot; id=&quot;modeGroup&quot;>
+    <button data-mode=&quot;none&quot;>no reasoning</button>
+    <button data-mode=&quot;short&quot;>short trace</button>
+    <button data-mode=&quot;verbose&quot;>verbose trace</button>
+  </div>
+  <button id=&quot;replayBtn&quot;>Replay generation order</button>
+  <div class=&quot;ctrl-caption&quot;>Replay generation order — re-plays the write animation above: highlights the reasoning panel first, then the action panel, showing that Z's tokens are generated before A's. It changes nothing about the trace text or the gauge values, which stay fixed by the current toggle state.</div>
+</div>
+<ul class=&quot;readout-list&quot; id=&quot;tokenCountList&quot;></ul>
+</div>
+
+<script>
+// ---- named physics constants (auditable) ----
+const LOGP0 = -4.0;        // nats, log p(A|C) with no reasoning
+const GAIN = 2.0;           // nats, gained once a trace states target+move
+const DILUTION = 0.018;     // nats per extra token beyond the short trace
+const T_BASE = 0.30;        // s, fixed decode overhead
+const T_TOKEN = 0.05;       // s per generated token
+const TOKENS_PER_WORD = 1.3;
+
+const TRACE = {
+  none: &quot;&quot;,
+  short: &quot;target: red pepper; move gripper left.&quot;,
+  verbose: &quot;Step 1 \u2014 I observe the scene. Objects present: red pepper, green pepper, yellow onion, metal bowl, wooden spoon, and a folded towel. Step 2 \u2014 the instruction names the red pepper as the target object. Step 3 \u2014 I plan a path for the gripper toward the red pepper that avoids the green pepper and the bowl. Step 4 \u2014 I lower the gripper, align it with the pepper's centroid, close the fingers slowly, and lift it clear of the table. Step 5 \u2014 having confirmed a stable grasp, I now output the action tokens.&quot;
+};
+
+function tokenCount(mode){
+  const t = TRACE[mode];
+  if(!t) return 0;
+  const words = t.trim().split(/\s+/).length;
+  return Math.round(words * TOKENS_PER_WORD);
+}
+const N_SHORT = tokenCount('short');
+
+function logpOf(mode){
+  if(mode === 'none') return LOGP0;
+  const n = tokenCount(mode);
+  const extra = Math.max(0, n - N_SHORT);
+  return LOGP0 + GAIN - DILUTION * extra;
+}
+function timeOf(mode){
+  return T_BASE + T_TOKEN * tokenCount(mode);
+}
+
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const reasoningText = document.getElementById('reasoningText');
+const tokenStrip = document.getElementById('tokenStrip');
+const reasoningPanel = document.getElementById('reasoningPanel');
+const actionPanel = document.getElementById('actionPanel');
+const logpFillRect = document.getElementById('logpFillRect');
+const timeFillRect = document.getElementById('timeFillRect');
+const logpBaseLine = document.getElementById('logpBaseLine');
+const logpValueEl = document.getElementById('logpValue');
+const timeValueEl = document.getElementById('timeValue');
+const lagNote = document.getElementById('lagNote');
+const tokenCountList = document.getElementById('tokenCountList');
+const baseValLabel = document.getElementById('baseValLabel');
+
+const LOGP_MIN=-6, LOGP_MAX=0, TIME_MAX=7;
+function fracLogp(v){ return Math.max(0,Math.min(1,(v-LOGP_MIN)/(LOGP_MAX-LOGP_MIN))); }
+function fracTime(v){ return Math.max(0,Math.min(1, v/TIME_MAX)); }
+
+const ACTION_TOKENS = [&quot;\u0394x: -0.02&quot;,&quot;\u0394y: 0.00&quot;,&quot;\u0394z: -0.01&quot;,&quot;grip: close&quot;];
+ACTION_TOKENS.forEach(t=>{
+  const s=document.createElement('span'); s.className='token'; s.textContent=t;
+  tokenStrip.appendChild(s);
+});
+
+logpBaseLine.setAttribute('x1', fracLogp(LOGP0)*300);
+logpBaseLine.setAttribute('x2', fracLogp(LOGP0)*300);
+baseValLabel.textContent = LOGP0.toFixed(2);
+
+let mode = 'none';
+let curLogp = LOGP0, curTime = timeOf('none');
+let writeAnim = null;
+
+function updateGaugesVisual(logpV, timeV){
+  logpFillRect.setAttribute('width', fracLogp(logpV)*300);
+  timeFillRect.setAttribute('width', fracTime(timeV)*300);
+  timeFillRect.classList.toggle('warn', timeV > 5);
+  logpValueEl.textContent = logpV.toFixed(2) + ' nats';
+  timeValueEl.textContent = timeV.toFixed(2) + ' s';
+  lagNote.style.visibility = timeV > 5 ? 'visible' : 'hidden';
+}
+
+// Gauges reflect the current toggle state immediately and correctly —
+// this is the physical quantity being taught, so it must never lag
+// behind or depend on animation timing.
+function applyGauges(m){
+  curLogp = logpOf(m);
+  curTime = timeOf(m);
+  updateGaugesVisual(curLogp, curTime);
+}
+
+function renderStatic(){
+  reasoningText.textContent = TRACE[mode] || '(empty \u2014 no reasoning written)';
+  const n = tokenCount(mode);
+  tokenCountList.innerHTML =
+    '<li>trace Z token count: n = ' + n + '</li>' +
+    '<li>reference short-trace length: n_short = ' + N_SHORT + '</li>' +
+    '<li>toggle state: ' + mode + '</li>';
+  document.querySelectorAll('#modeGroup button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+}
+
+// Purely decorative: highlights the reasoning panel, then the action panel,
+// to show that Z is written before A. Does not touch the gauge values.
+function playWriteEffect(){
+  if(writeAnim) writeAnim.cancelled = true;
+  if(reduceMotion){
+    reasoningPanel.classList.remove('active-write');
+    actionPanel.classList.remove('active-write');
+    return;
+  }
+  const duration = 700;
+  const t0 = performance.now();
+  const a = { cancelled:false };
+  writeAnim = a;
+  function step(now){
+    if(a.cancelled) return;
+    const t = Math.min(1, (now - t0) / duration);
+    reasoningPanel.classList.toggle('active-write', t < 0.5);
+    actionPanel.classList.toggle('active-write', t >= 0.5 &amp;&amp; t < 1);
+    if(t < 1){
+      requestAnimationFrame(step);
+    } else {
+      reasoningPanel.classList.remove('active-write');
+      actionPanel.classList.remove('active-write');
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+document.getElementById('modeGroup').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  mode = btn.dataset.mode;
+  renderStatic();
+  applyGauges(mode);
+  playWriteEffect();
+});
+document.getElementById('replayBtn').addEventListener('click', ()=>{
+  playWriteEffect();
+});
+
+// initial render
+renderStatic();
+applyGauges(mode);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;cot-scratchpad&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Text written before the action changes the action's probability — for better or worse"
+  ></iframe>
+</section>
+
+<section class="scene" id="grounding-gap">
+  <h3>There is no answer key for a robot's thoughts</h3>
+  <div class="caption">The last scene showed some thoughts help and some hurt — but how would we know which, in advance? Toggle between a math problem and our pepper task to see why the usual trick fails.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="grounding-gap"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The Grounding Gap</title>
+<style>
+:root{
+  --bg:#f7f7f5; --fg:#1b1b1b; --panel:#ffffff; --border:#c9c9c4;
+  --green:#1e8a4c; --red:#c8402c; --gray:#8a8a86; --muted:#5a5a56;
+  --accent:#2a5db0; --btn-bg:#eaeae6; --btn-active:#2a5db0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#17181a; --fg:#e8e8e5; --panel:#232426; --border:#3a3b3d;
+    --green:#4fd07c; --red:#ff7a63; --gray:#a3a3a0; --muted:#a9a9a5;
+    --accent:#7fb0ff; --btn-bg:#2c2d30; --btn-active:#3a6bc4;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h1{font-size:15px;margin:0 0 8px;font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
+.toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.toggle button{border:none;background:var(--btn-bg);color:var(--fg);padding:6px 10px;font-size:12px;cursor:pointer;}
+.toggle button[aria-pressed=&quot;true&quot;]{background:var(--btn-active);color:#fff;}
+button.play{border:1px solid var(--border);background:var(--btn-bg);color:var(--fg);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;}
+svg{width:100%;height:auto;max-width:100%;display:block;}
+.eq-box{margin-top:6px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--panel);}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;}
+ul.readouts{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}
+ul.readouts li{padding:4px 0;border-bottom:1px dashed var(--border);}
+ul.readouts li:last-child{border-bottom:none;}
+.hint{font-size:11px;color:var(--muted);margin-top:2px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Is there an answer key for this reasoning trace?</h1>
+  <div class=&quot;controls&quot;>
+    <div class=&quot;toggle&quot; role=&quot;group&quot; aria-label=&quot;Domain toggle&quot;>
+      <button id=&quot;btnMath&quot; aria-pressed=&quot;true&quot;>Math problem — trace ends in a checkable number</button>
+      <button id=&quot;btnPepper&quot; aria-pressed=&quot;false&quot;>Pepper task — trace ends in a robot action</button>
+    </div>
+    <button class=&quot;play&quot; id=&quot;btnPlay&quot;>Pause red-highlight animation</button>
+  </div>
+
+  <svg id=&quot;svg&quot; viewBox=&quot;0 0 640 500&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+    <defs>
+      <marker id=&quot;arrowhead&quot; markerWidth=&quot;8&quot; markerHeight=&quot;8&quot; refX=&quot;6&quot; refY=&quot;3&quot; orient=&quot;auto&quot;>
+        <path d=&quot;M0,0 L6,3 L0,6 Z&quot; fill=&quot;var(--fg)&quot;></path>
+      </marker>
+    </defs>
+    <rect x=&quot;10&quot; y=&quot;10&quot; width=&quot;290&quot; height=&quot;300&quot; rx=&quot;8&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--border)&quot;></rect>
+    <rect x=&quot;340&quot; y=&quot;10&quot; width=&quot;290&quot; height=&quot;300&quot; rx=&quot;8&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--border)&quot;></rect>
+    <g id=&quot;mathG&quot;></g>
+    <g id=&quot;pepperG&quot;></g>
+
+    <!-- circular chicken-and-egg diagram -->
+    <g id=&quot;loop&quot; font-size=&quot;11&quot; fill=&quot;var(--fg)&quot;>
+      <rect x=&quot;250&quot; y=&quot;325&quot; width=&quot;140&quot; height=&quot;46&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;></rect>
+      <text x=&quot;320&quot; y=&quot;345&quot; text-anchor=&quot;middle&quot;>Good policy</text>
+      <text x=&quot;320&quot; y=&quot;359&quot; text-anchor=&quot;middle&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>(robot behavior)</text>
+
+      <rect x=&quot;70&quot; y=&quot;415&quot; width=&quot;150&quot; height=&quot;46&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;></rect>
+      <text x=&quot;145&quot; y=&quot;435&quot; text-anchor=&quot;middle&quot;>Reasoning data</text>
+      <text x=&quot;145&quot; y=&quot;449&quot; text-anchor=&quot;middle&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>(collected traces)</text>
+
+      <rect x=&quot;420&quot; y=&quot;415&quot; width=&quot;170&quot; height=&quot;46&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot;></rect>
+      <text x=&quot;505&quot; y=&quot;435&quot; text-anchor=&quot;middle&quot;>Way to judge</text>
+      <text x=&quot;505&quot; y=&quot;449&quot; text-anchor=&quot;middle&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>which reasoning is good</text>
+
+      <path d=&quot;M270,371 C220,390 180,400 155,414&quot; fill=&quot;none&quot; stroke=&quot;var(--fg)&quot; marker-end=&quot;url(#arrowhead)&quot;></path>
+      <text x=&quot;175&quot; y=&quot;398&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>generates</text>
+
+      <path d=&quot;M220,438 C320,455 400,455 419,438&quot; fill=&quot;none&quot; stroke=&quot;var(--fg)&quot; marker-end=&quot;url(#arrowhead)&quot;></path>
+      <text x=&quot;300&quot; y=&quot;463&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>needs a judge for quality</text>
+
+      <path d=&quot;M470,414 C420,385 380,365 355,349&quot; fill=&quot;none&quot; stroke=&quot;var(--fg)&quot; marker-end=&quot;url(#arrowhead)&quot;></path>
+      <text x=&quot;405&quot; y=&quot;392&quot; font-size=&quot;9&quot; fill=&quot;var(--muted)&quot;>judging needs a good policy</text>
+
+      <text x=&quot;320&quot; y=&quot;490&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot; font-style=&quot;italic&quot;>Closed loop — no external ground-truth entry point</text>
+    </g>
+  </svg>
+
+  <div class=&quot;eq-box&quot;>
+    <math display=&quot;block&quot;>
+      <mi>V</mi><mo>(</mo><mtext>trace</mtext><mo>)</mo><mo>=</mo><mo>[</mo>
+      <msub><mi>y</mi><mtext>final</mtext></msub><mo>=</mo><msup><mi>y</mi><mo>*</mo></msup><mo>]</mo>
+    </math>
+    <div class=&quot;legend&quot;>
+      V — verifier output, 1 if the trace's final answer matches and 0 otherwise ·
+      trace — the full token sequence the model writes ·
+      y<sub style=&quot;font-size:0&quot;>final</sub> (y_final) — answer extracted from the trace ·
+      y* — ground-truth answer: known for the math problem, undefined for the pepper task
+    </div>
+  </div>
+
+  <ul class=&quot;readouts&quot; id=&quot;readouts&quot;></ul>
+  <div class=&quot;hint&quot;>Toggle the domain above; on the pepper task, irrelevant listed objects light up red one at a time.</div>
+</div>
+
+<script>
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let domain = 'math';           // 'math' | 'pepper'
+let highlightCount = 0;        // 0..11 irrelevant objects flagged red
+let playing = !reduceMotion;
+let lastStep = 0;
+
+const objects = ['bowl','plate','cup','spoon','fork','knife','napkin','glass','jar','box','lamp','pepper'];
+const RELEVANT_IDX = 11; // pepper, the only task-relevant object
+const IRRELEVANT_TOTAL = objects.length - 1; // 11
+const BASELINE_PCT = 0.03; // reported baseline: % of template traces mentioning only relevant objects
+
+const cs = getComputedStyle(document.documentElement);
+const col = n => cs.getPropertyValue(n).trim();
+
+const mathG = document.getElementById('mathG');
+const pepperG = document.getElementById('pepperG');
+const readouts = document.getElementById('readouts');
+
+function drawMath(){
+  const green = col('--green'), fg = col('--fg'), muted = col('--muted');
+  mathG.innerHTML = `
+    <text x=&quot;20&quot; y=&quot;35&quot; font-size=&quot;13&quot; font-weight=&quot;600&quot; fill=&quot;${fg}&quot;>Math trace: steps to an answer</text>
+    <text x=&quot;20&quot; y=&quot;62&quot; font-size=&quot;12&quot; fill=&quot;${fg}&quot;>Step 1: set up 6 &amp;#215; 7</text>
+    <text x=&quot;20&quot; y=&quot;82&quot; font-size=&quot;12&quot; fill=&quot;${fg}&quot;>Step 2: multiply digits</text>
+    <text x=&quot;20&quot; y=&quot;102&quot; font-size=&quot;12&quot; fill=&quot;${fg}&quot; font-weight=&quot;600&quot;>Final answer: 42</text>
+    <circle cx=&quot;155&quot; cy=&quot;185&quot; r=&quot;26&quot; fill=&quot;${green}&quot;></circle>
+    <text x=&quot;155&quot; y=&quot;193&quot; text-anchor=&quot;middle&quot; font-size=&quot;22&quot; fill=&quot;#fff&quot; font-weight=&quot;700&quot;>&amp;#10003;</text>
+    <text x=&quot;155&quot; y=&quot;228&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;${fg}&quot;>y* = 42 (known) &amp;#8594; MATCH</text>
+    <text x=&quot;155&quot; y=&quot;248&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; fill=&quot;${muted}&quot;>verifier grades instantly</text>
+  `;
+}
+
+function drawPepper(){
+  const fg = col('--fg'), red = col('--red'), green = col('--green'), gray = col('--gray'), muted = col('--muted');
+  let rows = '';
+  let irrelSeen = 0;
+  for(let i=0;i<objects.length;i++){
+    const y = 55 + i*13;
+    const isRelevant = i === RELEVANT_IDX;
+    let fill;
+    if(isRelevant){ fill = green; }
+    else {
+      irrelSeen++;
+      fill = (domain==='pepper' &amp;&amp; irrelSeen <= highlightCount) ? red : gray;
+    }
+    rows += `<rect x=&quot;350&quot; y=&quot;${y-9}&quot; width=&quot;9&quot; height=&quot;9&quot; fill=&quot;${fill}&quot;></rect>
+      <text x=&quot;365&quot; y=&quot;${y}&quot; font-size=&quot;11&quot; fill=&quot;${fg}&quot;>${i+1}. ${objects[i]}${isRelevant?' (target)':''}</text>`;
+  }
+  pepperG.innerHTML = `
+    <text x=&quot;350&quot; y=&quot;35&quot; font-size=&quot;13&quot; font-weight=&quot;600&quot; fill=&quot;${fg}&quot;>Robot trace: objects noticed</text>
+    ${rows}
+    <text x=&quot;350&quot; y=&quot;230&quot; font-size=&quot;11&quot; fill=&quot;${fg}&quot;>Action: grasp(pepper) &amp;#8594; lift &amp;#8594; place</text>
+    <circle cx=&quot;485&quot; cy=&quot;262&quot; r=&quot;22&quot; fill=&quot;${gray}&quot;></circle>
+    <text x=&quot;485&quot; y=&quot;270&quot; text-anchor=&quot;middle&quot; font-size=&quot;20&quot; fill=&quot;#fff&quot; font-weight=&quot;700&quot;>?</text>
+    <text x=&quot;485&quot; y=&quot;298&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;${fg}&quot;>y* undefined</text>
+    <text x=&quot;485&quot; y=&quot;313&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; fill=&quot;${muted}&quot;>must run the robot to grade it</text>
+  `;
+}
+
+function drawReadouts(){
+  const gt = domain==='math' ? 'Known (y* = 42)' : 'Undefined — no answer key';
+  const verifiable = domain==='math' ? 'Yes — instant grade' : 'No — must execute the robot';
+  const flagged = domain==='pepper' ? highlightCount : 0;
+  readouts.innerHTML = `
+    <li>Ground truth y*: ${gt}</li>
+    <li>Verifier can run cheaply: ${verifiable}</li>
+    <li>Irrelevant objects flagged red: ${flagged} / ${IRRELEVANT_TOTAL}</li>
+    <li>Template baseline: only ${BASELINE_PCT.toFixed(2)}% of traces mention exclusively task-relevant objects</li>
+  `;
+}
+
+function draw(){
+  drawMath();
+  drawPepper();
+  drawReadouts();
+  window.__sceneReady = true;
+}
+
+function setDomain(d){
+  domain = d;
+  document.getElementById('btnMath').setAttribute('aria-pressed', d==='math');
+  document.getElementById('btnPepper').setAttribute('aria-pressed', d==='pepper');
+  draw();
+}
+document.getElementById('btnMath').addEventListener('click', ()=>setDomain('math'));
+document.getElementById('btnPepper').addEventListener('click', ()=>setDomain('pepper'));
+
+const playBtn = document.getElementById('btnPlay');
+function syncPlayBtn(){ playBtn.textContent = playing ? 'Pause red-highlight animation' : 'Play red-highlight animation'; }
+playBtn.addEventListener('click', ()=>{ playing = !playing; syncPlayBtn(); });
+syncPlayBtn();
+
+function loop(ts){
+  if(playing &amp;&amp; domain==='pepper'){
+    if(ts - lastStep > 600){
+      highlightCount = (highlightCount + 1) % (IRRELEVANT_TOTAL + 1);
+      lastStep = ts;
+      draw();
+    }
+  }
+  requestAnimationFrame(loop);
+}
+draw();
+requestAnimationFrame(loop);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;grounding-gap&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="There is no answer key for a robot's thoughts"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Let the model grade its own thoughts</h2>
+  <div class="part-lede">We ended Part 1 stuck: there is no answer key for a robot's reasoning. This part builds one out of the model's own probabilities — treat the right thought as a hidden variable, propose candidates in hindsight, and weigh each by how much it helps predict the expert's action.</div>
+</header>
+<section class="scene" id="reasoning-as-latent">
+  <h3>Treat the right thought as a hidden variable between seeing and acting</h3>
+  <div class="caption">Since no external oracle exists, the paper turns inward: the good thought becomes a hidden variable <math><mi>Z</mi></math> to be inferred from the expert's action itself. Build candidate thoughts for the pepper task by toggling primitives — short reusable snippets like 'list the visible objects' or 'state the gripper position' — on and off.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="reasoning-as-latent"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Reasoning as a Latent Variable</title>
+<style>
+:root{
+  --bg:#ffffff;
+  --fg:#16181d;
+  --panel:#f1f3f7;
+  --panel-border:#9aa3b2;
+  --accent:#2563eb;
+  --accent-fg:#ffffff;
+  --muted:#5b6472;
+  --chip-off:#e3e6ec;
+  --chip-off-fg:#3a4150;
+  --ghost:#9aa3b2;
+  --z-fill:#eef2ff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161b;
+    --fg:#e7e9ee;
+    --panel:#1f232b;
+    --panel-border:#565f70;
+    --accent:#5b8dff;
+    --accent-fg:#0b0d10;
+    --muted:#9aa3b2;
+    --chip-off:#2a2f3a;
+    --chip-off-fg:#c7cdd8;
+    --ghost:#5b6472;
+    --z-fill:#20263a;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;padding:12px;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;
+}
+.wrap{max-width:680px;margin:0 auto;}
+h2{font-size:15px;margin:4px 0 2px;}
+.eqbox{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;
+  padding:8px 10px;margin-bottom:10px;}
+math{font-size:16px;color:var(--fg);}
+.legend{font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px;}
+.anno{font-size:11px;color:var(--muted);font-style:italic;margin-top:4px;}
+svg{width:100%;height:auto;display:block;max-width:100%;}
+.chipbar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px;}
+button.chip{
+  border:1px solid var(--panel-border);border-radius:14px;padding:5px 10px;
+  font-size:11px;cursor:pointer;background:var(--chip-off);color:var(--chip-off-fg);
+  transition:background .15s,color .15s;
+}
+button.chip.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);}
+.readouts{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;margin-top:6px;}
+.readouts div{background:var(--panel);border:1px solid var(--panel-border);
+  border-radius:6px;padding:4px 8px;}
+.zText{
+  font-size:9.5px;line-height:1.35;white-space:pre-wrap;color:var(--fg);
+  padding:2px 4px;overflow:hidden;height:100%;
+}
+@media (prefers-reduced-motion: reduce){
+  button.chip{transition:none;}
+}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>The intractable target</h2>
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <mo>log</mo><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>)</mo>
+        <mo>=</mo>
+        <mo>log</mo><msub><mo>&amp;#8747;</mo><mi>Z</mi></msub>
+        <mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><mi>Z</mi><mo>)</mo>
+        <mi>p</mi><mo>(</mo><mi>Z</mi><mo>|</mo><mi>C</mi><mo>)</mo>
+        <mtext>&amp;#8201;d</mtext><mi>Z</mi>
+      </mrow>
+    </math>
+    <div class=&quot;legend&quot;>
+      C — context fed to the model (camera frame + task string) &amp;middot;
+      Z — latent reasoning text (what the model &quot;thinks&quot; before acting) &amp;middot;
+      A — the 7 action tokens the robot outputs &amp;middot;
+      p(A|C,Z) — chance of that action given context and reasoning &amp;middot;
+      p(Z|C) — chance of that reasoning text given context &amp;middot;
+      &amp;#8747;&amp;nbsp;dZ — sum over every possible reasoning text
+    </div>
+    <div class=&quot;anno&quot;>The integral runs over every string of text a model could write as Z — uncountable, so it cannot be computed directly. That's why Z must be inferred, not enumerated.</div>
+  </div>
+
+  <svg viewBox=&quot;0 0 680 300&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+    <defs>
+      <marker id=&quot;arrow&quot; markerWidth=&quot;8&quot; markerHeight=&quot;8&quot; refX=&quot;6&quot; refY=&quot;3&quot; orient=&quot;auto&quot;>
+        <path d=&quot;M0,0 L6,3 L0,6 Z&quot; style=&quot;fill:var(--fg)&quot;></path>
+      </marker>
+    </defs>
+
+    <!-- ghost cloud behind Z -->
+    <g style=&quot;opacity:0.35&quot;>
+      <g transform=&quot;translate(258,34) rotate(-6)&quot;>
+        <rect width=&quot;210&quot; height=&quot;180&quot; rx=&quot;8&quot; style=&quot;fill:none;stroke:var(--ghost);stroke-dasharray:3 3&quot;></rect>
+      </g>
+      <g transform=&quot;translate(242,52) rotate(4)&quot;>
+        <rect width=&quot;210&quot; height=&quot;180&quot; rx=&quot;8&quot; style=&quot;fill:none;stroke:var(--ghost);stroke-dasharray:3 3&quot;></rect>
+      </g>
+      <g transform=&quot;translate(266,46) rotate(2)&quot;>
+        <rect width=&quot;210&quot; height=&quot;180&quot; rx=&quot;8&quot; style=&quot;fill:none;stroke:var(--ghost);stroke-dasharray:3 3&quot;></rect>
+      </g>
+    </g>
+    <text x=&quot;252&quot; y=&quot;16&quot; font-size=&quot;10&quot; style=&quot;fill:var(--muted)&quot;>ghost cloud: countless other possible wordings of Z</text>
+
+    <!-- C box -->
+    <rect x=&quot;10&quot; y=&quot;80&quot; width=&quot;140&quot; height=&quot;110&quot; rx=&quot;8&quot; style=&quot;fill:var(--panel);stroke:var(--panel-border)&quot;></rect>
+    <text x=&quot;18&quot; y=&quot;95&quot; font-size=&quot;10.5&quot; style=&quot;fill:var(--fg);font-weight:600&quot;>C — context</text>
+    <text x=&quot;18&quot; y=&quot;110&quot; font-size=&quot;9&quot; style=&quot;fill:var(--muted)&quot;>pepper camera frame</text>
+    <text x=&quot;18&quot; y=&quot;123&quot; font-size=&quot;9&quot; style=&quot;fill:var(--muted)&quot;>+ task string</text>
+
+    <!-- Z box -->
+    <rect x=&quot;250&quot; y=&quot;40&quot; width=&quot;220&quot; height=&quot;190&quot; rx=&quot;8&quot; style=&quot;fill:var(--z-fill);stroke:var(--accent);stroke-width:1.5&quot;></rect>
+    <text x=&quot;258&quot; y=&quot;55&quot; font-size=&quot;10.5&quot; style=&quot;fill:var(--fg);font-weight:600&quot;>Z — reasoning (assembled)</text>
+    <foreignObject x=&quot;254&quot; y=&quot;60&quot; width=&quot;212&quot; height=&quot;164&quot;>
+      <div xmlns=&quot;http://www.w3.org/1999/xhtml&quot; class=&quot;zText&quot; id=&quot;zTextBox&quot;></div>
+    </foreignObject>
+
+    <!-- A box -->
+    <rect x=&quot;530&quot; y=&quot;80&quot; width=&quot;140&quot; height=&quot;110&quot; rx=&quot;8&quot; style=&quot;fill:var(--panel);stroke:var(--panel-border)&quot;></rect>
+    <text x=&quot;538&quot; y=&quot;95&quot; font-size=&quot;10.5&quot; style=&quot;fill:var(--fg);font-weight:600&quot;>A — action</text>
+    <text x=&quot;538&quot; y=&quot;110&quot; font-size=&quot;9&quot; style=&quot;fill:var(--muted)&quot;>7 action tokens</text>
+    <text x=&quot;538&quot; y=&quot;123&quot; font-size=&quot;9&quot; style=&quot;fill:var(--muted)&quot;>(the robot's move)</text>
+
+    <!-- arrows -->
+    <line x1=&quot;150&quot; y1=&quot;135&quot; x2=&quot;248&quot; y2=&quot;135&quot; style=&quot;stroke:var(--fg);stroke-width:1.5&quot; marker-end=&quot;url(#arrow)&quot;></line>
+    <line x1=&quot;470&quot; y1=&quot;135&quot; x2=&quot;528&quot; y2=&quot;135&quot; style=&quot;stroke:var(--fg);stroke-width:1.5&quot; marker-end=&quot;url(#arrow)&quot;></line>
+    <path d=&quot;M80,190 Q340,272 600,190&quot; style=&quot;fill:none;stroke:var(--fg);stroke-width:1.3;stroke-dasharray:4 3&quot; marker-end=&quot;url(#arrow)&quot;></path>
+    <text x=&quot;270&quot; y=&quot;288&quot; font-size=&quot;9.5&quot; style=&quot;fill:var(--muted)&quot;>A also depends on C directly (skipping Z)</text>
+  </svg>
+
+  <div class=&quot;chipbar&quot; id=&quot;chipbar&quot;></div>
+  <div class=&quot;anno&quot; id=&quot;combosLine&quot;></div>
+
+  <div class=&quot;readouts&quot;>
+    <div id=&quot;countReadout&quot;>active: 0 of 7</div>
+    <div id=&quot;combosReadout&quot;>2^7 = 128 reachable Z's this way</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const chipData = [
+    {key:'plan', label:'Plan', text:'Plan: grasp pepper, move to pot, release.'},
+    {key:'vis', label:'Visible Objects', text:'Visible: red pepper, pot, gripper arm.'},
+    {key:'sub', label:'Subtask', text:'Subtask: close gripper on pepper.'},
+    {key:'move', label:'Move', text:'Move: shift end-effector left 3 cm.'},
+    {key:'grip', label:'Gripper Position', text:'Gripper at x=0.42, y=0.18, z=0.05 m.'},
+    {key:'aff', label:'Affordances', text:'Affordance: pepper graspable from top.'},
+    {key:'exp', label:'Explain', text:'Explain: pot is empty, so place now.'}
+  ];
+  const active = {plan:true, vis:true, sub:false, move:false, grip:false, aff:false, exp:false};
+
+  const chipbar = document.getElementById('chipbar');
+  chipData.forEach(c=>{
+    const b = document.createElement('button');
+    b.className = 'chip' + (active[c.key] ? ' on' : '');
+    b.textContent = c.label;
+    b.setAttribute('aria-pressed', active[c.key] ? 'true':'false');
+    b.addEventListener('click', ()=>{
+      active[c.key] = !active[c.key];
+      render();
+    });
+    b.dataset.key = c.key;
+    chipbar.appendChild(b);
+  });
+
+  const zTextBox = document.getElementById('zTextBox');
+  const countReadout = document.getElementById('countReadout');
+  const combosLine = document.getElementById('combosLine');
+
+  function render(){
+    let count = 0;
+    let lines = [];
+    chipData.forEach(c=>{
+      const btn = chipbar.querySelector('button[data-key=&quot;'+c.key+'&quot;]');
+      if(active[c.key]){
+        btn.classList.add('on');
+        btn.setAttribute('aria-pressed','true');
+        lines.push(c.text);
+        count++;
+      } else {
+        btn.classList.remove('on');
+        btn.setAttribute('aria-pressed','false');
+      }
+    });
+    zTextBox.textContent = lines.length ? lines.join('\n') : '(no primitives active — Z is empty text)';
+    countReadout.textContent = 'active: ' + count + ' of 7';
+    const totalCombos = Math.pow(2, chipData.length); // 2^7 = 128
+    combosLine.textContent = 'Toggling these 7 primitives reaches 2^' + chipData.length + ' = ' +
+      Math.round(totalCombos) + ' distinct Z texts — the true space of arbitrary wordings is far larger (uncountable).';
+  }
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;reasoning-as-latent&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Treat the right thought as a hidden variable between seeing and acting"
+  ></iframe>
+</section>
+
+<section class="scene" id="dropout-two-modes">
+  <h3>One model, two habits: predict thoughts forward, and explain actions in hindsight</h3>
+  <div class="caption">To search the space of thoughts we need candidates and a way to score them; this initial finetuning pass builds both from the same demonstrations. Slide the dropout rate <math><mi>d</mi></math> and watch the trace variety it creates.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="dropout-two-modes"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Dropout builds two modes</title>
+<style>
+  :root{
+    --bg:#f7f5f0; --panel:#ffffff; --fg:#1c1c1c; --muted:#6b6b6b;
+    --border:#c9c2b4; --kept:#3a7d5c; --dropped:#b9b2a4; --accentP:#2f6fae;
+    --accentQ:#ae5a2f; --modelfill:#e8e1d2; --shadow: rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16181c; --panel:#1f2227; --fg:#eae7e0; --muted:#9a9a9a;
+      --border:#3a3f47; --kept:#5fbf8f; --dropped:#54595f; --accentP:#69a8e0;
+      --accentQ:#e0955f; --modelfill:#2a2d33; --shadow: rgba(0,0,0,0.4);
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+  h1{font-size:15px;margin:0 0 4px;font-weight:600;}
+  .sub{font-size:11.5px;color:var(--muted);margin:0 0 10px;}
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+    background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:8px 12px;margin-bottom:10px;box-shadow:0 1px 2px var(--shadow);}
+  .controls label{font-size:12.5px;display:flex;align-items:center;gap:6px;}
+  input[type=range]{width:170px;}
+  .readouts{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;}
+  .readouts b{font-variant-numeric:tabular-nums;color:var(--fg);}
+  svg{width:100%;max-width:100%;display:block;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px;}
+  text{fill:var(--fg);}
+  .muted{fill:var(--muted);}
+  .qa{margin-top:10px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;}
+  .qa .q{font-weight:600;}
+  .qa .a{opacity:0;max-height:0;overflow:hidden;transition:opacity .25s;color:var(--muted);}
+  .qa:hover .a, .qa:focus .a, .qa:focus-within .a{opacity:1;max-height:80px;margin-top:4px;}
+  .banner{margin-top:10px;font-size:12px;background:var(--panel);
+    border:1px dashed var(--border);border-radius:8px;padding:8px 12px;color:var(--muted);}
+  .eqbox{margin-top:10px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:8px 12px;}
+  .eqbox math{font-size:15px;}
+  .legend{font-size:11px;color:var(--muted);margin-top:4px;}
+  .coin{transform-box:fill-box;transform-origin:center;}
+  .flip{animation:spin .55s ease-in-out;}
+  @keyframes spin{0%{transform:scaleX(1);}50%{transform:scaleX(0.1);}100%{transform:scaleX(1);}}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Action-blind dropout builds candidates and a hindsight grader</h1>
+  <p class=&quot;sub&quot;>One pepper-dish demonstration, 7 primitives, coin flip per primitive kept with probability 1−d.</p>
+
+  <div class=&quot;controls&quot;>
+    <label>Dropout rate d: <input id=&quot;dSlider&quot; type=&quot;range&quot; min=&quot;0.2&quot; max=&quot;0.5&quot; step=&quot;0.01&quot; value=&quot;0.35&quot;></label>
+    <div class=&quot;readouts&quot;>
+      <span>d = <b id=&quot;dVal&quot;>0.35</b></span>
+      <span>1−d = <b id=&quot;pVal&quot;>0.65</b></span>
+      <span>kept fraction in stack ≈ <b id=&quot;fracVal&quot;>0.65</b></span>
+    </div>
+  </div>
+
+  <svg viewBox=&quot;0 0 640 610&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;>
+    <defs>
+      <marker id=&quot;arrow&quot; markerWidth=&quot;8&quot; markerHeight=&quot;8&quot; refX=&quot;6&quot; refY=&quot;3&quot; orient=&quot;auto&quot;>
+        <path d=&quot;M0,0 L6,3 L0,6 Z&quot; fill=&quot;var(--muted)&quot;></path>
+      </marker>
+    </defs>
+
+    <text x=&quot;320&quot; y=&quot;16&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; class=&quot;muted&quot;>one demonstration's 7 primitives, each flipped independently</text>
+    <g id=&quot;coinsGroup&quot;></g>
+
+    <!-- no-A-wire annotation -->
+    <g>
+      <rect x=&quot;540&quot; y=&quot;10&quot; width=&quot;34&quot; height=&quot;20&quot; rx=&quot;3&quot; fill=&quot;none&quot; stroke=&quot;var(--accentQ)&quot;></rect>
+      <text x=&quot;557&quot; y=&quot;24&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--accentQ)&quot;>A</text>
+      <line x1=&quot;540&quot; y1=&quot;20&quot; x2=&quot;480&quot; y2=&quot;50&quot; stroke=&quot;var(--accentQ)&quot; stroke-dasharray=&quot;3,3&quot;></line>
+      <text x=&quot;500&quot; y=&quot;42&quot; font-size=&quot;14&quot; fill=&quot;var(--accentQ)&quot;>✕</text>
+    </g>
+    <text x=&quot;320&quot; y=&quot;104&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; class=&quot;muted&quot;>coin flip reads only &quot;which primitive&quot; — never the action A</text>
+
+    <text x=&quot;320&quot; y=&quot;122&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; class=&quot;muted&quot;>stack of M = 8 synthetic traces (sparse → dense)</text>
+    <g id=&quot;stackGroup&quot;></g>
+
+    <text x=&quot;320&quot; y=&quot;300&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; class=&quot;muted&quot;>↓ these traces train one shared model, wired two ways ↓</text>
+
+    <!-- Mode p box -->
+    <g>
+      <rect x=&quot;20&quot; y=&quot;315&quot; width=&quot;280&quot; height=&quot;245&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accentP)&quot; stroke-width=&quot;1.5&quot;></rect>
+      <text x=&quot;160&quot; y=&quot;333&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; fill=&quot;var(--accentP)&quot; font-weight=&quot;600&quot;>Mode p — prior</text>
+      <text x=&quot;160&quot; y=&quot;347&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; class=&quot;muted&quot;>the robot we will deploy</text>
+
+      <rect x=&quot;130&quot; y=&quot;358&quot; width=&quot;60&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--accentP)&quot;></rect>
+      <text x=&quot;160&quot; y=&quot;375&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot;>C</text>
+      <line x1=&quot;160&quot; y1=&quot;384&quot; x2=&quot;160&quot; y2=&quot;404&quot; stroke=&quot;var(--muted)&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+      <rect x=&quot;110&quot; y=&quot;404&quot; width=&quot;100&quot; height=&quot;30&quot; rx=&quot;4&quot; fill=&quot;var(--modelfill)&quot; stroke=&quot;var(--fg)&quot;></rect>
+      <text x=&quot;160&quot; y=&quot;423&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot;>shared model</text>
+      <line x1=&quot;160&quot; y1=&quot;434&quot; x2=&quot;160&quot; y2=&quot;452&quot; stroke=&quot;var(--muted)&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+      <rect x=&quot;100&quot; y=&quot;452&quot; width=&quot;46&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--accentP)&quot;></rect>
+      <text x=&quot;123&quot; y=&quot;469&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot;>Z</text>
+      <line x1=&quot;146&quot; y1=&quot;465&quot; x2=&quot;174&quot; y2=&quot;465&quot; stroke=&quot;var(--muted)&quot; marker-end=&quot;url(#arrow)&quot;></line>
+      <rect x=&quot;174&quot; y=&quot;452&quot; width=&quot;46&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--accentP)&quot;></rect>
+      <text x=&quot;197&quot; y=&quot;469&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot;>A</text>
+      <text x=&quot;160&quot; y=&quot;495&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; class=&quot;muted&quot; font-style=&quot;italic&quot;>writes p(Z, A | C)</text>
+      <text x=&quot;160&quot; y=&quot;520&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; id=&quot;pKeepLabel&quot; fill=&quot;var(--accentP)&quot;>P(primitive kept) = 1−d = 0.65</text>
+      <text x=&quot;160&quot; y=&quot;540&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; class=&quot;muted&quot;>never sees the true A during writing</text>
+    </g>
+
+    <!-- Mode q box -->
+    <g>
+      <rect x=&quot;340&quot; y=&quot;315&quot; width=&quot;280&quot; height=&quot;245&quot; rx=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;var(--accentQ)&quot; stroke-width=&quot;1.5&quot;></rect>
+      <text x=&quot;480&quot; y=&quot;333&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; fill=&quot;var(--accentQ)&quot; font-weight=&quot;600&quot;>Mode q — posterior</text>
+      <text x=&quot;480&quot; y=&quot;347&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; class=&quot;muted&quot;>the hindsight explainer</text>
+
+      <rect x=&quot;360&quot; y=&quot;358&quot; width=&quot;46&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--accentQ)&quot;></rect>
+      <text x=&quot;383&quot; y=&quot;375&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot;>C</text>
+      <rect x=&quot;554&quot; y=&quot;358&quot; width=&quot;46&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--accentQ)&quot;></rect>
+      <text x=&quot;577&quot; y=&quot;375&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot;>A</text>
+      <text x=&quot;577&quot; y=&quot;393&quot; text-anchor=&quot;middle&quot; font-size=&quot;9&quot; class=&quot;muted&quot;>ground truth</text>
+
+      <line x1=&quot;390&quot; y1=&quot;384&quot; x2=&quot;460&quot; y2=&quot;404&quot; stroke=&quot;var(--muted)&quot; marker-end=&quot;url(#arrow)&quot;></line>
+      <line x1=&quot;577&quot; y1=&quot;384&quot; x2=&quot;500&quot; y2=&quot;404&quot; stroke=&quot;var(--muted)&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+      <rect x=&quot;430&quot; y=&quot;404&quot; width=&quot;100&quot; height=&quot;30&quot; rx=&quot;4&quot; fill=&quot;var(--modelfill)&quot; stroke=&quot;var(--fg)&quot;></rect>
+      <text x=&quot;480&quot; y=&quot;423&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot;>shared model</text>
+      <line x1=&quot;480&quot; y1=&quot;434&quot; x2=&quot;480&quot; y2=&quot;452&quot; stroke=&quot;var(--muted)&quot; marker-end=&quot;url(#arrow)&quot;></line>
+
+      <rect x=&quot;458&quot; y=&quot;452&quot; width=&quot;46&quot; height=&quot;26&quot; rx=&quot;4&quot; fill=&quot;var(--panel)&quot; stroke=&quot;var(--accentQ)&quot;></rect>
+      <text x=&quot;481&quot; y=&quot;469&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot;>Z</text>
+      <text x=&quot;480&quot; y=&quot;495&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; class=&quot;muted&quot; font-style=&quot;italic&quot;>writes q(Z | C, A)</text>
+      <text x=&quot;480&quot; y=&quot;520&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; id=&quot;qKeepLabel&quot; fill=&quot;var(--accentQ)&quot;>P(primitive kept) = 1−d = 0.65</text>
+      <text x=&quot;480&quot; y=&quot;540&quot; text-anchor=&quot;middle&quot; font-size=&quot;10&quot; class=&quot;muted&quot;>peeks at A to propose better thoughts</text>
+    </g>
+    <text x=&quot;320&quot; y=&quot;585&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; class=&quot;muted&quot;>same coin flip, same 1−d for both — the symmetry the search will exploit later</text>
+  </svg>
+
+  <div class=&quot;qa&quot; tabindex=&quot;0&quot;>
+    <div class=&quot;q&quot;>Why let a model peek at the answer?</div>
+    <div class=&quot;a&quot;>Hover / focus to reveal — hindsight proposals (mode q) are far more likely to be genuinely useful thoughts: exactly what we need to sample candidate reasoning traces for training mode p.</div>
+  </div>
+
+  <div class=&quot;banner&quot;>Both wirings share one model. The coin flip that builds each synthetic trace never looks at the action A, so it hands the same probability 1−d of &quot;included&quot; to both the prior and the posterior — the cancellation used in the next scene.</div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>P</mi><mo>(</mo><mtext>primitive kept</mtext><mo>)</mo><mo>=</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>d</mi>
+    </math>
+    <math display=&quot;block&quot;>
+      <mi>p</mi><mo>(</mo><mi>Z</mi><mo>,</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>)</mo>
+      <mtext>&amp;#160;&amp;#160;vs&amp;#160;&amp;#160;</mtext>
+      <mi>q</mi><mo>(</mo><mi>Z</mi><mo>|</mo><mi>C</mi><mo>,</mo><mi>A</mi><mo>)</mo>
+    </math>
+    <div class=&quot;legend&quot;>
+      d — dropout rate, fraction of primitives dropped (control above) · Z — latent thought (reasoning trace) ·
+      A — action / final answer · C — context (question plus kept steps so far) ·
+      p — prior mode used at deployment (sees C only) · q — hindsight posterior (also sees the true A)
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const chips = [&quot;pick&quot;,&quot;wash&quot;,&quot;cut&quot;,&quot;season&quot;,&quot;cook&quot;,&quot;plate&quot;,&quot;serve&quot;];
+  const M = 8;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NS = &quot;http://www.w3.org/2000/svg&quot;;
+  const coinsG = document.getElementById('coinsGroup');
+  const stackG = document.getElementById('stackGroup');
+  const slider = document.getElementById('dSlider');
+  const dVal = document.getElementById('dVal');
+  const pVal = document.getElementById('pVal');
+  const fracVal = document.getElementById('fracVal');
+
+  const colX = chips.map((_,i)=> 40 + i*(560/6));
+
+  function bernoulliTrace(prob){ return chips.map(()=>Math.random()<prob); }
+
+  function sampleStack(prob){
+    let best=null, bestErr=Infinity;
+    for(let t=0;t<250;t++){
+      const matrix = [];
+      for(let i=0;i<M;i++) matrix.push(bernoulliTrace(prob));
+      const total = matrix.reduce((s,row)=>s+row.filter(Boolean).length,0);
+      const frac = total/(M*chips.length);
+      const err = Math.abs(frac-prob);
+      if(err<bestErr){bestErr=err; best={matrix, frac};}
+      if(err<0.03) break;
+    }
+    best.matrix.sort((a,b)=> a.filter(Boolean).length - b.filter(Boolean).length);
+    return best;
+  }
+
+  function el(tag, attrs, txt){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    if(txt!==undefined) e.textContent = txt;
+    return e;
+  }
+
+  function drawCoins(keptArr, animate){
+    coinsG.innerHTML = &quot;&quot;;
+    chips.forEach((name,i)=>{
+      const cx = colX[i], cy=54;
+      const g = el('g',{});
+      const circle = el('circle',{cx:cx,cy:cy,r:18,class:'coin',
+        fill: (!animate) ? (keptArr[i]?&quot;var(--kept)&quot;:&quot;var(--dropped)&quot;) : &quot;var(--dropped)&quot;,
+        stroke:&quot;var(--fg)&quot;,&quot;stroke-width&quot;:1});
+      g.appendChild(circle);
+      const label = el('text',{x:cx,y:cy+34,'text-anchor':'middle','font-size':10,class:'muted'}, name);
+      g.appendChild(label);
+      coinsG.appendChild(g);
+      if(animate &amp;&amp; !reduce){
+        circle.classList.add('flip');
+        setTimeout(()=>{
+          circle.setAttribute('fill', keptArr[i]?&quot;var(--kept)&quot;:&quot;var(--dropped)&quot;);
+        }, 300);
+      }
+    });
+  }
+
+  function drawStack(matrix){
+    stackG.innerHTML = &quot;&quot;;
+    matrix.forEach((row,r)=>{
+      const y = 132 + r*20;
+      row.forEach((kept,i)=>{
+        const x = colX[i]-8;
+        stackG.appendChild(el('rect',{x:x,y:y,width:16,height:14,rx:2,
+          fill: kept?&quot;var(--kept)&quot;:&quot;var(--dropped)&quot;, stroke:&quot;var(--border)&quot;}));
+      });
+      const n = row.filter(Boolean).length;
+      stackG.appendChild(el('text',{x:610,y:y+11,'text-anchor':'end','font-size':10,class:'muted'}, n+&quot;/&quot;+chips.length));
+    });
+  }
+
+  function render(animateCoins){
+    const d = parseFloat(slider.value);
+    const keep = 1-d;
+    dVal.textContent = d.toFixed(2);
+    pVal.textContent = keep.toFixed(2);
+    document.getElementById('pKeepLabel').textContent = &quot;P(primitive kept) = 1−d = &quot;+keep.toFixed(2);
+    document.getElementById('qKeepLabel').textContent = &quot;P(primitive kept) = 1−d = &quot;+keep.toFixed(2);
+
+    const demoKept = bernoulliTrace(keep);
+    drawCoins(demoKept, animateCoins);
+
+    const stack = sampleStack(keep);
+    drawStack(stack.matrix);
+    fracVal.textContent = stack.frac.toFixed(2);
+  }
+
+  slider.addEventListener('input', ()=>render(true));
+  render(false);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;dropout-two-modes&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One model, two habits: predict thoughts forward, and explain actions in hindsight"
+  ></iframe>
+</section>
+
+<section class="scene" id="importance-weight-equation">
+  <h3>The weight w = p/q is a self-computed quality score for a thought</h3>
+  <div class="caption">We can now sample plausible thoughts from <math><mi>q</mi></math> — but <math><mi>q</mi></math> peeked at the answer, so its samples need correcting. This one equation is the correction, and every symbol in it is a number our two model modes can already compute.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="importance-weight-equation"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Importance weight w = p/q</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f4f5f8;
+    --text:#17181c;
+    --muted:#5a5c66;
+    --border:#d4d6de;
+    --num:#1d4ed8;
+    --den:#b45309;
+    --num-bg:rgba(29,78,216,0.16);
+    --den-bg:rgba(180,83,9,0.16);
+    --accent:#0f766e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111319;
+      --panel:#1b1e26;
+      --text:#e9e9ef;
+      --muted:#a1a3b0;
+      --border:#343947;
+      --num:#7aa2ff;
+      --den:#f2b84b;
+      --num-bg:rgba(122,162,255,0.22);
+      --den-bg:rgba(242,184,75,0.22);
+      --accent:#4fd1c5;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:16px 18px 22px;}
+  h2.tag{font-size:0.78rem;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 6px;font-weight:600;}
+  .eq-wrap{background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:18px 10px;text-align:center;overflow-x:auto;}
+  math{font-size:1.55rem;}
+  @media (max-width:420px){ math{font-size:1.15rem;} }
+  .legend{margin-top:10px;font-size:0.78rem;color:var(--muted);line-height:1.5;}
+  .legend div{margin:2px 0;}
+  .controls{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
+  .btnrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  button{font-size:0.85rem;padding:8px 12px;border-radius:8px;
+    border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;}
+  button:hover{border-color:var(--accent);}
+  .slider-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:0.82rem;}
+  .slider-row label{color:var(--text);min-width:100%;}
+  input[type=range]{flex:1;min-width:140px;}
+  .sliderval{font-weight:600;min-width:3.6em;text-align:right;}
+  ul.readouts{list-style:none;margin:14px 0 0;padding:0;
+    display:flex;flex-wrap:wrap;gap:14px;font-size:0.9rem;}
+  ul.readouts li{background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:6px 10px;}
+  ul.readouts .k{color:var(--muted);}
+  .modeLink{margin-top:10px;font-size:0.82rem;font-weight:600;}
+  .intuition{margin-top:6px;font-size:0.82rem;color:var(--text);
+    border-left:3px solid var(--accent);padding-left:8px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2 class=&quot;tag&quot;>The importance weight, symbol by symbol</h2>
+
+  <div class=&quot;eq-wrap&quot;>
+    <math display=&quot;block&quot;>
+      <mi>w</mi><mo>(</mo><msub><mi>Z</mi><mi>k</mi></msub><mo>)</mo><mo>=</mo>
+      <mfrac>
+        <mstyle id=&quot;numMstyle&quot; mathbackground=&quot;transparent&quot;>
+          <mrow>
+            <mi>p</mi><mo>(</mo><msub><mi>Z</mi><mi>k</mi></msub><mo>,</mo><mi>A</mi><mo>&amp;#8739;</mo><mi>C</mi><mo>)</mo>
+          </mrow>
+        </mstyle>
+        <mstyle id=&quot;denMstyle&quot; mathbackground=&quot;transparent&quot;>
+          <mrow>
+            <mi>q</mi><mo>(</mo><msub><mi>Z</mi><mi>k</mi></msub><mo>&amp;#8739;</mo><mi>C</mi><mo>,</mo><mi>A</mi><mo>)</mo>
+          </mrow>
+        </mstyle>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      <div><b>Z<sub>k</sub></b> — the k-th candidate thought: a text reasoning trace proposed for the pepper-grasping task</div>
+      <div><b>A</b> — the expert's action: 7 control tokens the robot actually executed</div>
+      <div><b>C</b> — context: camera image + task string given to the model</div>
+      <div><b>p(Z<sub>k</sub>,A|C)</b> — joint probability the forward model (p-mode) assigns to thought+action together</div>
+      <div><b>q(Z<sub>k</sub>|C,A)</b> — probability the hindsight explainer (q-mode) assigns to proposing that same thought, having already seen A</div>
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <div class=&quot;btnrow&quot;>
+      <button id=&quot;toggleBtn&quot; type=&quot;button&quot;>Toggle highlight: numerator (p) ↔ denominator (q)</button>
+    </div>
+    <div class=&quot;slider-row&quot;>
+      <label id=&quot;sliderLabel&quot; for=&quot;probSlider&quot;></label>
+      <input type=&quot;range&quot; id=&quot;probSlider&quot; min=&quot;0.01&quot; max=&quot;0.2&quot; step=&quot;0.005&quot; value=&quot;0.03&quot;>
+      <span class=&quot;sliderval&quot; id=&quot;sliderVal&quot;>0.030</span>
+    </div>
+  </div>
+
+  <ul class=&quot;readouts&quot;>
+    <li><span class=&quot;k&quot;>p(Z<sub>k</sub>,A|C) =</span> <span id=&quot;pVal&quot;>0.030</span></li>
+    <li><span class=&quot;k&quot;>q(Z<sub>k</sub>|C,A) =</span> <span id=&quot;qVal&quot;>0.050</span></li>
+    <li><span class=&quot;k&quot;>w(Z<sub>k</sub>) = p/q =</span> <span id=&quot;wVal&quot;>0.60</span></li>
+  </ul>
+
+  <div class=&quot;modeLink&quot; id=&quot;modeLink&quot;></div>
+  <div class=&quot;intuition&quot; id=&quot;intuitionLine&quot;></div>
+</div>
+
+<script>
+(function(){
+  const root = document.documentElement;
+  function cssVar(name){ return getComputedStyle(root).getPropertyValue(name).trim(); }
+
+  let highlight = 'num'; // 'num' or 'den'
+  let p = 0.030, q = 0.050;
+
+  const numEl = document.getElementById('numMstyle');
+  const denEl = document.getElementById('denMstyle');
+  const toggleBtn = document.getElementById('toggleBtn');
+  const slider = document.getElementById('probSlider');
+  const sliderLabel = document.getElementById('sliderLabel');
+  const sliderVal = document.getElementById('sliderVal');
+  const pValEl = document.getElementById('pVal');
+  const qValEl = document.getElementById('qVal');
+  const wValEl = document.getElementById('wVal');
+  const modeLinkEl = document.getElementById('modeLink');
+  const intuitionEl = document.getElementById('intuitionLine');
+
+  function render(){
+    pValEl.textContent = p.toFixed(3);
+    qValEl.textContent = q.toFixed(3);
+    wValEl.textContent = (p / q).toFixed(2);
+  }
+
+  function updateHighlight(){
+    numEl.setAttribute('mathbackground', highlight === 'num' ? cssVar('--num-bg') : 'transparent');
+    denEl.setAttribute('mathbackground', highlight === 'den' ? cssVar('--den-bg') : 'transparent');
+
+    if(highlight === 'num'){
+      sliderLabel.textContent = 'Example forward probability p(Zk, A | C):';
+      slider.value = p;
+      sliderVal.textContent = p.toFixed(3);
+      modeLinkEl.textContent = 'Linked mode: P-MODE — forward robot policy scores thought + action together';
+      modeLinkEl.style.color = cssVar('--num');
+      intuitionEl.textContent = 'Raise p → the forward model finds (Zk, A) more probable together → w rises: this thought explains the expert action well.';
+    } else {
+      sliderLabel.textContent = 'Example hindsight probability q(Zk | C, A):';
+      slider.value = q;
+      sliderVal.textContent = q.toFixed(3);
+      modeLinkEl.textContent = 'Linked mode: Q-MODE — hindsight explainer proposes the thought after seeing A';
+      modeLinkEl.style.color = cssVar('--den');
+      intuitionEl.textContent = 'Raise q → the hindsight explainer over-produces this thought → w falls: we correct for its eagerness.';
+    }
+    render();
+  }
+
+  toggleBtn.addEventListener('click', function(){
+    highlight = (highlight === 'num') ? 'den' : 'num';
+    updateHighlight();
+  });
+
+  slider.addEventListener('input', function(){
+    const v = parseFloat(slider.value);
+    if(highlight === 'num'){ p = v; } else { q = v; }
+    sliderVal.textContent = v.toFixed(3);
+    render();
+  });
+
+  updateHighlight();
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;importance-weight-equation&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The weight w = p/q is a self-computed quality score for a thought"
+  ></iframe>
+</section>
+
+<section class="scene" id="resample-refine">
+  <h3>Sample K thoughts, weigh them, keep one — and more samples provably get closer to the truth</h3>
+  <div class="caption">With the weight defined, refinement is a weighted lottery: draw K hindsight thoughts and keep one with probability proportional to its weight. <math><mi>mathcal</mi><msub><mrow><mi>L</mi></mrow><mi>K</mi></msub></math> is a guaranteed lower estimate of <math><mi>log</mi><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>)</mo></math>, and it can only rise as K grows. Before sliding K up, predict which candidate wins for the pepper demo.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="resample-refine"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Resample &amp;amp; Refine</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1b1b1f; --muted:#6b6b74;
+  --accent:#3a6df0; --accent2:#e0621f; --border:#d7d7de; --card-bg:#fafafe;
+  --winner:#1f9e58;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14151a; --panel:#1d1e24; --text:#e8e8ee; --muted:#9a9aa6;
+    --accent:#6f96ff; --accent2:#ff9a5c; --border:#33343c; --card-bg:#22232b;
+    --winner:#37c97a;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:12px 14px 20px;}
+math{color:var(--text);}
+.eqblock{margin-bottom:10px;}
+.legend{font-size:0.7rem;color:var(--muted);margin:2px 0 10px;line-height:1.35;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:0.82rem;}
+.controls label{display:flex;align-items:center;gap:6px;}
+input[type=range]{width:150px;}
+button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 10px;font-size:0.78rem;cursor:pointer;}
+button:hover{filter:brightness(1.08);}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 12px;font-size:0.76rem;margin:8px 0 14px;}
+.panel{border:1px solid var(--border);border-radius:8px;background:var(--panel);padding:8px 10px;margin-bottom:12px;}
+.hint{font-size:0.68rem;color:var(--muted);margin-bottom:6px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;}
+.card{border-left:4px solid var(--accent);background:var(--card-bg);border-radius:4px;padding:5px 6px;font-size:0.62rem;}
+.card.winner{outline:2px solid var(--winner);}
+.ctext{max-height:3.6em;overflow:hidden;line-height:1.2;margin-bottom:4px;}
+.barwrap{background:var(--border);border-radius:3px;height:6px;overflow:hidden;margin-bottom:3px;}
+.bar{height:6px;}
+.wval{color:var(--muted);font-size:0.6rem;}
+.wheelpanel{display:flex;flex-direction:column;align-items:center;}
+canvas{max-width:260px;width:100%;height:auto;}
+svg{width:100%;max-width:640px;height:auto;display:block;}
+ul.history{list-style:none;margin:0;padding:0;font-size:0.68rem;display:flex;flex-direction:column;gap:3px;}
+ul.history li{border-bottom:1px dashed var(--border);padding-bottom:3px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;eqblock&quot;>
+    <math display=&quot;block&quot;>
+      <mi>P</mi><mo>(</mo><msup><mi>Z</mi><mo>*</mo></msup><mo>=</mo><msub><mi>Z</mi><mi>k</mi></msub><mo>)</mo><mo>=</mo>
+      <mfrac>
+        <msub><mi>w</mi><mi>k</mi></msub>
+        <mrow><munderover><mo>&amp;#8721;</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>w</mi><mi>j</mi></msub></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;legend&quot;>Z* — the resampled thought (winning trace) &amp;middot; w_k — importance weight of candidate k, computed as p(Z_k,A)/q(Z_k|A) (unitless) &amp;middot; K — number of candidates drawn, set by the slider below.</div>
+    <math display=&quot;block&quot;>
+      <msub><mi>L</mi><mi>K</mi></msub><mo>=</mo><mi>E</mi><mo>[</mo><mi mathvariant=&quot;normal&quot;>log</mi>
+      <mfrac><mn>1</mn><mi>K</mi></mfrac>
+      <munderover><mo>&amp;#8721;</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>w</mi><mi>k</mi></msub><mo>]</mo>
+      <mo>&amp;#8804;</mo><mi mathvariant=&quot;normal&quot;>log</mi><mi>p</mi><mo>(</mo><mi>A</mi><mo>)</mo>
+    </math>
+    <div class=&quot;legend&quot;>L_K — evidence lower bound using K samples (nats) &amp;middot; w_k — importance weight of candidate k &amp;middot; log p(A) — true log-probability of the demonstration A (the fixed ceiling, nats).</div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label>Candidates drawn, K: <input type=&quot;range&quot; id=&quot;kSlider&quot; min=&quot;1&quot; max=&quot;16&quot; step=&quot;1&quot; value=&quot;4&quot;><span id=&quot;kVal&quot;>4</span></label>
+    <button id=&quot;spinBtn&quot;>Spin the wheel — resample one thought</button>
+  </div>
+
+  <div class=&quot;stats&quot;>
+    <div>K (candidates) = <span id=&quot;roK&quot;></span></div>
+    <div>Winner Z*: <span id=&quot;roWinner&quot;>&amp;mdash;</span></div>
+    <div>L_K = <span id=&quot;roLK&quot;></span> nats</div>
+    <div>log p(A) ceiling = <span id=&quot;roCeil&quot;></span> nats</div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;hint&quot;>Candidate thoughts Z_k for one demo (pepper pick-and-place) drawn from q(Z|A,C) &amp;mdash; bar length &amp;prop; weight w_k</div>
+    <div id=&quot;cards&quot; class=&quot;cards&quot;></div>
+  </div>
+
+  <div class=&quot;panel wheelpanel&quot;>
+    <div class=&quot;hint&quot;>Roulette wheel &amp;mdash; slice area &amp;prop; weight; the arrow marks the fixed pointer</div>
+    <canvas id=&quot;wheel&quot; width=&quot;260&quot; height=&quot;260&quot;></canvas>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;hint&quot;>Evidence bound L_K vs K &amp;mdash; rises monotonically, never crosses the ceiling</div>
+    <svg id=&quot;gauge&quot; viewBox=&quot;0 0 640 100&quot;></svg>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <div class=&quot;hint&quot;>Refined dataset tray &amp;mdash; accepted Z* from recent spins</div>
+    <ul id=&quot;history&quot; class=&quot;history&quot;><li>No spins yet</li></ul>
+  </div>
+
+</div>
+
+<script>
+const CANDIDATES=[
+ {text:&quot;grip pepper, lift, move left to basket&quot;,logp:-0.9,logq:-2.5},
+ {text:&quot;detect pepper via bounding box, compute grasp pose, plan trajectory avoiding obstacles, execute pick, place in basket&quot;,logp:-2.6,logq:-1.8},
+ {text:&quot;grasp pepper&quot;,logp:-4.0,logq:-1.5},
+ {text:&quot;pick up pepper, move to basket, drop it&quot;,logp:-1.3,logq:-2.0},
+ {text:&quot;reach toward pepper, close gripper, lift arm, translate left, open gripper&quot;,logp:-1.6,logq:-1.9},
+ {text:&quot;scan scene, enumerate ingredients, select pepper, plan multi-step trajectory, execute pick-and-place&quot;,logp:-3.8,logq:-1.6},
+ {text:&quot;grip pepper, lift, shift left, release&quot;,logp:-1.1,logq:-2.3},
+ {text:&quot;move gripper near pepper, attempt grasp twice, lift, transport&quot;,logp:-2.9,logq:-1.7},
+ {text:&quot;grip pepper, lift, move to basket location, lower, release&quot;,logp:-1.2,logq:-2.2},
+ {text:&quot;look around, find all vegetables, choose pepper, grasp, transport, place&quot;,logp:-3.5,logq:-1.9},
+ {text:&quot;grasp, lift, drop&quot;,logp:-3.0,logq:-1.4},
+ {text:&quot;pepper: locate, grip, lift, carry left, release above basket, drop&quot;,logp:-1.4,logq:-2.1},
+ {text:&quot;survey workspace, catalog items, plan pick order, grip pepper last, lift, transplant to basket&quot;,logp:-3.9,logq:-1.7},
+ {text:&quot;identify all objects: pepper, tomato, cup, bowl, knife, board; grip pepper, lift, transport, release&quot;,logp:-3.4,logq:-2.0},
+ {text:&quot;align gripper, squeeze pepper, raise, swing left, unclench&quot;,logp:-1.7,logq:-2.1},
+ {text:&quot;observe scene, reason about task, grip pepper, lift, move left, release into basket&quot;,logp:-1.5,logq:-2.4}
+];
+const computeWeight=c=>Math.exp(c.logp-c.logq);
+const maxWeight=Math.max(...CANDIDATES.map(computeWeight));
+const LOG_PA=1.0, L1REF=-0.8, DECAY=5; // nats; toy constants for a smooth, monotone bound curve
+const LK=K=>LOG_PA-(LOG_PA-L1REF)*Math.exp(-(K-1)/DECAY);
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let K=4, rotation=0, spinning=false, winnerIndex=null, historyArr=[];
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const colorFor=(i,n)=>`hsl(${Math.round(i/n*360)},62%,52%)`;
+
+const cardsEl=document.getElementById('cards');
+const canvas=document.getElementById('wheel'), ctx=canvas.getContext('2d');
+const gaugeSvg=document.getElementById('gauge');
+const historyEl=document.getElementById('history');
+const kSlider=document.getElementById('kSlider'), kVal=document.getElementById('kVal');
+const spinBtn=document.getElementById('spinBtn');
+const roK=document.getElementById('roK'), roWinner=document.getElementById('roWinner'),
+      roLK=document.getElementById('roLK'), roCeil=document.getElementById('roCeil');
+
+function sliceAngles(weights){
+  const total=weights.reduce((a,b)=>a+b,0);
+  let acc=0, out=[];
+  for(const w of weights){const start=acc, sweep=w/total*Math.PI*2; acc+=sweep; out.push({start,end:acc,center:start+sweep/2});}
+  return out;
+}
+function pickWeighted(weights){
+  const total=weights.reduce((a,b)=>a+b,0);
+  let r=Math.random()*total;
+  for(let i=0;i<weights.length;i++){ if(r<weights[i]) return i; r-=weights[i]; }
+  return weights.length-1;
+}
+
+function renderCards(){
+  cardsEl.innerHTML='';
+  for(let i=0;i<K;i++){
+    const w=computeWeight(CANDIDATES[i]);
+    const pct=(w/maxWeight*100).toFixed(1);
+    const div=document.createElement('div');
+    div.className='card'+(winnerIndex===i?' winner':'');
+    div.style.borderLeftColor=colorFor(i,K);
+    div.title=CANDIDATES[i].text;
+    div.innerHTML=`<div class=&quot;ctext&quot;>${CANDIDATES[i].text}</div><div class=&quot;barwrap&quot;><div class=&quot;bar&quot; style=&quot;width:${pct}%;background:${colorFor(i,K)}&quot;></div></div><div class=&quot;wval&quot;>w=${w.toFixed(2)}</div>`;
+    cardsEl.appendChild(div);
+  }
+}
+
+function drawWheel(){
+  const weights=CANDIDATES.slice(0,K).map(computeWeight);
+  const angles=sliceAngles(weights);
+  const cx=canvas.width/2, cy=canvas.height/2, r=Math.min(cx,cy)-10;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(rotation);
+  for(let i=0;i<K;i++){
+    const a0=angles[i].start-Math.PI/2, a1=angles[i].end-Math.PI/2;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r,a0,a1); ctx.closePath();
+    ctx.fillStyle=colorFor(i,K); ctx.fill();
+    ctx.strokeStyle=css('--panel'); ctx.lineWidth=1.5; ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle=css('--text');
+  ctx.beginPath();
+  ctx.moveTo(cx-8,cy-r-3); ctx.lineTo(cx+8,cy-r-3); ctx.lineTo(cx,cy-r+11); ctx.closePath(); ctx.fill();
+  if(K===1){
+    ctx.fillStyle=css('--muted'); ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('single draw kept (no resampling)', cx, cy+r+16);
+  }
+}
+
+function updateGauge(){
+  const L1=LK(1), L4=LK(4), L16=LK(16), ceil=LOG_PA, cur=LK(K);
+  const vmin=-1.0, vmax=1.2, x0=25, x1=615;
+  const toX=v=>x0+(v-vmin)/(vmax-vmin)*(x1-x0);
+  const muted=css('--muted'), accent2=css('--accent2'), border=css('--border');
+  const ticks=[
+    {x:toX(L1),label:'L (K=1)',below:true},
+    {x:toX(L4),label:'L (K=4)',below:false},
+    {x:toX(L16),label:'L (K=16)',below:true},
+    {x:toX(ceil),label:'log p(A) ceiling',below:false}
+  ];
+  let s=`<line x1=&quot;${x0}&quot; y1=&quot;50&quot; x2=&quot;${x1}&quot; y2=&quot;50&quot; stroke=&quot;${border}&quot; stroke-width=&quot;2&quot;/>`;
+  ticks.forEach(t=>{
+    s+=`<line x1=&quot;${t.x}&quot; y1=&quot;40&quot; x2=&quot;${t.x}&quot; y2=&quot;60&quot; stroke=&quot;${muted}&quot; stroke-width=&quot;1.5&quot;/>`;
+    const y=t.below?88:15;
+    s+=`<text x=&quot;${t.x}&quot; y=&quot;${y}&quot; font-size=&quot;9.5&quot; text-anchor=&quot;middle&quot; fill=&quot;${muted}&quot;>${t.label}</text>`;
+  });
+  const cx=Math.max(x0+40,Math.min(x1-40,toX(cur)));
+  s+=`<polygon points=&quot;${cx-6},34 ${cx+6},34 ${cx},46&quot; fill=&quot;${accent2}&quot;/>`;
+  s+=`<text x=&quot;${cx}&quot; y=&quot;30&quot; font-size=&quot;10&quot; text-anchor=&quot;middle&quot; fill=&quot;${accent2}&quot; font-weight=&quot;600&quot;>L(K=${K})=${cur.toFixed(3)}</text>`;
+  gaugeSvg.innerHTML=s;
+}
+
+function addHistory(idx){
+  const w=computeWeight(CANDIDATES[idx]);
+  historyArr.unshift({text:CANDIDATES[idx].text,w});
+  historyArr=historyArr.slice(0,5);
+  historyEl.innerHTML=historyArr.map(h=>`<li><strong>Z*</strong>: &quot;${h.text}&quot; &amp;mdash; w=${h.w.toFixed(2)}</li>`).join('');
+}
+
+function updateReadouts(){
+  kVal.textContent=K;
+  roK.textContent=K;
+  roWinner.textContent = winnerIndex!=null ? '&quot;'+CANDIDATES[winnerIndex].text.slice(0,42)+(CANDIDATES[winnerIndex].text.length>42?'…':'')+'&quot;' : '\u2014';
+  roLK.textContent=LK(K).toFixed(3);
+  roCeil.textContent=LOG_PA.toFixed(3);
+}
+
+function renderAll(){
+  renderCards(); drawWheel(); updateGauge(); updateReadouts();
+  spinBtn.textContent = K===1 ? 'Keep the single draw (no resampling at K=1)' : 'Spin the wheel — resample one thought';
+}
+
+function spin(){
+  if(spinning) return;
+  const weights=CANDIDATES.slice(0,K).map(computeWeight);
+  const idx = K===1 ? 0 : pickWeighted(weights);
+  // Stamp the winner and update the tray/readouts immediately so the
+  // resample outcome is visible even before any spin animation runs.
+  winnerIndex=idx;
+  addHistory(idx);
+  renderAll();
+
+  if(K===1) return; // single slice, nothing to animate
+
+  const angles=sliceAngles(weights);
+  const target=-(angles[idx].center)+Math.PI*2*4;
+  if(reducedMotion){
+    rotation=((target%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+    drawWheel();
+    return;
+  }
+  spinning=true;
+  const start=rotation, t0=performance.now(), dur=1500;
+  function step(t){
+    const p=Math.min(1,(t-t0)/dur);
+    const eased=1-Math.pow(1-p,3);
+    rotation=start+(target-start)*eased;
+    drawWheel();
+    if(p<1) requestAnimationFrame(step);
+    else{
+      spinning=false;
+      rotation=((target%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+      drawWheel();
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+kSlider.addEventListener('input',()=>{
+  K=parseInt(kSlider.value,10);
+  winnerIndex=null; rotation=0;
+  renderAll();
+});
+spinBtn.addEventListener('click',spin);
+
+renderAll();
+window.__sceneReady=true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;resample-refine&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Sample K thoughts, weigh them, keep one — and more samples provably get closer to the truth"
+  ></iframe>
+</section>
+
+<section class="scene" id="kl-yardstick">
+  <h3>KL divergence is the yardstick for 'how wrong is my policy'</h3>
+  <div class="caption">Before we can prove the lottery selects the right thoughts, we need one yardstick for error in the policy — the model's rule mapping what it sees to an action. Drag the model's action distribution toward the expert's and watch the divergence fall to zero.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="kl-yardstick"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>KL Divergence Yardstick</title>
+<style>
+  :root{
+    --bg:#faf9f6;
+    --panel:#ffffff;
+    --ink:#1b1b1f;
+    --muted:#5b5b63;
+    --border:#d7d5cd;
+    --expert:#c0392b;
+    --model:#2166ac;
+    --accent:#8a6d3b;
+    --grid:#e4e2da;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16171b;
+      --panel:#1f2126;
+      --ink:#eceae4;
+      --muted:#a2a0a8;
+      --border:#3a3c42;
+      --expert:#ff7a68;
+      --model:#6fb3ff;
+      --accent:#e0c07a;
+      --grid:#2b2d33;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 16px 20px;}
+  h2{font-size:15px;margin:2px 0 10px;font-weight:600;}
+  .eqbox{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:10px 12px;margin-bottom:10px;}
+  math{font-size:16px;}
+  .legend{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:6px;}
+  .note{font-size:12.5px;color:var(--ink);background:rgba(138,109,59,0.08);
+    border-left:3px solid var(--accent);padding:6px 9px;margin:8px 0 12px;border-radius:4px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:10px 12px;}
+  canvas{display:block;width:100%;max-width:100%;height:auto;}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;}
+  .controls label{font-size:12.5px;color:var(--ink);flex:1 1 220px;}
+  input[type=range]{width:100%;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:13px;}
+  .readout{background:var(--grid);border-radius:6px;padding:5px 9px;}
+  .readout b{color:var(--accent);}
+  .foot{font-size:11px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>KL divergence: the yardstick for policy error</h2>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>D</mi><mtext>KL</mtext></msub>
+      <mo>(</mo><msub><mi>p</mi><mtext>data</mtext></msub><mo>&amp;#8741;</mo><msub><mi>p</mi><mtext>model</mtext></msub><mo>)</mo>
+      <mo>=</mo>
+      <mo>&amp;#8722;</mo><mi>H</mi><mo>(</mo><msub><mi>p</mi><mtext>data</mtext></msub><mo>)</mo>
+      <mo>&amp;#8722;</mo>
+      <msub><mi>E</mi><mrow><mi>A</mi><mo>~</mo><msub><mi>p</mi><mtext>data</mtext></msub></mrow></msub>
+      <mo>[</mo><mo>log</mo><msub><mi>p</mi><mtext>model</mtext></msub><mo>(</mo><mi>A</mi><mo>)</mo><mo>]</mo>
+    </math>
+    <div class=&quot;legend&quot;>
+      D<sub></sub>KL — divergence (nats), zero only if the two distributions coincide &amp;middot;
+      p<sub>data</sub> — expert's distribution over approach trajectories &amp;middot;
+      p<sub>model</sub> — robot policy's distribution &amp;middot;
+      H(p<sub>data</sub>) — expert's entropy (nats), fixed, we cannot change it &amp;middot;
+      A — one sampled trajectory (here: approach angle, degrees) &amp;middot;
+      E[&amp;middot;] — average over experts's actions
+    </div>
+    <div class=&quot;note&quot;>
+      H(p<sub>data</sub>) is a constant. So minimizing D<sub>KL</sub> is <b>identical</b> to maximizing
+      E[log p<sub>model</sub>(A)] — the same average log-probability of expert actions used to train the policy.
+    </div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;280&quot;></canvas>
+    <div class=&quot;controls&quot;>
+      <label for=&quot;slide&quot;>Model distribution offset from expert (&amp;deg;): drag toward 0 to match the expert
+        <input type=&quot;range&quot; id=&quot;slide&quot; min=&quot;0&quot; max=&quot;60&quot; step=&quot;1&quot; value=&quot;45&quot;>
+      </label>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;>offset = <b id=&quot;offVal&quot;>45</b>&amp;deg;</div>
+      <div class=&quot;readout&quot;>D<sub>KL</sub> = <b id=&quot;klVal&quot;>--</b> nats</div>
+      <div class=&quot;readout&quot;>E[log p<sub>model</sub>(A<sub>expert</sub>)] = <b id=&quot;lpVal&quot;>--</b> nats</div>
+    </div>
+    <div class=&quot;foot&quot;>Curves: expert p<sub>data</sub> (red, fixed at 0&amp;deg;) vs. robot p<sub>model</sub> (blue, slides). Both are bell curves (std dev = 15&amp;deg;) over approach angle to the pepper.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const slide = document.getElementById('slide');
+  const offVal = document.getElementById('offVal');
+  const klVal = document.getElementById('klVal');
+  const lpVal = document.getElementById('lpVal');
+
+  const cs = getComputedStyle(document.documentElement);
+  const col = name => cs.getPropertyValue(name).trim();
+
+  // physical constants of the two Gaussians (approach angle, degrees)
+  const SIGMA = 15;       // std dev, degrees, same for both curves
+  const MU_DATA = 0;      // expert mean, degrees
+  const PI = Math.PI;
+
+  function gaussPdf(x, mu, sigma){
+    return Math.exp(-((x-mu)*(x-mu))/(2*sigma*sigma)) / (sigma*Math.sqrt(2*PI));
+  }
+
+  // KL divergence between two Gaussians with equal sigma:
+  // KL = (mu_d - mu_m)^2 / (2*sigma^2)   [nats]
+  function klDivergence(offsetDeg, sigma){
+    return (offsetDeg*offsetDeg)/(2*sigma*sigma);
+  }
+
+  // differential entropy of a Gaussian: H = 0.5*ln(2*pi*e*sigma^2)  [nats]
+  function gaussEntropy(sigma){
+    return 0.5*Math.log(2*PI*Math.E*sigma*sigma);
+  }
+
+  function avgLogPModel(offsetDeg, sigma){
+    const H = gaussEntropy(sigma);
+    const KL = klDivergence(offsetDeg, sigma);
+    return -H - KL; // E[log p_model(A)] = -H(p_data) - KL
+  }
+
+  function draw(){
+    const offset = parseFloat(slide.value);
+    const muModel = MU_DATA - offset; // model mean shifts away, offset>=0
+
+    const KL = klDivergence(offset, SIGMA);
+    const lp = avgLogPModel(offset, SIGMA);
+
+    offVal.textContent = Math.round(offset);
+    klVal.textContent = KL.toFixed(3);
+    lpVal.textContent = lp.toFixed(3);
+
+    // --- canvas geometry ---
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    const marginL=46, marginR=20, marginT=18, marginB=34;
+    const plotW = W-marginL-marginR, plotH = H-marginT-marginB;
+
+    const xMin=-90, xMax=30; // degrees, expert fixed at 0, model ranges to -60
+    const yMaxPdf = gaussPdf(0,0,SIGMA)*1.15;
+
+    function xToPx(x){ return marginL + (x-xMin)/(xMax-xMin)*plotW; }
+    function yToPx(y){ return marginT + plotH - (y/yMaxPdf)*plotH; }
+
+    // grid + axes
+    ctx.strokeStyle = col('--grid');
+    ctx.lineWidth = 1;
+    ctx.fillStyle = col('--muted');
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    for(let x=xMin; x<=xMax; x+=15){
+      const px = xToPx(x);
+      ctx.beginPath(); ctx.moveTo(px, marginT); ctx.lineTo(px, marginT+plotH); ctx.stroke();
+      ctx.fillText(String(x), px, marginT+plotH+16);
+    }
+    ctx.textAlign='right';
+    ctx.fillText('angle (deg)', marginL+plotW+2>W-4? W-4: marginL+plotW, marginT+plotH+30);
+    // y axis label
+    ctx.save();
+    ctx.translate(14, marginT+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';
+    ctx.fillText('probability density', 0, 0);
+    ctx.restore();
+
+    // axis lines
+    ctx.strokeStyle = col('--border');
+    ctx.beginPath();
+    ctx.moveTo(marginL, marginT); ctx.lineTo(marginL, marginT+plotH); ctx.lineTo(marginL+plotW, marginT+plotH);
+    ctx.stroke();
+
+    // curve drawing helper
+    function drawCurve(mu, color, label, labelYoff){
+      ctx.beginPath();
+      for(let i=0;i<=200;i++){
+        const x = xMin + (xMax-xMin)*i/200;
+        const y = gaussPdf(x, mu, SIGMA);
+        const px = xToPx(x), py = yToPx(y);
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      // peak label
+      const peakPx = xToPx(mu);
+      const peakPy = yToPx(gaussPdf(mu,mu,SIGMA));
+      ctx.fillStyle = color;
+      ctx.textAlign='center';
+      ctx.font='11.5px sans-serif';
+      ctx.fillText(label, peakPx, peakPy - labelYoff);
+    }
+
+    drawCurve(MU_DATA, col('--expert'), 'expert p_data', 12);
+    drawCurve(muModel, col('--model'), 'model p_model', 12);
+
+    // mean marker lines
+    ctx.setLineDash([4,3]);
+    ctx.strokeStyle = col('--expert');
+    ctx.beginPath();
+    ctx.moveTo(xToPx(MU_DATA), marginT); ctx.lineTo(xToPx(MU_DATA), marginT+plotH);
+    ctx.stroke();
+    ctx.strokeStyle = col('--model');
+    ctx.beginPath();
+    ctx.moveTo(xToPx(muModel), marginT); ctx.lineTo(xToPx(muModel), marginT+plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  slide.addEventListener('input', ()=> requestAnimationFrame(draw));
+
+  draw();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;kl-yardstick&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="KL divergence is the yardstick for 'how wrong is my policy'"
+  ></iframe>
+</section>
+
+<section class="scene" id="weights-are-benefit">
+  <h3>The lottery weights measure exactly how much a thought shrinks the policy's KL gap</h3>
+  <div class="caption">Here is the paper's proposition, and it hinges on the fact that dropout in the initial finetuning was random and never saw the action. Because of that, two terms cancel exactly — step through the cancellation and watch what's left.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="weights-are-benefit"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Weights are Benefit — derivation cascade</title>
+<style>
+  :root{
+    --bg:#f7f6f2; --panel:#ffffff; --text:#1c1d1f; --muted:#6b6f76;
+    --line:#d8d5cc; --good:#1f7a4d; --bad:#b1401e; --neutral:#8a7f4b;
+    --accent:#2857c9; --baseline:#555b66;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a; --panel:#1e2025; --text:#e8e7e2; --muted:#9a9ea7;
+      --line:#3a3d44; --good:#4fd18a; --bad:#ff8f6b; --neutral:#d8c774;
+      --accent:#7fa4ff; --baseline:#b9bdc6;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  h3.part{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 8px;
+    text-transform:uppercase;letter-spacing:.03em;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;margin-bottom:12px;}
+  math{font-size:15.5px;}
+  .struck{text-decoration-line:line-through;text-decoration-color:var(--bad);
+    text-decoration-thickness:2px;opacity:.55;}
+  .legend{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:4px;}
+  .note{font-size:11.5px;color:var(--accent);margin-top:6px;}
+  .btnrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  button{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;margin:8px 0;}
+  input[type=range]{flex:1;min-width:140px;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:4px;}
+  .readouts b{color:var(--text);}
+  canvas{max-width:100%;display:block;margin-top:6px;}
+  .foot{font-size:11px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--line);
+    padding-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+
+  <div class=&quot;panel&quot;>
+    <h3 class=&quot;part&quot;>Weight-ratio derivation, primitive R = &quot;Gripper Position&quot;</h3>
+    <div id=&quot;eqBox&quot;></div>
+    <div class=&quot;legend&quot;>
+      w — importance weight of a sampled thought Z (dimensionless) · Z∋R / Z∉R — thought did / did not
+      keep primitive R · C — context, A — expert action · p(Z<sub></sub>|C) — warmstart prior probability of
+      keeping R before A is seen · q(Z|C,A) — refinement posterior probability of keeping R after A is seen ·
+      d — dropout probability (fraction of thoughts where R is randomly hidden) · p(A|C,Z) — likelihood of
+      the expert action given that thought · ΔI<sub></sub> — information benefit of R (nats)
+    </div>
+    <div class=&quot;btnrow&quot;>
+      <button data-s=&quot;expand&quot;>1. Expand ratio</button>
+      <button data-s=&quot;cancel&quot; class=&quot;active&quot;>2. Cancel prior/posterior</button>
+      <button data-s=&quot;conclude&quot;>3. Conclude → ΔI_R</button>
+    </div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <h3 class=&quot;part&quot;>Refined-dataset log-preference per primitive</h3>
+    <math display=&quot;block&quot;>
+      <mtext>log-preference</mtext><mo>=</mo><mi mathvariant=&quot;normal&quot;>Δ</mi><msub><mi>I</mi><mi>R</mi></msub>
+      <mo>+</mo><mo>log</mo><mfrac><mrow><mo>(</mo><mn>1</mn><mo>-</mo><mi>d</mi><mo>)</mo></mrow><mi>d</mi></mfrac>
+    </math>
+    <div class=&quot;legend&quot;>
+      ΔI<sub></sub> — the KL reduction primitive R buys (nats) · d — dropout probability · the second term is
+      the fixed dropout baseline, identical for every primitive.
+    </div>
+    <div class=&quot;ctrl&quot;>
+      <label for=&quot;dSlide&quot;>Dropout probability d (fraction of thoughts hiding R at random):</label>
+      <input id=&quot;dSlide&quot; type=&quot;range&quot; min=&quot;0.05&quot; max=&quot;0.95&quot; step=&quot;0.01&quot; value=&quot;0.30&quot;>
+    </div>
+    <div class=&quot;readouts&quot;>
+      <span>d = <b id=&quot;dVal&quot;></b></span>
+      <span>baseline log((1−d)/d) = <b id=&quot;bVal&quot;></b> nats</span>
+    </div>
+    <canvas id=&quot;chart&quot; width=&quot;620&quot; height=&quot;260&quot;></canvas>
+    <div class=&quot;foot&quot;>The weight never scores whether text is true or well-written — only whether conditioning
+      on it raises the probability the model assigns to the expert's actual action.</div>
+  </div>
+
+</div>
+
+<script>
+window.__sceneReady = false;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- equation stages ----------
+const eqBox = document.getElementById('eqBox');
+const stages = {
+  expand: `
+    <math display=&quot;block&quot;>
+      <mfrac>
+        <mrow><mi>E</mi><mo>[</mo><mi>w</mi><mo>|</mo><mi>Z</mi><mo>&amp;#x220B;</mo><mi>R</mi><mo>]</mo></mrow>
+        <mrow><mi>E</mi><mo>[</mo><mi>w</mi><mo>|</mo><mi>Z</mi><mo>&amp;#x2209;</mo><mi>R</mi><mo>]</mo></mrow>
+      </mfrac>
+      <mo>=</mo>
+      <mfrac>
+        <mrow><mi>p</mi><mo>(</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>|</mo><mi>C</mi><mo>)</mo><mo>&amp;#183;</mo>
+          <mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>)</mo></mrow>
+        <mrow><mi>q</mi><mo>(</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>|</mo><mi>C</mi><mo>,</mo><mi>A</mi><mo>)</mo><mo>&amp;#183;</mo>
+          <mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mtext>&amp;#172;R</mtext></msub><mo>)</mo></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;note&quot;>Unsimplified: prior, posterior and likelihood factors all present.</div>`,
+  cancel: `
+    <math display=&quot;block&quot;>
+      <mfrac>
+        <mrow><mi>E</mi><mo>[</mo><mi>w</mi><mo>|</mo><mi>Z</mi><mo>&amp;#x220B;</mo><mi>R</mi><mo>]</mo></mrow>
+        <mrow><mi>E</mi><mo>[</mo><mi>w</mi><mo>|</mo><mi>Z</mi><mo>&amp;#x2209;</mo><mi>R</mi><mo>]</mo></mrow>
+      </mfrac>
+      <mo>=</mo>
+      <mfrac>
+        <mrow><mrow class=&quot;struck&quot;><mo>(</mo><mn>1</mn><mo>-</mo><mi>d</mi><mo>)</mo></mrow><mo>&amp;#183;</mo>
+          <mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>)</mo></mrow>
+        <mrow><mrow class=&quot;struck&quot;><mo>(</mo><mn>1</mn><mo>-</mo><mi>d</mi><mo>)</mo></mrow><mo>&amp;#183;</mo>
+          <mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mtext>&amp;#172;R</mtext></msub><mo>)</mo></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;note&quot;>&amp;#8617; both terms = 1&amp;#8722;d, the same action-blind coin flip from warmstart &amp;mdash;
+      it never conditioned on A, so prior = posterior.</div>
+    <math display=&quot;block&quot;>
+      <mo>=</mo>
+      <mfrac>
+        <mrow><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>)</mo></mrow>
+        <mrow><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mtext>&amp;#172;R</mtext></msub><mo>)</mo></mrow>
+      </mfrac>
+    </math>
+    <div class=&quot;note&quot;>Surviving term: a pure likelihood ratio — no q anywhere.</div>`,
+  conclude: `
+    <math display=&quot;block&quot;>
+      <mo>=</mo>
+      <mfrac>
+        <mrow><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>)</mo></mrow>
+        <mrow><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mtext>&amp;#172;R</mtext></msub><mo>)</mo></mrow>
+      </mfrac>
+    </math>
+    <math display=&quot;block&quot;>
+      <mi mathvariant=&quot;normal&quot;>Δ</mi><msub><mi>I</mi><mi>R</mi></msub><mo>=</mo>
+      <msub><mi>E</mi><mrow><mi>A</mi><mo>&amp;#x223C;</mo><msub><mi>p</mi><mtext>data</mtext></msub></mrow></msub>
+      <mrow><mo>[</mo><mo>log</mo>
+        <mfrac>
+          <mrow><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mi>R</mi></msub><mo>)</mo></mrow>
+          <mrow><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><msub><mi>Z</mi><mtext>&amp;#172;R</mtext></msub><mo>)</mo></mrow>
+        </mfrac><mo>]</mo></mrow>
+    </math>
+    <div class=&quot;note&quot;>Log of the surviving ratio, averaged over expert actions = ΔI_R, the KL drop when the
+      thought includes R (see the KL yardstick scene). Bar chart below is now live.</div>`
+};
+let stage = 'cancel';
+function renderEq(){ eqBox.innerHTML = stages[stage]; }
+renderEq();
+
+document.querySelectorAll('button[data-s]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('button[data-s]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    stage = b.dataset.s;
+    renderEq();
+    setTarget(stage==='conclude' ? 1 : 0);
+  });
+});
+
+// ---------- bar chart ----------
+const primitives = [
+  {name:'Gripper Position', dI: 0.9},
+  {name:'Move',             dI: 0.5},
+  {name:'Color Name',       dI: 0.0},
+  {name:'Full Object List', dI:-0.6},
+  {name:'Verbose Explain',  dI:-0.9}
+];
+const dSlide = document.getElementById('dSlide');
+const dVal = document.getElementById('dVal');
+const bVal = document.getElementById('bVal');
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const cs = getComputedStyle(document.documentElement);
+const col = n => cs.getPropertyValue(n).trim();
+
+let progress = 0, target = 0, raf = null;
+function setTarget(t){
+  target = t;
+  if(reduceMotion){ progress = t; draw(); return; }
+  if(!raf) raf = requestAnimationFrame(step);
+}
+function step(){
+  progress += (target - progress) * 0.14;
+  if(Math.abs(target-progress) < 0.002){ progress = target; raf=null; draw(); return; }
+  draw();
+  raf = requestAnimationFrame(step);
+}
+
+function draw(){
+  const d = parseFloat(dSlide.value);
+  const baseline = Math.log((1-d)/d);
+  dVal.textContent = d.toFixed(2);
+  bVal.textContent = baseline.toFixed(2);
+
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const marginL=46, marginR=16, marginT=16, marginB=46;
+  const plotW = W-marginL-marginR, plotH = H-marginT-marginB;
+  const yMin=-4, yMax=4;
+  const yToPx = v => marginT + plotH*(1-(v-yMin)/(yMax-yMin));
+
+  // axis
+  ctx.strokeStyle = col('--line'); ctx.fillStyle = col('--muted');
+  ctx.font='11px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.lineWidth=1;
+  for(let v=-4; v<=4; v+=2){
+    const y=yToPx(v);
+    ctx.beginPath(); ctx.moveTo(marginL,y); ctx.lineTo(W-marginR,y); ctx.strokeStyle=col('--line');
+    ctx.globalAlpha=0.4; ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillText(v.toString(), marginL-6, y);
+  }
+  ctx.save();
+  ctx.translate(14, marginT+plotH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillText('log-preference (nats)',0,0);
+  ctx.restore();
+
+  // baseline dashed line
+  const yB = yToPx(Math.max(yMin,Math.min(yMax,baseline)));
+  ctx.setLineDash([5,4]);
+  ctx.strokeStyle = col('--baseline'); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(marginL,yB); ctx.lineTo(W-marginR,yB); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = col('--baseline'); ctx.textAlign='left'; ctx.font='11px sans-serif';
+  ctx.fillText('dropout baseline (ΔI_R = 0)', marginL+4, Math.max(marginT+10, yB-8));
+
+  // bars
+  const n = primitives.length;
+  const bw = plotW/n * 0.55;
+  ctx.font='11px sans-serif';
+  primitives.forEach((p,i)=>{
+    const cx = marginL + plotW*(i+0.5)/n;
+    const effDI = p.dI * progress;
+    const val = baseline + effDI;
+    const yv = yToPx(Math.max(yMin,Math.min(yMax,val)));
+    const color = p.dI>0.01 ? col('--good') : (p.dI<-0.01 ? col('--bad') : col('--neutral'));
+    ctx.fillStyle = color;
+    const top = Math.min(yB,yv), h = Math.abs(yv-yB);
+    ctx.fillRect(cx-bw/2, top, bw, Math.max(h,1.5));
+    // value label
+    ctx.fillStyle = col('--text'); ctx.textAlign='center';
+    ctx.fillText(val.toFixed(2), cx, yv - (yv<yB? 8: -12));
+    // name label (two lines if long)
+    ctx.fillStyle = col('--muted');
+    const words = p.name.split(' ');
+    const mid = Math.ceil(words.length/2);
+    ctx.fillText(words.slice(0,mid).join(' '), cx, H-marginB+16);
+    if(words.length>mid) ctx.fillText(words.slice(mid).join(' '), cx, H-marginB+29);
+  });
+}
+
+dSlide.addEventListener('input', draw);
+draw();
+setTarget(0);
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;weights-are-benefit&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The lottery weights measure exactly how much a thought shrinks the policy's KL gap"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The filtered diet wins</h2>
+  <div class="part-lede">The refinement loop hands us a new training set: one self-selected reasoning trace per demonstration. Now we retrain the pepper-task robot on it and put it head-to-head against the no-reasoning and recite-everything baselines from Part 1, using the paper's real numbers.</div>
+</header>
+<section class="scene" id="bootstrap-results">
+  <h3>Retraining on self-selected thoughts beats both baselines — while thinking half as much</h3>
+  <div class="caption">The proposition said the lottery keeps only KL-shrinking thoughts; now retrain the pepper-task robot on them and face the two baselines from Part 1 on LIBERO-90, a suite of 90 simulated tabletop manipulation tasks. Predict first: does halving the reasoning cost any success?</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="bootstrap-results"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Retraining on filtered thoughts: success up, cost down</title>
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#ffffff; --text:#1c1c1e; --muted:#6b6b70;
+  --grid:#d8d8dc; --accentGlow: rgba(46,125,222,0.35);
+  --bar-no:#9aa3ad; --bar-all:#c98a3c; --bar-refined:#2e7dde;
+  --dim:0.42;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15161a; --panel:#1d1f24; --text:#eceef1; --muted:#9a9ea5;
+    --grid:#333640; --accentGlow: rgba(90,160,255,0.35);
+    --bar-no:#7d858e; --bar-all:#d99a4f; --bar-refined:#5aa0ff;
+    --dim:0.38;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+h1{font-size:15px;line-height:1.35;margin:0 0 10px;font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+button.policy{
+  flex:1 1 auto;min-width:110px;padding:7px 8px;font-size:12px;border-radius:7px;
+  border:1px solid var(--grid);background:var(--panel);color:var(--text);cursor:pointer;
+}
+button.policy.active{border-color:var(--accentGlow);box-shadow:0 0 0 2px var(--accentGlow) inset;font-weight:600;}
+.afrow{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:10px;flex-wrap:wrap;}
+.afrow input{transform:translateY(1px);}
+.panel{background:var(--panel);border:1px solid var(--grid);border-radius:8px;
+  padding:6px 8px 2px;margin-bottom:10px;}
+svg{width:100%;height:auto;display:block;}
+rect.bar{transition:height .4s ease, y .4s ease, opacity .3s ease;}
+@media (prefers-reduced-motion: reduce){ rect.bar{transition:none;} }
+text{fill:var(--text);}
+.muted{fill:var(--muted);}
+.summary{font-size:12px;color:var(--text);}
+.summary ul{margin:4px 0 0;padding-left:18px;}
+.summary li{margin:2px 0;}
+.eqbox{background:var(--panel);border:1px solid var(--grid);border-radius:8px;
+  padding:8px 10px;margin-top:8px;}
+math{font-size:16px;}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;}
+.note{font-size:11px;color:var(--muted);margin-top:8px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>Retrain on the filtered thoughts Z*: pick a policy, watch all three meters move together</h1>
+
+  <div class=&quot;controls&quot; id=&quot;policyBtns&quot;></div>
+
+  <div class=&quot;afrow&quot;>
+    <label><input type=&quot;checkbox&quot; id=&quot;afCheck&quot; disabled>
+      Force action &amp;mdash; suppress reasoning entirely at test time (zero-shot; refined policy only)</label>
+  </div>
+
+  <div class=&quot;panel&quot;><svg id=&quot;svgSuccess&quot; viewBox=&quot;0 0 480 150&quot;></svg></div>
+  <div class=&quot;panel&quot;><svg id=&quot;svgTokens&quot; viewBox=&quot;0 0 480 150&quot;></svg></div>
+  <div class=&quot;panel&quot;><svg id=&quot;svgLatency&quot; viewBox=&quot;0 0 480 150&quot;></svg></div>
+
+  <div class=&quot;panel summary&quot; id=&quot;summaryBox&quot;></div>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mi>r</mi><mo>=</mo>
+      <mfrac><msub><mi>T</mi><mtext>refined</mtext></msub><msub><mi>T</mi><mtext>all&amp;#8202;prim.</mtext></msub></mfrac>
+      <mo>=</mo><mfrac><mn>129.3</mn><mn>256.8</mn></mfrac><mo>&amp;#8776;</mo><mn id=&quot;ratioVal&quot;>0.50</mn>
+    </math>
+    <div class=&quot;legend&quot;>r &amp;mdash; token ratio (unitless) &amp;middot; T<sub>refined</sub>, T<sub>all&amp;#8202;prim.</sub> &amp;mdash; average generated tokens per action step for the refined and all-primitives policies</div>
+  </div>
+
+  <div class=&quot;note&quot;>LIBERO-90: 90 simulated tabletop manipulation tasks, the pepper-grasping task's home benchmark. Latency is measured per control step on a real WidowX arm.</div>
+</div>
+
+<script>
+const POLICIES = [
+  {key:'no',   label:'No reasoning',    success:75.9, tokens:10.0,  latency:1.1, color:'var(--bar-no)'},
+  {key:'all',  label:'All primitives',  success:78.6, tokens:256.8, latency:5.4, color:'var(--bar-all)'},
+  {key:'ref',  label:'Refined (Z*)',    success:79.9, successLow:79.5, successHigh:80.3,
+                tokens:129.3, latency:3.0, color:'var(--bar-refined)'}
+];
+const ACTION_FORCED = { tokens:0.0, latency:1.0 }; // suppress reasoning at test time, zero-shot
+
+let selected = 2;      // start on the refined policy
+let forced = false;
+
+const btnBar = document.getElementById('policyBtns');
+POLICIES.forEach((p,i)=>{
+  const b = document.createElement('button');
+  b.className='policy'; b.textContent=p.label; b.dataset.i=i;
+  b.title = 'Show meters for the &quot;'+p.label+'&quot; policy';
+  b.addEventListener('click', ()=>{ selected=i; forced = forced &amp;&amp; p.key==='ref'; render(); });
+  btnBar.appendChild(b);
+});
+const afCheck = document.getElementById('afCheck');
+afCheck.addEventListener('change', ()=>{ forced = afCheck.checked; render(); });
+
+function svgEl(tag, attrs){
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+// geometry shared by all three panels
+const W=480,H=150, PL=62, PR=460, PT=26, PB=110;
+const GW=(PR-PL)/3, BW=64;
+
+function drawPanel(svg, title, unit, values, maxVal, fmt, rangeIndex){
+  svg.innerHTML='';
+  svg.appendChild(svgEl('text',{x:8,y:14,'font-size':12,'font-weight':600}));
+  svg.lastChild.textContent = title+'  ('+unit+')';
+  // gridlines + ticks
+  svg.appendChild(svgEl('line',{x1:PL,y1:PT,x2:PR,y2:PT,stroke:'var(--grid)','stroke-width':1}));
+  svg.appendChild(svgEl('line',{x1:PL,y1:PB,x2:PR,y2:PB,stroke:'var(--grid)','stroke-width':1}));
+  svg.appendChild(svgEl('text',{x:PL-6,y:PB+4,'font-size':10,'text-anchor':'end',class:'muted'}));
+  svg.lastChild.textContent='0';
+  svg.appendChild(svgEl('text',{x:PL-6,y:PT+4,'font-size':10,'text-anchor':'end',class:'muted'}));
+  svg.lastChild.textContent=fmt(maxVal);
+
+  values.forEach((v,i)=>{
+    const cx = PL + i*GW + GW/2;
+    const h = (v.val/maxVal)*(PB-PT);
+    const y = PB - h;
+    const isSel = i===selected;
+    svg.appendChild(svgEl('rect',{class:'bar', x:cx-BW/2, y:y, width:BW, height:h,
+      fill:v.color, opacity:isSel?1:0.42, rx:3}));
+    if(isSel){
+      svg.appendChild(svgEl('rect',{x:cx-BW/2, y:y, width:BW, height:h, fill:'none',
+        stroke:'var(--text)', 'stroke-width':1, rx:3, opacity:0.6}));
+    }
+    // value label
+    svg.appendChild(svgEl('text',{x:cx,y:y-6,'font-size':11,'text-anchor':'middle',
+      'font-weight':isSel?700:400}));
+    svg.lastChild.textContent = v.display;
+    // range whiskers (success only)
+    if(v.low!==undefined){
+      const yLo = PB - (v.low/maxVal)*(PB-PT), yHi = PB - (v.high/maxVal)*(PB-PT);
+      svg.appendChild(svgEl('line',{x1:cx,y1:yLo,x2:cx,y2:yHi,stroke:'var(--text)','stroke-width':1.4}));
+      svg.appendChild(svgEl('line',{x1:cx-6,y1:yLo,x2:cx+6,y2:yLo,stroke:'var(--text)','stroke-width':1.4}));
+      svg.appendChild(svgEl('line',{x1:cx-6,y1:yHi,x2:cx+6,y2:yHi,stroke:'var(--text)','stroke-width':1.4}));
+    }
+    // forced overlay (dashed) — only meaningful on tokens/latency, drawn by caller via v.forced
+    if(v.forced!==undefined){
+      const hf = (v.forced/maxVal)*(PB-PT);
+      const yf = PB - hf;
+      svg.appendChild(svgEl('rect',{x:cx-BW/2-4, y:yf, width:BW+8, height:hf,
+        fill:'none', stroke:'var(--text)','stroke-width':1.3,'stroke-dasharray':'4,3'}));
+      svg.appendChild(svgEl('text',{x:cx, y:yf-6, 'font-size':10,'text-anchor':'middle',class:'muted'}));
+      svg.lastChild.textContent = 'forced: '+fmt(v.forced);
+    }
+    // x label (policy name), two lines if needed
+    const words = v.label.split(' ');
+    svg.appendChild(svgEl('text',{x:cx,y:PB+20,'font-size':10,'text-anchor':'middle',class:'muted'}));
+    svg.lastChild.textContent = words.slice(0,2).join(' ');
+    if(words.length>2){
+      svg.appendChild(svgEl('text',{x:cx,y:PB+32,'font-size':10,'text-anchor':'middle',class:'muted'}));
+      svg.lastChild.textContent = words.slice(2).join(' ');
+    }
+  });
+}
+
+function fmt1(v){ return v.toFixed(1); }
+function fmtS(v){ return v.toFixed(1)+'s'; }
+function fmt0(v){ return Math.round(v); }
+
+function render(){
+  document.querySelectorAll('button.policy').forEach((b,i)=>b.classList.toggle('active', i===selected));
+  const isRef = POLICIES[selected].key==='ref';
+  afCheck.disabled = !isRef;
+  if(!isRef) afCheck.checked=false, forced=false;
+  else afCheck.checked = forced;
+
+  // SUCCESS panel
+  const succVals = POLICIES.map((p,i)=>{
+    const isRefP = p.key==='ref';
+    return { val:p.success, display: isRefP? p.successLow.toFixed(1)+'\u2013'+p.successHigh.toFixed(1)+'%' : p.success.toFixed(1)+'%',
+      color:p.color, label:p.label, low:isRefP?p.successLow:undefined, high:isRefP?p.successHigh:undefined };
+  });
+  drawPanel(document.getElementById('svgSuccess'),'Task success rate','% tasks solved', succVals, 100, v=>v.toFixed(0));
+
+  // TOKENS panel
+  const tokVals = POLICIES.map((p,i)=>{
+    const o = { val:p.tokens, display: fmt1(p.tokens), color:p.color, label:p.label };
+    if(p.key==='ref' &amp;&amp; forced) o.forced = ACTION_FORCED.tokens;
+    return o;
+  });
+  drawPanel(document.getElementById('svgTokens'),'Tokens generated per step','tokens', tokVals, 300, fmt0);
+
+  // LATENCY panel
+  const latVals = POLICIES.map((p,i)=>{
+    const o = { val:p.latency, display: fmtS(p.latency), color:p.color, label:p.label };
+    if(p.key==='ref' &amp;&amp; forced) o.forced = ACTION_FORCED.latency;
+    return o;
+  });
+  drawPanel(document.getElementById('svgLatency'),'Real-robot per-step latency','seconds', latVals, 7, fmtS);
+
+  // summary list, comparing selected policy to the all-primitives template baseline
+  const sel = POLICIES[selected];
+  const base = POLICIES[1];
+  const sBox = document.getElementById('summaryBox');
+  const sSucc = sel.key==='ref' ? sel.successLow.toFixed(1)+'\u2013'+sel.successHigh.toFixed(1)+'%' : sel.success.toFixed(1)+'%';
+  const sTok = forced &amp;&amp; sel.key==='ref' ? ACTION_FORCED.tokens.toFixed(1) : sel.tokens.toFixed(1);
+  const sLat = forced &amp;&amp; sel.key==='ref' ? ACTION_FORCED.latency.toFixed(1)+'s' : sel.latency.toFixed(1)+'s';
+  sBox.innerHTML =
+    '<strong>Selected: '+sel.label+'</strong>'+
+    '<ul>'+
+    '<li>Success rate: '+sSucc+' (template baseline: '+base.success.toFixed(1)+'%)</li>'+
+    '<li>Tokens / step: '+sTok+' (template baseline: '+base.tokens.toFixed(1)+')</li>'+
+    '<li>Latency / step: '+sLat+' (template baseline: '+base.latency.toFixed(1)+'s)</li>'+
+    '</ul>';
+}
+
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;bootstrap-results&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Retraining on self-selected thoughts beats both baselines — while thinking half as much"
+  ></iframe>
+</section>
+
+<section class="scene" id="pruned-distractors">
+  <h3>The filter keeps action-relevant thoughts, prunes junk, and that buys robustness</h3>
+  <div class="caption">Where did the gains come from? Compare the reasoning diet before and after refinement. Then toggle on a cluttered scene unlike the training demos: a model that never learned to attend to distractors doesn't degrade there.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="pruned-distractors"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Pruned Distractors — Reasoning Diet After Refinement</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1a1a1a; --muted:#666a72; --panel-bg:#f4f5f8;
+  --border:#d7d9de;
+  --pepper:#d1531f; --basket:#7b5230;
+  --distractor1:#2f6fb0; --distractor2:#3f9142; --distractor3:#7d4fae; --distractor4:#c0392b;
+  --attn-template:#e67e22; --attn-refined:#1f7a3d;
+  --bar-template:#c0392b; --bar-refined:#1f7a3d;
+  --before-bar:#b7b9c2; --after-bar:#3f6fb0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121216; --fg:#eaeaea; --muted:#a3a7b0; --panel-bg:#1c1c23; --border:#34343d;
+    --pepper:#e8763a; --basket:#a67c52;
+    --distractor1:#5b9bd5; --distractor2:#6cbf6f; --distractor3:#a97fda; --distractor4:#e5766a;
+    --attn-template:#f0a04b; --attn-refined:#4fd17a;
+    --bar-template:#e5766a; --bar-refined:#4fd17a;
+    --before-bar:#4a4a55; --after-bar:#5b9bd5;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:12px;}
+h2{font-size:16px;margin:0 0 4px;}
+h3{font-size:13px;margin:0 0 8px;color:var(--fg);}
+.sub{font-size:12px;color:var(--muted);margin:0 0 10px;}
+.row{display:flex;gap:14px;flex-wrap:wrap;}
+.panel{flex:1 1 300px;min-width:250px;background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px;}
+svg{width:100%;height:auto;max-width:100%;display:block;}
+.legend-row{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:6px 0;}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;}
+button{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--fg);cursor:pointer;margin-top:8px;}
+button:hover{filter:brightness(1.08);}
+.success-bars{margin-top:10px;}
+.bar-group{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px;}
+.bar-label{width:110px;flex:0 0 110px;color:var(--muted);}
+.bar-track{flex:1;background:var(--before-bar);border-radius:4px;height:14px;overflow:hidden;}
+.bar-fill{height:100%;transition:width .3s ease;}
+.bar-fill.template{background:var(--bar-template);}
+.bar-fill.refined{background:var(--bar-refined);}
+.bar-value{width:70px;flex:0 0 70px;text-align:right;font-variant-numeric:tabular-nums;}
+.eq{font-size:12px;color:var(--muted);margin-top:8px;}
+math{font-size:14px;}
+ul.freq-list{list-style:none;margin:0;padding:0;}
+.freq-item{margin-bottom:8px;}
+.freq-label{font-size:12px;margin-bottom:2px;}
+.freq-bars{display:flex;flex-direction:column;gap:2px;}
+.mini-bar{height:10px;border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;font-size:9px;color:#fff;white-space:nowrap;}
+.mini-bar.before{background:var(--before-bar);color:var(--fg);}
+.mini-bar.after{background:var(--after-bar);}
+.callout{margin-top:10px;font-size:12px;padding:8px;border:1px dashed var(--border);border-radius:6px;background:var(--bg);}
+.legend-line{font-size:11px;color:var(--muted);margin-top:4px;}
+.attn-note{font-size:11px;margin-top:6px;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border);}
+@media (prefers-reduced-motion: reduce){ .bar-fill{transition:none;} }
+@media (max-width:400px){ .bar-label{width:80px;flex:0 0 80px;} .bar-value{width:55px;flex:0 0 55px;} }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<h2>The filtered diet wins</h2>
+<p class=&quot;sub&quot;>Left: pepper-grasping scene, clean vs. cluttered — toggle it. Right: what the reasoning traces contained before/after refinement.</p>
+
+<div class=&quot;row&quot;>
+  <div class=&quot;panel&quot;>
+    <h3>Pepper scene — attention &amp; success</h3>
+    <div class=&quot;legend-row&quot;>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--pepper)&quot;></span>pepper (target)</span>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--basket)&quot;></span>basket (goal)</span>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--distractor1)&quot;></span>distractor objects</span>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--attn-template)&quot;></span>template attention</span>
+      <span><span class=&quot;swatch&quot; style=&quot;background:var(--attn-refined)&quot;></span>refined attention</span>
+    </div>
+    <svg id=&quot;sceneSvg&quot; viewBox=&quot;0 0 400 210&quot; role=&quot;img&quot; aria-label=&quot;pepper scene comparison&quot;></svg>
+    <div class=&quot;attn-note&quot; id=&quot;attnNote&quot;></div>
+    <div class=&quot;success-bars&quot;>
+      <div class=&quot;bar-group&quot;>
+        <span class=&quot;bar-label&quot;>Template baseline</span>
+        <div class=&quot;bar-track&quot;><div class=&quot;bar-fill template&quot; id=&quot;barTemplate&quot;></div></div>
+        <span class=&quot;bar-value&quot; id=&quot;valTemplate&quot;>88%</span>
+      </div>
+      <div class=&quot;bar-group&quot;>
+        <span class=&quot;bar-label&quot;>Refined model</span>
+        <div class=&quot;bar-track&quot;><div class=&quot;bar-fill refined&quot; id=&quot;barRefined&quot;></div></div>
+        <span class=&quot;bar-value&quot; id=&quot;valRefined&quot;>87%</span>
+      </div>
+    </div>
+    <button id=&quot;toggleBtn&quot;>Toggle scene: clean → cluttered (adds 4 distractor objects)</button>
+    <div class=&quot;eq&quot;>
+      <math display=&quot;block&quot;>
+        <msub><mi>S</mi><mtext>cluttered</mtext></msub><mo>=</mo>
+        <msub><mi>S</mi><mtext>clean</mtext></msub><mo>&amp;#183;</mo><mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>&amp;#916;</mi><mo>)</mo>
+      </math>
+      <div class=&quot;legend-line&quot;>S — task success rate (%) · Δ — fractional drop under clutter: template 0.31 (Fig. 7a), refined 0.02 (holds steady)</div>
+    </div>
+  </div>
+
+  <div class=&quot;panel&quot;>
+    <h3>Reasoning diet, pepper task (Fig. 4a, 5)</h3>
+    <div class=&quot;legend-line&quot; style=&quot;margin-bottom:6px;&quot;>bars: light = before refinement, blue = after refinement — same primitive, per-response mention rate</div>
+    <ul class=&quot;freq-list&quot; id=&quot;freqList&quot;></ul>
+    <div class=&quot;callout&quot;>Object mentions that are <strong>exclusively</strong> the task-relevant one: <strong>0.03% → 25.4%</strong> of responses (Fig. 5).</div>
+  </div>
+</div>
+
+<script>
+// ---- constants (named, auditable) ----
+const TEMPLATE_CLEAN = 0.88;   // baseline success rate on clean scenes
+const TEMPLATE_DEG    = 0.31;  // relative degradation under clutter (Fig. 7a)
+const REFINED_CLEAN  = 0.87;   // refined model success rate on clean scenes
+const REFINED_DEG    = 0.02;   // refined model barely moves under clutter
+
+// reasoning-diet frequencies: [label, before %, after %]
+const FREQ = [
+  [&quot;Move&quot;, 92, 90],
+  [&quot;Gripper position&quot;, 85, 83],
+  [&quot;Visible objects&quot;, 71, 20],
+  [&quot;Explain (justification)&quot;, 64, 15],
+  [&quot;Injected junk primitive&quot;, 100, 36.7]
+];
+
+const cs = getComputedStyle(document.documentElement);
+const col = name => cs.getPropertyValue(name).trim();
+
+let cluttered = false;
+
+function halfScene(offsetX, isTemplate, clutter){
+  const g = [];
+  // basket + pepper (local coords, then offset)
+  const bx = offsetX+55, by=150, bw=70, bh=35;
+  const px = offsetX+90, py=132;
+  g.push(`<rect x=&quot;${bx}&quot; y=&quot;${by}&quot; width=&quot;${bw}&quot; height=&quot;${bh}&quot; rx=&quot;4&quot; fill=&quot;${col('--basket')}&quot;></rect>`);
+  g.push(`<text x=&quot;${offsetX+90}&quot; y=&quot;200&quot; font-size=&quot;9&quot; fill=&quot;${col('--muted')}&quot; text-anchor=&quot;middle&quot;>basket</text>`);
+  g.push(`<ellipse cx=&quot;${px}&quot; cy=&quot;${py}&quot; rx=&quot;14&quot; ry=&quot;18&quot; fill=&quot;${col('--pepper')}&quot;></ellipse>`);
+  g.push(`<text x=&quot;${px}&quot; y=&quot;${py-24}&quot; font-size=&quot;9&quot; fill=&quot;${col('--muted')}&quot; text-anchor=&quot;middle&quot;>pepper</text>`);
+
+  const distractors = [
+    {x:offsetX+20, y:38, r:10, fill:col('--distractor1')},
+    {x:offsetX+150,y:28, w:16,h:30, fill:col('--distractor2')},
+    {x:offsetX+15, y:96, w:20,h:20, fill:col('--distractor3')},
+    {x:offsetX+150,y:105,r:9,  fill:col('--distractor4')}
+  ];
+  if(clutter){
+    distractors.forEach(d=>{
+      if(d.r) g.push(`<circle cx=&quot;${d.x}&quot; cy=&quot;${d.y}&quot; r=&quot;${d.r}&quot; fill=&quot;${d.fill}&quot;></circle>`);
+      else g.push(`<rect x=&quot;${d.x}&quot; y=&quot;${d.y}&quot; width=&quot;${d.w}&quot; height=&quot;${d.h}&quot; rx=&quot;3&quot; fill=&quot;${d.fill}&quot;></rect>`);
+    });
+  }
+  // attention overlay
+  if(isTemplate){
+    if(!clutter){
+      g.push(`<ellipse cx=&quot;${px}&quot; cy=&quot;${py+10}&quot; rx=&quot;50&quot; ry=&quot;45&quot; fill=&quot;${col('--attn-template')}&quot; opacity=&quot;0.32&quot;></ellipse>`);
+    } else {
+      // attention has left the pepper/basket entirely and scattered onto every distractor
+      distractors.forEach(d=>{
+        const cx = d.x + (d.w? d.w/2:0);
+        const cy = d.y + (d.h? d.h/2:0);
+        const r  = (d.r||12)+10;
+        g.push(`<circle cx=&quot;${cx}&quot; cy=&quot;${cy}&quot; r=&quot;${r}&quot; fill=&quot;none&quot; stroke=&quot;${col('--attn-template')}&quot; stroke-width=&quot;3.5&quot; opacity=&quot;0.9&quot;></circle>`);
+        g.push(`<circle cx=&quot;${cx}&quot; cy=&quot;${cy}&quot; r=&quot;${r}&quot; fill=&quot;${col('--attn-template')}&quot; opacity=&quot;0.18&quot;></circle>`);
+      });
+    }
+  } else {
+    // refined attention never moves off the target, clean or cluttered
+    g.push(`<ellipse cx=&quot;${px}&quot; cy=&quot;${py+10}&quot; rx=&quot;50&quot; ry=&quot;45&quot; fill=&quot;${col('--attn-refined')}&quot; opacity=&quot;0.32&quot;></ellipse>`);
+  }
+  g.push(`<text x=&quot;${offsetX+90}&quot; y=&quot;14&quot; font-size=&quot;11&quot; fill=&quot;${col('--fg')}&quot; text-anchor=&quot;middle&quot;>${isTemplate? 'Template baseline':'Refined model'}</text>`);
+  return g.join('');
+}
+
+function renderScene(){
+  const svg = document.getElementById('sceneSvg');
+  svg.innerHTML = halfScene(10, true, cluttered) + halfScene(210, false, cluttered)
+    + `<line x1=&quot;200&quot; y1=&quot;0&quot; x2=&quot;200&quot; y2=&quot;210&quot; stroke=&quot;${col('--border')}&quot; stroke-dasharray=&quot;3,3&quot;></line>`;
+
+  const note = document.getElementById('attnNote');
+  note.textContent = cluttered
+    ? 'Cluttered scene: the template\u2019s orange attention rings jump onto the 4 distractor objects (basket/pepper no longer highlighted). The refined model\u2019s green ellipse stays put on the pepper and basket.'
+    : 'Clean scene: both models\u2019 attention highlights sit on the pepper and basket. Toggle below to add distractor objects.';
+}
+
+function renderBars(){
+  const st = TEMPLATE_CLEAN * (1 - (cluttered? TEMPLATE_DEG:0));
+  const sr = REFINED_CLEAN  * (1 - (cluttered? REFINED_DEG:0));
+  document.getElementById('barTemplate').style.width = (st*100).toFixed(0)+'%';
+  document.getElementById('barRefined').style.width  = (sr*100).toFixed(0)+'%';
+  document.getElementById('valTemplate').textContent = (st*100).toFixed(0)+'%'+(cluttered? ' (\u2212'+(TEMPLATE_DEG*100).toFixed(0)+'%)':'');
+  document.getElementById('valRefined').textContent  = (sr*100).toFixed(0)+'%'+(cluttered? ' (\u2212'+(REFINED_DEG*100).toFixed(0)+'%)':'');
+}
+
+function renderFreq(){
+  const ul = document.getElementById('freqList');
+  ul.innerHTML = FREQ.map(([label,before,after])=>{
+    return `<li class=&quot;freq-item&quot;>
+      <div class=&quot;freq-label&quot;>${label}</div>
+      <div class=&quot;freq-bars&quot;>
+        <div class=&quot;mini-bar before&quot; style=&quot;width:${before}%&quot;>${before}%</div>
+        <div class=&quot;mini-bar after&quot; style=&quot;width:${after}%&quot;>${after.toFixed? after.toFixed(1):after}%</div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+document.getElementById('toggleBtn').addEventListener('click', ()=>{
+  cluttered = !cluttered;
+  document.getElementById('toggleBtn').textContent =
+    cluttered ? 'Toggle scene: cluttered → clean (remove distractor objects)'
+              : 'Toggle scene: clean → cluttered (adds 4 distractor objects)';
+  renderScene();
+  renderBars();
+});
+
+renderScene();
+renderBars();
+renderFreq();
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;pruned-distractors&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The filter keeps action-relevant thoughts, prunes junk, and that buys robustness"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now, and what it unlocks</h2>
+  <div class="part-lede">The same self-grading loop, run unchanged on a robot arm, four legged robots, and a self-driving car, discovers a different reasoning diet for each body — something no hand-written template could. Because it needs zero external labels, it scales with nothing but logged demonstrations.</div>
+</header>
+<section class="scene" id="embodiment-diets">
+  <h3>Different bodies discover different thoughts — with no labels, from logged demos alone</h3>
+  <div class="caption">Everything so far ran on one arm and one pepper. Press the embodiment buttons: the same algorithm, unchanged, prescribes a different reasoning diet for each body. Over the no-reasoning baseline, the gains in task success are arm +28%, legs +101%, wheels +21% — no universal best template exists, which is why a self-grading filter had to replace hand-written ones.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="embodiment-diets"
+    srcdoc="<!doctype html>
+<html>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Embodiment diets</title>
+<style>
+:root{
+  --bg:#fbfaf7; --panel:#ffffff; --ink:#1c1c1c; --muted:#6b6b6b;
+  --grid:#dcdcd6; --accent:#b3541e; --accent2:#2f6f4f; --bar:#8f8f86;
+  --btn:#eee7db; --btnActive:#2f6f4f; --btnActiveInk:#fff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#17181a; --panel:#1f2124; --ink:#e9e7e1; --muted:#a4a29a;
+    --grid:#3a3c3e; --accent:#e08a4c; --accent2:#5fbf8f; --bar:#6d6f6a;
+    --btn:#2b2d2f; --btnActive:#5fbf8f; --btnActiveInk:#0e0f10;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px;}
+h1{font-size:15px;margin:2px 0 10px;font-weight:600;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+button.embBtn{background:var(--btn);color:var(--ink);border:none;border-radius:8px;
+  padding:8px 12px;font-size:13px;cursor:pointer;line-height:1.3;text-align:left;}
+button.embBtn.active{background:var(--btnActive);color:var(--btnActiveInk);}
+.note{display:block;font-size:10px;color:var(--muted);}
+button.embBtn.active .note{color:var(--btnActiveInk);opacity:.85;}
+svg{width:100%;height:auto;max-width:100%;display:block;background:var(--panel);border-radius:10px;}
+.readouts{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;}
+.card{flex:1 1 130px;background:var(--panel);border-radius:8px;padding:8px 10px;}
+.card .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;}
+.card .v{font-size:17px;font-weight:600;margin-top:2px;}
+.gloss{font-size:12px;color:var(--muted);margin:4px 0 8px;}
+.eqnBlock{background:var(--panel);border-radius:8px;padding:8px 10px;margin:8px 0;}
+math{color:var(--ink);}
+.legend{font-size:11px;color:var(--muted);margin-top:4px;}
+ul.closing{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+ul.closing li{background:var(--panel);border-left:3px solid var(--accent2);border-radius:4px;
+  padding:6px 8px;font-size:12px;line-height:1.4;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+<h1>Same self-grading loop, different embodiment → different reasoning diet</h1>
+
+<div class=&quot;controls&quot; id=&quot;btns&quot;>
+  <button class=&quot;embBtn&quot; data-emb=&quot;arm&quot;>🦾 Robot arm</button>
+  <button class=&quot;embBtn&quot; data-emb=&quot;legs&quot;>🐾 Legged robots</button>
+  <button class=&quot;embBtn&quot; data-emb=&quot;drive&quot;>🚗 Driving policy
+    <span class=&quot;note&quot;>VLA = vision-language-action model</span>
+  </button>
+</div>
+
+<svg id=&quot;chart&quot; viewBox=&quot;0 0 640 300&quot; preserveAspectRatio=&quot;xMidYMid meet&quot;>
+  <line x1=&quot;30&quot; y1=&quot;250&quot; x2=&quot;610&quot; y2=&quot;250&quot; stroke=&quot;var(--grid)&quot; stroke-width=&quot;1&quot;/>
+  <g id=&quot;bars&quot;></g>
+</svg>
+<div class=&quot;gloss&quot; id=&quot;glossLine&quot;></div>
+
+<div class=&quot;readouts&quot; id=&quot;readouts&quot;></div>
+
+<div class=&quot;eqnBlock&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>f</mi><mi>i</mi></msub><mo>=</mo>
+  <mfrac>
+    <msup><mi>e</mi><msub><mi>w</mi><mi>i</mi></msub></msup>
+    <mrow><msub><mo>&amp;#8721;</mo><mi>j</mi></msub><msup><mi>e</mi><msub><mi>w</mi><mi>j</mi></msub></msup></mrow>
+  </mfrac>
+</math>
+<div class=&quot;legend&quot;>f<sub>i</sub> — frequency (fraction, 0–1) of primitive i in the discovered diet · w<sub>i</sub> — learned utility weight of primitive i (unitless, output of self-grading) · sum runs over all primitives shown in the bar chart.</div>
+</div>
+
+<div class=&quot;eqnBlock&quot;>
+<math display=&quot;block&quot;>
+  <mi>&amp;#916;</mi><mo>=</mo>
+  <mfrac>
+    <mrow><msub><mi>S</mi><mtext>treated</mtext></msub><mo>&amp;#8722;</mo><msub><mi>S</mi><mtext>base</mtext></msub></mrow>
+    <msub><mi>S</mi><mtext>base</mtext></msub>
+  </mfrac>
+</math>
+<div class=&quot;legend&quot;>Δ — relative gain (or, for driving, relative reduction) shown as the headline % · S<sub>base</sub> — metric with no reasoning (task success rate; or collision rate for driving) · S<sub>treated</sub> — metric with the discovered reasoning diet.</div>
+</div>
+
+<ul class=&quot;closing&quot;>
+  <li><math><mi>p</mi><mo>(</mo><mi>A</mi><mo>|</mo><mi>C</mi><mo>,</mo><mi>Z</mi><mo>)</mo></math> is exact and free — actions A are discrete tokens given context C and reasoning trace Z, so no sampling approximation is needed.</li>
+  <li>The hindsight proposer q that invents plausible reasoning is just the same vision-language-action model, re-wired to look backwards from the logged action.</li>
+  <li>The whole loop consumes only logged expert demonstrations — no robot rollouts, no human ratings — so any existing demo dataset becomes reasoning-refinement fuel.</li>
+</ul>
+</div>
+
+<script>
+const embodiments = {
+  arm:{ icon:'🦾', label:'Robot arm',
+    primitives:[{name:'Move (concise)',w:2.4},{name:'Gripper position',w:2.0},{name:'Explain',w:0.2},{name:'Object list',w:0.1}],
+    gloss:'terse motion primitive: where the end-effector goes next',
+    baseline:0.50, gain:0.28, metricName:'task success rate' },
+  legs:{ icon:'🐾', label:'Legged robots',
+    primitives:[{name:'Affordances',w:3.0},{name:'Move',w:1.0},{name:'Balance',w:0.8},{name:'Counterfactual',w:-0.5}],
+    gloss:'affordance = which terrain patch is steppable',
+    baseline:0.34, gain:1.01, metricName:'task success rate' },
+  drive:{ icon:'🚗', label:'Driving policy',
+    primitives:[{name:'Goals',w:2.6},{name:'Constraints',w:2.3},{name:'Explain',w:0.3},{name:'Object list',w:0.2}],
+    gloss:'goals = where to go; constraints = the traffic rule that limits it',
+    collisionBaseline:0.38, collisionTreated:0.30, metricName:'collision rate (%)' }
+};
+
+function softmax(ws){
+  const m = Math.max(...ws);
+  const exps = ws.map(w=>Math.exp(w-m));
+  const s = exps.reduce((a,b)=>a+b,0);
+  return exps.map(e=>e/s);
+}
+
+const svgNS = &quot;http://www.w3.org/2000/svg&quot;;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let currentHeights = {}; // name -> current px height, persists across switches for smoothness
+
+function drawBars(items){
+  const g = document.getElementById('bars');
+  g.innerHTML='';
+  const chartH=200, baseY=250, barW=90, gap=30, startX=45;
+  const scale = 320; // px per unit frequency
+  const targets = items.map((it,idx)=>({
+    name:it.name, freq:it.freq, dominant:it.dominant,
+    x:startX+idx*(barW+gap),
+    target: Math.min(chartH, it.freq*scale)
+  }));
+
+  const rects = targets.map(t=>{
+    const rect = document.createElementNS(svgNS,'rect');
+    rect.setAttribute('x', t.x);
+    rect.setAttribute('width', barW);
+    rect.setAttribute('fill', t.dominant ? 'var(--accent)' : 'var(--bar)');
+    const startH = reduced ? t.target : 0;
+    rect.setAttribute('y', baseY-startH);
+    rect.setAttribute('height', startH);
+    g.appendChild(rect);
+
+    const label = document.createElementNS(svgNS,'text');
+    label.setAttribute('x', t.x+barW/2);
+    label.setAttribute('y', baseY+18);
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('font-size','11');
+    label.setAttribute('fill','var(--ink)');
+    label.textContent = t.name;
+    g.appendChild(label);
+
+    const pctLabel = document.createElementNS(svgNS,'text');
+    pctLabel.setAttribute('x', t.x+barW/2);
+    pctLabel.setAttribute('text-anchor','middle');
+    pctLabel.setAttribute('font-size','12');
+    pctLabel.setAttribute('font-weight','600');
+    pctLabel.setAttribute('fill', t.dominant ? 'var(--accent)' : 'var(--ink)');
+    g.appendChild(pctLabel);
+
+    return {rect, pctLabel, startH, target:t.target, freq:t.freq, baseY};
+  });
+
+  if(reduced){
+    rects.forEach(r=>{
+      r.pctLabel.setAttribute('y', baseY-r.target-8);
+      r.pctLabel.textContent = Math.round(r.freq*100)+'%';
+    });
+    return;
+  }
+
+  const dur=500; let start=null;
+  function step(ts){
+    if(!start) start=ts;
+    const t = Math.min(1,(ts-start)/dur);
+    const ease = 1-Math.pow(1-t,3);
+    rects.forEach(r=>{
+      const h = r.startH + (r.target-r.startH)*ease;
+      r.rect.setAttribute('y', r.baseY-h);
+      r.rect.setAttribute('height', h);
+      r.pctLabel.setAttribute('y', r.baseY-h-8);
+      r.pctLabel.textContent = Math.round(r.freq*ease*100 + r.freq*(1-ease)*(r.startH/scale>0?0:0))+'%';
+      r.pctLabel.textContent = Math.round((r.freq)*100)+'%';
+    });
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderReadouts(key){
+  const e = embodiments[key];
+  const box = document.getElementById('readouts');
+  box.innerHTML='';
+  function card(k,v){
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML = '<div class=&quot;k&quot;>'+k+'</div><div class=&quot;v&quot;>'+v+'</div>';
+    box.appendChild(d);
+  }
+  card('Embodiment', e.icon+' '+e.label);
+  if(key==='drive'){
+    const delta = (e.collisionBaseline - e.collisionTreated)/e.collisionBaseline;
+    card('Collision rate: no reasoning', e.collisionBaseline.toFixed(2)+'%');
+    card('Collision rate: with diet', e.collisionTreated.toFixed(2)+'%');
+    card('Relative reduction (\u0394)', (delta*100).toFixed(0)+'%');
+  } else {
+    const treated = e.baseline*(1+e.gain);
+    card('Success, no reasoning', (e.baseline*100).toFixed(0)+'%');
+    card('Success, with diet', (treated*100).toFixed(0)+'%');
+    card('Relative gain (\u0394)', (e.gain*100).toFixed(0)+'%');
+  }
+}
+
+function render(key){
+  const e = embodiments[key];
+  document.querySelectorAll('.embBtn').forEach(b=>b.classList.toggle('active', b.dataset.emb===key));
+  const freqs = softmax(e.primitives.map(p=>p.w));
+  let items = e.primitives.map((p,i)=>({name:p.name, freq:freqs[i]}));
+  items.sort((a,b)=>b.freq-a.freq);
+  items[0].dominant = true;
+  drawBars(items);
+  renderReadouts(key);
+  document.getElementById('glossLine').textContent =
+    'Dominant primitive: ' + items[0].name + ' — ' + e.gloss;
+}
+
+document.getElementById('btns').addEventListener('click', ev=>{
+  const btn = ev.target.closest('.embBtn');
+  if(btn) render(btn.dataset.emb);
+});
+
+render('arm');
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;embodiment-diets&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Different bodies discover different thoughts — with no labels, from logged demos alone"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Self-Supervised Bootstrapping of Action-Predictive Embodied Reasoning (R&amp;B-EnCoRe)</em> — Milan Ganai, Katie Luo, Jonas Frey, Clark Barrett, Marco Pavone. Explainer generated 2026-07-27.</footer>
+</main>
+<script>
+  // Size each scene iframe to its content so it never shows its own scrollbar
+  // (a "scrollbar inside the page scrollbar"). Two mechanisms, belt-and-suspenders:
+  //
+  // 1) Scenes postMessage({ explainItScene, height }) — but their ResizeObserver only
+  //    fires on box-size changes, so late reflow (MathML, web fonts, async SVG) that
+  //    grows content AFTER the first report is missed and the frame stays too short.
+  // 2) Because scenes are srcdoc (same-origin), we also measure each frame's true
+  //    scrollHeight directly and refit on every signal that can change it: the load
+  //    event, DOM mutations, box resizes, fonts.ready, and a few bounded timeouts that
+  //    catch reflow with no observable trigger. This converges and needs no scene changes.
+  const fitToContent = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc) return;
+    const h = Math.max(
+      doc.documentElement ? doc.documentElement.scrollHeight : 0,
+      doc.body ? doc.body.scrollHeight : 0
+    );
+    if (h && Math.ceil(h) !== Math.ceil(parseFloat(frame.style.height) || 0)) {
+      frame.style.height = Math.ceil(h) + "px";
+    }
+  };
+
+  const wireFrame = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc || !doc.documentElement) return;
+    const refit = () => fitToContent(frame);
+    refit();
+    try { new MutationObserver(refit).observe(doc.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); } catch { /* noop */ }
+    try { new ResizeObserver(refit).observe(doc.documentElement); } catch { /* noop */ }
+    try { if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(refit); } catch { /* noop */ }
+    [50, 150, 350, 700, 1200, 2500].forEach((t) => setTimeout(refit, t));
+  };
+
+  for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+    frame.addEventListener("load", () => wireFrame(frame));
+    // Non-lazy or already-cached frames may have loaded before this ran.
+    try { if (frame.contentDocument && frame.contentDocument.readyState === "complete") wireFrame(frame); } catch { /* noop */ }
+  }
+
+  // Keep honoring scene-sent heights too (harmless, and covers any edge our measure misses).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        if (Math.ceil(data.height) > Math.ceil(parseFloat(frame.style.height) || 0)) {
+          frame.style.height = Math.ceil(data.height) + "px";
+        }
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>
