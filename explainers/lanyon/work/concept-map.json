@@ -1,0 +1,100 @@
+{
+  "paper": {
+    "title": "Lanyon AI: Correctness-by-Construction Neurosymbolic AI for Scientific Computing",
+    "authors": [
+      "Jonathan Gorard",
+      "Ammar Hakim",
+      "Jimmy Juno"
+    ],
+    "oneSentenceClaim": "AI models now write code fast, but they also write subtle, silent bugs. Lanyon generates code together with a machine-checked proof, so the two can never disagree. It emits thousands of verified lines per second, at a fraction of a top-end model's cost.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "calculus and ordinary differential equations",
+    "linear algebra basics",
+    "classical mechanics (F = ma, conservation laws)",
+    "general programming literacy (what source code and a compiler are)",
+    "high-level awareness that LLMs generate text/code probabilistically"
+  ],
+  "concepts": [
+    {
+      "id": "spec-vs-implementation",
+      "name": "Correctness is always relative to a specification",
+      "whyItMatters": "Every claim Lanyon makes — 'provably correct by construction' — is a claim about matching a specification, not about being 'right' in some absolute sense. Without this distinction the whole architecture (and its footnoted caveat) is unintelligible.",
+      "coreMechanism": "A program is never correct in a vacuum; it is correct with respect to a formal specification — a precise mathematical statement of what the program must do (e.g. 'this solver conserves total energy to machine precision'). Verification means producing a proof that implementation ⊨ specification. This splits the trust problem into two separate links: does the code match the spec, and does the spec match what the human actually wanted?",
+      "misconception": "That 'verified code' means bug-free in every sense. Verification only guarantees the code does what the spec says; a wrong spec yields perfectly verified wrong behavior.",
+      "foundational": true
+    },
+    {
+      "id": "proof-assistants-type-checking",
+      "name": "Machine-checked proofs and proof assistants",
+      "whyItMatters": "Lanyon's entire pitch rests on the fact that proofs can be checked mechanically with zero trust in whoever wrote them — including an LLM. The reader needs to know why a type-checked proof is trustworthy at all.",
+      "coreMechanism": "Proof assistants (Lean, Rocq, Agda) encode mathematical statements as types and proofs as programs; a proof is valid if and only if it type-checks, which a small, well-audited kernel verifies deterministically. This means proof-checking is cheap and infallible even when proof-writing is hard and creative. The asymmetry — hard to produce, trivial to verify — is what makes it safe to let an unreliable generator (an LLM) propose proofs.",
+      "misconception": "That a computer 'believing' a proof requires AI-level judgment. It doesn't: checking is pure mechanical symbol manipulation, like a compiler checking syntax, just with far stronger guarantees.",
+      "foundational": true
+    },
+    {
+      "id": "llm-unreliability",
+      "name": "Code is abundant, correctness is scarce",
+      "whyItMatters": "This is the problem statement of the whole company: LLMs in 2026 produce vast amounts of plausible code, but each token is sampled probabilistically, so subtle errors are endemic and invisible.",
+      "coreMechanism": "An LLM generates code token by token from a learned distribution; nothing in the generation process enforces mathematical constraints, so a sign flip, an off-by-one, or a wrong boundary condition is just a slightly-less-likely token that got sampled anyway. Testing catches some errors, but for scientific code the failure mode is often a simulation that runs, converges, and quietly produces physically wrong numbers. In mission-critical domains (aerospace, nuclear), 'looks right and usually works' is not an acceptable correctness standard.",
+      "misconception": "That better/larger LLMs asymptotically solve this. Lowering the error rate per token never gets you to zero, and a 10,000-line simulation multiplies thousands of chances to fail.",
+      "foundational": true
+    },
+    {
+      "id": "numerical-pde-simulation",
+      "name": "Scientific computing = discretizing PDEs, where subtle errors are fatal",
+      "whyItMatters": "Lanyon's target domain is simulation of physical systems (Euler equations, Maxwell, MHD). Understanding why numerical PDE solvers are unusually error-sensitive explains why this domain, specifically, needs formal verification.",
+      "coreMechanism": "Physics is written in partial differential equations — conservation of mass, momentum, energy expressed as relations between derivatives in space and time. Computers can't handle continuous fields, so solvers replace derivatives with finite differences on a grid and step forward in time. The catch: a scheme's correctness depends on delicate mathematical properties (conservation, stability conditions, correct shock-capturing for nonlinear equations like Burgers'), and violating them doesn't crash the program — it produces smooth, confident, wrong physics. Lanyon's research notes (Euler, Maxwell, advection-diffusion, ideal MHD) are exactly this class of problem.",
+      "keyEquation": "\\frac{\\partial u}{\\partial t} + \\frac{\\partial f(u)}{\\partial x} = 0",
+      "misconception": "That a simulation that runs stably and produces smooth output is probably correct. Hyperbolic PDE solvers can be stable and convergent to the wrong solution if the scheme is subtly flawed.",
+      "foundational": true
+    },
+    {
+      "id": "autoformalization",
+      "name": "Autoformalization: the obvious approach Lanyon rejects",
+      "whyItMatters": "The paper's argument is structured as 'autoformalization is the consensus answer, and it has a fatal flaw.' You need the consensus answer first to see what Lanyon is arguing against.",
+      "coreMechanism": "Autoformalization means: have the LLM write the code, then have it (simultaneously or afterward) write a formal proof of that code's correctness in Lean/Rocq/Agda. Since the proof assistant's kernel checks the proof, the hope is that LLM unreliability gets filtered out by the symbolic checker. This has genuinely worked in pure-math domains, which is why it became the default paradigm.",
+      "foundational": false
+    },
+    {
+      "id": "misformalization",
+      "name": "Misformalization: a valid proof of the wrong statement",
+      "whyItMatters": "This is the central failure mode motivating Lanyon's architecture. The proof assistant checks that the proof is valid — it cannot check that the proof is about the code you actually shipped.",
+      "coreMechanism": "In autoformalization, code and proof are two separate artifacts, and the LLM writes both. If the implementation contains a plus sign but the proof reasons about a minus sign, the proof can still type-check perfectly — it's a flawless proof of a statement that doesn't describe the running code. The verification gives you false confidence: the formal seal of approval is attached to the wrong object. Because the LLM is exactly the kind of generator that introduces such transcription drift, the weak link (LLM reliability) reappears at the code–proof interface even though each artifact individually looks rigorous.",
+      "misconception": "That 'the proof type-checked' implies 'the code is verified.' Type-checking validates the proof internally; it says nothing about whether the proof's subject matches the implementation."
+    },
+    {
+      "id": "neurosymbolic-division-of-labor",
+      "name": "Neurosymbolic split: LLM proposes, symbolic engine constructs",
+      "whyItMatters": "This is Lanyon's core architectural claim: assign creativity to the neural component and reliability to the symbolic component, so neither is asked to do what it's bad at.",
+      "coreMechanism": "LLMs are good at open-ended proposal — conjuring a plausible formalization of a physics problem — but unreliable at exact symbol manipulation. Symbolic algorithms (theorem provers, code generators) are the opposite: zero creativity, perfect determinism. Lanyon restricts the LLM to a single job: emit a short formal specification. Everything downstream — expanding the spec into implementation code and correctness proofs — is done by deterministic symbolic algorithms that cannot introduce errors, because they don't sample from a distribution."
+    },
+    {
+      "id": "correctness-by-construction",
+      "name": "Correctness by construction: code and proof from one source",
+      "whyItMatters": "This is the mechanism that makes misformalization structurally impossible — the paper's headline claim ('mathematically impossible for Lanyon ever to make a mistake') is a direct consequence of it.",
+      "coreMechanism": "Instead of writing code and then proving it correct, Lanyon's symbolic engine generates the implementation and its proof simultaneously from the same DSL specification — they are two projections of one object, so they cannot disagree, the way a plus sign in code can never diverge from a minus sign in a proof written separately. If the specification cannot be rigorously proven correct, the code-generation step simply doesn't fire: no proof, no code. Errors aren't caught after the fact; the pipeline is shaped so the erroneous artifact is never produced.",
+      "misconception": "That this is just very good automated testing or post-hoc verification. It's neither: there is no verification 'step' that could fail silently, because unverifiable code is never emitted at all."
+    },
+    {
+      "id": "dsl-compression-economics",
+      "name": "The DSL leverage: tens of lines in, tens of thousands out",
+      "whyItMatters": "This explains the speed/cost claim — Lanyon runs at 'a tiny fraction of the token and compute cost of frontier models' — as a direct consequence of the architecture, not of a bigger model.",
+      "coreMechanism": "LLM inference cost scales with tokens generated. Lanyon's LLM only reasons over tens of lines of a highly condensed, domain-specific formal language that bakes in decades of applied-math and computational-physics expertise (conservation laws, discretization schemes, equation-class properties). Deterministic symbolic expansion — which costs essentially nothing compared to LLM inference — then blows those tens of lines up into tens of thousands of lines of code and proof, at rates of thousands of lines of type-correct proof per second. The expensive, fallible component touches the fewest possible tokens; the cheap, infallible component does the bulk of the writing."
+    },
+    {
+      "id": "syntactic-vs-semantic-correctness",
+      "name": "The honest caveat: syntactic vs semantic correctness",
+      "whyItMatters": "The footnote is the most important epistemic boundary in the announcement: Lanyon guarantees spec→code→proof consistency, but whether the spec captures what the user meant remains open. Without this rung the 'never makes a mistake' claim reads as either magic or hype.",
+      "coreMechanism": "Lanyon guarantees perfect syntactic correctness: every implementation matches its specification and every proof matches its implementation, 100% of the time, by construction. What it cannot yet guarantee is semantic correctness: that the LLM-proposed formal specification faithfully captures the user's natural-language intent. If you ask for one physical system and the LLM formalizes a subtly different one, Lanyon will flawlessly and provably solve the wrong problem. The founders flag this spec-intent gap as an open research problem spanning linguistics, psychology, and agent-harness design.",
+      "misconception": "That 'mathematically impossible to make a mistake' means the output always matches user intent. It means the output always matches the specification — a strictly weaker, but still unprecedented, guarantee."
+    },
+    {
+      "id": "mission-critical-stakes",
+      "name": "Why verified simulation targets aerospace, propulsion, and nuclear first",
+      "whyItMatters": "This grounds the whole enterprise: the choice of first markets follows from where the cost of a silent numerical error is highest and where trust in AI-generated code is currently lowest.",
+      "coreMechanism": "In aerospace engineering, space/atmospheric propulsion, and nuclear energy, design decisions rest on simulations of exactly the PDE systems in Lanyon's research notes (Euler gas dynamics, Maxwell/electrodynamics, MHD for conducting plasmas). A wrong simulation doesn't fail a unit test — it certifies an unsafe design. As AI accelerates how fast such code is produced, the verification bottleneck becomes the binding constraint; Lanyon's bet is that provable correctness is the only way AI-generated scientific code gets adopted in these domains at all."
+    }
+  ]
+}

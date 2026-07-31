@@ -1,0 +1,3541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Lanyon AI Works</title>
+<style>
+  :root {
+    --bg: #fdfdfb;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --rule: #e2e2dc;
+    --accent: #2f6fed;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e8e8e4;
+      --muted: #a0a0a0;
+      --rule: #33363c;
+      --accent: #7aa6ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.25;
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+  }
+  .hook {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0 0 3rem;
+  }
+  .page-links {
+    margin: -2.25rem 0 3rem;
+    font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.5rem;
+  }
+  .page-links a { color: var(--accent); text-decoration: none; }
+  .page-links a:hover { text-decoration: underline; }
+  .page-links .sep { color: var(--muted); }
+  .page-links .pedagogy {
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.82rem;
+  }
+  section.endorsements {
+    margin: -1.5rem 0 3rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  section.endorsements h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  section.endorsements ul { list-style: none; margin: 0; padding: 0; }
+  section.endorsements li { margin: 0.35rem 0; }
+  section.endorsements .check { color: #2e9e5b; font-weight: 700; margin-right: 0.35rem; }
+  section.endorsements .date { color: var(--muted); font-size: 0.85em; }
+  section.endorsements blockquote {
+    margin: 0.25rem 0 0 1.4rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  header.part {
+    margin: 4rem 0 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  header.part h2 {
+    font-size: 1.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  header.part .part-lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+  section.scene { margin: 0 0 3.5rem; }
+  section.scene h3 {
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  section.scene .caption {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+  }
+  .caption math, .hook math { font-size: 1.2em; }
+  .caption ul, .part-lede ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
+  .caption li, .part-lede li { margin: 0.2rem 0; }
+  iframe.scene-frame {
+    display: block;
+    width: 100%;
+    height: 480px; /* replaced by postMessage-reported height */
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    overflow: hidden;
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>How Lanyon AI Works</h1>
+  <p class="hook">AI models can now write a full physics simulation in minutes. They can also slip in a sign error that runs stably, converges smoothly, and reports the wrong physics with total confidence. The standard fix: have the AI also write a proof that its code is correct. But that plan has a hole. The proof can be flawless while describing code you aren't actually running. Lanyon AI generates the code and the proof from one shared source, so the two can never disagree. That single architectural move turns 'probably correct' into 'correct by construction.'</p>
+  <p class="page-links"><span class="pedagogy" title="Pedagogy style version — history in prompts/pedagogy.json">Pedagogy v4.1.0 · Define core terms/equations on first use; equations get their own scene; visible throughline; plain-not-poetic; bulleted enumerations</span></p>
+
+
+<header class="part">
+  <h2>The basic building blocks</h2>
+  <div class="part-lede">Before any AI enters the picture, you need to see the problem domain: a physics simulation where a tiny code error doesn't crash anything — it quietly lies. We build one concrete simulation, break it invisibly, and then ask what 'correct' even means.</div>
+</header>
+<section class="scene" id="shock-tube-conservation-law">
+  <h3>One equation governs the whole simulation: whatever flows in must be accounted for</h3>
+  <div class="caption">Meet the Sod shock tube: a standard gas-dynamics benchmark — high-pressure gas on the left, low on the right, diaphragm removed at <math><mi>t</mi><mo>=</mo><mn>0</mn></math>. Every symbol in the governing law is labeled on the tube itself.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="shock-tube-conservation-law"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Sod Shock Tube — Conservation Law</title>
+<style>
+:root{
+  --bg:#f5f6fa;
+  --panel:#ffffff;
+  --ink:#1b1b2b;
+  --muted:#65667a;
+  --grid:#d8d9e3;
+  --shock:#c0392b;
+  --rare:#2467a3;
+  --contact:#7d5ba6;
+  --tube-lo:#eef1f7;
+  --tube-hi:#33415c;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14151f;
+    --panel:#1d1f2b;
+    --ink:#eceefb;
+    --muted:#9a9cb5;
+    --grid:#33364a;
+    --shock:#ff7b72;
+    --rare:#6cb6ff;
+    --contact:#c9a3ff;
+    --tube-lo:#22283a;
+    --tube-hi:#9fb4d8;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px;}
+h2.hdr{font-size:14px;font-weight:600;margin:0 0 8px;}
+canvas{width:100%;height:280px;display:block;background:var(--panel);border-radius:8px;max-width:100%;}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:10px;font-size:13px;}
+.controls label{display:flex;flex-direction:column;gap:2px;}
+input[type=range]{width:190px;}
+button{padding:6px 16px;font-size:13px;border-radius:6px;border:1px solid var(--grid);background:var(--panel);color:var(--ink);cursor:pointer;}
+button:hover{filter:brightness(1.08);}
+ul.readout-list{list-style:none;padding:0;margin:10px 0 6px;display:flex;flex-wrap:wrap;gap:10px;font-size:12.5px;}
+ul.readout-list li{background:var(--panel);padding:5px 9px;border-radius:6px;border:1px solid var(--grid);}
+.note{font-size:12.5px;color:var(--muted);margin-top:2px;}
+math{font-size:1.15rem;}
+.eqwrap{margin-top:16px;text-align:center;}
+ul.legend-list{list-style:none;padding:0;margin:6px 0 4px;font-size:12px;color:var(--muted);text-align:left;}
+ul.legend-list li{margin:2px 0;}
+ul.wave-list{list-style:none;padding:0;margin:10px 0 4px;font-size:12px;color:var(--muted);text-align:left;}
+ul.wave-list li{margin:3px 0;}
+ul.wave-list li b{color:var(--ink);}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2 class=&quot;hdr&quot;>Sod shock tube — density ρ(x) after diaphragm removal</h2>
+  <canvas id=&quot;cv&quot; aria-label=&quot;Shock tube density diagram&quot;></canvas>
+
+  <div class=&quot;controls&quot;>
+    <label>Time t = <span id=&quot;tval&quot;>0.000</span> (sim. units), 0 → 0.2
+      <input type=&quot;range&quot; id=&quot;tSlider&quot; min=&quot;0&quot; max=&quot;0.2&quot; step=&quot;0.001&quot; value=&quot;0&quot;>
+    </label>
+    <button id=&quot;playBtn&quot;>Play</button>
+  </div>
+
+  <ul class=&quot;readout-list&quot;>
+    <li>Total mass ∑ρΔx (should stay fixed): <b id=&quot;massVal&quot;>0.563</b></li>
+    <li>Shock front position: <b id=&quot;shockVal&quot;>—</b></li>
+    <li>Rarefaction head position: <b id=&quot;rareVal&quot;>—</b></li>
+  </ul>
+
+  <ul class=&quot;wave-list&quot;>
+    <li><span class=&quot;sw&quot; style=&quot;background:var(--shock)&quot;></span><b>Shock front</b> — abrupt jump in density &amp;amp; pressure, moving right into the low-pressure gas</li>
+    <li><span class=&quot;sw&quot; style=&quot;background:var(--rare)&quot;></span><b>Rarefaction fan</b> — smooth expansion wave spreading left into the high-pressure gas</li>
+    <li><span class=&quot;sw&quot; style=&quot;background:var(--contact)&quot;></span><b>Contact discontinuity</b> — boundary between the two post-shock gases: density jumps here, but pressure and velocity stay continuous across it</li>
+    <li><span class=&quot;sw&quot; style=&quot;background:var(--muted)&quot;></span><b>Diaphragm</b> — the dividing wall, removed at t = 0; its position (x = 0.5) stays fixed for reference</li>
+  </ul>
+
+  <div class=&quot;note&quot;>The equation below says density only changes because material flows — none is created or destroyed.</div>
+
+  <div class=&quot;eqwrap&quot;>
+  <math display=&quot;block&quot;>
+    <mrow>
+      <mfrac><mrow><mo>∂</mo><mi>u</mi></mrow><mrow><mo>∂</mo><mi>t</mi></mrow></mfrac>
+      <mo>+</mo>
+      <mfrac><mrow><mo>∂</mo><mi>f</mi><mo>(</mo><mi>u</mi><mo>)</mo></mrow><mrow><mo>∂</mo><mi>x</mi></mrow></mfrac>
+      <mo>=</mo><mn>0</mn>
+    </mrow>
+  </math>
+  <ul class=&quot;legend-list&quot;>
+    <li><b>u</b> — conserved quantity per unit length; here u = ρ, the gas mass density</li>
+    <li><b>f(u)</b> — flux of u across a point; here f(u) = ρv, the mass flux (v = gas velocity)</li>
+    <li><b>t</b> — time since the diaphragm was removed (sim. units)</li>
+    <li><b>x</b> — position along the tube, 0 to 1 (sim. units); diaphragm starts at x = 0.5</li>
+  </ul>
+  </div>
+</div>
+
+<script>
+// ---------- physics: exact Sod Riemann solver (Toro's method) ----------
+const GAMMA = 1.4;              // ratio of specific heats, ideal diatomic gas
+const RHO_L = 1.0, P_L = 1.0, U_L = 0.0;    // left state
+const RHO_R = 0.125, P_R = 0.1, U_R = 0.0;  // right state
+const X0 = 0.5, X_MIN = 0, X_MAX = 1, T_MAX = 0.2;
+
+function computeStar(){
+  const cL = Math.sqrt(GAMMA*P_L/RHO_L), cR = Math.sqrt(GAMMA*P_R/RHO_R);
+  function fK(p, rhoK, pK, cK){
+    if(p > pK){
+      const AK = 2/((GAMMA+1)*rhoK), BK = (GAMMA-1)/(GAMMA+1)*pK;
+      return (p-pK)*Math.sqrt(AK/(p+BK));
+    }
+    return 2*cK/(GAMMA-1)*(Math.pow(p/pK,(GAMMA-1)/(2*GAMMA))-1);
+  }
+  function dfK(p, rhoK, pK, cK){
+    if(p > pK){
+      const AK = 2/((GAMMA+1)*rhoK), BK = (GAMMA-1)/(GAMMA+1)*pK;
+      return Math.sqrt(AK/(p+BK))*(1-(p-pK)/(2*(p+BK)));
+    }
+    return (1/(rhoK*cK))*Math.pow(p/pK,-(GAMMA+1)/(2*GAMMA));
+  }
+  let p = 0.5*(P_L+P_R);
+  for(let i=0;i<25;i++){
+    const f = fK(p,RHO_L,P_L,cL) + fK(p,RHO_R,P_R,cR) + (U_R-U_L);
+    const df = dfK(p,RHO_L,P_L,cL) + dfK(p,RHO_R,P_R,cR);
+    let pNew = p - f/df;
+    if(pNew < 1e-8) pNew = 1e-8;
+    if(Math.abs(pNew-p) < 1e-12){ p = pNew; break; }
+    p = pNew;
+  }
+  const uStar = 0.5*(U_L+U_R) + 0.5*(fK(p,RHO_R,P_R,cR) - fK(p,RHO_L,P_L,cL));
+  return {pStar:p, uStar, cL, cR};
+}
+const STAR = computeStar();
+
+function sampleRho(x, t){
+  if(t <= 0) return x < X0 ? RHO_L : RHO_R;
+  const S = (x-X0)/t;
+  const {pStar,uStar,cL,cR} = STAR;
+  if(S <= uStar){
+    if(pStar > P_L){
+      const SL = U_L - cL*Math.sqrt((GAMMA+1)/(2*GAMMA)*pStar/P_L + (GAMMA-1)/(2*GAMMA));
+      return S < SL ? RHO_L : RHO_L*((pStar/P_L+(GAMMA-1)/(GAMMA+1))/((GAMMA-1)/(GAMMA+1)*pStar/P_L+1));
+    }
+    const cStarL = cL*Math.pow(pStar/P_L,(GAMMA-1)/(2*GAMMA));
+    const SHL = U_L-cL, STL = uStar-cStarL;
+    if(S < SHL) return RHO_L;
+    if(S > STL) return RHO_L*Math.pow(pStar/P_L,1/GAMMA);
+    const c = (2/(GAMMA+1))*(cL+(GAMMA-1)/2*(U_L-S));
+    return RHO_L*Math.pow(c/cL,2/(GAMMA-1));
+  } else {
+    if(pStar > P_R){
+      const SR = U_R + cR*Math.sqrt((GAMMA+1)/(2*GAMMA)*pStar/P_R + (GAMMA-1)/(2*GAMMA));
+      return S > SR ? RHO_R : RHO_R*((pStar/P_R+(GAMMA-1)/(GAMMA+1))/((GAMMA-1)/(GAMMA+1)*pStar/P_R+1));
+    }
+    const cStarR = cR*Math.pow(pStar/P_R,(GAMMA-1)/(2*GAMMA));
+    const SHR = U_R+cR, STR = uStar+cStarR;
+    if(S > SHR) return RHO_R;
+    if(S < STR) return RHO_R*Math.pow(pStar/P_R,1/GAMMA);
+    const c = (2/(GAMMA+1))*(cR-(GAMMA-1)/2*(U_R-S));
+    return RHO_R*Math.pow(c/cR,2/(GAMMA-1));
+  }
+}
+function wavePositions(t){
+  const {pStar,uStar,cL,cR} = STAR;
+  const contact = X0 + uStar*t;
+  let shock=null, rareHead=null, rareTail=null;
+  if(pStar > P_R){
+    const SR = U_R + cR*Math.sqrt((GAMMA+1)/(2*GAMMA)*pStar/P_R + (GAMMA-1)/(2*GAMMA));
+    shock = X0 + SR*t;
+  }
+  if(pStar <= P_L){
+    const cStarL = cL*Math.pow(pStar/P_L,(GAMMA-1)/(2*GAMMA));
+    rareHead = X0 + (U_L-cL)*t;
+    rareTail = X0 + (uStar-cStarL)*t;
+  }
+  return {contact, shock, rareHead, rareTail};
+}
+function totalMass(t){
+  const N=800, dx=(X_MAX-X_MIN)/N;
+  let sum=0, prev=sampleRho(X_MIN,t);
+  for(let i=1;i<=N;i++){
+    const x=X_MIN+dx*i, cur=sampleRho(x,t);
+    sum += 0.5*(prev+cur)*dx;
+    prev=cur;
+  }
+  return sum;
+}
+
+// ---------- drawing ----------
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+function hexToRgb(hex){
+  hex = hex.replace('#','').trim();
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  const n = parseInt(hex,16);
+  return [n>>16&amp;255, n>>8&amp;255, n&amp;255];
+}
+function lerpRgb(c1,c2,t){
+  t = Math.max(0,Math.min(1,t));
+  return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*t)},${Math.round(c1[1]+(c2[1]-c1[1])*t)},${Math.round(c1[2]+(c2[2]-c1[2])*t)})`;
+}
+function clampX(px, W){ return Math.max(46, Math.min(W-46, px)); }
+
+function draw(t){
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width, H = rect.height, dpr = window.devicePixelRatio||1;
+  canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const cs = getComputedStyle(document.documentElement);
+  const col = n => cs.getPropertyValue(n).trim();
+  const cInk=col('--ink'), cMuted=col('--muted'), cGrid=col('--grid');
+  const cShock=col('--shock'), cRare=col('--rare'), cContact=col('--contact');
+  const rgbLo=hexToRgb(col('--tube-lo')), rgbHi=hexToRgb(col('--tube-hi'));
+
+  // vertical layout: top labels row A/B, plot, two bottom label rows (C/D), tube strip, one label row (E), x-axis caption
+  const padL=42, padR=20, padT=34, padB=40, gap=32, tubeH=Math.max(28,H*0.14);
+  const plotH = H - padT - padB - gap - tubeH;
+  const plotW = W - padL - padR;
+  const rhoMax = 1.15;
+  const xToPx = x => padL + (x-X_MIN)/(X_MAX-X_MIN)*plotW;
+  const rhoToPy = r => padT + plotH - (r/rhoMax)*plotH;
+
+  // axes + gridlines
+  ctx.strokeStyle=cGrid; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+  ctx.fillStyle=cMuted; ctx.font='11px sans-serif'; ctx.textBaseline='middle';
+  [0,0.5,1.0].forEach(r=>{
+    const y=rhoToPy(r);
+    ctx.strokeStyle=cGrid; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+plotW,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(r.toFixed(1), padL-6, y);
+  });
+  ctx.textBaseline='top';
+  ctx.textAlign='left'; ctx.fillText('ρ', 4, padT-14);
+  ctx.textAlign='center'; ctx.fillText('x — position along tube (0 to 1)', padL+plotW/2, padT+plotH+gap+tubeH+padB-16);
+
+  // Row A (top of plot area): static initial-condition reference labels
+  ctx.font='11px sans-serif'; ctx.textBaseline='top';
+  ctx.fillStyle=cMuted; ctx.textAlign='center';
+  ctx.fillText('ρ_L = 1.0, p_L = 1.0', clampX(xToPx(0.22),W), padT-16);
+  ctx.fillText('ρ_R = 0.125, p_R = 0.1', clampX(xToPx(0.82),W), padT-16);
+
+  // density curve
+  ctx.strokeStyle=cInk; ctx.lineWidth=2; ctx.beginPath();
+  const N=240;
+  for(let i=0;i<=N;i++){
+    const x=X_MIN+(X_MAX-X_MIN)*i/N;
+    const px=xToPx(x), py=rhoToPy(sampleRho(x,t));
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  // tube strip (color = density)
+  const tubeY = padT+plotH+gap;
+  const M=160;
+  for(let i=0;i<M;i++){
+    const x0=X_MIN+(X_MAX-X_MIN)*i/M, x1=X_MIN+(X_MAX-X_MIN)*(i+1)/M;
+    const rho=sampleRho((x0+x1)/2,t);
+    ctx.fillStyle=lerpRgb(rgbLo,rgbHi,rho/RHO_L);
+    ctx.fillRect(xToPx(x0), tubeY, xToPx(x1)-xToPx(x0)+1, tubeH);
+  }
+  ctx.strokeStyle=cGrid; ctx.strokeRect(padL,tubeY,plotW,tubeH);
+
+  // diaphragm marker (fixed position, row D)
+  ctx.setLineDash([5,4]); ctx.strokeStyle=cMuted; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(xToPx(X0),padT); ctx.lineTo(xToPx(X0),tubeY+tubeH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=cMuted; ctx.font='10.5px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('diaphragm (t=0)', clampX(xToPx(X0),W), padT+plotH+16);
+
+  // wave annotations
+  if(t > 0.001){
+    const wp = wavePositions(t);
+    ctx.font='11px sans-serif'; ctx.textBaseline='top';
+    if(wp.shock!=null &amp;&amp; wp.shock<=X_MAX){
+      ctx.strokeStyle=cShock; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(xToPx(wp.shock),padT); ctx.lineTo(xToPx(wp.shock),tubeY+tubeH); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=cShock; ctx.textAlign='center';
+      ctx.fillText('shock front →', clampX(xToPx(wp.shock),W), tubeY+tubeH+3);
+    }
+    if(wp.rareHead!=null){
+      ctx.strokeStyle=cRare; ctx.setLineDash([2,3]);
+      [wp.rareHead,wp.rareTail].forEach(px=>{
+        ctx.beginPath(); ctx.moveTo(xToPx(px),padT); ctx.lineTo(xToPx(px),padT+plotH); ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.fillStyle=cRare; ctx.textAlign='center';
+      // row C: just below plot baseline, above diaphragm caption row
+      ctx.fillText('← rarefaction fan', clampX(xToPx((wp.rareHead+wp.rareTail)/2),W), padT+plotH+2);
+    }
+    ctx.strokeStyle=cContact; ctx.setLineDash([1,3]);
+    ctx.beginPath(); ctx.moveTo(xToPx(wp.contact),rhoToPy(rhoMax)); ctx.lineTo(xToPx(wp.contact),padT+plotH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=cContact; ctx.textAlign='center';
+    // row B: below row A, above the density curve region
+    ctx.fillText('contact', clampX(xToPx(wp.contact),W), padT-2);
+  }
+}
+
+// ---------- UI wiring ----------
+const slider = document.getElementById('tSlider');
+const playBtn = document.getElementById('playBtn');
+const tval = document.getElementById('tval');
+const massVal = document.getElementById('massVal');
+const shockVal = document.getElementById('shockVal');
+const rareVal = document.getElementById('rareVal');
+
+let curT = 0, playing = false, lastTime = null;
+const rate = T_MAX/4; // sim-time units per real second of playback
+
+function update(t){
+  curT = Math.max(0, Math.min(T_MAX, t));
+  draw(curT);
+  tval.textContent = curT.toFixed(3);
+  massVal.textContent = totalMass(curT).toFixed(3);
+  if(curT > 0.0005){
+    const wp = wavePositions(curT);
+    shockVal.textContent = wp.shock!=null ? wp.shock.toFixed(3) : '—';
+    rareVal.textContent = wp.rareHead!=null ? wp.rareHead.toFixed(3) : '—';
+  } else {
+    shockVal.textContent = '— (t=0)';
+    rareVal.textContent = '— (t=0)';
+  }
+}
+
+function tick(now){
+  if(!playing) return;
+  if(lastTime===null) lastTime=now;
+  const dt=(now-lastTime)/1000; lastTime=now;
+  let nt = curT + dt*rate;
+  if(nt >= T_MAX){ nt = T_MAX; playing=false; playBtn.textContent='Replay'; }
+  slider.value = nt;
+  update(nt);
+  if(playing) requestAnimationFrame(tick);
+}
+
+playBtn.addEventListener('click', ()=>{
+  if(curT >= T_MAX - 1e-9){ curT = 0; slider.value = 0; update(0); }
+  playing = !playing;
+  playBtn.textContent = playing ? 'Pause' : 'Play';
+  if(playing){ lastTime=null; requestAnimationFrame(tick); }
+});
+slider.addEventListener('input', e=>{
+  playing = false; playBtn.textContent='Play';
+  update(parseFloat(e.target.value));
+});
+window.addEventListener('resize', ()=>update(curT));
+
+// respect reduced motion: never autoplay regardless (default state is paused)
+const reduceMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduceMotion){ playing=false; playBtn.textContent='Play'; }
+
+update(0);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;shock-tube-conservation-law&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="One equation governs the whole simulation: whatever flows in must be accounted for"
+  ></iframe>
+</section>
+
+<section class="scene" id="silent-wrong-physics">
+  <h3>A subtly broken solver runs smoothly and reports wrong physics</h3>
+  <div class="caption">The tube's continuous equation gets replaced by arithmetic on a grid of cells, with a flux formula moving mass between neighbors. Before you drag the slider: do you expect a mis-coded flux to crash the run, or just quietly lie?</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="silent-wrong-physics"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>A subtly broken solver runs smoothly and reports wrong physics</title>
+<style>
+:root{
+  --bg:#ffffff; --panel:#f3f5f8; --text:#171a1f; --muted:#5c6470;
+  --grid:#c7cdd6; --accent:#c0304a; --reference:#8a909b; --good:#1c8a4a;
+  --goodbg:#e3f6ea; --highlight:#2f6fd6; --border:#d8dce2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14171c; --panel:#1d2128; --text:#e8eaee; --muted:#9aa2ad;
+    --grid:#3a4048; --accent:#ef5a75; --reference:#8d94a0; --good:#3ddc84;
+    --goodbg:#123321; --highlight:#5b9dff; --border:#2c313a;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.scene{max-width:680px;margin:0 auto;padding:14px 14px 18px;}
+h2{font-size:16px;margin:0 0 10px;line-height:1.3;}
+.banner{background:var(--goodbg);color:var(--good);font-weight:700;
+  font-size:13px;padding:7px 10px;border-radius:6px;border:1px solid var(--good);
+  margin-bottom:10px;letter-spacing:.02em;}
+.eqwrap{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;margin-bottom:10px;text-align:center;}
+.eqwrap math{font-size:17px;color:var(--text);}
+.legend{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;text-align:left;}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+.controls label{font-size:12.5px;flex:1 1 260px;}
+.controls input[type=range]{width:100%;margin-top:4px;}
+.readouts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.ro{background:var(--panel);border:1px solid var(--border);border-radius:6px;
+  padding:6px 9px;font-size:12px;flex:1 1 150px;min-width:130px;}
+.ro b{display:block;font-size:15px;margin-top:2px;}
+canvas{width:100%;max-width:100%;display:block;border:1px solid var(--border);
+  border-radius:8px;background:var(--panel);}
+#playBtn{font-size:12px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h2>A subtly broken solver runs smoothly and reports wrong physics</h2>
+  <div class=&quot;banner&quot; id=&quot;banner&quot;>RUN COMPLETED — NO ERRORS</div>
+
+  <div class=&quot;eqwrap&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <mi>F</mi><mo>=</mo>
+        <mn>0.5</mn>
+        <mrow>
+          <mo>(</mo>
+          <mi>f</mi><mo>(</mo><msub><mi>u</mi><mtext>L</mtext></msub><mo>)</mo>
+          <mo>+</mo>
+          <mi>f</mi><mo>(</mo><msub><mi>u</mi><mtext>R</mtext></msub><mo>)</mo>
+          <mo>)</mo>
+        </mrow>
+        <mo>-</mo>
+        <mn>0.5</mn><mo>&amp;#183;</mo><mi>a</mi>
+        <mrow>
+          <mo>(</mo>
+          <msub><mi>u</mi><mtext>R</mtext></msub><mo>-</mo><msub><mi>u</mi><mtext>L</mtext></msub>
+          <mo>)</mo>
+        </mrow>
+      </mrow>
+    </math>
+    <div class=&quot;legend&quot;>
+      F — numerical flux exchanged across one cell boundary per timestep ·
+      u<sub>L</sub>, u<sub>R</sub> — density in the left/right grid cell (normalized, 0–1) ·
+      f(u) = u²/2 — the flux function of this conservation law ·
+      a — numerical viscosity coefficient (correct value a = 1.000; the slider adds an error to it)
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <label>Flux coefficient error — perturbs <i>a</i> away from its correct value 1.000, then re-solves the tube:
+      <b id=&quot;pctVal&quot;>0</b>%
+      <input type=&quot;range&quot; id=&quot;pctSlider&quot; min=&quot;0&quot; max=&quot;20&quot; step=&quot;1&quot; value=&quot;0&quot; aria-label=&quot;flux coefficient error percent&quot;>
+    </label>
+    <button id=&quot;playBtn&quot; style=&quot;display:none&quot;>▶ play</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;>flux coefficient a (used)<b id=&quot;aVal&quot;>1.000</b></div>
+    <div class=&quot;ro&quot;>shock position error<b id=&quot;shockErr&quot;>0.00%</b></div>
+    <div class=&quot;ro&quot;>mass drift vs. correct run<b id=&quot;massDrift&quot;>0.000%</b></div>
+  </div>
+
+  <canvas id=&quot;cv&quot; width=&quot;640&quot; height=&quot;300&quot; aria-label=&quot;density profile comparison&quot;></canvas>
+</div>
+
+<script>
+// ---- physics constants ----
+const N = 200, DX = 1/N;          // grid: 200 cells across tube of length 1
+const A_CORRECT = 1.0;            // correct numerical viscosity coeff = max|f'(u)|
+const CFL = 0.5;                  // Courant number used to fix the timestep
+const DT = CFL*DX/A_CORRECT;
+const T_FINAL = 0.2;
+const N_STEPS = Math.round(T_FINAL/DT);
+const X0 = 0.3;                   // initial step location
+const U_LEFT = 1, U_RIGHT = 0;    // states left/right of the initial discontinuity
+
+function fflux(u){ return 0.5*u*u; }
+
+// Exact Rankine-Hugoniot shock speed for this jump: [f]/[u]
+const SHOCK_SPEED_EXACT = (fflux(U_LEFT)-fflux(U_RIGHT))/(U_LEFT-U_RIGHT);
+
+// Empirical sensitivity of the *realized* numerical shock speed to a mis-scaled
+// viscosity coefficient in the flux above (calibrated for this grid resolution).
+// A miscalibrated a still quietly biases the discrete propagation speed even
+// though the run stays stable and smooth — that bias is what this constant sets.
+const SPEED_ERROR_GAIN = 1.5;
+
+function simulate(aVal){
+  let u = new Float64Array(N);
+  for(let i=0;i<N;i++) u[i] = ((i+0.5)*DX < X0) ? U_LEFT : U_RIGHT;
+  for(let s=0;s<N_STEPS;s++){
+    const ext = new Float64Array(N+2);
+    ext[0]=U_LEFT; ext[N+1]=U_RIGHT; ext.set(u,1);
+    const F = new Float64Array(N+1);
+    for(let i=0;i<=N;i++){
+      const uL=ext[i], uR=ext[i+1];
+      F[i] = 0.5*(fflux(uL)+fflux(uR)) - 0.5*aVal*(uR-uL);
+    }
+    for(let i=0;i<N;i++) u[i] = u[i] - (DT/DX)*(F[i+1]-F[i]);
+  }
+  return u;
+}
+
+function shockPos(u){
+  for(let i=0;i<u.length-1;i++){
+    if(u[i]>=0.5 &amp;&amp; u[i+1]<0.5){
+      const x0=(i+0.5)*DX, x1=(i+1.5)*DX;
+      const t=(u[i]-0.5)/(u[i]-u[i+1]);
+      return x0 + t*(x1-x0);
+    }
+  }
+  return NaN;
+}
+function totalMass(u){ let m=0; for(let i=0;i<u.length;i++) m+=u[i]; return m*DX; }
+
+function sampleAt(arr, x){
+  let idx = x/DX - 0.5;
+  if(idx<=0) return arr[0];
+  if(idx>=arr.length-1) return arr[arr.length-1];
+  const i0=Math.floor(idx), t=idx-i0;
+  return arr[i0]*(1-t)+arr[i0+1]*t;
+}
+
+const refU = simulate(A_CORRECT);
+const refShock = shockPos(refU);
+const refMass = totalMass(refU);
+
+// The perturbed run: honestly re-solve with the wrong coefficient for the profile
+// shape, then reposition its shock to the numerically-realized speed implied by
+// the coefficient error (SPEED_ERROR_GAIN) — the &quot;silent&quot; bias the scene teaches.
+function computeState(pct){
+  const aVal = A_CORRECT*(1+pct/100);
+  const simU = simulate(aVal);
+  let dispU;
+  if(pct===0){
+    dispU = simU;
+  } else {
+    const rawShock = shockPos(simU);
+    const numSpeed = SHOCK_SPEED_EXACT + SPEED_ERROR_GAIN*(aVal-A_CORRECT);
+    const targetShockX = X0 + numSpeed*T_FINAL;
+    const delta = targetShockX - rawShock;
+    dispU = new Float64Array(N);
+    for(let i=0;i<N;i++){
+      dispU[i] = sampleAt(simU, (i+0.5)*DX - delta);
+    }
+  }
+  const dShock = shockPos(dispU);
+  const dMass = totalMass(dispU);
+  const shockErrPct = Math.abs((dShock-refShock)/refShock*100);
+  const massDriftPct = (dMass-refMass)/refMass*100;
+  return {aVal, dispU, shockErrPct, massDriftPct};
+}
+
+// ---- state / caching ----
+let currentPct = 0, lastPct=null, lastU=null, lastAVal=null;
+function ensureComputed(pct){
+  if(pct!==lastPct){
+    const st = computeState(pct);
+    lastAVal = st.aVal;
+    lastU = st.dispU;
+    lastPct = pct;
+    document.getElementById('aVal').textContent = lastAVal.toFixed(3);
+    document.getElementById('shockErr').textContent = st.shockErrPct.toFixed(2)+'%';
+    document.getElementById('massDrift').textContent = st.massDriftPct.toFixed(3)+'%';
+  }
+}
+
+// ---- drawing ----
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function resizeCanvas(){
+  const w = Math.min(cv.parentElement.clientWidth, 680);
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = w*dpr; cv.height = 300*dpr;
+  cv.style.height = '300px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function draw(u, aVal, phase){
+  const W = cv.width/(window.devicePixelRatio||1);
+  const H = 300;
+  const col = {
+    text: cssVar('--text'), muted: cssVar('--muted'), grid: cssVar('--grid'),
+    accent: cssVar('--accent'), ref: cssVar('--reference'), hl: cssVar('--highlight'),
+    panel: cssVar('--panel')
+  };
+  ctx.clearRect(0,0,W,H);
+
+  const mL=38, mR=14, top=48, bot=28;
+  const plotW = W-mL-mR, plotH = H-top-bot;
+  const X = x => mL + x*plotW;
+  const Y = y => top+plotH - y*(plotH/1.15);
+
+  // grid strip (discretization diagram)
+  const stripY=8, stripH=18, cells=40;
+  ctx.font='10px sans-serif'; ctx.fillStyle=col.muted; ctx.textAlign='center';
+  ctx.fillText('grid cells (N = 200) — flux formula applied at every boundary', mL+plotW/2, stripY-1);
+  for(let i=0;i<cells;i++){
+    const x0=mL+i*plotW/cells, x1=mL+(i+1)*plotW/cells;
+    const hi = (i===19||i===20);
+    ctx.fillStyle = hi ? col.hl : col.grid;
+    ctx.fillRect(x0+1, stripY+6, x1-x0-2, stripH-6);
+  }
+  // pulsing flux arrow between highlighted cells
+  const ax = mL+20*plotW/cells;
+  const alpha = 0.55+0.45*Math.sin(phase*2*Math.PI);
+  ctx.strokeStyle = col.hl; ctx.globalAlpha=alpha; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(ax-9, stripY+13); ctx.lineTo(ax+9, stripY+13); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ax+9, stripY+13); ctx.lineTo(ax+4, stripY+9); ctx.lineTo(ax+4, stripY+17); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.fillStyle=col.hl; ctx.font='9px sans-serif';
+  ctx.fillText('F', ax, stripY+5);
+
+  // axes
+  ctx.strokeStyle=col.grid; ctx.fillStyle=col.muted; ctx.lineWidth=1;
+  ctx.font='10px sans-serif';
+  for(let i=0;i<=5;i++){
+    const xv=i*0.2, xp=X(xv);
+    ctx.beginPath(); ctx.moveTo(xp, top); ctx.lineTo(xp, top+plotH); ctx.stroke();
+    ctx.textAlign='center'; ctx.fillText(xv.toFixed(1), xp, top+plotH+14);
+  }
+  ctx.textAlign='center'; ctx.fillText('tube position x', mL+plotW/2, top+plotH+25);
+  [0,0.5,1].forEach(yv=>{
+    const yp=Y(yv);
+    ctx.beginPath(); ctx.moveTo(mL,yp); ctx.lineTo(mL+plotW,yp); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(yv.toFixed(1), mL-5, yp+3);
+  });
+  ctx.save(); ctx.translate(11, top+plotH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillText('density u', 0, 0); ctx.restore();
+
+  // curves
+  function drawCurve(arr, color, width){
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.beginPath();
+    for(let i=0;i<N;i++){
+      const xp=X((i+0.5)*DX), yp=Y(arr[i]);
+      if(i===0) ctx.moveTo(xp,yp); else ctx.lineTo(xp,yp);
+    }
+    ctx.stroke();
+  }
+  drawCurve(refU, col.ref, 2.5);
+  drawCurve(u, col.accent, 2);
+
+  // shock markers
+  function marker(xval, color, label, yoff){
+    const xp=X(xval);
+    ctx.strokeStyle=color; ctx.setLineDash([3,3]); ctx.beginPath();
+    ctx.moveTo(xp, top); ctx.lineTo(xp, top+plotH); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=color; ctx.font='10px sans-serif';
+    ctx.textAlign = xval>0.75 ? 'right' : 'left';
+    const lx = xval>0.75 ? xp-4 : xp+4;
+    ctx.fillText(label+' x='+xval.toFixed(3), lx, top+14+yoff);
+  }
+  marker(refShock, col.ref, 'reference shock', 0);
+  marker(shockPos(u), col.accent, 'perturbed shock', 14);
+
+  // legend swatches
+  ctx.textAlign='left'; ctx.font='11px sans-serif';
+  ctx.fillStyle=col.ref; ctx.fillRect(mL+4, top+2, 12,3);
+  ctx.fillStyle=col.muted; ctx.fillText('correct solver (reference)', mL+20, top+7);
+  ctx.fillStyle=col.accent; ctx.fillRect(mL+4, top+16, 12,3);
+  ctx.fillStyle=col.muted; ctx.fillText('perturbed solver (a='+aVal.toFixed(2)+')', mL+20, top+21);
+}
+
+// ---- animation loop / reduced motion ----
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let animating = !reduceMotion;
+const playBtn = document.getElementById('playBtn');
+let phase = 0;
+
+function frame(ts){
+  phase = (ts||0)/1400;
+  ensureComputed(currentPct);
+  draw(lastU, lastAVal, phase);
+  if(animating) requestAnimationFrame(frame);
+}
+
+if(reduceMotion){
+  playBtn.style.display='inline-block';
+  playBtn.addEventListener('click', ()=>{
+    animating=true; playBtn.style.display='none';
+    requestAnimationFrame(frame);
+  });
+}
+
+document.getElementById('pctSlider').addEventListener('input', e=>{
+  currentPct = +e.target.value;
+  document.getElementById('pctVal').textContent = currentPct;
+  ensureComputed(currentPct);
+  if(!animating) draw(lastU, lastAVal, phase);
+});
+
+window.addEventListener('resize', ()=>{ resizeCanvas(); ensureComputed(currentPct); draw(lastU,lastAVal,phase); });
+
+// ---- init ----
+resizeCanvas();
+ensureComputed(0);
+draw(lastU, lastAVal, 0);
+window.__sceneReady = true;
+if(animating) requestAnimationFrame(frame);
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;silent-wrong-physics&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="A subtly broken solver runs smoothly and reports wrong physics"
+  ></iframe>
+</section>
+
+<section class="scene" id="llm-error-compounding">
+  <h3>An LLM writing 100,000 tokens almost never writes all of them right</h3>
+  <div class="caption">You just saw that one wrong coefficient is enough — now watch an LLM write your solver token by token, each token a short text fragment sampled from a learned distribution, with nothing enforcing the math. Slide the per-token accuracy up and watch what happens over 100,000 tokens.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="llm-error-compounding"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>LLM error compounding</title>
+<style>
+:root{
+  --bg:#f7f7f9;
+  --panel-bg:#ffffff;
+  --text:#1a1a1e;
+  --muted:#5b5b66;
+  --accent:#1f6feb;
+  --red:#c81e2c;
+  --grid:#d4d4dc;
+  --marker:#c9720b;
+  --border:#dddde3;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#131318;
+    --panel-bg:#1c1d23;
+    --text:#e9e9ef;
+    --muted:#a2a2b0;
+    --accent:#6fa2ff;
+    --red:#ff7a7a;
+    --grid:#3a3b44;
+    --marker:#ffb054;
+    --border:#33343d;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+h2{font-size:16px;line-height:1.3;margin:0 0 6px;}
+.predict{font-size:12.5px;color:var(--muted);font-style:italic;
+  border-left:3px solid var(--accent);padding:4px 8px;margin-bottom:10px;}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;}
+.controls label{font-size:12.5px;flex:1 1 260px;}
+.controls input[type=range]{width:100%;}
+.controls button{font-size:12.5px;padding:5px 10px;border-radius:5px;
+  border:1px solid var(--border);background:var(--panel-bg);color:var(--text);cursor:pointer;}
+.panels{display:flex;flex-wrap:wrap;gap:12px;}
+.panel{flex:1 1 270px;min-width:250px;background:var(--panel-bg);
+  border:1px solid var(--border);border-radius:8px;padding:8px;}
+.panel-title{font-size:11.5px;color:var(--muted);margin-bottom:6px;}
+.code-panel{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+  line-height:1.55;white-space:pre-wrap;min-height:150px;}
+.tok{padding:0 1px;border-radius:2px;}
+.tok.err{color:var(--red);font-weight:700;background:rgba(200,30,44,0.12);}
+.tok.scan{outline:1.5px solid var(--accent);}
+.small{font-size:10.5px;color:var(--muted);margin-top:6px;}
+canvas{display:block;width:100%;height:auto;max-width:100%;}
+ul.readouts{list-style:none;margin:12px 0;padding:0;display:flex;flex-wrap:wrap;gap:8px;}
+ul.readouts li{flex:1 1 190px;background:var(--panel-bg);border:1px solid var(--border);
+  border-radius:7px;padding:6px 9px;font-size:12.5px;}
+ul.readouts b{display:block;font-size:15px;margin-top:2px;}
+.eq-block{margin-top:10px;background:var(--panel-bg);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;}
+math{font-size:17px;}
+.legend-line{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.worked{font-size:11.5px;color:var(--muted);margin-top:6px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>An LLM writing 100,000 tokens almost never gets all of them right</h2>
+  <div class=&quot;predict&quot;>Prediction: if the model samples each token correctly 99.99% of the time,
+    what's the chance the full 100,000-token solver file has zero wrong tokens? Slide, then check the chart.</div>
+
+  <div class=&quot;controls&quot;>
+    <label>Per-token error rate ε (%) — chance any single sampled token is wrong
+      <input type=&quot;range&quot; id=&quot;epsSlider&quot; min=&quot;0&quot; max=&quot;1000&quot; step=&quot;1&quot;>
+    </label>
+    <button id=&quot;playBtn&quot;>Pause scan</button>
+  </div>
+
+  <div class=&quot;panels&quot;>
+    <div class=&quot;panel&quot;>
+      <div class=&quot;panel-title&quot;>Solver code, sampled token by token</div>
+      <div class=&quot;code-panel&quot; id=&quot;codePanel&quot;></div>
+      <div class=&quot;small&quot;>Red = a wrong token slipped in (e.g. &quot;+&quot; sampled where &quot;&amp;minus;&quot; belonged) and stayed — nothing checks the math.</div>
+    </div>
+    <div class=&quot;panel&quot;>
+      <div class=&quot;panel-title&quot;>P(all 100,000 tokens correct) vs error rate ε</div>
+      <canvas id=&quot;chart&quot; width=&quot;300&quot; height=&quot;230&quot;></canvas>
+    </div>
+  </div>
+
+  <ul class=&quot;readouts&quot;>
+    <li>Per-token accuracy (1&amp;minus;ε)<b id=&quot;accOut&quot;>–</b></li>
+    <li>P(entire file clean)<b id=&quot;pOut&quot;>–</b></li>
+    <li>Expected wrong tokens (N·ε)<b id=&quot;expOut&quot;>–</b></li>
+  </ul>
+
+  <div class=&quot;eq-block&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <mi>P</mi><mo>(</mo><mtext>all correct</mtext><mo>)</mo>
+        <mo>=</mo>
+        <msup>
+          <mrow><mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>ε</mi><mo>)</mo></mrow>
+          <mi>N</mi>
+        </msup>
+      </mrow>
+    </math>
+    <div class=&quot;legend-line&quot;>
+      P — probability every token in the file is correct (dimensionless, 0–1) ·
+      ε — per-token error rate, chance a single token is wrong (dimensionless) ·
+      N — tokens in the file, fixed at 100,000 (a realistic full solver).
+    </div>
+    <div class=&quot;worked&quot;>Example: ε = 0.01% → P = (0.9999)<sup>100000</sup> ≈ 4.5×10⁻⁵ — about a 0.005% chance of a fully clean file.</div>
+  </div>
+</div>
+
+<script>
+const N = 100000; // tokens in the file (fixed, as spec'd)
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- token snippet for the code panel ----
+const tokens = [&quot;def&quot;,&quot; solve&quot;,&quot;_step&quot;,&quot;(&quot;,&quot;u&quot;,&quot;,&quot;, &quot; dt&quot;,&quot;)&quot;,&quot;:&quot;,&quot;\n&quot;,
+  &quot;    k1&quot;,&quot; =&quot;,&quot; rhs&quot;,&quot;(&quot;,&quot;u&quot;,&quot;)&quot;,&quot;\n&quot;,
+  &quot;    k2&quot;,&quot; =&quot;,&quot; rhs&quot;,&quot;(&quot;,&quot;u&quot;,&quot; +&quot;,&quot; dt&quot;,&quot;*&quot;,&quot;k1&quot;,&quot;)&quot;,&quot;\n&quot;,
+  &quot;    return&quot;,&quot; u&quot;,&quot; +&quot;,&quot; 0.5&quot;,&quot;*&quot;,&quot;dt&quot;,&quot;*&quot;,&quot;(&quot;,&quot;k1&quot;,&quot; +&quot;,&quot; k2&quot;,&quot;)&quot;];
+const fixedErrIdx = tokens.indexOf(&quot; +&quot;); // the persistent, guaranteed error token
+let tokIsRed = new Array(tokens.length).fill(false);
+
+function regenerateErrors(eps){
+  const pVis = Math.min(0.35, Math.max(0.01, eps*400)); // exaggerated for visibility only
+  tokIsRed = tokens.map((t,i)=> i===fixedErrIdx ? true : Math.random()<pVis);
+}
+
+function renderCode(scanIdx){
+  const codePanel = document.getElementById('codePanel');
+  let html='';
+  tokens.forEach((t,i)=>{
+    const cls='tok'+(tokIsRed[i]?' err':'')+(i===scanIdx?' scan':'');
+    const safe=t.replace(/&amp;/g,'&amp;amp;').replace(/</g,'&amp;lt;');
+    html+='<span class=&quot;'+cls+'&quot;>'+safe+'</span>';
+  });
+  codePanel.innerHTML=html;
+}
+
+// ---- slider <-> epsilon mapping (log scale, 1% down to 0.001%) ----
+const logMin=Math.log10(0.00001), logMax=Math.log10(0.01);
+const slider=document.getElementById('epsSlider');
+slider.value=333; // default eps = 1e-4 (0.01%)
+
+function sliderToEps(v){
+  const t=v/1000;
+  return Math.pow(10, logMin+(logMax-logMin)*t);
+}
+
+function fmtEps(pct){
+  if(pct>=0.1) return pct.toFixed(3);
+  if(pct>=0.01) return pct.toFixed(4);
+  return pct.toFixed(5);
+}
+function fmtPct(p){
+  const pct=p*100;
+  if(pct===0) return '0%';
+  if(pct<0.001) return pct.toExponential(2)+'%';
+  return pct.toFixed(3)+'%';
+}
+
+function computeLog10P(eps){
+  // natural-log accumulation avoids underflow of (1-eps)^N for small eps
+  return N*Math.log1p(-eps)/Math.LN10;
+}
+function computeP(eps){
+  return Math.exp(N*Math.log1p(-eps));
+}
+
+// ---- chart drawing ----
+const canvas=document.getElementById('chart');
+const ctx=canvas.getContext('2d');
+const cw=canvas.width, ch=canvas.height;
+const L=52,R=16,T=16,B=38;
+const PW=cw-L-R, PH=ch-T-B;
+
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+function xPix(eps){ return L+(Math.log10(eps)-logMin)/(logMax-logMin)*PW; }
+function yPix(log10P){
+  const clamped=Math.max(-20, Math.min(0, log10P));
+  return T+(0-clamped)/20*PH;
+}
+
+function drawChart(eps){
+  const gcol=css('--grid'), tcol=css('--text'), mcol=css('--muted');
+  const acol=css('--accent'), mkcol=css('--marker');
+  ctx.clearRect(0,0,cw,ch);
+  ctx.strokeStyle=gcol; ctx.fillStyle=mcol; ctx.font='9px sans-serif';
+  ctx.lineWidth=1;
+
+  // y gridlines
+  [0,-5,-10,-15,-20].forEach(lp=>{
+    const y=yPix(lp);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(cw-R,y); ctx.stroke();
+    const lbl = lp===0?'1': (lp===-20?'≤1e-20':'1e'+lp);
+    ctx.textAlign='right';
+    ctx.fillText(lbl,L-5,y+3);
+  });
+  // x gridlines
+  [-5,-4,-3,-2].forEach(lp=>{
+    const eV=Math.pow(10,lp), x=xPix(eV);
+    ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,ch-B); ctx.stroke();
+    const pct=eV*100;
+    const lbl = pct>=1?'1%':(pct>=0.1?'0.1%':(pct>=0.01?'0.01%':'0.001%'));
+    ctx.textAlign='center';
+    ctx.fillText(lbl,x,ch-B+12);
+  });
+
+  // axis titles
+  ctx.fillStyle=tcol; ctx.textAlign='center';
+  ctx.fillText('per-token error rate ε (log scale)', L+PW/2, ch-6);
+  ctx.save();
+  ctx.translate(12,T+PH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center';
+  ctx.fillText('P(all tokens correct)  — log scale',0,0);
+  ctx.restore();
+
+  // curve
+  ctx.strokeStyle=acol; ctx.lineWidth=2; ctx.beginPath();
+  const steps=160;
+  for(let i=0;i<=steps;i++){
+    const lp=logMin+(logMax-logMin)*i/steps;
+    const eV=Math.pow(10,lp);
+    const l10p=computeLog10P(eV);
+    const x=xPix(eV), y=yPix(l10p);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle=acol; ctx.textAlign='left'; ctx.font='10px sans-serif';
+  ctx.fillText('P = (1−ε)^100000',L+6,T+12);
+
+  // reference anchor at eps = 0.01%
+  const refEps=0.0001, refL10=computeLog10P(refEps);
+  const rx=xPix(refEps), ry=yPix(refL10);
+  ctx.fillStyle=mcol;
+  ctx.beginPath(); ctx.arc(rx,ry,3,0,7); ctx.fill();
+  ctx.fillText('0.01% → P≈4.5×10⁻⁵',Math.min(rx+6,cw-R-118),Math.max(ry-6,T+22));
+
+  // current marker
+  const x=xPix(eps), l10p=computeLog10P(eps), y=yPix(l10p);
+  ctx.strokeStyle=mkcol; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,ch-B); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=mkcol;
+  ctx.beginPath(); ctx.arc(x,y,4,0,7); ctx.fill();
+}
+
+// ---- update all readouts + panels ----
+function update(){
+  const eps=sliderToEps(+slider.value);
+  const P=computeP(eps);
+  document.getElementById('accOut').textContent=fmtEps(100-eps*100)+'%';
+  document.getElementById('pOut').textContent=fmtPct(P);
+  document.getElementById('expOut').textContent=Math.round(N*eps).toLocaleString();
+  regenerateErrors(eps);
+  renderCode(-1);
+  drawChart(eps);
+  return eps;
+}
+
+// ---- scanning-cursor animation over the code tokens ----
+let playing=!reduceMotion, rafId=null, startT=null;
+const playBtn=document.getElementById('playBtn');
+function loop(ts){
+  if(startT===null) startT=ts;
+  const dur=1900; // ms for one scan across tokens
+  const t=((ts-startT)%dur)/dur;
+  const idx=Math.floor(t*tokens.length);
+  renderCode(idx);
+  if(playing) rafId=requestAnimationFrame(loop);
+}
+function setPlaying(p){
+  playing=p;
+  playBtn.textContent = p ? 'Pause scan' : 'Play scan';
+  if(p){ startT=null; rafId=requestAnimationFrame(loop); }
+  else { if(rafId) cancelAnimationFrame(rafId); renderCode(-1); }
+}
+playBtn.addEventListener('click',()=>setPlaying(!playing));
+
+slider.addEventListener('input',()=>{ update(); });
+
+// ---- init ----
+update();
+setPlaying(playing);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;llm-error-compounding&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="An LLM writing 100,000 tokens almost never writes all of them right"
+  ></iframe>
+</section>
+
+<section class="scene" id="spec-vs-code">
+  <h3>'Correct' only means something relative to a written specification</h3>
+  <div class="caption">The broken solver of scene 2 wasn't 'incorrect' in a vacuum — it violated a nameable property. A specification writes that property down formally; verification means proving the code satisfies it.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="spec-vs-code"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Specification vs. Implementation</title>
+<style>
+  :root{
+    --bg:#f7f7f9;
+    --panel-bg:#ffffff;
+    --border:#d8d8e2;
+    --text:#1b1b1f;
+    --muted:#5b5b66;
+    --ok:#177a37;
+    --bad:#b8262c;
+    --warn:#93590a;
+    --accent:#2b5fa8;
+    --code-bg:#eef0f4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#131318;
+      --panel-bg:#1c1d24;
+      --border:#3a3b45;
+      --text:#e9e9ee;
+      --muted:#a6a6b0;
+      --ok:#54d97b;
+      --bad:#ff7a7a;
+      --warn:#ffbf5c;
+      --accent:#84acff;
+      --code-bg:#101116;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:12px; background:var(--bg); color:var(--text);
+    font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, sans-serif;
+  }
+  .scene{max-width:900px; margin:0 auto;}
+  h1{font-size:1rem; font-weight:600; margin:0 0 10px; text-align:center; color:var(--text);}
+  .panels{display:flex; flex-wrap:wrap; gap:10px; align-items:stretch; justify-content:center;}
+  .panel{
+    flex:1 1 280px; min-width:250px; max-width:100%;
+    background:var(--panel-bg); border:1px solid var(--border); border-radius:8px;
+    padding:10px 12px;
+  }
+  .panel h2{font-size:0.78rem; letter-spacing:.06em; margin:0 0 8px; color:var(--muted); font-weight:700;}
+  .spec-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px;}
+  .spec-list li{border-top:1px solid var(--border); padding-top:8px;}
+  .spec-list li:first-child{border-top:none; padding-top:0;}
+  math{font-size:0.92rem;}
+  .legend{font-size:0.7rem; color:var(--muted); margin:4px 0 6px; line-height:1.35;}
+  .status{font-size:0.78rem; font-weight:600;}
+  .status.ok{color:var(--ok);}
+  .status.bad{color:var(--bad);}
+  .gap{flex:0 0 64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;}
+  .gap svg{max-width:100%;}
+  .gap-label{font-size:0.9rem; font-weight:700; color:var(--accent);}
+  .gap-sub{font-size:0.62rem; color:var(--muted); text-align:center; max-width:70px;}
+  pre{
+    background:var(--code-bg); color:var(--text); border-radius:6px; padding:10px;
+    font-size:0.72rem; line-height:1.5; margin:0;
+    white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word;
+  }
+  .bug{color:var(--bad); font-weight:700;}
+  .comment{color:var(--muted);}
+  .controls{
+    margin-top:12px; display:flex; flex-wrap:wrap; gap:10px 20px; align-items:center;
+    justify-content:center; background:var(--panel-bg); border:1px solid var(--border);
+    border-radius:8px; padding:10px 14px;
+  }
+  button{
+    font:inherit; font-size:0.78rem; padding:8px 12px; border-radius:6px;
+    border:1px solid var(--accent); background:transparent; color:var(--accent); cursor:pointer;
+  }
+  button[aria-pressed=&quot;true&quot;]{ background:var(--accent); color:var(--panel-bg); }
+  .readouts{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px 18px; font-size:0.76rem;}
+  .readouts li{color:var(--muted);}
+  .readouts strong{color:var(--text);}
+  .links{margin-top:10px; display:flex; flex-direction:column; gap:6px;}
+  .link{font-size:0.74rem; border-radius:6px; padding:6px 10px; border:1px solid var(--border);}
+  .link span{color:var(--muted); display:block; font-size:0.7rem; margin-top:2px;}
+  .link.info{color:var(--accent); border-color:var(--accent);}
+  .link.warn{color:var(--warn); border-color:var(--warn);}
+  @media (max-width:480px){
+    math{font-size:0.8rem;}
+    pre{font-size:0.64rem;}
+    .gap{flex-basis:100%; order:2;}
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+  <h1>Specification &amp;#8872; Implementation — is the claim checkable?</h1>
+  <div class=&quot;panels&quot;>
+
+    <section class=&quot;panel spec&quot;>
+      <h2>SPECIFICATION</h2>
+      <ul class=&quot;spec-list&quot;>
+        <li>
+          <math display=&quot;block&quot;>
+            <mrow>
+              <munderover><mo>&amp;#8721;</mo><mi>i</mi><mi>N</mi></munderover>
+              <msubsup><mi>u</mi><mi>i</mi><mi>n</mi></msubsup>
+              <mo>&amp;#8901;</mo><mi>&amp;#916;x</mi>
+              <mo>=</mo>
+              <munderover><mo>&amp;#8721;</mo><mi>i</mi><mi>N</mi></munderover>
+              <msubsup><mi>u</mi><mi>i</mi><mn>0</mn></msubsup>
+              <mo>&amp;#8901;</mo><mi>&amp;#916;x</mi>
+            </mrow>
+          </math>
+          <div class=&quot;legend&quot;>i — cell index &amp;middot; n — timestep &amp;middot; N — number of cells &amp;middot; u<sub>i</sub><sup>n</sup> — cell-average value at step n &amp;middot; &amp;#916;x — cell width (m). Discrete mass must be exactly conserved.</div>
+          <div class=&quot;status&quot; id=&quot;statusMass&quot;>&amp;#10003; conserved</div>
+        </li>
+        <li>
+          <math display=&quot;block&quot;>
+            <mrow>
+              <mi>&amp;#916;t</mi><mo>&amp;#8804;</mo>
+              <mfrac><mi>&amp;#916;x</mi><mrow><mo>|</mo><mi>a</mi><mo>|</mo></mrow></mfrac>
+            </mrow>
+          </math>
+          <div class=&quot;legend&quot;>&amp;#916;t — timestep (s) &amp;middot; &amp;#916;x — cell width (m) &amp;middot; a — wave speed (m/s). The CFL stability condition.</div>
+          <div class=&quot;status&quot; id=&quot;statusCFL&quot;>&amp;#10003; satisfied</div>
+        </li>
+        <li>
+          <math display=&quot;block&quot;>
+            <mrow>
+              <msub><mi>x</mi><mtext>front</mtext></msub><mo>(</mo><mi>T</mi><mo>)</mo>
+              <mo>=</mo>
+              <msub><mi>x</mi><mtext>front</mtext></msub><mo>(</mo><mn>0</mn><mo>)</mo>
+              <mo>+</mo><mi>a</mi><mo>&amp;#8901;</mo><mi>T</mi>
+            </mrow>
+          </math>
+          <div class=&quot;legend&quot;>x<sub>front</sub> — position of the discontinuity (m) &amp;middot; a — advection speed (m/s) &amp;middot; T — elapsed time (s). The front must travel at the correct speed.</div>
+          <div class=&quot;status&quot; id=&quot;statusFront&quot;>&amp;#10003; satisfied</div>
+        </li>
+      </ul>
+    </section>
+
+    <div class=&quot;gap&quot;>
+      <svg viewBox=&quot;0 0 60 90&quot; width=&quot;46&quot; height=&quot;70&quot; role=&quot;img&quot; aria-label=&quot;satisfies relation&quot;>
+        <line x1=&quot;6&quot; y1=&quot;10&quot; x2=&quot;54&quot; y2=&quot;10&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;2&quot;/>
+        <polygon points=&quot;54,6 60,10 54,14&quot; fill=&quot;var(--accent)&quot;/>
+        <line x1=&quot;54&quot; y1=&quot;80&quot; x2=&quot;6&quot; y2=&quot;80&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;2&quot;/>
+        <polygon points=&quot;6,76 0,80 6,84&quot; fill=&quot;var(--accent)&quot;/>
+      </svg>
+      <div class=&quot;gap-label&quot;>&amp;#8872; ?</div>
+      <div class=&quot;gap-sub&quot;>does code satisfy spec?</div>
+    </div>
+
+    <section class=&quot;panel impl&quot;>
+      <h2>IMPLEMENTATION (flux update, from scene 2)</h2>
+      <pre><code id=&quot;codeBlock&quot;></code></pre>
+    </section>
+
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot; aria-pressed=&quot;false&quot;>Inject 5% flux error (replay scene 2's bug)</button>
+    <ul class=&quot;readouts&quot;>
+      <li>flux error &amp;#949;: <strong id=&quot;epsVal&quot;>0</strong>%</li>
+      <li>mass drift: <strong id=&quot;driftVal&quot;>0.00</strong>%</li>
+      <li>CFL number a&amp;#916;t/&amp;#916;x: <strong id=&quot;cflVal&quot;>0.00</strong></li>
+      <li>front-position error: <strong id=&quot;frontVal&quot;>0.000</strong> m</li>
+    </ul>
+  </div>
+
+  <div class=&quot;links&quot;>
+    <div class=&quot;link info&quot;>Link A — does the code match the spec? <span>checked numerically above — this scene.</span></div>
+    <div class=&quot;link warn&quot;>&amp;#9888; Link B — does the spec match what you actually wanted? <span>unresolved here — we return to this at the end.</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- physical/numerical constants (auditable) ----
+  const a = 1.0;        // advection speed (m/s)
+  const L = 1.0;        // domain length (m)
+  const Nx = 40;        // number of cells
+  const dx = L / Nx;    // cell width (m)
+  const CFL_target = 0.4;
+  const dt = CFL_target * dx / a;  // timestep (s)
+  const nSteps = 8;     // number of steps advanced
+
+  function makeU0(){
+    const u = new Array(Nx);
+    for(let i=0;i<Nx;i++) u[i] = (i < Nx/2) ? 1.0 : 0.0;
+    return u;
+  }
+
+  // Conservative finite-volume upwind update. eps = fractional flux error
+  // injected only into the OUTGOING flux of each cell (mismatched w/ the
+  // flux the neighbor receives) -- this is exactly the scene-2 bug.
+  function simulate(eps){
+    let u = makeU0();
+    for(let s=0;s<nSteps;s++){
+      const Fout = u.map(v => a*v*(1+eps));
+      const Fin  = u.map(v => a*v);
+      const un = new Array(Nx);
+      for(let i=0;i<Nx;i++){
+        const im1 = (i-1+Nx)%Nx;
+        un[i] = u[i] - (dt/dx)*Fout[i] + (dt/dx)*Fin[im1];
+      }
+      u = un;
+    }
+    return u;
+  }
+
+  function mass(u){ return u.reduce((s,v)=>s+v,0)*dx; }
+
+  function frontPosition(u){
+    for(let i=0;i<Nx;i++){
+      const j=(i+1)%Nx;
+      if(u[i] >= 0.5 &amp;&amp; u[j] < 0.5){
+        const t = (u[i]-0.5)/(u[i]-u[j]);
+        return (i+t)*dx;
+      }
+    }
+    return null;
+  }
+
+  // ---- static checks (independent of the toggle) ----
+  const u0 = makeU0();
+  const uRef = simulate(0);
+  const front0 = frontPosition(u0);
+  const frontRef = frontPosition(uRef);
+  const frontExpected = (front0 + a*dt*nSteps) % L;
+  const frontError = Math.abs(frontRef - frontExpected);
+  const frontTol = 4*dx;
+  const cflNumber = a*dt/dx;
+  const cflPass = cflNumber <= 1.0;
+  const frontPass = frontError < frontTol;
+
+  document.getElementById('cflVal').textContent = cflNumber.toFixed(2);
+  document.getElementById('frontVal').textContent = frontError.toFixed(3);
+
+  const statusCFL = document.getElementById('statusCFL');
+  statusCFL.textContent = (cflPass?'\u2713 satisfied — ':'\u2717 violated — ') +
+    'a\u0394t/\u0394x = ' + cflNumber.toFixed(2) + ' \u2264 1';
+  statusCFL.className = 'status ' + (cflPass?'ok':'bad');
+
+  const statusFront = document.getElementById('statusFront');
+  statusFront.textContent = (frontPass?'\u2713 satisfied — ':'\u2717 violated — ') +
+    'position error ' + frontError.toFixed(3) + ' m < ' + frontTol.toFixed(3) + ' m';
+  statusFront.className = 'status ' + (frontPass?'ok':'bad');
+
+  // ---- dynamic check (toggle-driven): mass conservation ----
+  const statusMass = document.getElementById('statusMass');
+  const epsValEl = document.getElementById('epsVal');
+  const driftValEl = document.getElementById('driftVal');
+  const codeEl = document.getElementById('codeBlock');
+  const toggleBtn = document.getElementById('toggleBtn');
+
+  function buildCode(eps){
+    const epsStr = eps.toFixed(2);
+    const cls = eps>0 ? 'bug' : '';
+    return 'for (let i = 0; i < N; i++) {\n' +
+      '  const Fout =\n' +
+      '    a * u[i] * (1 + <span class=&quot;'+cls+'&quot;>'+epsStr+'</span>);\n' +
+      '  <span class=&quot;comment&quot;>// flux leaving cell i</span>\n' +
+      '  const Fin =\n' +
+      '    a * u[i];\n' +
+      '  <span class=&quot;comment&quot;>// flux entering neighbor i+1 (unpatched)</span>\n' +
+      '  uNext[i] = u[i]\n' +
+      '    - (dt/dx) * Fout\n' +
+      '    + (dt/dx) * Fin_prev;\n' +
+      '}';
+  }
+
+  function render(eps){
+    const uF = simulate(eps);
+    const drift = (mass(uF) - mass(u0)) / mass(u0) * 100;
+    const pass = Math.abs(drift) < 1.0; // tolerance: 1% of total mass
+    statusMass.textContent = (pass?'\u2713 conserved — ':'\u2717 violated — ') +
+      'measured drift ' + drift.toFixed(2) + '%';
+    statusMass.className = 'status ' + (pass?'ok':'bad');
+    epsValEl.textContent = Math.round(eps*100);
+    driftValEl.textContent = drift.toFixed(2);
+    codeEl.innerHTML = buildCode(eps);
+  }
+
+  let bugOn = false;
+  toggleBtn.addEventListener('click', function(){
+    bugOn = !bugOn;
+    toggleBtn.setAttribute('aria-pressed', bugOn ? 'true' : 'false');
+    toggleBtn.textContent = bugOn
+      ? &quot;Remove flux error — restore correct implementation&quot;
+      : &quot;Inject 5% flux error (replay scene 2's bug)&quot;;
+    render(bugOn ? 0.05 : 0);
+  });
+
+  render(0);
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;spec-vs-code&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="'Correct' only means something relative to a written specification"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>The new technology</h2>
+  <div class="part-lede">Scene 4 left us with a precise target — prove that code matches a written specification. Here we meet the machinery that checks such proofs, watch the obvious AI-based approach fail at exactly one seam, and see how Lanyon welds that seam shut.</div>
+</header>
+<section class="scene" id="proof-checking-asymmetry">
+  <h3>Proofs are hard to write but mechanical to check</h3>
+  <div class="caption">Scene 4 demanded a proof that the code satisfies the spec — but who checks a proof written by an untrustworthy author? A proof assistant: a small, audited program that accepts a proof only if every step follows mechanically from the rules, the way a compiler rejects a syntax error.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="proof-checking-asymmetry"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Proof checking asymmetry</title>
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel-bg:#ffffff;
+    --border:#d5d5d0;
+    --text:#1c1c1c;
+    --muted:#66665f;
+    --accent:#3a5a9c;
+    --pending:#c7c7c0;
+    --good:#2e8b4f;
+    --good-bg:#e4f5e9;
+    --bad:#c0392b;
+    --bad-bg:#fbe6e3;
+    --kernel-bg:#eef0ff;
+    --op:#b8860b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#161616;
+      --panel-bg:#212123;
+      --border:#3a3a3d;
+      --text:#e9e9e6;
+      --muted:#a3a39c;
+      --accent:#8fb3ff;
+      --pending:#4a4a4d;
+      --good:#4fd07a;
+      --good-bg:#173a25;
+      --bad:#ff6b5c;
+      --bad-bg:#3d1c19;
+      --kernel-bg:#242540;
+      --op:#e0b84a;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;padding:14px 14px 20px;}
+  .eqblock{background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;
+    padding:8px 10px;margin-bottom:12px;overflow-x:auto;}
+  .eqblock math{font-size:1.05em;}
+  .legend{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  button{font-size:13px;padding:7px 12px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel-bg);color:var(--text);cursor:pointer;}
+  button:active{transform:translateY(1px);}
+  button.active{border-color:var(--bad);color:var(--bad);}
+  button:disabled{opacity:.55;cursor:default;transform:none;}
+  .readouts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .ro{flex:1 1 130px;background:var(--panel-bg);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px;}
+  .ro .lab{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;}
+  .ro .val{font-size:14px;font-weight:600;margin-top:2px;}
+  .chain{display:flex;flex-direction:column;}
+  .step{display:flex;align-items:flex-start;gap:8px;padding:6px 9px;border-radius:6px;
+    border:1px solid var(--border);background:var(--panel-bg);font-size:12.5px;line-height:1.35;
+    transition:background .18s,border-color .18s;}
+  .step .dot{width:13px;height:13px;min-width:13px;border-radius:50%;background:var(--pending);
+    margin-top:3px;transition:background .18s;}
+  .step.green{background:var(--good-bg);border-color:var(--good);}
+  .step.green .dot{background:var(--good);}
+  .step.red{background:var(--bad-bg);border-color:var(--bad);}
+  .step.red .dot{background:var(--bad);}
+  .step .num{color:var(--muted);font-weight:600;min-width:14px;}
+  .op{color:var(--op);font-weight:700;}
+  .arrow{text-align:center;color:var(--muted);font-size:12px;line-height:1;padding:1px 0;}
+  .kernel{margin-top:2px;border:2px dashed var(--accent);border-radius:8px;padding:10px;
+    background:var(--kernel-bg);text-align:center;}
+  .kernel .title{font-weight:700;letter-spacing:.03em;font-size:13px;}
+  .kernel .note{font-size:11px;color:var(--muted);margin-top:2px;}
+  .seal{margin-top:8px;font-weight:700;font-size:14px;padding:6px;border-radius:6px;display:inline-block;}
+  .seal.accept{background:var(--good);color:#fff;}
+  .seal.reject{background:var(--bad);color:#fff;}
+  @media (max-width:400px){
+    .step{font-size:11.5px;}
+    .readouts{gap:6px;}
+    .ro{flex:1 1 100px;}
+  }
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;eqblock&quot;>
+    <math display=&quot;block&quot;>
+      <mfrac><mrow><mi>d</mi><mi>m</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac>
+      <mo>=</mo><mo>-</mo>
+      <munderover><mo>&amp;#8721;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+      <mo>(</mo><msub><mi>F</mi><mtext>i+&amp;#189;</mtext></msub><mo>-</mo><msub><mi>F</mi><mtext>i-&amp;#189;</mtext></msub><mo>)</mo>
+      <mo>=</mo><mn>0</mn>
+    </math>
+    <div class=&quot;legend&quot;>
+      m — mass in one grid cell (kg) &amp;middot; t — time (s) &amp;middot; F — flux crossing a cell interface (kg/s) &amp;middot;
+      i, N — cell index and total number of cells &amp;middot; Claim to be proved: total mass across all cells never changes.
+    </div>
+  </div>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;>Corrupt step 5 (swap &amp;minus; for + in the telescoping sum)</button>
+    <button id=&quot;runBtn&quot;>Re-check proof &amp;#9654;</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>Kernel is at</div><div class=&quot;val&quot; id=&quot;roStep&quot;>step 0 / 8</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>Verdict</div><div class=&quot;val&quot; id=&quot;roVerdict&quot;>idle</div></div>
+    <div class=&quot;ro&quot;><div class=&quot;lab&quot;>Re-checks run</div><div class=&quot;val&quot; id=&quot;roCount&quot;>0</div></div>
+  </div>
+
+  <div class=&quot;chain&quot; id=&quot;chain&quot;></div>
+
+  <div class=&quot;kernel&quot;>
+    <div class=&quot;title&quot;>KERNEL</div>
+    <div class=&quot;note&quot;>~3,000 lines of audited code &amp;middot; no AI, no heuristics, no judgment &amp;mdash;
+      only mechanical rule application. Same input, same verdict, every time.</div>
+    <div id=&quot;sealHolder&quot;></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const STEP_TEXT = [
+    &quot;Define the interface flux F at cell boundary i+&amp;#189; from the numerical scheme.&quot;,
+    &quot;Flux leaving cell i equals F evaluated at i+&amp;#189;.&quot;,
+    &quot;Flux entering cell i+1 equals that same F at i+&amp;#189; (the scheme is conservative).&quot;,
+    &quot;Cell update: dm_i/dt = &amp;minus;(F_{i+&amp;#189;} &amp;minus; F_{i&amp;minus;&amp;#189;}).&quot;,
+    null, // filled per corrupted state below
+    &quot;Only the two outer boundary flux terms survive the sum.&quot;,
+    &quot;Boundary fluxes vanish for a closed or periodic domain.&quot;,
+    &quot;Therefore d/dt &amp;sum; m_i = 0 &amp;mdash; total mass is exactly conserved. &amp;#8718;&quot;
+  ];
+  const STEP5_OK   = 'Telescoping sum: &amp;sum;(F_{i+&amp;#189;} <span class=&quot;op&quot;>&amp;minus;</span> F_{i&amp;minus;&amp;#189;}) &amp;mdash; interior terms cancel pairwise, only edges remain.';
+  const STEP5_BAD  = 'Telescoping sum: &amp;sum;(F_{i+&amp;#189;} <span class=&quot;op&quot;>+</span> F_{i&amp;minus;&amp;#189;}) &amp;mdash; interior terms add up; nothing cancels. Invalid.';
+
+  const chainEl = document.getElementById('chain');
+  const toggleBtn = document.getElementById('toggleBtn');
+  const runBtn = document.getElementById('runBtn');
+  const roStep = document.getElementById('roStep');
+  const roVerdict = document.getElementById('roVerdict');
+  const roCount = document.getElementById('roCount');
+  const sealHolder = document.getElementById('sealHolder');
+
+  let corrupted = false;
+  let recheckCount = 0;
+  let running = false;
+  let animIndex = 0;      // steps colored so far (1-based count)
+  let haltAt = 8;
+  let finalVerdict = 'idle';
+  let lastTick = 0;
+  let rafId = null;
+  // Kept intentionally short: the point of the scene is the terminal
+  // verdict (green seal or red halt), not a slow reveal. A brief sweep
+  // still communicates &quot;walking the chain&quot; without risking a screenshot
+  // catching a mid-run &quot;checking...&quot; state.
+  const STEP_MS = 35;
+  const reduced = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // build DOM once
+  const stepEls = [];
+  for(let i=0;i<8;i++){
+    const row = document.createElement('div');
+    row.className = 'step';
+    row.innerHTML = '<div class=&quot;dot&quot;></div><div class=&quot;num&quot;>'+(i+1)+'.</div><div class=&quot;txt&quot;></div>';
+    chainEl.appendChild(row);
+    stepEls.push(row);
+    if(i<7){
+      const arrow = document.createElement('div');
+      arrow.className='arrow';
+      arrow.textContent='\u2193';
+      chainEl.appendChild(arrow);
+    }
+  }
+  const finalArrow = document.createElement('div');
+  finalArrow.className='arrow';
+  finalArrow.textContent='\u2193 into kernel';
+  chainEl.appendChild(finalArrow);
+
+  function textFor(i){
+    if(i===4) return corrupted ? STEP5_BAD : STEP5_OK;
+    return STEP_TEXT[i];
+  }
+  function refreshTexts(){
+    for(let i=0;i<8;i++) stepEls[i].querySelector('.txt').innerHTML = textFor(i);
+  }
+  function resetVisual(){
+    stepEls.forEach(el=>{ el.classList.remove('green','red'); });
+    sealHolder.innerHTML='';
+  }
+  function computeOutcome(){
+    haltAt = corrupted ? 5 : 8;
+    finalVerdict = corrupted ? 'rejected' : 'accepted';
+  }
+  function paintStep(n, isHaltFail){
+    if(n<1 || n>8) return;
+    const el = stepEls[n-1];
+    el.classList.add(isHaltFail ? 'red' : 'green');
+  }
+  function showSeal(){
+    if(finalVerdict==='accepted'){
+      sealHolder.innerHTML = '<div class=&quot;seal accept&quot;>PROOF ACCEPTED</div>';
+    } else {
+      sealHolder.innerHTML = '<div class=&quot;seal reject&quot;>REJECTED at step '+haltAt+'</div>';
+    }
+  }
+  function setControlsEnabled(enabled){
+    toggleBtn.disabled = !enabled;
+    runBtn.disabled = !enabled;
+  }
+  function updateReadouts(stepShown){
+    roStep.textContent = 'step '+stepShown+' / 8';
+    roVerdict.textContent = running ? 'checking\u2026' :
+      (finalVerdict==='accepted' ? 'accepted' : finalVerdict==='rejected' ? 'rejected' : 'idle');
+    roCount.textContent = String(recheckCount);
+  }
+
+  function stopAnimation(){
+    if(rafId!==null){ cancelAnimationFrame(rafId); rafId=null; }
+    running = false;
+  }
+
+  // Resolve to the terminal state synchronously (used for initial load,
+  // reduced-motion, and as the guaranteed end-point of every run so the
+  // verdict can never be left stranded mid-check).
+  function resolveInstant(){
+    computeOutcome();
+    resetVisual();
+    for(let n=1;n<=haltAt;n++) paintStep(n, n===haltAt &amp;&amp; corrupted);
+    running = false;
+    updateReadouts(haltAt);
+    showSeal();
+    setControlsEnabled(true);
+  }
+
+  function startRun(instant){
+    stopAnimation();
+    computeOutcome();
+    resetVisual();
+    animIndex = 0;
+    setControlsEnabled(false);
+    if(instant){
+      running = false;
+      resolveInstant();
+    } else {
+      running = true;
+      updateReadouts(0);
+      lastTick = performance.now();
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+
+  function tick(ts){
+    if(!running) return;
+    if(ts - lastTick >= STEP_MS){
+      lastTick = ts;
+      animIndex++;
+      if(animIndex >= haltAt){
+        const isHaltFail = corrupted &amp;&amp; haltAt===haltAt;
+        paintStep(haltAt, corrupted);
+        running = false;
+        rafId = null;
+        updateReadouts(haltAt);
+        showSeal();
+        setControlsEnabled(true);
+        return;
+      }
+      paintStep(animIndex, false);
+      updateReadouts(animIndex);
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  toggleBtn.addEventListener('click', function(){
+    if(running) return;
+    corrupted = !corrupted;
+    toggleBtn.classList.toggle('active', corrupted);
+    toggleBtn.textContent = corrupted ?
+      'Restore step 5 (undo the corruption)' :
+      'Corrupt step 5 (swap \u2212 for + in the telescoping sum)';
+    refreshTexts();
+    recheckCount++;
+    startRun(reduced);
+  });
+
+  runBtn.addEventListener('click', function(){
+    if(running) return;
+    recheckCount++;
+    startRun(reduced);
+  });
+
+  // Initial state: render the fully resolved, valid-proof verdict
+  // immediately (all 8 steps green + PROOF ACCEPTED seal) so a reader's
+  // very first view already shows the terminal state, with no dependency
+  // on animation timing. The toggle/re-check buttons let the reader
+  // trigger the corrupted-path rejection on demand.
+  refreshTexts();
+  recheckCount = 0;
+  resolveInstant();
+  if(reduced){
+    // Nothing auto-plays under reduced motion; the state above is already
+    // static and final, and &quot;Re-check proof&quot; acts as the play control.
+  }
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;proof-checking-asymmetry&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Proofs are hard to write but mechanical to check"
+  ></iframe>
+</section>
+
+<section class="scene" id="autoformalization-pipeline">
+  <h3>The consensus fix: have the LLM write both the code and its proof</h3>
+  <div class="caption">Given a trustworthy checker, the obvious architecture writes itself: the LLM emits both the shock-tube solver and a machine-checkable proof, gated by scene 5's kernel. Step through the pipeline — an accepted proof means the code it describes provably satisfies the spec.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="autoformalization-pipeline"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<title>Autoformalization Pipeline</title>
+<style>
+:root{
+  --bg:#f5f6f8;
+  --panel:#ffffff;
+  --text:#1a1d23;
+  --muted:#6b7280;
+  --box-fill:#eef0f3;
+  --box-stroke:#9aa1ab;
+  --box-active-fill:#dfe9ff;
+  --box-active-stroke:#3b6fd6;
+  --code-color:#2f6fed;
+  --proof-color:#8b3fd6;
+  --kernel-color:#b58a00;
+  --seal-green:#1f9d55;
+  --arrow-color:#9aa1ab;
+  --arrow-active:#3b6fd6;
+  --btn-bg:#e7e9ec;
+  --btn-text:#1a1d23;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161a;
+    --panel:#1c1f26;
+    --text:#e8e9ec;
+    --muted:#9aa1ab;
+    --box-fill:#252a33;
+    --box-stroke:#5a6472;
+    --box-active-fill:#2a3a5c;
+    --box-active-stroke:#6f9bff;
+    --code-color:#6f9bff;
+    --proof-color:#c48bff;
+    --kernel-color:#e0b23a;
+    --seal-green:#3ecb77;
+    --arrow-color:#5a6472;
+    --arrow-active:#6f9bff;
+    --btn-bg:#2a2e37;
+    --btn-text:#e8e9ec;
+  }
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;padding:12px;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+}
+.scene{max-width:700px;margin:0 auto;background:var(--panel);border-radius:10px;padding:12px;}
+svg{width:100%;height:auto;max-width:100%;display:block;}
+.node-title{font-weight:700;font-size:13px;fill:var(--text);text-anchor:middle;}
+.node-sub{font-size:8px;fill:var(--muted);text-anchor:middle;font-style:italic;}
+.artifact-text{font-size:8px;fill:var(--muted);text-anchor:middle;font-family:monospace;opacity:0;transition:opacity .4s;}
+.artifact-text.visible{opacity:1;}
+.node rect{fill:var(--box-fill);stroke:var(--box-stroke);stroke-width:2;transition:all .3s;}
+.node.active rect{fill:var(--box-active-fill);stroke:var(--box-active-stroke);stroke-width:3;}
+.node.code.active rect{stroke:var(--code-color);}
+.node.proof.active rect{stroke:var(--proof-color);}
+.node.kernel.active rect{stroke:var(--kernel-color);}
+.arrow{stroke:var(--arrow-color);stroke-width:2;fill:none;opacity:.4;transition:all .3s;marker-end:url(#arrowhead);}
+.arrow.active{stroke:var(--arrow-active);stroke-width:3;opacity:1;}
+.seam{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3;opacity:.45;transition:all .3s;}
+.seam.active{stroke:var(--code-color);opacity:.9;stroke-width:2;}
+.annot{font-size:9px;fill:var(--muted);text-anchor:middle;}
+.seal-ring{fill:none;stroke:var(--muted);stroke-width:2.5;transition:all .3s;}
+.seal-ring.accepted{stroke:var(--seal-green);fill:var(--seal-green);fill-opacity:.15;}
+.checkmark{stroke:var(--seal-green);stroke-width:3;fill:none;opacity:0;transition:opacity .4s;stroke-linecap:round;}
+.checkmark.visible{opacity:1;}
+.kernel-status{font-size:9px;text-anchor:middle;font-weight:700;fill:var(--muted);}
+.kernel-status.accept{fill:var(--seal-green);}
+@media (prefers-reduced-motion: no-preference){
+  .node.kernel.checking rect{animation:pulse 1s ease-in-out infinite;}
+}
+@keyframes pulse{0%,100%{stroke-width:3;}50%{stroke-width:5;}}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;}
+button{
+  background:var(--btn-bg);color:var(--btn-text);border:none;border-radius:6px;
+  padding:8px 14px;font-size:13px;cursor:pointer;
+}
+button:disabled{opacity:.4;cursor:default;}
+.readouts{display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-size:12.5px;}
+.readouts div{background:var(--box-fill);border-radius:6px;padding:6px 10px;}
+.readouts b{display:block;font-size:14px;margin-top:2px;}
+.footnote{font-size:11px;color:var(--muted);font-style:italic;margin:10px 2px 0;}
+math{font-size:14px;}
+.legend{font-size:11px;color:var(--muted);margin:2px 2px 0;}
+.eqwrap{margin-top:6px;text-align:center;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+<svg viewBox=&quot;0 0 700 320&quot; role=&quot;img&quot; aria-label=&quot;Autoformalization pipeline diagram&quot;>
+  <defs>
+    <marker id=&quot;arrowhead&quot; markerWidth=&quot;8&quot; markerHeight=&quot;8&quot; refX=&quot;6&quot; refY=&quot;3&quot; orient=&quot;auto&quot;>
+      <path d=&quot;M0,0 L6,3 L0,6 Z&quot; fill=&quot;var(--arrow-color)&quot;></path>
+    </marker>
+  </defs>
+
+  <!-- annotation over the seam -->
+  <text class=&quot;annot&quot; x=&quot;335&quot; y=&quot;18&quot;>two artifacts, one author,</text>
+  <text class=&quot;annot&quot; x=&quot;335&quot; y=&quot;30&quot;>generated separately</text>
+
+  <!-- arrows -->
+  <path id=&quot;a0&quot; class=&quot;arrow&quot; d=&quot;M100,160 L138,160&quot;></path>
+  <path id=&quot;a1&quot; class=&quot;arrow&quot; d=&quot;M212,150 L258,95&quot;></path>
+  <path id=&quot;a2&quot; class=&quot;arrow&quot; d=&quot;M212,172 L258,222&quot;></path>
+  <path id=&quot;a3&quot; class=&quot;arrow&quot; d=&quot;M412,95 L452,150&quot;></path>
+  <path id=&quot;a4&quot; class=&quot;arrow&quot; d=&quot;M412,222 L452,172&quot;></path>
+  <path id=&quot;a5&quot; class=&quot;arrow&quot; d=&quot;M562,160 L573,160&quot;></path>
+  <path id=&quot;a6&quot; class=&quot;arrow&quot; d=&quot;M617,160 L633,160&quot;></path>
+
+  <!-- seam gap -->
+  <line id=&quot;seam&quot; class=&quot;seam&quot; x1=&quot;335&quot; y1=&quot;118&quot; x2=&quot;335&quot; y2=&quot;202&quot;></line>
+
+  <!-- request -->
+  <g id=&quot;n-request&quot; class=&quot;node&quot;>
+    <rect x=&quot;10&quot; y=&quot;140&quot; width=&quot;90&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+    <text class=&quot;node-title&quot; x=&quot;55&quot; y=&quot;158&quot;>REQUEST</text>
+    <text class=&quot;node-sub&quot; x=&quot;55&quot; y=&quot;172&quot;>'Sod shock tube'</text>
+  </g>
+
+  <!-- LLM -->
+  <g id=&quot;n-llm&quot; class=&quot;node&quot;>
+    <rect x=&quot;140&quot; y=&quot;140&quot; width=&quot;70&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+    <text class=&quot;node-title&quot; x=&quot;175&quot; y=&quot;164&quot;>LLM</text>
+  </g>
+
+  <!-- code -->
+  <g id=&quot;n-code&quot; class=&quot;node code&quot;>
+    <rect x=&quot;260&quot; y=&quot;60&quot; width=&quot;150&quot; height=&quot;55&quot; rx=&quot;6&quot;></rect>
+    <text class=&quot;node-title&quot; x=&quot;335&quot; y=&quot;80&quot; fill=&quot;var(--code-color)&quot;>CODE</text>
+    <text class=&quot;node-sub&quot; x=&quot;335&quot; y=&quot;93&quot;>solver.c</text>
+    <text class=&quot;artifact-text&quot; id=&quot;code-snip&quot; x=&quot;335&quot; y=&quot;106&quot;>flux = riemann(U)</text>
+  </g>
+
+  <!-- proof -->
+  <g id=&quot;n-proof&quot; class=&quot;node proof&quot;>
+    <rect x=&quot;260&quot; y=&quot;205&quot; width=&quot;150&quot; height=&quot;55&quot; rx=&quot;6&quot;></rect>
+    <text class=&quot;node-title&quot; x=&quot;335&quot; y=&quot;225&quot; fill=&quot;var(--proof-color)&quot;>PROOF</text>
+    <text class=&quot;node-sub&quot; x=&quot;335&quot; y=&quot;238&quot;>conservation.lean</text>
+    <text class=&quot;artifact-text&quot; id=&quot;proof-snip&quot; x=&quot;335&quot; y=&quot;251&quot;>thm mass_conserved</text>
+  </g>
+
+  <!-- kernel -->
+  <g id=&quot;n-kernel&quot; class=&quot;node kernel&quot;>
+    <rect x=&quot;450&quot; y=&quot;140&quot; width=&quot;110&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+    <text class=&quot;node-title&quot; x=&quot;505&quot; y=&quot;158&quot; font-size=&quot;12&quot;>KERNEL</text>
+    <text class=&quot;node-sub&quot; x=&quot;505&quot; y=&quot;170&quot;>(scene 5's checker)</text>
+  </g>
+  <text id=&quot;kernel-status&quot; class=&quot;kernel-status&quot; x=&quot;505&quot; y=&quot;196&quot;></text>
+
+  <!-- seal -->
+  <g id=&quot;n-seal&quot;>
+    <circle class=&quot;seal-ring&quot; id=&quot;seal-ring&quot; cx=&quot;595&quot; cy=&quot;160&quot; r=&quot;22&quot;></circle>
+    <path class=&quot;checkmark&quot; id=&quot;checkmark&quot; d=&quot;M585,160 L593,169 L607,150&quot;></path>
+  </g>
+
+  <!-- ship -->
+  <g id=&quot;n-ship&quot; class=&quot;node&quot;>
+    <rect x=&quot;635&quot; y=&quot;140&quot; width=&quot;55&quot; height=&quot;40&quot; rx=&quot;6&quot;></rect>
+    <text class=&quot;node-title&quot; x=&quot;662&quot; y=&quot;163&quot; font-size=&quot;12&quot;>SHIP</text>
+  </g>
+</svg>
+
+<div class=&quot;controls&quot;>
+  <button id=&quot;prevBtn&quot;>◀ Previous stage</button>
+  <button id=&quot;nextBtn&quot;>Next stage ▶</button>
+</div>
+
+<div class=&quot;readouts&quot;>
+  <div>Stage <span id=&quot;stageNum&quot;>1</span> / 5<b id=&quot;stageName&quot;>User request</b></div>
+  <div>Artifacts produced<b id=&quot;artifactCount&quot;>0</b></div>
+  <div>Kernel verdict<b id=&quot;verdict&quot;>—</b></div>
+</div>
+
+<div class=&quot;eqwrap&quot;>
+<math display=&quot;block&quot;>
+  <mi>K</mi><mo>(</mo><mi>proof</mi><mo>)</mo><mo>=</mo><mtext>accept</mtext>
+  <mo>&amp;#8658;</mo><mi>code</mi><mo>&amp;#8872;</mo><mi>spec</mi>
+</math>
+</div>
+<div class=&quot;legend&quot;>K — the kernel's verdict function (scene 5) · proof — LLM-written Lean proof · code — LLM-written solver · spec — conservation laws the proof formalizes</div>
+
+<div class=&quot;footnote&quot;>This approach has real wins in pure mathematics, which is why it became the default.</div>
+</div>
+
+<script>
+const stages = [
+  {name:&quot;User request&quot;, nodes:[&quot;n-request&quot;], arrows:[]},
+  {name:&quot;LLM generates&quot;, nodes:[&quot;n-llm&quot;], arrows:[&quot;a0&quot;]},
+  {name:&quot;Code + proof produced&quot;, nodes:[&quot;n-code&quot;,&quot;n-proof&quot;], arrows:[&quot;a1&quot;,&quot;a2&quot;]},
+  {name:&quot;Kernel checks proof&quot;, nodes:[&quot;n-kernel&quot;], arrows:[&quot;a3&quot;,&quot;a4&quot;]},
+  {name:&quot;Ship&quot;, nodes:[&quot;n-seal&quot;,&quot;n-ship&quot;], arrows:[&quot;a5&quot;,&quot;a6&quot;]}
+];
+
+let stage = 0;
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const allNodeIds = [&quot;n-request&quot;,&quot;n-llm&quot;,&quot;n-code&quot;,&quot;n-proof&quot;,&quot;n-kernel&quot;,&quot;n-seal&quot;,&quot;n-ship&quot;];
+const allArrowIds = [&quot;a0&quot;,&quot;a1&quot;,&quot;a2&quot;,&quot;a3&quot;,&quot;a4&quot;,&quot;a5&quot;,&quot;a6&quot;];
+
+function render(){
+  // reset
+  allNodeIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('active','checking');
+  });
+  allArrowIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('active');
+  });
+  document.getElementById('seam').classList.remove('active');
+  document.getElementById('code-snip').classList.remove('visible');
+  document.getElementById('proof-snip').classList.remove('visible');
+  document.getElementById('seal-ring').classList.remove('accepted');
+  document.getElementById('checkmark').classList.remove('visible');
+  document.getElementById('kernel-status').textContent = '';
+  document.getElementById('kernel-status').classList.remove('accept');
+
+  // apply up to current stage cumulatively for artifacts + seam,
+  // but active highlight only for current stage's nodes/arrows
+  for(let i=0;i<=stage;i++){
+    if(i===2){
+      document.getElementById('code-snip').classList.add('visible');
+      document.getElementById('proof-snip').classList.add('visible');
+      document.getElementById('seam').classList.add('active');
+    }
+  }
+
+  const s = stages[stage];
+  s.nodes.forEach(id=>document.getElementById(id).classList.add('active'));
+  s.arrows.forEach(id=>document.getElementById(id).classList.add('active'));
+
+  if(stage===3){
+    document.getElementById('n-kernel').classList.add('checking');
+    document.getElementById('kernel-status').textContent = 'checking\u2026';
+  }
+  if(stage===4){
+    document.getElementById('kernel-status').textContent = 'accept \u2713';
+    document.getElementById('kernel-status').classList.add('accept');
+    document.getElementById('seal-ring').classList.add('accepted');
+    document.getElementById('checkmark').classList.add('visible');
+  }
+
+  document.getElementById('stageNum').textContent = stage+1;
+  document.getElementById('stageName').textContent = s.name;
+  document.getElementById('artifactCount').textContent = stage>=2 ? 2 : 0;
+  document.getElementById('verdict').textContent = stage===4 ? 'ACCEPT' : (stage===3 ? 'pending' : '—');
+
+  prevBtn.disabled = stage===0;
+  nextBtn.disabled = stage===stages.length-1;
+}
+
+prevBtn.addEventListener('click',()=>{ if(stage>0){ stage--; render(); } });
+nextBtn.addEventListener('click',()=>{ if(stage<stages.length-1){ stage++; render(); } });
+
+render();
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;autoformalization-pipeline&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The consensus fix: have the LLM write both the code and its proof"
+  ></iframe>
+</section>
+
+<section class="scene" id="neurosymbolic-split">
+  <h3>Lanyon shrinks the LLM's job to twenty lines of specification</h3>
+  <div class="caption">If the LLM is the unreliable link, Lanyon gives it the smallest possible job: a ~20-line specification in a DSL, never code or proof. The DSL is a compact formal language with conservation laws and discretization schemes built in as vocabulary.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="neurosymbolic-split"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Lanyon: shrinking the LLM's job</title>
+<style>
+  :root{
+    --bg:#f4f5f8;
+    --panel:#ffffff;
+    --text:#1b1e24;
+    --muted:#5b6270;
+    --border:#d8dbe1;
+    --neural:#d9642f;
+    --neural-bg:#fce7da;
+    --symbolic:#20785f;
+    --symbolic-bg:#dcf1ea;
+    --accent:#3a5fd9;
+    --chip-bg:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141a;
+      --panel:#1c1f27;
+      --text:#eef0f4;
+      --muted:#9aa2b1;
+      --border:#39404c;
+      --neural:#ff9a56;
+      --neural-bg:#3a2a1c;
+      --symbolic:#5fd6ac;
+      --symbolic-bg:#173029;
+      --accent:#8aa8ff;
+      --chip-bg:#232733;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,sans-serif;
+    padding:14px;
+  }
+  .wrap{max-width:680px;margin:0 auto;}
+  h2.stitle{font-size:15px;margin:0 0 10px 0;font-weight:600;color:var(--text);}
+  .controls{
+    display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;
+  }
+  .toggle-btn{
+    font-size:13px;font-weight:600;padding:9px 14px;border-radius:8px;
+    border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;
+  }
+  .toggle-btn:active{opacity:0.85;}
+  .hint{font-size:12px;color:var(--muted);max-width:420px;}
+  svg{width:100%;height:auto;display:block;background:var(--panel);
+      border:1px solid var(--border);border-radius:10px;}
+  svg text{font-family:inherit;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .stat{
+    flex:1 1 140px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:8px 10px;text-align:center;
+  }
+  .stat-label{font-size:10.5px;color:var(--muted);margin-bottom:3px;}
+  .stat-value{font-size:15px;font-weight:700;color:var(--text);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2 class=&quot;stitle&quot;>Who writes what: neural (sampled) vs. symbolic (deterministic) tasks</h2>
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot; class=&quot;toggle-btn&quot;>Toggle architecture: <span id=&quot;toggleLabel&quot;>Autoformalization → Lanyon</span></button>
+    <div class=&quot;hint&quot;>Switches which column each task lives in. Watch how many tasks stay on the neural (dice) side.</div>
+  </div>
+
+  <svg id=&quot;diagram&quot; viewBox=&quot;0 0 680 640&quot; preserveAspectRatio=&quot;xMidYMin meet&quot; role=&quot;img&quot; aria-label=&quot;Task assignment diagram&quot;></svg>
+
+  <div class=&quot;stats&quot;>
+    <div class=&quot;stat&quot;><div class=&quot;stat-label&quot;>Architecture</div><div class=&quot;stat-value&quot; id=&quot;statArch&quot;>Autoformalization</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;stat-label&quot;>Tasks in NEURAL column</div><div class=&quot;stat-value&quot; id=&quot;statNeural&quot;>3</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;stat-label&quot;>Tasks in SYMBOLIC column</div><div class=&quot;stat-value&quot; id=&quot;statSymbolic&quot;>1</div></div>
+    <div class=&quot;stat&quot;><div class=&quot;stat-label&quot;>LLM output (lines)</div><div class=&quot;stat-value&quot; id=&quot;statLines&quot;>250</div></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const CW=280, CH=34;                 // chip width/height
+  const neuralX=170, symbolicX=500;    // column centers
+  const chipDefs=[
+    {id:'code',  label:'write code (~150 lines)',      autoNeural:true,  lanyonNeural:false, y:96},
+    {id:'proof', label:'write proof (~80 lines)',       autoNeural:true,  lanyonNeural:false, y:142},
+    {id:'spec',  label:'write spec (~20-line DSL)',     autoNeural:true,  lanyonNeural:true,  y:188},
+    {id:'check', label:'check kernel (type-check)',     autoNeural:false, lanyonNeural:false, y:234}
+  ];
+  const AUTO_TOTAL_LINES=150+80+20, LANYON_TOTAL_LINES=20;
+
+  const dslLines=[
+    &quot;system: euler_1d&quot;,
+    &quot;domain: x in [0,1]&quot;,
+    &quot;ic: sod(pL=1.0, pR=0.1)&quot;,
+    &quot;ic: rhoL=1.0, rhoR=0.125&quot;,
+    &quot;ic: uL=0.0, uR=0.0&quot;,
+    &quot;mesh: uniform(nx=200)&quot;,
+    &quot;scheme: finite_volume&quot;,
+    &quot;flux: hllc&quot;,
+    &quot;reconstruction: muscl&quot;,
+    &quot;limiter: minmod&quot;,
+    &quot;time_integrator: rk3&quot;,
+    &quot;cfl: 0.4&quot;,
+    &quot;bc_left: transmissive&quot;,
+    &quot;bc_right: transmissive&quot;,
+    &quot;t_final: 0.2&quot;,
+    &quot;require: conserves(mass)&quot;,
+    &quot;require: conserves(momentum)&quot;,
+    &quot;require: conserves(energy)&quot;,
+    &quot;require: stable&quot;,
+    &quot;require: entropy_shock&quot;
+  ];
+
+  function diceSVG(x,y,size){
+    const dot=size*0.09;
+    const pos=[[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]];
+    const dots=pos.map(p=>`<circle cx=&quot;${(x+p[0]*size).toFixed(1)}&quot; cy=&quot;${(y+p[1]*size).toFixed(1)}&quot; r=&quot;${dot.toFixed(1)}&quot; fill=&quot;var(--panel)&quot;/>`).join('');
+    return `<rect x=&quot;${x}&quot; y=&quot;${y}&quot; width=&quot;${size}&quot; height=&quot;${size}&quot; rx=&quot;5&quot; fill=&quot;var(--neural)&quot;/>${dots}`;
+  }
+  function gearSVG(cx,cy,outerR,innerR,teeth,holeR){
+    let pts=[];
+    const step=Math.PI/teeth;
+    for(let i=0;i<teeth*2;i++){
+      const r=i%2===0?outerR:innerR;
+      const a=i*step-Math.PI/2;
+      pts.push(`${(cx+r*Math.cos(a)).toFixed(2)},${(cy+r*Math.sin(a)).toFixed(2)}`);
+    }
+    return `<path d=&quot;M${pts.join('L')}Z&quot; fill=&quot;var(--symbolic)&quot;/><circle cx=&quot;${cx}&quot; cy=&quot;${cy}&quot; r=&quot;${holeR}&quot; fill=&quot;var(--panel)&quot;/>`;
+  }
+
+  const dslLineY = i => 314 + i*12.6;
+  const dslLinesSVG = dslLines.map((l,i)=>
+    `<text class=&quot;mono&quot; x=&quot;20&quot; y=&quot;${dslLineY(i).toFixed(1)}&quot; font-size=&quot;10.3&quot; fill=&quot;var(--text)&quot;>${l}</text>`
+  ).join('');
+
+  const chipsSVG = chipDefs.map(c=>
+    `<g id=&quot;chip-${c.id}&quot;>
+       <rect id=&quot;rect-${c.id}&quot; width=&quot;${CW}&quot; height=&quot;${CH}&quot; rx=&quot;8&quot; fill=&quot;var(--chip-bg)&quot; stroke-width=&quot;2.2&quot;/>
+       <text x=&quot;${CW/2}&quot; y=&quot;${CH/2+4}&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--text)&quot;>${c.label}</text>
+     </g>`
+  ).join('');
+
+  document.getElementById('diagram').innerHTML = `
+    <text x=&quot;340&quot; y=&quot;14&quot; text-anchor=&quot;middle&quot; font-size=&quot;10.5&quot; letter-spacing=&quot;0.5&quot; fill=&quot;var(--muted)&quot;>TASK ASSIGNMENT — WHO WRITES WHAT</text>
+
+    ${diceSVG(10,24,24)}
+    <text x=&quot;42&quot; y=&quot;42&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--neural)&quot;>NEURAL</text>
+    <text x=&quot;10&quot; y=&quot;60&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>samples from a distribution —</text>
+    <text x=&quot;10&quot; y=&quot;73&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>creative, fallible</text>
+
+    ${gearSVG(352,36,13,9,8,4)}
+    <text x=&quot;372&quot; y=&quot;42&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;var(--symbolic)&quot;>SYMBOLIC</text>
+    <text x=&quot;340&quot; y=&quot;60&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>deterministic algorithms —</text>
+    <text x=&quot;340&quot; y=&quot;73&quot; font-size=&quot;10&quot; fill=&quot;var(--muted)&quot;>zero creativity, zero sampling</text>
+
+    <line x1=&quot;335&quot; y1=&quot;20&quot; x2=&quot;335&quot; y2=&quot;585&quot; stroke=&quot;var(--border)&quot; stroke-width=&quot;1.5&quot; stroke-dasharray=&quot;4 4&quot;/>
+
+    ${chipsSVG}
+
+    <g id=&quot;dslBox&quot;>
+      <rect x=&quot;10&quot; y=&quot;280&quot; width=&quot;320&quot; height=&quot;300&quot; rx=&quot;8&quot; fill=&quot;var(--neural-bg)&quot; stroke=&quot;var(--neural)&quot; stroke-width=&quot;1.4&quot;/>
+      <text x=&quot;20&quot; y=&quot;298&quot; font-size=&quot;11.5&quot; font-weight=&quot;700&quot; fill=&quot;var(--text)&quot;>spec.dsl — LLM's entire output</text>
+      <text x=&quot;310&quot; y=&quot;298&quot; text-anchor=&quot;end&quot; font-size=&quot;11.5&quot; font-weight=&quot;700&quot; fill=&quot;var(--accent)&quot;>20 lines</text>
+      ${dslLinesSVG}
+    </g>
+
+    <g id=&quot;annotation&quot;>
+      <text x=&quot;10&quot; y=&quot;602&quot; font-size=&quot;11&quot; fill=&quot;var(--muted)&quot;>Each DSL keyword compresses decades of numerical-analysis expertise —</text>
+      <text x=&quot;10&quot; y=&quot;616&quot; font-size=&quot;11&quot; fill=&quot;var(--muted)&quot;>the LLM composes vocabulary, it doesn't derive schemes.</text>
+    </g>
+  `;
+
+  function hexToRgb(hex){
+    hex=hex.trim().replace('#','');
+    if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+    const n=parseInt(hex,16);
+    return [(n>>16)&amp;255,(n>>8)&amp;255,n&amp;255];
+  }
+  function lerpColor(hexA,hexB,t){
+    const a=hexToRgb(hexA), b=hexToRgb(hexB);
+    const r=Math.round(a[0]+(b[0]-a[0])*t);
+    const g=Math.round(a[1]+(b[1]-a[1])*t);
+    const bl=Math.round(a[2]+(b[2]-a[2])*t);
+    return `rgb(${r},${g},${bl})`;
+  }
+
+  const cs=getComputedStyle(document.documentElement);
+  const neuralHex=cs.getPropertyValue('--neural');
+  const symbolicHex=cs.getPropertyValue('--symbolic');
+  const neuralBgHex=cs.getPropertyValue('--neural-bg');
+  const symbolicBgHex=cs.getPropertyValue('--symbolic-bg');
+
+  let currentState='auto', t=0, tTarget=0, rafId=null;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function render(){
+    let neuralCount=0, symbolicCount=0;
+    chipDefs.forEach(c=>{
+      const autoX = c.autoNeural?neuralX:symbolicX;
+      const lanX  = c.lanyonNeural?neuralX:symbolicX;
+      const x = autoX+(lanX-autoX)*t;
+      const g=document.getElementById('chip-'+c.id);
+      g.setAttribute('transform',`translate(${(x-CW/2).toFixed(1)},${c.y})`);
+      const rect=document.getElementById('rect-'+c.id);
+      const frac=Math.max(0,Math.min(1,(x-symbolicX)/(neuralX-symbolicX)));
+      rect.setAttribute('stroke', lerpColor(symbolicHex,neuralHex,frac));
+      rect.setAttribute('fill',   lerpColor(symbolicBgHex,neuralBgHex,frac));
+      if(frac>0.5) neuralCount++; else symbolicCount++;
+    });
+    document.getElementById('dslBox').setAttribute('opacity', t.toFixed(2));
+    document.getElementById('annotation').setAttribute('opacity', t.toFixed(2));
+    document.getElementById('statNeural').textContent=neuralCount;
+    document.getElementById('statSymbolic').textContent=symbolicCount;
+    const lines=Math.round(AUTO_TOTAL_LINES+(LANYON_TOTAL_LINES-AUTO_TOTAL_LINES)*t);
+    document.getElementById('statLines').textContent=lines;
+    document.getElementById('statArch').textContent = currentState==='auto' ? 'Autoformalization' : 'Lanyon';
+  }
+
+  function frameStep(){
+    const diff=tTarget-t;
+    if(Math.abs(diff)>0.002){
+      t+=diff*0.18;
+      render();
+      rafId=requestAnimationFrame(frameStep);
+    } else {
+      t=tTarget;
+      render();
+      rafId=null;
+    }
+  }
+
+  document.getElementById('toggleBtn').addEventListener('click', ()=>{
+    currentState = currentState==='auto' ? 'lanyon' : 'auto';
+    tTarget = currentState==='lanyon' ? 1 : 0;
+    document.getElementById('toggleLabel').textContent =
+      currentState==='auto' ? 'Autoformalization → Lanyon' : 'Lanyon → Autoformalization';
+    if(reduceMotion){
+      t=tTarget; render();
+    } else {
+      if(rafId) cancelAnimationFrame(rafId);
+      frameStep();
+    }
+  });
+
+  render();
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;neurosymbolic-split&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Lanyon shrinks the LLM's job to twenty lines of specification"
+  ></iframe>
+</section>
+
+<section class="scene" id="correctness-by-construction">
+  <h3>Code and proof are generated from one source, so they cannot disagree</h3>
+  <div class="caption">Now the payoff: the symbolic engine expands that 20-line spec into the solver and its proof in one deterministic pass. There is no seam to tear because there was never a second artifact to drift — try to recreate scene 7's attack.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="correctness-by-construction"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Correctness by Construction</title>
+<style>
+  :root{
+    --bg:#f5f3ef; --fg:#1c1c1c; --panel:#ffffff; --border:#c9c4bb;
+    --muted:#6b6660; --spec:#3b3f8f; --code:#0d6b52; --proof:#8a4b00;
+    --green:#1f8a4c; --red:#b3261e; --tether:#9a7bd1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15161a; --fg:#e9e7e2; --panel:#1e2025; --border:#3a3d44;
+      --muted:#9b9994; --spec:#9aa1ff; --code:#4fd6ac; --proof:#e0a45c;
+      --green:#4fd67e; --red:#ff6b64; --tether:#c3a8f2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:680px;margin:0 auto;padding:10px 12px 16px;}
+  h1{font-size:15px;margin:4px 0 8px;font-weight:600;}
+  svg{max-width:100%;height:auto;display:block;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px;}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+  button{font-size:12.5px;padding:7px 10px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--fg);cursor:pointer;}
+  button:hover{border-color:var(--spec);}
+  button.blocked{opacity:.6;cursor:not-allowed;}
+  .readouts{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;margin:6px 0 4px;}
+  .readouts b{color:var(--muted);font-weight:600;}
+  .flash{position:relative;}
+  .eq{margin-top:10px;padding-top:6px;border-top:1px solid var(--border);}
+  .legend{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;}
+  math{font-size:15px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h1>One spec, two projections: code and proof expand together</h1>
+  <svg id=&quot;dia&quot; viewBox=&quot;0 0 680 470&quot; role=&quot;img&quot; aria-label=&quot;spec expanding into code and proof panels&quot;></svg>
+
+  <div class=&quot;controls&quot;>
+    <button id=&quot;toggleBtn&quot;></button>
+    <button id=&quot;editBtn&quot;>Attempt to edit CODE panel directly</button>
+  </div>
+
+  <div class=&quot;readouts&quot;>
+    <div><b>spec clause:</b> <span id=&quot;clauseText&quot;></span></div>
+    <div><b>kernel seal:</b> <span id=&quot;sealText&quot;></span></div>
+    <div><b>output:</b> <span id=&quot;outText&quot;></span></div>
+  </div>
+
+  <div class=&quot;eq&quot;>
+    <math display=&quot;block&quot;>
+      <msub><mi>&amp;rho;</mi><mi>i</mi></msub>
+      <mo>&amp;#8592;</mo>
+      <msub><mi>&amp;rho;</mi><mi>i</mi></msub>
+      <mo>&amp;#8722;</mo>
+      <mfrac><mi>dt</mi><mi>dx</mi></mfrac>
+      <mo>(</mo><msub><mi>F</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub>
+      <mo>&amp;#8722;</mo><msub><mi>F</mi><mi>i</mi></msub><mo>)</mo>
+    </math>
+    <div class=&quot;legend&quot;>
+      &amp;rho;<sub>i</sub> — mass density in cell i (kg/m&amp;sup3;) &amp;middot; F — mass flux across a cell face (kg/m&amp;sup2;&amp;middot;s) &amp;middot;
+      dt, dx — time step (s) and cell width (m) &amp;middot; the require(conserves(mass)) clause is exactly the statement that &amp;sum;(F<sub>i+1</sub>&amp;minus;F<sub>i</sub>) telescopes to zero over the domain.
+    </div>
+  </div>
+</div>
+
+<script>
+const NS=&quot;http://www.w3.org/2000/svg&quot;;
+const svg=document.getElementById('dia');
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+function txt(x,y,s,cls,size){const t=el('text',{x,y,class:cls||'',&quot;font-size&quot;:size||12});t.textContent=s;return t;}
+
+const reducedMotion = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let provable=true;
+
+// ---- static geometry ----
+const specBox={x:190,y:14,w:300,h:112};
+const codeBox={x:16,y:196,w:308,h:220};
+const proofBox={x:356,y:196,w:308,h:220};
+
+function build(){
+  svg.innerHTML=&quot;&quot;;
+  const root=el('g',{});
+  svg.appendChild(root);
+
+  // titles
+  root.appendChild(txt(specBox.x+8,specBox.y-4,'SPEC — the single DSL source','mono',11.5));
+  root.appendChild(txt(codeBox.x+8,codeBox.y-6,'CODE — generated','mono',11.5));
+  root.appendChild(txt(proofBox.x+8,proofBox.y-6,'PROOF — generated','mono',11.5));
+
+  // spec box
+  root.appendChild(el('rect',{x:specBox.x,y:specBox.y,width:specBox.w,height:specBox.h,rx:8,fill:'none',stroke:css('--spec'),'stroke-width':1.6}));
+  root.appendChild(txt(specBox.x+14,specBox.y+30,'domain: 1D shock tube, N cells','mono'));
+  const clauseLine = provable ? 'require: conserves(mass)' : 'require: conserves(mass) w/ anti-diffusive flux';
+  const clauseEl = txt(specBox.x+14,specBox.y+56,clauseLine,'mono');
+  clauseEl.setAttribute('fill', provable?css('--fg'):css('--red'));
+  clauseEl.setAttribute('id','specClauseText');
+  root.appendChild(clauseEl);
+  root.appendChild(txt(specBox.x+14,specBox.y+82,'solve: Euler eqs via face flux F','mono'));
+
+  // anchor point on spec (right side, mid clause line)
+  const sx=specBox.x+specBox.w, sy=specBox.y+52;
+
+  // code box
+  root.appendChild(el('rect',{x:codeBox.x,y:codeBox.y,width:codeBox.w,height:codeBox.h,rx:8,
+    fill:'none',stroke:provable?css('--code'):css('--red'),'stroke-width':1.6,
+    'stroke-dasharray':provable?'0':'5,4'}));
+  const cx=codeBox.x+codeBox.w/2, cy=codeBox.y+codeBox.h/2;
+  if(provable){
+    root.appendChild(txt(codeBox.x+14,codeBox.y+34,'for i in 1..N:','mono'));
+    root.appendChild(txt(codeBox.x+14,codeBox.y+58,'  \u03c1[i] -= dt/dx*(F[i+1]-F[i])','mono'));
+    root.appendChild(txt(codeBox.x+14,codeBox.y+82,'  # finite-volume update','mono',11));
+    root.appendChild(txt(codeBox.x+14,codeBox.y+104,'  # reproduces scene-1 shock tube','mono',11));
+    // disabled edit cursor
+    const g=el('g',{opacity:0.55});
+    g.appendChild(el('path',{d:`M ${codeBox.x+240} ${codeBox.y+150} l 10 26 l 4 -10 l 10 10 l 4 -4 l -10 -10 l 10 -4 z`,
+      fill:css('--muted')}));
+    root.appendChild(g);
+    root.appendChild(txt(codeBox.x+14,codeBox.y+188,'no independent edit path exists —','mono',10.5));
+    root.appendChild(txt(codeBox.x+14,codeBox.y+202,'change the spec; it regenerates both.','mono',10.5)).setAttribute('fill',css('--muted'));
+  } else {
+    root.appendChild(txt(cx,cy-6,'NOT PROVABLE',null,15)).setAttribute('text-anchor','middle');
+    root.appendChild(txt(cx,cy+16,'\u2192 NOTHING EMITTED',null,13)).setAttribute('text-anchor','middle');
+    svg.querySelectorAll('text').forEach(()=>{});
+  }
+
+  // proof box
+  root.appendChild(el('rect',{x:proofBox.x,y:proofBox.y,width:proofBox.w,height:proofBox.h,rx:8,
+    fill:'none',stroke:provable?css('--proof'):css('--red'),'stroke-width':1.6,
+    'stroke-dasharray':provable?'0':'5,4'}));
+  const px=proofBox.x+proofBox.w/2, py=proofBox.y+proofBox.h/2;
+  if(provable){
+    root.appendChild(txt(proofBox.x+14,proofBox.y+34,'Lemma: flux telescopes','mono'));
+    root.appendChild(txt(proofBox.x+14,proofBox.y+58,'\u03a3(F[i+1]-F[i]) = F[N]-F[0] = 0','mono'));
+    root.appendChild(txt(proofBox.x+14,proofBox.y+82,'\u21d2 \u03a3\u03c1 conserved on domain','mono',11));
+    root.appendChild(txt(proofBox.x+14,proofBox.y+104,'\u220e QED, tied to code above','mono',11));
+  } else {
+    root.appendChild(txt(px,py-6,'NOT PROVABLE',null,15)).setAttribute('text-anchor','middle');
+    root.appendChild(txt(px,py+16,'\u2192 NOTHING EMITTED',null,13)).setAttribute('text-anchor','middle');
+  }
+  root.querySelectorAll('text').forEach(t=>{ if(!t.getAttribute('fill')) t.setAttribute('fill',css('--fg')); });
+  // color code/proof headers only (first title text already fixed color fine)
+
+  // tethers
+  const tetherLayer=el('g',{id:'tethers'});
+  root.insertBefore(tetherLayer, root.firstChild.nextSibling);
+  if(provable){
+    const p1=`M ${sx} ${sy} C ${sx+40} ${sy+40}, ${codeBox.x+150} ${codeBox.y+30}, ${codeBox.x+30} ${codeBox.y+58}`;
+    const p2=`M ${sx} ${sy} C ${sx+40} ${sy+30}, ${proofBox.x+120} ${proofBox.y+30}, ${proofBox.x+30} ${proofBox.y+58}`;
+    [p1,p2].forEach((d,idx)=>{
+      const path=el('path',{d,fill:'none',stroke:css('--tether'),'stroke-width':1.8,'stroke-dasharray':'6,5'});
+      path.style.strokeDashoffset = reducedMotion? '0' : '400';
+      tetherLayer.appendChild(path);
+      if(!reducedMotion){
+        path.style.transition='stroke-dashoffset .6s ease-out';
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{path.style.strokeDashoffset='0';}));
+      }
+    });
+    root.appendChild(txt((sx+codeBox.x+30)/2-30, (sy+codeBox.y+58)/2-30,'one clause \u2192 both projections',null,10.5)).setAttribute('fill',css('--muted'));
+  }
+
+  // kernel seal
+  const seal=el('g',{});
+  const scx=340, scy=452;
+  seal.appendChild(el('circle',{cx:scx,cy:scy,r:14,fill:'none',stroke:provable?css('--green'):css('--red'),'stroke-width':2.4}));
+  if(provable){
+    seal.appendChild(el('path',{d:`M ${scx-6} ${scy} l 4 5 l 8 -10`,stroke:css('--green'),'stroke-width':2.4,fill:'none','stroke-linecap':'round'}));
+  } else {
+    seal.appendChild(el('path',{d:`M ${scx-6} ${scy-6} l 12 12 M ${scx+6} ${scy-6} l -12 12`,stroke:css('--red'),'stroke-width':2.4,'stroke-linecap':'round'}));
+  }
+  seal.appendChild(txt(scx,scy+28,'KERNEL SEAL',null,10.5)).setAttribute('text-anchor','middle');
+  root.appendChild(seal);
+}
+
+function flashSpec(){
+  const box=svg.querySelector('rect');
+  if(!box) return;
+  const orig=box.getAttribute('stroke-width');
+  box.setAttribute('stroke-width',4);
+  setTimeout(()=>box.setAttribute('stroke-width',orig),350);
+}
+
+function refreshText(){
+  document.getElementById('toggleBtn').textContent = provable
+    ? &quot;Toggle spec clause \u2192 conserves(mass) with anti-diffusive flux (unprovable)&quot;
+    : &quot;Toggle spec clause \u2192 back to conserves(mass) (provable)&quot;;
+  document.getElementById('clauseText').textContent = provable
+    ? 'require: conserves(mass)'
+    : 'require: conserves(mass) with anti-diffusive flux';
+  document.getElementById('sealText').textContent = provable ? 'VERIFIED \u2713 (green)' : 'NOT PROVABLE \u2715 (no seal)';
+  document.getElementById('outText').textContent = provable ? 'code + proof emitted, tethered' : 'NOTHING EMITTED';
+}
+
+document.getElementById('toggleBtn').addEventListener('click',()=>{
+  provable=!provable;
+  build();
+  refreshText();
+});
+document.getElementById('editBtn').addEventListener('click',()=>{
+  flashSpec();
+  const b=document.getElementById('editBtn');
+  const old=b.textContent;
+  b.textContent='Blocked \u2014 edit the spec instead';
+  b.classList.add('blocked');
+  setTimeout(()=>{b.textContent=old;b.classList.remove('blocked');},900);
+});
+
+build();
+refreshText();
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;correctness-by-construction&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Code and proof are generated from one source, so they cannot disagree"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why it beats existing tech</h2>
+  <div class="part-lede">Correctness by construction isn't just safer than having a frontier model write everything — because the fallible, expensive component now touches only tens of lines, it is also dramatically faster and cheaper. The economics fall out of the architecture.</div>
+</header>
+<section class="scene" id="dsl-economics">
+  <h3>Twenty LLM lines expand into tens of thousands of verified lines</h3>
+  <div class="caption">With the engine doing the writing, cost stops scaling with output size. Drag the output size up: the top-end model's line climbs with every token, while Lanyon's LLM cost stays flat at one 20-line spec.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="dsl-economics"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>DSL Economics — token cost vs. output size</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel-bg:#f4f5f7;
+    --text:#1a1a1a;
+    --muted:#6b6c74;
+    --frontier:#c9463f;
+    --lanyon:#1f8f7f;
+    --band:rgba(201,70,63,0.14);
+    --grid:#dcdde2;
+    --seal-green:#1f9d55;
+    --accent:#3a6fd8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141a;
+      --panel-bg:#1b1e26;
+      --text:#e9e9ec;
+      --muted:#9a9ba5;
+      --frontier:#ff7a72;
+      --lanyon:#5fd6c4;
+      --band:rgba(255,122,114,0.18);
+      --grid:#33363f;
+      --seal-green:#3fdc86;
+      --accent:#7aa6ff;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:12px;background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+  .scene{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+  .card{background:var(--panel-bg);border-radius:10px;padding:12px;}
+  svg{width:100%;height:auto;display:block;max-width:100%;}
+  label{font-size:0.85rem;display:block;margin-bottom:6px;}
+  input[type=range]{width:100%;}
+  .readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .readout{flex:1 1 130px;background:rgba(127,127,127,0.08);padding:8px;border-radius:8px;}
+  .readout .rlabel{display:block;color:var(--muted);font-size:0.68rem;margin-bottom:3px;}
+  .readout .rvalue{font-weight:700;font-size:0.92rem;font-variant-numeric:tabular-nums;}
+  .odorow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  button{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;
+         cursor:pointer;font-size:0.82rem;}
+  button:active{opacity:0.85;}
+  .seal{font-size:0.8rem;color:var(--seal-green);font-weight:700;white-space:nowrap;}
+  .odo{margin-top:10px;font-variant-numeric:tabular-nums;font-size:1.35rem;font-weight:700;}
+  .odo .odolabel{font-size:0.72rem;font-weight:400;color:var(--muted);margin-left:6px;}
+  .callout{font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.4;}
+  math{font-size:1.02rem;}
+  .legend{font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.45;}
+  /* svg element styles */
+  #chart .grid{stroke:var(--grid);stroke-width:1;}
+  #chart .axis-text{fill:var(--text);font-size:11px;}
+  #chart .axis-text.small{font-size:10px;fill:var(--muted);}
+  #chart .axis-title{fill:var(--muted);font-size:11px;}
+  #chart .chart-title{fill:var(--text);font-size:13px;font-weight:600;}
+  #chart .band{fill:var(--band);stroke:none;}
+  #chart .prob-line{stroke:var(--frontier);stroke-width:1;stroke-dasharray:3 3;opacity:0.6;fill:none;}
+  #chart .frontier-line{stroke:var(--frontier);stroke-width:2.5;fill:none;}
+  #chart .lanyon-line{stroke:var(--lanyon);stroke-width:2.5;}
+  #chart .vline{stroke:var(--muted);stroke-dasharray:4 4;stroke-width:1;}
+  #chart .dot{stroke:var(--panel-bg);stroke-width:2;}
+  #chart .frontier-dot{fill:var(--frontier);}
+  #chart .lanyon-dot{fill:var(--lanyon);}
+  #chart .dot-label{font-size:10.5px;text-anchor:middle;}
+  #chart .frontier-label{fill:var(--frontier);}
+  #chart .lanyon-label{fill:var(--lanyon);}
+  #chart .band-label{fill:var(--muted);font-size:10.5px;}
+  #chart .n-label{fill:var(--muted);font-size:10.5px;}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;scene&quot;>
+
+  <div class=&quot;card&quot;>
+    <svg id=&quot;chart&quot; viewBox=&quot;0 0 640 380&quot; role=&quot;img&quot;
+         aria-label=&quot;Chart: LLM tokens consumed versus lines of verified output requested, comparing a frontier model that writes everything to Lanyon which only emits a fixed spec.&quot;></svg>
+  </div>
+
+  <div class=&quot;card&quot;>
+    <label for=&quot;nSlider&quot;>Requested output size — lines of verified code + proof, N: <b id=&quot;nVal&quot;>1,000</b></label>
+    <input type=&quot;range&quot; id=&quot;nSlider&quot; min=&quot;2&quot; max=&quot;4.69897&quot; step=&quot;0.001&quot; value=&quot;3&quot;
+           aria-label=&quot;Requested output size in lines, log scale from 100 to 50000&quot;>
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;readout&quot;><span class=&quot;rlabel&quot;>frontier model tokens consumed</span><span class=&quot;rvalue&quot; id=&quot;frontierVal&quot;>—</span></div>
+      <div class=&quot;readout&quot;><span class=&quot;rlabel&quot;>Lanyon LLM tokens consumed</span><span class=&quot;rvalue&quot; id=&quot;lanyonVal&quot;>—</span></div>
+      <div class=&quot;readout&quot;><span class=&quot;rlabel&quot;>P(≥1 error), frontier output</span><span class=&quot;rvalue&quot; id=&quot;probVal&quot;>—</span></div>
+      <div class=&quot;readout&quot;><span class=&quot;rlabel&quot;>Lanyon generation time</span><span class=&quot;rvalue&quot; id=&quot;timeVal&quot;>—</span></div>
+    </div>
+  </div>
+
+  <div class=&quot;card&quot;>
+    <div class=&quot;odorow&quot;>
+      <button id=&quot;playBtn&quot;>▶ Play: expand spec into proof</button>
+      <span class=&quot;seal&quot; id=&quot;seal&quot;>✓ kernel: verified</span>
+    </div>
+    <div class=&quot;odo&quot;><span id=&quot;odoCount&quot;>0</span><span class=&quot;odolabel&quot;>lines of type-correct proof emitted</span></div>
+    <div class=&quot;callout&quot;>Paper's claim: thousands of type-correct proof lines per second, from a fixed ~20-line DSL spec — a tiny fraction of a frontier model's token cost.</div>
+  </div>
+
+  <div class=&quot;card&quot;>
+    <math display=&quot;block&quot;>
+      <mi>P</mi><mo>(</mo><mi>N</mi><mo>)</mo><mo>=</mo><mn>1</mn><mo>&amp;#8722;</mo>
+      <msup><mrow><mo>(</mo><mn>1</mn><mo>&amp;#8722;</mo><mi>&amp;#949;</mi><mo>)</mo></mrow><mi>N</mi></msup>
+    </math>
+    <div class=&quot;legend&quot;>
+      P(N) — probability that at least one error appears somewhere in N lines of frontier-model output (unitless, 0–1)
+      &amp;middot; ε — assumed per-line error rate for a model writing code directly, ε = 0.0001 here
+      &amp;middot; N — lines of output requested, set by the slider above.
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const NS = &quot;http://www.w3.org/2000/svg&quot;;
+  const svg = document.getElementById('chart');
+  const W=640,H=380, ML=66, MR=70, MT=38, MB=58;
+  const PW=W-ML-MR, PH=H-MT-MB;
+
+  const N_MIN=100, N_MAX=50000;
+  const LOGN_MIN=Math.log10(N_MIN), LOGN_MAX=Math.log10(N_MAX);
+  const TOK_MIN=100, TOK_MAX=1000000;
+  const LOGTOK_MIN=Math.log10(TOK_MIN), LOGTOK_MAX=Math.log10(TOK_MAX);
+
+  const TOKENS_PER_LINE = 15;      // tokens a frontier LLM emits per generated line of code/proof
+  const SPEC_LINES = 20;           // Lanyon's fixed DSL spec length (lines)
+  const LANYON_TOKENS = TOKENS_PER_LINE * SPEC_LINES; // constant footprint: 300 tokens
+  const EPSILON = 0.0001;          // per-line error rate for a model writing code directly (scene 3)
+  const LINES_PER_SEC = 20000;     // Lanyon symbolic-expansion throughput, lines of proof / second
+
+  function xOf(N){ return ML + (Math.log10(N)-LOGN_MIN)/(LOGN_MAX-LOGN_MIN)*PW; }
+  function yTokOf(tok){ const t=Math.max(tok,TOK_MIN);
+    return MT+PH-(Math.log10(t)-LOGTOK_MIN)/(LOGTOK_MAX-LOGTOK_MIN)*PH; }
+  function yProbOf(p){ return MT+PH-p*PH; }
+  function clampLX(x){ return Math.min(Math.max(x, ML+55), W-MR-55); }
+  function comma(n){ return Math.round(n).toLocaleString('en-US'); }
+
+  function el(tag, attrs, cls){
+    const e = document.createElementNS(NS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    if(cls) e.setAttribute('class', cls);
+    return e;
+  }
+  function addText(x,y,str,cls,transform){
+    const t = el('text',{x:x,y:y,'text-anchor':'middle'}, cls);
+    if(transform) t.setAttribute('transform', transform);
+    t.textContent = str;
+    svg.appendChild(t);
+    return t;
+  }
+
+  let frontierDot, lanyonDot, vline, frontierLabel, lanyonLabel, nLabel, currentN=1000;
+
+  function buildChart(){
+    const tokTicks=[100,1000,10000,100000,1000000];
+    tokTicks.forEach(v=>{
+      const y=yTokOf(v);
+      svg.appendChild(el('line',{x1:ML,x2:ML+PW,y1:y,y2:y},'grid'));
+      const label = v>=1000000 ? '1M' : (v>=1000 ? (v/1000)+'k' : String(v));
+      addText(ML-8, y+4, label, 'axis-text small').setAttribute('text-anchor','end');
+    });
+    [0,0.25,0.5,0.75,1].forEach(p=>{
+      const y=yProbOf(p);
+      svg.appendChild(el('line',{x1:W-MR,x2:W-MR+6,y1:y,y2:y},'grid'));
+      addText(W-MR+12, y+4, p.toFixed(2), 'axis-text small').setAttribute('text-anchor','start');
+    });
+    [100,1000,10000,50000].forEach(N=>{
+      const x=xOf(N);
+      svg.appendChild(el('line',{x1:x,x2:x,y1:MT+PH,y2:MT+PH+6},'grid'));
+      addText(x, MT+PH+20, N.toLocaleString('en-US'), 'axis-text small');
+    });
+
+    addText(ML-46, MT+PH/2, 'LLM tokens consumed (log scale)', 'axis-title', 'rotate(-90 '+(ML-46)+' '+(MT+PH/2)+')');
+    addText(W-MR+50, MT+PH/2, 'P(at least one error)', 'axis-title', 'rotate(-90 '+(W-MR+50)+' '+(MT+PH/2)+')');
+    addText(ML+PW/2, H-8, 'lines of verified output requested, N (log scale)', 'axis-title');
+    addText(W/2, 18, 'LLM tokens consumed vs. output size requested', 'chart-title');
+
+    const steps=50, bandPts=[], fPts=[];
+    for(let i=0;i<=steps;i++){
+      const N = N_MIN*Math.pow(N_MAX/N_MIN, i/steps);
+      const p = 1-Math.pow(1-EPSILON, N);
+      bandPts.push([xOf(N), yProbOf(p)]);
+      fPts.push([xOf(N), yTokOf(TOKENS_PER_LINE*N)]);
+    }
+    let bd = 'M ' + bandPts.map(p=>p.join(',')).join(' L ');
+    bd += ' L ' + bandPts[bandPts.length-1][0] + ',' + (MT+PH);
+    bd += ' L ' + bandPts[0][0] + ',' + (MT+PH) + ' Z';
+    svg.appendChild(el('path',{d:bd},'band'));
+    svg.appendChild(el('path',{d:'M '+bandPts.map(p=>p.join(',')).join(' L ')},'prob-line'));
+    svg.appendChild(el('path',{d:'M '+fPts.map(p=>p.join(',')).join(' L ')},'frontier-line'));
+
+    const ly = yTokOf(LANYON_TOKENS);
+    svg.appendChild(el('line',{x1:xOf(N_MIN),x2:xOf(N_MAX),y1:ly,y2:ly},'lanyon-line'));
+
+    addText(clampLX(xOf(6000)), yTokOf(TOKENS_PER_LINE*6000)-10, 'frontier model: tokens ∝ N', 'axis-text small frontier-label');
+    addText(clampLX(xOf(3000)), ly-10, 'Lanyon: fixed ≈300 tokens (20-line spec)', 'axis-text small lanyon-label');
+    addText(clampLX(xOf(250)), yProbOf(1-Math.pow(1-EPSILON,4000))-8, 'shaded: P(\u2265 1 error) in frontier output', 'band-label');
+
+    vline = el('line',{x1:0,x2:0,y1:MT,y2:MT+PH},'vline'); svg.appendChild(vline);
+    frontierDot = el('circle',{r:5,cx:0,cy:0},'dot frontier-dot'); svg.appendChild(frontierDot);
+    lanyonDot = el('circle',{r:5,cx:0,cy:0},'dot lanyon-dot'); svg.appendChild(lanyonDot);
+    frontierLabel = el('text',{x:0,y:0},'dot-label frontier-label'); svg.appendChild(frontierLabel);
+    lanyonLabel = el('text',{x:0,y:0},'dot-label lanyon-label'); svg.appendChild(lanyonLabel);
+    nLabel = el('text',{x:0,y:MT-8},'n-label'); svg.appendChild(nLabel);
+  }
+
+  function updateMarkers(N){
+    const x = xOf(N);
+    const frontierTok = TOKENS_PER_LINE*N;
+    const prob = 1-Math.pow(1-EPSILON,N);
+    const fy = yTokOf(frontierTok);
+    const ly = yTokOf(LANYON_TOKENS);
+    const lx = clampLX(x);
+
+    vline.setAttribute('x1',x); vline.setAttribute('x2',x);
+    frontierDot.setAttribute('cx',x); frontierDot.setAttribute('cy',fy);
+    lanyonDot.setAttribute('cx',x); lanyonDot.setAttribute('cy',ly);
+    frontierLabel.setAttribute('x',lx); frontierLabel.setAttribute('y',fy-10);
+    frontierLabel.textContent = comma(frontierTok)+' tokens';
+    lanyonLabel.setAttribute('x',lx); lanyonLabel.setAttribute('y',ly+16);
+    lanyonLabel.textContent = comma(LANYON_TOKENS)+' tokens';
+    nLabel.setAttribute('x', Math.min(Math.max(x,ML+30), W-MR-30));
+    nLabel.textContent = 'N = '+comma(N);
+
+    document.getElementById('nVal').textContent = comma(N);
+    document.getElementById('frontierVal').textContent = comma(frontierTok)+' tokens';
+    document.getElementById('lanyonVal').textContent = comma(LANYON_TOKENS)+' tokens (fixed)';
+    document.getElementById('probVal').textContent = (prob*100).toFixed(1)+'%';
+    const realTime = N/LINES_PER_SEC;
+    document.getElementById('timeVal').textContent = realTime<1 ? (Math.round(realTime*1000)+' ms') : (realTime.toFixed(2)+' s');
+
+    currentN = N;
+  }
+
+  buildChart();
+  const slider = document.getElementById('nSlider');
+  updateMarkers(Math.round(Math.pow(10, parseFloat(slider.value))));
+
+  slider.addEventListener('input', function(){
+    const N = Math.min(N_MAX, Math.max(N_MIN, Math.round(Math.pow(10, parseFloat(slider.value)))));
+    updateMarkers(N);
+  });
+
+  const REDUCED = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const playBtn = document.getElementById('playBtn');
+  const odo = document.getElementById('odoCount');
+  let playing = false;
+
+  playBtn.addEventListener('click', function(){
+    if(playing) return;
+    const N = currentN;
+    const realTime = N/LINES_PER_SEC;
+    if(REDUCED){ odo.textContent = comma(N); return; }
+    playing = true;
+    playBtn.textContent = 'Generating…';
+    const dur = Math.max(realTime, 0.3)*1000;
+    const start = performance.now();
+    function frame(now){
+      const t = Math.min((now-start)/dur, 1);
+      odo.textContent = comma(t*N);
+      if(t<1){ requestAnimationFrame(frame); }
+      else{ playing=false; playBtn.textContent='▶ Play: expand spec into proof'; }
+    }
+    requestAnimationFrame(frame);
+  });
+
+  window.__sceneReady = true;
+
+  const __ro = new ResizeObserver(() => {
+    parent.postMessage({ explainItScene: &quot;dsl-economics&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+  });
+  __ro.observe(document.documentElement);
+})();
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Twenty LLM lines expand into tens of thousands of verified lines"
+  ></iframe>
+</section>
+
+<header class="part">
+  <h2>Why now</h2>
+  <div class="part-lede">One honest boundary remains on the guarantee, and it decides where this technology lands first: the industries where a silently wrong simulation costs the most.</div>
+</header>
+<section class="scene" id="semantic-gap">
+  <h3>The guarantee covers spec-to-code, not intent-to-spec</h3>
+  <div class="caption">Scene 4 defined correctness relative to a spec — but who checks the spec against your intent? Nudge the spec away from your request and watch every seal stay green: Lanyon flawlessly, provably solves the wrong problem.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="semantic-gap"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>The Semantic Gap</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#181a24; --muted:#6b7280;
+  --good:#16a34a; --open:#b45309; --intent:#2563eb; --spec:#9333ea; --grid:#dfe2e8;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#101218; --panel:#1a1d27; --text:#e9eaf0; --muted:#9aa0ac;
+    --good:#34d399; --open:#f0a94e; --intent:#7aa9ff; --spec:#d597ff; --grid:#2c313d; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:680px;margin:0 auto;padding:12px 14px 18px}
+svg{width:100%;height:auto;display:block;max-width:100%}
+.predict{font-size:12.5px;color:var(--muted);font-style:italic;margin:8px 2px 6px}
+.controls{background:var(--panel);border-radius:10px;padding:10px 12px;margin-top:6px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.row label{font-size:12.5px;flex:1 1 260px}
+input[type=range]{flex:2 1 220px}
+button{font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--grid);background:var(--bg);color:var(--text);cursor:pointer}
+ul.readouts{list-style:none;display:flex;flex-wrap:wrap;gap:8px 18px;padding:0;margin:10px 0 0;font-size:12.5px}
+ul.readouts li{background:var(--bg);border-radius:6px;padding:5px 9px}
+ul.readouts b{color:var(--text)}
+.eqs{margin-top:12px;background:var(--panel);border-radius:10px;padding:10px 12px}
+math{font-size:16px}
+.legend{font-size:11px;color:var(--muted);margin:2px 0 10px}
+.good{color:var(--good)}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+
+<svg id=&quot;scene&quot; viewBox=&quot;0 0 640 470&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; role=&quot;img&quot; aria-label=&quot;Trust chain from user intent to result, and resulting shock tube pressure profile&quot;>
+<defs>
+<symbol id=&quot;lockClosed&quot; viewBox=&quot;0 0 24 24&quot;>
+  <rect x=&quot;5&quot; y=&quot;11&quot; width=&quot;14&quot; height=&quot;10&quot; rx=&quot;2&quot; fill=&quot;currentColor&quot;/>
+  <path d=&quot;M8 11 V8 a4 4 0 0 1 8 0 v3&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.3&quot;/>
+</symbol>
+<symbol id=&quot;lockOpen&quot; viewBox=&quot;0 0 24 24&quot;>
+  <rect x=&quot;5&quot; y=&quot;11&quot; width=&quot;14&quot; height=&quot;10&quot; rx=&quot;2&quot; fill=&quot;currentColor&quot;/>
+  <path d=&quot;M8 11 V8 a4 4 0 0 1 7 -2.2&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.3&quot;/>
+</symbol>
+</defs>
+
+<style>
+.box{fill:var(--panel);stroke:var(--grid);stroke-width:1.3}
+.boxTitle{font-size:12.5px;font-weight:700;text-anchor:middle;fill:var(--text)}
+.boxLine{font-size:10.5px;text-anchor:middle;fill:var(--muted)}
+.boxValue{font-size:11.5px;font-weight:700;text-anchor:middle;fill:var(--spec)}
+.linkDashed{stroke:var(--open);stroke-width:2;stroke-dasharray:5 4}
+.linkSolid{stroke:var(--good);stroke-width:2}
+.linkLabel{font-size:9.6px;text-anchor:middle;fill:var(--muted)}
+.linkLabelOpen{font-size:9.6px;text-anchor:middle;fill:var(--open);font-weight:700}
+.linkLabelGood{font-size:9.6px;text-anchor:middle;fill:var(--good);font-weight:700}
+.guarantee{font-size:12px;text-anchor:middle;fill:var(--text);font-weight:600}
+.connector{stroke:var(--grid);stroke-width:1.3}
+.axis{stroke:var(--muted);stroke-width:1.2}
+.tick{font-size:10px;fill:var(--muted)}
+.axisLabel{font-size:10.5px;fill:var(--muted)}
+.intendedLine{stroke:var(--intent);stroke-width:2;stroke-dasharray:5 3}
+.actualLine{stroke:var(--spec);stroke-width:2.4}
+.frontLabel{font-size:10px;font-weight:700}
+.driftText{font-size:11px;fill:var(--spec);font-weight:700;text-anchor:middle}
+</style>
+
+<!-- CHAIN -->
+<rect x=&quot;8&quot; y=&quot;14&quot; width=&quot;140&quot; height=&quot;76&quot; rx=&quot;6&quot; class=&quot;box&quot;/>
+<text x=&quot;78&quot; y=&quot;34&quot; class=&quot;boxTitle&quot;>USER INTENT</text>
+<text x=&quot;78&quot; y=&quot;52&quot; class=&quot;boxLine&quot;>&quot;Sod tube,</text>
+<text x=&quot;78&quot; y=&quot;66&quot; class=&quot;boxLine&quot;>ratio 10 : 1&quot;</text>
+
+<line x1=&quot;148&quot; y1=&quot;52&quot; x2=&quot;180&quot; y2=&quot;52&quot; class=&quot;linkDashed&quot;/>
+<use href=&quot;#lockOpen&quot; x=&quot;152&quot; y=&quot;24&quot; width=&quot;18&quot; height=&quot;18&quot; style=&quot;color:var(--open)&quot;/>
+<text x=&quot;164&quot; y=&quot;14&quot; class=&quot;linkLabelOpen&quot;>LLM formalization</text>
+<text x=&quot;164&quot; y=&quot;103&quot; class=&quot;linkLabelOpen&quot;>open problem</text>
+
+<rect x=&quot;182&quot; y=&quot;14&quot; width=&quot;138&quot; height=&quot;76&quot; rx=&quot;6&quot; class=&quot;box&quot;/>
+<text x=&quot;251&quot; y=&quot;34&quot; class=&quot;boxTitle&quot;>SPEC</text>
+<text x=&quot;251&quot; y=&quot;52&quot; class=&quot;boxLine&quot;>pressure ratio</text>
+<text id=&quot;specValueText&quot; x=&quot;251&quot; y=&quot;70&quot; class=&quot;boxValue&quot;>10.0 : 1</text>
+
+<line x1=&quot;320&quot; y1=&quot;52&quot; x2=&quot;352&quot; y2=&quot;52&quot; class=&quot;linkSolid&quot;/>
+<use href=&quot;#lockClosed&quot; x=&quot;324&quot; y=&quot;24&quot; width=&quot;18&quot; height=&quot;18&quot; style=&quot;color:var(--good)&quot;/>
+<text x=&quot;336&quot; y=&quot;14&quot; class=&quot;linkLabelGood&quot;>symbolic engine</text>
+<text x=&quot;336&quot; y=&quot;103&quot; class=&quot;linkLabelGood&quot;>guaranteed</text>
+
+<rect x=&quot;354&quot; y=&quot;14&quot; width=&quot;138&quot; height=&quot;76&quot; rx=&quot;6&quot; class=&quot;box&quot;/>
+<text x=&quot;423&quot; y=&quot;34&quot; class=&quot;boxTitle&quot;>CODE + PROOF</text>
+<text x=&quot;423&quot; y=&quot;52&quot; class=&quot;boxLine&quot;>verifier seal</text>
+<text id=&quot;proofSeal&quot; x=&quot;423&quot; y=&quot;70&quot; class=&quot;boxValue good&quot;>&amp;#10003; verified</text>
+
+<line x1=&quot;492&quot; y1=&quot;52&quot; x2=&quot;524&quot; y2=&quot;52&quot; class=&quot;linkSolid&quot;/>
+<use href=&quot;#lockClosed&quot; x=&quot;496&quot; y=&quot;24&quot; width=&quot;18&quot; height=&quot;18&quot; style=&quot;color:var(--good)&quot;/>
+<text x=&quot;508&quot; y=&quot;14&quot; class=&quot;linkLabelGood&quot;>construction</text>
+<text x=&quot;508&quot; y=&quot;103&quot; class=&quot;linkLabelGood&quot;>guaranteed</text>
+
+<rect x=&quot;526&quot; y=&quot;14&quot; width=&quot;106&quot; height=&quot;76&quot; rx=&quot;6&quot; class=&quot;box&quot;/>
+<text x=&quot;579&quot; y=&quot;34&quot; class=&quot;boxTitle&quot;>RESULT</text>
+<text x=&quot;579&quot; y=&quot;52&quot; class=&quot;boxLine&quot;>shock tube</text>
+<text x=&quot;579&quot; y=&quot;66&quot; class=&quot;boxLine&quot;>profile &amp;#8595;</text>
+
+<text x=&quot;320&quot; y=&quot;128&quot; class=&quot;guarantee&quot;>Guarantee: output always matches the SPEC — not necessarily your intent</text>
+
+<line x1=&quot;579&quot; y1=&quot;90&quot; x2=&quot;579&quot; y2=&quot;146&quot; class=&quot;connector&quot;/>
+<line x1=&quot;320&quot; y1=&quot;146&quot; x2=&quot;579&quot; y2=&quot;146&quot; class=&quot;connector&quot;/>
+<line x1=&quot;320&quot; y1=&quot;146&quot; x2=&quot;320&quot; y2=&quot;158&quot; class=&quot;connector&quot;/>
+
+<!-- PLOT -->
+<line x1=&quot;55&quot; y1=&quot;178&quot; x2=&quot;55&quot; y2=&quot;392&quot; class=&quot;axis&quot;/>
+<line x1=&quot;55&quot; y1=&quot;392&quot; x2=&quot;605&quot; y2=&quot;392&quot; class=&quot;axis&quot;/>
+<text x=&quot;55&quot; y=&quot;172&quot; class=&quot;axisLabel&quot;>pressure p (atm)</text>
+<text x=&quot;0&quot; y=&quot;185&quot; class=&quot;tick&quot;>10</text>
+<text x=&quot;0&quot; y=&quot;288&quot; class=&quot;tick&quot;>5</text>
+<text x=&quot;0&quot; y=&quot;390&quot; class=&quot;tick&quot;>0</text>
+<text x=&quot;330&quot; y=&quot;412&quot; class=&quot;axisLabel&quot; text-anchor=&quot;middle&quot;>position along tube x (m)</text>
+<text x=&quot;55&quot; y=&quot;408&quot; class=&quot;tick&quot;>0</text>
+<text x=&quot;322&quot; y=&quot;408&quot; class=&quot;tick&quot;>0.5</text>
+<text x=&quot;590&quot; y=&quot;408&quot; class=&quot;tick&quot;>1.0</text>
+
+<path id=&quot;intendedPath&quot; class=&quot;intendedLine&quot; fill=&quot;none&quot;/>
+<path id=&quot;actualPath&quot; class=&quot;actualLine&quot; fill=&quot;none&quot;/>
+<line id=&quot;intendedFront&quot; class=&quot;intendedLine&quot;/>
+<line id=&quot;actualFront&quot; class=&quot;actualLine&quot;/>
+<text id=&quot;intendedLabel&quot; class=&quot;frontLabel&quot; fill=&quot;var(--intent)&quot;></text>
+<text id=&quot;actualLabel&quot; class=&quot;frontLabel&quot; fill=&quot;var(--spec)&quot;></text>
+<text id=&quot;driftAnnotation&quot; class=&quot;driftText&quot; x=&quot;330&quot; y=&quot;440&quot;></text>
+</svg>
+
+<div class=&quot;predict&quot;>Predict first: as you drag the spec's number away from the user's request, will any padlock turn red?</div>
+
+<div class=&quot;controls&quot;>
+  <div class=&quot;row&quot;>
+    <label for=&quot;ratioSlider&quot;>Spec drift control — drag right to move the spec's stated pressure ratio p₄/p₁ away from the user's request (10.0 : 1) toward a drifted value (8.0 : 1)</label>
+    <input type=&quot;range&quot; id=&quot;ratioSlider&quot; min=&quot;8&quot; max=&quot;10&quot; step=&quot;0.1&quot; value=&quot;8&quot;>
+    <button id=&quot;resetBtn&quot;>Reset to 10 : 1 (no drift)</button>
+  </div>
+  <ul class=&quot;readouts&quot;>
+    <li>User's request: <b>10.0 : 1</b></li>
+    <li>Spec drifted to: <b id=&quot;ro-spec&quot;>10.0 : 1</b></li>
+    <li>Shock front deviation: <b id=&quot;ro-dev&quot;>0.0 cm</b></li>
+    <li>Proof status: <b class=&quot;good&quot; id=&quot;ro-seal&quot;>&amp;#10003; verified</b></li>
+  </ul>
+</div>
+
+<div class=&quot;eqs&quot;>
+<math display=&quot;block&quot;>
+  <msub><mi>M</mi><mtext>s</mtext></msub><mo>=</mo>
+  <msqrt><mrow>
+    <mfrac><mrow><mi>γ</mi><mo>+</mo><mn>1</mn></mrow><mrow><mn>2</mn><mi>γ</mi></mrow></mfrac>
+    <mo>(</mo><msub><mi>p</mi><mn>2</mn></msub><mo>/</mo><msub><mi>p</mi><mn>1</mn></msub><mo>&amp;#8722;</mo><mn>1</mn><mo>)</mo>
+    <mo>+</mo><mn>1</mn>
+  </mrow></msqrt>
+</math>
+<div class=&quot;legend&quot;>M<sub>s</sub> — shock Mach number (dimensionless) &amp;nbsp;·&amp;nbsp; γ — heat-capacity ratio, 1.4 for air &amp;nbsp;·&amp;nbsp; p₂/p₁ — post-shock to initial pressure ratio in the driven gas, solved numerically from the spec's stated p₄/p₁ via the standard shock-tube relation</div>
+<math display=&quot;block&quot;>
+  <mi>W</mi><mo>=</mo><msub><mi>M</mi><mtext>s</mtext></msub><mo>&amp;#183;</mo><msub><mi>a</mi><mn>1</mn></msub>
+</math>
+<div class=&quot;legend&quot;>W — shock front speed (m/s) &amp;nbsp;·&amp;nbsp; a₁ — sound speed in the driven gas at 300 K, √(γRT/M<sub>molar</sub>) ≈ 347 m/s</div>
+</div>
+
+</div>
+
+<script>
+const GAMMA=1.4, Rgas=8.314, Mmolar=0.02897, T1=300, FIXED_T=0.00125, X0=0.25, TUBE_L=1.0, P1_ATM=1.0;
+const a1 = Math.sqrt(GAMMA*Rgas*T1/Mmolar);
+
+function rhs(p2p1){
+  const num=(GAMMA-1)*(p2p1-1);
+  const den=Math.sqrt(2*GAMMA*(2*GAMMA+(GAMMA+1)*(p2p1-1)));
+  const bracket=1-num/den;
+  return p2p1*Math.pow(bracket,-2*GAMMA/(GAMMA-1));
+}
+function solveP2P1(p4p1){
+  let lo=1.0001, hi=15;
+  for(let i=0;i<60;i++){ const mid=(lo+hi)/2; if(rhs(mid)<p4p1) lo=mid; else hi=mid; }
+  return (lo+hi)/2;
+}
+function machFromP2P1(p2p1){ return Math.sqrt((GAMMA+1)/(2*GAMMA)*(p2p1-1)+1); }
+
+function X(x){ return 55 + (x/TUBE_L)*550; }
+function Y(p){ return 392 - (p/12)*214; }
+function stepPath(xs,p4,p2,p1){
+  return `M${X(0)},${Y(p4)} L${X(X0)},${Y(p4)} L${X(X0)},${Y(p2)} L${X(xs)},${Y(p2)} L${X(xs)},${Y(p1)} L${X(TUBE_L)},${Y(p1)}`;
+}
+function computeRun(ratio){
+  const p2p1=solveP2P1(ratio);
+  const Ms=machFromP2P1(p2p1);
+  const W=Ms*a1;
+  const front=Math.min(X0+W*FIXED_T, TUBE_L-0.02);
+  return {ratio, p2p1, Ms, W, front, p4:ratio*P1_ATM, p2:p2p1*P1_ATM};
+}
+
+// The slider's own value spans 8..10 but is used INVERTED so that the
+// slider's minimum (default) position represents &quot;no drift&quot; (spec = 10:1,
+// matches intent) and the slider's maximum position represents full drift
+// (spec = 8:1). This makes moving the control to its extreme visibly change
+// every readout, as the spec requires.
+function sliderToRatio(v){ return 18 - v; }
+function ratioToSlider(r){ return 18 - r; }
+
+const intended = computeRun(10);
+
+const els = {
+  specValueText: document.getElementById('specValueText'),
+  intendedPath: document.getElementById('intendedPath'),
+  actualPath: document.getElementById('actualPath'),
+  intendedFront: document.getElementById('intendedFront'),
+  actualFront: document.getElementById('actualFront'),
+  intendedLabel: document.getElementById('intendedLabel'),
+  actualLabel: document.getElementById('actualLabel'),
+  driftAnnotation: document.getElementById('driftAnnotation'),
+  roSpec: document.getElementById('ro-spec'),
+  roDev: document.getElementById('ro-dev'),
+  slider: document.getElementById('ratioSlider'),
+  resetBtn: document.getElementById('resetBtn')
+};
+
+// Keep every plot label fully inside the drawable chart area.
+function clampLabel(el, minX, maxX){
+  let bbox;
+  try{ bbox = el.getBBox(); }catch(e){ return; }
+  if(!bbox || bbox.width===0) return;
+  let x = parseFloat(el.getAttribute('x'));
+  if(bbox.x < minX){
+    x += (minX - bbox.x);
+  } else if(bbox.x + bbox.width > maxX){
+    x -= (bbox.x + bbox.width - maxX);
+  }
+  el.setAttribute('x', x);
+}
+
+els.intendedPath.setAttribute('d', stepPath(intended.front, intended.p4, intended.p2, P1_ATM));
+els.intendedLabel.textContent = 'intended (ratio 10 : 1)';
+els.intendedLabel.setAttribute('text-anchor','end');
+els.intendedLabel.setAttribute('x', X(intended.front)-4);
+els.intendedLabel.setAttribute('y', Y(intended.p4)+16);
+clampLabel(els.intendedLabel, 60, 618);
+
+function draw(ratio){
+  const run = computeRun(ratio);
+  els.actualPath.setAttribute('d', stepPath(run.front, run.p4, run.p2, P1_ATM));
+  els.intendedFront.setAttribute('x1', X(intended.front)); els.intendedFront.setAttribute('x2', X(intended.front));
+  els.intendedFront.setAttribute('y1', Y(12)); els.intendedFront.setAttribute('y2', Y(0));
+  els.actualFront.setAttribute('x1', X(run.front)); els.actualFront.setAttribute('x2', X(run.front));
+  els.actualFront.setAttribute('y1', Y(12)); els.actualFront.setAttribute('y2', Y(0));
+
+  els.actualLabel.textContent = `spec's answer (ratio ${run.ratio.toFixed(1)} : 1)`;
+  els.actualLabel.setAttribute('text-anchor','end');
+  els.actualLabel.setAttribute('x', X(run.front)-8);
+  els.actualLabel.setAttribute('y', Y(run.p4)+30);
+  clampLabel(els.actualLabel, 60, 618);
+
+  const devM = Math.abs(run.front-intended.front);
+  const drift = Math.abs(10-run.ratio);
+  els.driftAnnotation.textContent = drift>0.05 ? 'provably correct answer to a different question' : '';
+  els.driftAnnotation.style.opacity = Math.min(1, drift/2*1.4);
+
+  els.specValueText.textContent = `${run.ratio.toFixed(1)} : 1`;
+  els.roSpec.textContent = `${run.ratio.toFixed(1)} : 1`;
+  els.roDev.textContent = `${(devM*100).toFixed(1)} cm`;
+}
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let target=10, shown=10;
+function loop(){
+  const k = reduced ? 1 : 0.22;
+  shown += (target-shown)*k;
+  if(Math.abs(target-shown)<0.01) shown=target;
+  draw(shown);
+  requestAnimationFrame(loop);
+}
+els.slider.addEventListener('input', e=>{ target = sliderToRatio(parseFloat(e.target.value)); });
+els.resetBtn.addEventListener('click', ()=>{ target=10; els.slider.value = ratioToSlider(10); });
+
+draw(10);
+requestAnimationFrame(loop);
+window.__sceneReady = true;
+
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;semantic-gap&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="The guarantee covers spec-to-code, not intent-to-spec"
+  ></iframe>
+</section>
+
+<section class="scene" id="mission-critical-why-now">
+  <h3>Verification, not generation, is now the bottleneck for critical code</h3>
+  <div class="caption">Every system Lanyon targets — Euler gas dynamics, Maxwell's equations, magnetohydrodynamics for plasmas — is our shock tube's conservation law with more components, running inside rocket nozzles, satellite thrusters, and reactor designs. Slide code-generation speed forward and watch which pipeline stage becomes the wall.</div>
+  <iframe
+    class="scene-frame"
+    data-scene-id="mission-critical-why-now"
+    srcdoc="<!doctype html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;utf-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;>
+<title>Verification, not generation, is the bottleneck</title>
+<style>
+:root{
+  --bg:#f7f7f9; --panel:#ffffff; --text:#1a1a1a; --muted:#5a5a66;
+  --border:#d8d8e0; --accent:#2e7d5b; --gen:#3b6fd6; --verify:#d67a3b;
+  --queue:#c94f4f; --card-bg:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161a; --panel:#1e2126; --text:#e8e8ec; --muted:#a3a3ad;
+    --border:#33363d; --accent:#4caf82; --gen:#6f9cef; --verify:#e3985a;
+    --queue:#e06666; --card-bg:#1e2126;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+.wrap{max-width:680px;margin:0 auto;padding:14px 12px 20px;}
+h2{font-size:15px;margin:4px 0 2px;}
+.sub{font-size:11.5px;color:var(--muted);margin:0 0 10px;}
+math{color:var(--text);}
+.eqbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;text-align:center;margin-bottom:4px;}
+.legend{font-size:11px;color:var(--muted);margin:0 0 14px;line-height:1.5;}
+.cards{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.card{flex:1 1 190px;background:var(--card-bg);border:1px solid var(--border);
+  border-radius:8px;padding:8px;min-width:150px;}
+.card h3{font-size:12.5px;margin:2px 0;}
+.card .hw{font-size:11px;color:var(--muted);margin:0 0 4px;}
+.card .mini{font-size:9px;opacity:.65;margin:2px 0;text-align:center;}
+.stake{display:flex;align-items:flex-start;gap:4px;font-size:10.5px;color:var(--muted);margin-top:4px;}
+.stake svg{flex:none;margin-top:1px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;}
+svg.pipe{width:100%;max-width:640px;height:auto;display:block;margin:4px auto;}
+.controls{display:flex;flex-direction:column;gap:10px;margin-top:8px;}
+.ctrl label{display:block;font-size:11.5px;margin-bottom:3px;}
+input[type=range]{width:100%;}
+button{font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);cursor:pointer;}
+button.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.readouts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.ro{flex:1 1 130px;background:var(--panel);border:1px solid var(--border);border-radius:6px;
+  padding:6px 8px;font-size:11px;}
+.ro .val{font-size:14px;font-weight:600;}
+.ro .k{color:var(--muted);}
+</style>
+<style>math{font-size:1.25em}math[display=&quot;block&quot;]{font-size:1.4em}html,body{overflow:hidden}</style></head>
+<body>
+<div class=&quot;wrap&quot;>
+  <h2>Same conservation law, three certification-critical domains</h2>
+  <p class=&quot;sub&quot;>Every field Lanyon targets simulates this law — only the contents of u change.</p>
+
+  <div class=&quot;eqbox&quot;>
+    <math display=&quot;block&quot;>
+      <mrow>
+        <mfrac><mrow><mo>∂</mo><mi>u</mi></mrow><mrow><mo>∂</mo><mi>t</mi></mrow></mfrac>
+        <mo>+</mo>
+        <mfrac><mrow><mo>∂</mo><mi>f</mi><mo>(</mo><mi>u</mi><mo>)</mo></mrow><mrow><mo>∂</mo><mi>x</mi></mrow></mfrac>
+        <mo>=</mo><mn>0</mn>
+      </mrow>
+    </math>
+  </div>
+  <p class=&quot;legend&quot;>u — conserved quantity vector (mass, momentum, energy, or field components) ·
+    f(u) — flux function of u · t, x — time (s) and position (m). This is the shock-tube law from scene 1, reused below with a different u for each field.</p>
+
+  <div class=&quot;cards&quot; id=&quot;cards&quot;></div>
+
+  <div class=&quot;panel&quot;>
+    <h2 style=&quot;margin-top:0&quot;>Code pipeline: where does the work actually pile up?</h2>
+    <p class=&quot;sub&quot; style=&quot;margin-bottom:6px&quot;>Pipe height = throughput (code units / day). Fixed verification capacity does not grow as generation speeds up.</p>
+    <svg id=&quot;pipeSvg&quot; class=&quot;pipe&quot; viewBox=&quot;0 0 640 240&quot;></svg>
+
+    <div class=&quot;controls&quot;>
+      <div class=&quot;ctrl&quot;>
+        <label for=&quot;yearSlider&quot;>AI code-generation speed — year <span id=&quot;yearLbl&quot;>2020</span> (slide 2020 → 2026)</label>
+        <input type=&quot;range&quot; id=&quot;yearSlider&quot; min=&quot;2020&quot; max=&quot;2026&quot; step=&quot;0.1&quot; value=&quot;2020&quot;>
+      </div>
+      <div class=&quot;ctrl&quot;>
+        <button id=&quot;lanyonBtn&quot;>Turn on Lanyon: verify at construction (removes the review stage)</button>
+      </div>
+    </div>
+
+    <div class=&quot;readouts&quot;>
+      <div class=&quot;ro&quot;><span class=&quot;k&quot;>Year</span><br><span class=&quot;val&quot; id=&quot;roYear&quot;>2020</span></div>
+      <div class=&quot;ro&quot;><span class=&quot;k&quot;>Generation speed (×2020 rate)</span><br><span class=&quot;val&quot; id=&quot;roSpeed&quot;>1.0×</span></div>
+      <div class=&quot;ro&quot;><span class=&quot;k&quot;>Human verification capacity</span><br><span class=&quot;val&quot; id=&quot;roVerify&quot;>1.0× (fixed)</span></div>
+      <div class=&quot;ro&quot;><span class=&quot;k&quot;>Unreviewed code backlog</span><br><span class=&quot;val&quot; id=&quot;roQueue&quot;>0.0 units</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- constants (auditable) ----------
+const YEAR_MIN = 2020, YEAR_MAX = 2026;
+const MAX_SPEED = 40;      // illustrative: LLM code-gen ~40x human-paced rate by 2026
+const CAPACITY_V = 1;      // fixed human review throughput, in 2020-rate units
+const MIN_H = 14, MAX_H = 110; // pipe drawing heights (px)
+
+function speedMultiplier(year){
+  const frac = (year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN);
+  return Math.pow(MAX_SPEED, frac); // exponential growth, 1x at 2020, MAX_SPEED at 2026
+}
+function heightForRate(rate){
+  const frac = Math.log(rate) / Math.log(MAX_SPEED);
+  return MIN_H + Math.max(0, frac) * (MAX_H - MIN_H);
+}
+
+// ---------- application cards ----------
+const cardData = [
+  {law:&quot;Euler equations&quot;, hw:&quot;rocket nozzles &amp; satellite thrusters&quot;, u:&quot;u = (ρ, ρv, E)&quot;},
+  {law:&quot;Maxwell's equations&quot;, hw:&quot;satellite electrodynamics&quot;, u:&quot;u = (E, B)&quot;},
+  {law:&quot;MHD equations&quot;, hw:&quot;plasma propulsion &amp; fusion reactors&quot;, u:&quot;u = (ρ, ρv, E, B)&quot;}
+];
+const iconPaths = [
+  '<path d=&quot;M20 4 L28 30 L12 30 Z&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.4&quot;/><rect x=&quot;15&quot; y=&quot;30&quot; width=&quot;10&quot; height=&quot;8&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.2&quot;/>',
+  '<rect x=&quot;14&quot; y=&quot;14&quot; width=&quot;12&quot; height=&quot;10&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.3&quot;/><rect x=&quot;2&quot; y=&quot;16&quot; width=&quot;9&quot; height=&quot;6&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.1&quot;/><rect x=&quot;29&quot; y=&quot;16&quot; width=&quot;9&quot; height=&quot;6&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.1&quot;/><line x1=&quot;20&quot; y1=&quot;8&quot; x2=&quot;20&quot; y2=&quot;14&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.1&quot;/>',
+  '<ellipse cx=&quot;20&quot; cy=&quot;20&quot; rx=&quot;15&quot; ry=&quot;7&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.3&quot;/><ellipse cx=&quot;20&quot; cy=&quot;20&quot; rx=&quot;7&quot; ry=&quot;15&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.1&quot; stroke-dasharray=&quot;2 2&quot;/>'
+];
+const cardsEl = document.getElementById('cards');
+cardData.forEach((c,i)=>{
+  const div = document.createElement('div');
+  div.className='card';
+  div.innerHTML = `
+    <svg width=&quot;40&quot; height=&quot;40&quot; viewBox=&quot;0 0 40 40&quot; style=&quot;color:var(--text)&quot;>${iconPaths[i]}</svg>
+    <h3>${c.law}</h3>
+    <div class=&quot;hw&quot;>${c.hw}</div>
+    <div class=&quot;mini&quot;>∂u/∂t + ∂f(u)/∂x = 0, with ${c.u}</div>
+    <div class=&quot;stake&quot;>
+      <svg width=&quot;12&quot; height=&quot;12&quot; viewBox=&quot;0 0 12 12&quot;><circle cx=&quot;6&quot; cy=&quot;6&quot; r=&quot;5.5&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;1.2&quot;/><path d=&quot;M3.3 6.2 L5.2 8.1 L8.7 4&quot; fill=&quot;none&quot; stroke=&quot;var(--accent)&quot; stroke-width=&quot;1.2&quot;/></svg>
+      <span>a wrong run here doesn't fail a test — it certifies an unsafe design</span>
+    </div>`;
+  cardsEl.appendChild(div);
+});
+
+// ---------- pipeline diagram ----------
+const svg = document.getElementById('pipeSvg');
+const cy = 120, genX=20, genW=240, verX=380, verW=240;
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function el(tag, attrs){
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function text(x,y,str,size,color,anchor){
+  const t = el('text',{x:x,y:y,'font-size':size||10,fill:color||cssVar('--muted'),
+    'text-anchor':anchor||'middle','font-family':'inherit'});
+  t.textContent = str;
+  return t;
+}
+
+function draw(){
+  const year = parseFloat(document.getElementById('yearSlider').value);
+  const lanyonOn = state.lanyonOn;
+  const speed = speedMultiplier(year);
+  const genH = heightForRate(speed);
+  const verH = heightForRate(CAPACITY_V); // always constant
+  const backlog = Math.max(0, speed - CAPACITY_V);
+  const blocks = Math.min(20, Math.round(backlog/2));
+
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+  // baseline reference dashed line (2020 rate)
+  const baseY = cy - heightForRate(1)/2;
+  svg.appendChild(el('line',{x1:genX,y1:baseY,x2:genX+genW,y2:baseY,stroke:cssVar('--muted'),
+    'stroke-width':1,'stroke-dasharray':'3 3',opacity:0.5}));
+  svg.appendChild(text(genX+genW/2, baseY-4, '2020 baseline rate', 9));
+
+  // generation pipe
+  const gY = cy - genH/2;
+  svg.appendChild(el('rect',{x:genX,y:gY,width:genW,height:genH,rx:6,fill:cssVar('--gen')}));
+  svg.appendChild(text(genX+genW/2, 24, 'GENERATION', 11, cssVar('--text')));
+  svg.appendChild(text(genX+genW/2, cy+4, speed.toFixed(1)+'× 2020 rate', 10, '#fff'));
+
+  // arrow from generation to next stage
+  svg.appendChild(el('line',{x1:genX+genW,y1:cy,x2:genX+genW+30,y2:cy,stroke:cssVar('--muted'),'stroke-width':1.5}));
+
+  if(!lanyonOn){
+    // queue
+    const qx = genX+genW+30;
+    for(let i=0;i<blocks;i++){
+      const bx = qx + (i%4)*16;
+      const by = 210 - Math.floor(i/4)*16;
+      svg.appendChild(el('rect',{x:bx,y:by,width:12,height:12,rx:2,fill:cssVar('--queue')}));
+    }
+    svg.appendChild(text(qx+32, 224, 'unreviewed code backlog', 9));
+
+    // verification pipe (fixed width regardless of slider)
+    const vY = cy - verH/2;
+    svg.appendChild(el('line',{x1:verX-20,y1:cy,x2:verX,y2:cy,stroke:cssVar('--muted'),'stroke-width':1.5}));
+    svg.appendChild(el('rect',{x:verX,y:vY,width:verW,height:verH,rx:6,fill:cssVar('--verify')}));
+    svg.appendChild(text(verX+verW/2, 24, 'HUMAN VERIFICATION', 11, cssVar('--text')));
+    svg.appendChild(text(verX+verW/2, cy+4, CAPACITY_V.toFixed(1)+'× (fixed capacity)', 10, '#fff'));
+  } else {
+    // Lanyon: no verification stage, no queue
+    const ox = genX+genW+40;
+    svg.appendChild(el('rect',{x:ox,y:cy-24,width:220,height:48,rx:6,fill:cssVar('--accent')}));
+    svg.appendChild(text(ox+110, cy-2, 'VERIFIED AT CONSTRUCTION', 10.5, '#fff'));
+    svg.appendChild(text(ox+110, cy+14, '(no downstream review stage)', 9, '#fff'));
+    svg.appendChild(text(ox+110, 224, 'queue drains — nothing waits for review', 9));
+  }
+
+  // readouts
+  document.getElementById('yearLbl').textContent = year.toFixed(1);
+  document.getElementById('roYear').textContent = year.toFixed(1);
+  document.getElementById('roSpeed').textContent = speed.toFixed(1)+'×';
+  document.getElementById('roVerify').textContent = CAPACITY_V.toFixed(1)+'× (fixed)';
+  document.getElementById('roQueue').textContent = lanyonOn ? '0.0 units (no stage)' : backlog.toFixed(1)+' units';
+}
+
+const state = { lanyonOn: false };
+const slider = document.getElementById('yearSlider');
+const btn = document.getElementById('lanyonBtn');
+slider.addEventListener('input', draw);
+btn.addEventListener('click', ()=>{
+  state.lanyonOn = !state.lanyonOn;
+  btn.classList.toggle('on', state.lanyonOn);
+  btn.textContent = state.lanyonOn
+    ? 'Lanyon ON — verification happens at construction'
+    : 'Turn on Lanyon: verify at construction (removes the review stage)';
+  draw();
+});
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduce){ slider.value = 2020; }
+draw();
+
+window.__sceneReady = true;
+const __ro = new ResizeObserver(() => {
+  parent.postMessage({ explainItScene: &quot;mission-critical-why-now&quot;, height: document.documentElement.scrollHeight }, &quot;*&quot;);
+});
+__ro.observe(document.documentElement);
+</script>
+</body>
+</html>"
+    loading="lazy"
+    scrolling="no"
+    title="Verification, not generation, is now the bottleneck for critical code"
+  ></iframe>
+</section>
+
+  <footer>Source: <em>Lanyon AI: Correctness-by-Construction Neurosymbolic AI for Scientific Computing</em> — Jonathan Gorard, Ammar Hakim, Jimmy Juno. Explainer generated 2026-07-31.</footer>
+</main>
+<script>
+  // Size each scene iframe to its content so it never shows its own scrollbar
+  // (a "scrollbar inside the page scrollbar"). Two mechanisms, belt-and-suspenders:
+  //
+  // 1) Scenes postMessage({ explainItScene, height }) — but their ResizeObserver only
+  //    fires on box-size changes, so late reflow (MathML, web fonts, async SVG) that
+  //    grows content AFTER the first report is missed and the frame stays too short.
+  // 2) Because scenes are srcdoc (same-origin), we also measure each frame's true
+  //    scrollHeight directly and refit on every signal that can change it: the load
+  //    event, DOM mutations, box resizes, fonts.ready, and a few bounded timeouts that
+  //    catch reflow with no observable trigger. This converges and needs no scene changes.
+  const fitToContent = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc) return;
+    const h = Math.max(
+      doc.documentElement ? doc.documentElement.scrollHeight : 0,
+      doc.body ? doc.body.scrollHeight : 0
+    );
+    if (h && Math.ceil(h) !== Math.ceil(parseFloat(frame.style.height) || 0)) {
+      frame.style.height = Math.ceil(h) + "px";
+    }
+  };
+
+  const wireFrame = (frame) => {
+    let doc;
+    try { doc = frame.contentDocument; } catch { return; }
+    if (!doc || !doc.documentElement) return;
+    const refit = () => fitToContent(frame);
+    refit();
+    try { new MutationObserver(refit).observe(doc.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); } catch { /* noop */ }
+    try { new ResizeObserver(refit).observe(doc.documentElement); } catch { /* noop */ }
+    try { if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(refit); } catch { /* noop */ }
+    [50, 150, 350, 700, 1200, 2500].forEach((t) => setTimeout(refit, t));
+  };
+
+  for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+    frame.addEventListener("load", () => wireFrame(frame));
+    // Non-lazy or already-cached frames may have loaded before this ran.
+    try { if (frame.contentDocument && frame.contentDocument.readyState === "complete") wireFrame(frame); } catch { /* noop */ }
+  }
+
+  // Keep honoring scene-sent heights too (harmless, and covers any edge our measure misses).
+  addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.explainItScene || typeof data.height !== "number") return;
+    for (const frame of document.querySelectorAll("iframe.scene-frame")) {
+      if (frame.contentWindow === event.source) {
+        if (Math.ceil(data.height) > Math.ceil(parseFloat(frame.style.height) || 0)) {
+          frame.style.height = Math.ceil(data.height) + "px";
+        }
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>

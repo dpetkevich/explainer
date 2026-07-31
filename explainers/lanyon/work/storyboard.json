@@ -1,0 +1,313 @@
+{
+  "title": "How Lanyon AI Works",
+  "hook": "AI models can now write a full physics simulation in minutes. They can also slip in a sign error that runs stably, converges smoothly, and reports the wrong physics with total confidence. The standard fix: have the AI also write a proof that its code is correct. But that plan has a hole. The proof can be flawless while describing code you aren't actually running. Lanyon AI generates the code and the proof from one shared source, so the two can never disagree. That single architectural move turns 'probably correct' into 'correct by construction.'",
+  "parts": [
+    {
+      "title": "The basic building blocks",
+      "lede": "Before any AI enters the picture, you need to see the problem domain: a physics simulation where a tiny code error doesn't crash anything — it quietly lies. We build one concrete simulation, break it invisibly, and then ask what 'correct' even means."
+    },
+    {
+      "title": "The new technology",
+      "lede": "Scene 4 left us with a precise target — prove that code matches a written specification. Here we meet the machinery that checks such proofs, watch the obvious AI-based approach fail at exactly one seam, and see how Lanyon welds that seam shut."
+    },
+    {
+      "title": "Why it beats existing tech",
+      "lede": "Correctness by construction isn't just safer than having a frontier model write everything — because the fallible, expensive component now touches only tens of lines, it is also dramatically faster and cheaper. The economics fall out of the architecture."
+    },
+    {
+      "title": "Why now",
+      "lede": "One honest boundary remains on the guarantee, and it decides where this technology lands first: the industries where a silently wrong simulation costs the most."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "shock-tube-conservation-law",
+      "conceptId": "numerical-pde-simulation",
+      "part": "The basic building blocks",
+      "title": "One equation governs the whole simulation: whatever flows in must be accounted for",
+      "teaches": "The running example — the Sod shock tube — and the conservation law \\(\\frac{∂u}{∂t} + \\frac{∂f(u)}{∂x} = 0\\) that any correct simulation of it must respect.",
+      "requires": [],
+      "caption": "Meet the Sod shock tube: a standard gas-dynamics benchmark — high-pressure gas on the left, low on the right, diaphragm removed at \\(t = 0\\). Every symbol in the governing law is labeled on the tube itself.",
+      "visualMetaphor": "A horizontal tube split by a dashed diaphragm: left half shaded dense (labeled 'density \\(ρ_L = 1.0\\), pressure \\(p_L = 1.0\\)'), right half sparse (labeled '\\(ρ_R = 0.125\\), \\(p_R = 0.1\\)'). Below, the equation \\(\\frac{∂u}{∂t} + \\frac{∂f(u)}{∂x} = 0\\) with three callout arrows: \\(u\\) → 'a conserved quantity per unit length (here: mass density)', \\(\\frac{∂u}{∂t}\\) → 'how it changes in time at one point', \\(\\frac{∂f(u)}{∂x}\\) → 'net flow — the flux \\(f\\) — across that point'. A play button removes the diaphragm and animates the density profile: a shock front races right, a rarefaction fans left. Annotation: 'the equation says: density only changes because material flows — none is created or destroyed.'",
+      "animatedVariable": {
+        "name": "time after diaphragm removal",
+        "control": "play-pause",
+        "range": "t = 0 to t = 0.2 (simulation units)",
+        "whatChangesOnScreen": "The density profile evolves: a sharp shock moves right, a smooth rarefaction wave spreads left, and a running total '∑ mass in tube' stays pinned at its initial value."
+      },
+      "quantitativeAnchor": "Sod's standard initial conditions: left state \\(ρ_L = 1.0, p_L = 1.0\\); right state \\(ρ_R = 0.125, p_R = 0.1\\) — an 8:1 pressure ratio.",
+      "physicsChecks": [
+        "At t = 0 the density profile is a step function matching the labeled left/right values.",
+        "During playback the total-mass readout is constant to the displayed precision.",
+        "The shock front moves right; the rarefaction spreads left — never the reverse."
+      ]
+    },
+    {
+      "id": "silent-wrong-physics",
+      "conceptId": "numerical-pde-simulation",
+      "part": "The basic building blocks",
+      "title": "A subtly broken solver runs smoothly and reports wrong physics",
+      "teaches": "Computers solve the tube on a discrete grid, and a small error in the numerical flux produces stable, plausible, quantitatively wrong output — not a crash.",
+      "requires": [
+        "shock-tube-conservation-law"
+      ],
+      "caption": "The tube's continuous equation gets replaced by arithmetic on a grid of cells, with a flux formula moving mass between neighbors. Before you drag the slider: do you expect a mis-coded flux to crash the run, or just quietly lie?",
+      "visualMetaphor": "Top: the tube divided into 200 grid cells, with the flux formula between two highlighted cells shown as code: 'F = 0.5*(f(uL)+f(uR)) - 0.5*a*(uR-uL)'. A slider perturbs the coefficient 'a' away from its correct value. Bottom: two density profiles overlaid at t = 0.2 — correct solution (grey reference line) and the perturbed solver (colored). At small perturbation the curves look near-identical but the shock front sits at the wrong position; a readout shows 'shock position error' and 'mass drift'. Big status banner throughout: 'RUN COMPLETED — NO ERRORS', deliberately green even when the physics is wrong.",
+      "animatedVariable": {
+        "name": "flux coefficient error",
+        "control": "slider",
+        "range": "0% to 20% perturbation of the numerical flux coefficient",
+        "whatChangesOnScreen": "The computed profile stays smooth and stable, but the shock front drifts from the reference position and the mass-conservation readout accumulates drift — while the status banner stays green."
+      },
+      "quantitativeAnchor": "At a 5% flux perturbation the run completes cleanly, the profile looks smooth, but the shock front is displaced several percent from the true position — a design-relevant error with zero warnings.",
+      "physicsChecks": [
+        "At 0% perturbation the two curves coincide exactly.",
+        "Shock-position error increases monotonically with the slider.",
+        "The 'RUN COMPLETED' banner remains green at every slider value — the failure is silent by construction of the scene.",
+        "The perturbed profile never shows visible oscillation or blow-up in the shown range (the point is stability + wrongness)."
+      ]
+    },
+    {
+      "id": "llm-error-compounding",
+      "conceptId": "llm-unreliability",
+      "part": "The basic building blocks",
+      "title": "An LLM writing 100,000 tokens almost never writes all of them right",
+      "teaches": "LLMs sample code token by token from a probability distribution, so a tiny per-token error rate compounds to near-certain failure over a real-sized solver.",
+      "requires": [
+        "silent-wrong-physics"
+      ],
+      "caption": "You just saw that one wrong coefficient is enough — now watch an LLM write your solver token by token, each token a short text fragment sampled from a learned distribution, with nothing enforcing the math. Slide the per-token accuracy up and watch what happens over 100,000 tokens.",
+      "visualMetaphor": "Left: a code panel where the solver is 'typed' token by token, each token briefly flashing its sampling — occasionally a token in red ('+' where '−' belonged) slips in and stays. Right: a chart of \\(P(\\text{all tokens correct}) = (1-ε)^{N}\\) versus per-token error rate \\(ε\\), with a vertical line at the current slider value and \\(N\\) fixed at 100,000 tokens (a realistic full solver). Prediction prompt before interacting: 'if the model is 99.99% accurate per token, what's the chance of a fully clean file?' Reveal: the curve answers.",
+      "animatedVariable": {
+        "name": "per-token error rate ε",
+        "control": "slider",
+        "range": "ε from 1% down to 0.001%",
+        "whatChangesOnScreen": "The chart's marker slides along \\((1-ε)^{100000}\\); the code panel's density of red tokens thins out but never reaches zero, and the probability readout updates."
+      },
+      "quantitativeAnchor": "At 99.99% per-token accuracy, \\((1-0.0001)^{100000} ≈ 4.5×10^{-5}\\) — a 0.005% chance the 100,000-token solver contains zero errors.",
+      "physicsChecks": [
+        "P(clean file) increases as ε decreases, but stays visibly far below 1 across the whole displayed range.",
+        "At ε = 0.01% the readout shows ≈ 0.005%, matching \\(e^{-10}\\) to the displayed precision.",
+        "The code panel shows at least one red token at every slider setting, tying back to scene 2's single fatal coefficient."
+      ]
+    },
+    {
+      "id": "spec-vs-code",
+      "conceptId": "spec-vs-implementation",
+      "part": "The basic building blocks",
+      "title": "'Correct' only means something relative to a written specification",
+      "teaches": "A specification is a precise mathematical statement of what the program must do, and 'verified' means proving the implementation satisfies it.",
+      "requires": [
+        "silent-wrong-physics"
+      ],
+      "caption": "The broken solver of scene 2 wasn't 'incorrect' in a vacuum — it violated a nameable property. A specification writes that property down formally; verification means proving the code satisfies it.",
+      "visualMetaphor": "Two side-by-side panels. Left, labeled SPECIFICATION: three formal statements about the shock-tube solver, e.g. 'for every timestep \\(n\\): \\(∑_i u_i^n·Δx = ∑_i u_i^0·Δx\\) (discrete mass exactly conserved)', plus a stability condition and a shock-speed condition. Right, labeled IMPLEMENTATION: the solver code from scene 2. Between them a gap labeled '⊨ ?' — 'does the code satisfy the spec?'. A toggle re-injects scene 2's 5% flux error into the code: the mass-conservation line in the spec panel turns red with the measured drift, making 'wrong' a checkable claim rather than a vibe. Annotation splitting the trust problem in two: link A 'does code match spec?' (this scene), link B 'does spec match what you wanted?' (flagged as 'we return to this at the end').",
+      "animatedVariable": {
+        "name": "flux error in the implementation",
+        "control": "toggle",
+        "range": "correct flux ↔ 5% perturbed flux",
+        "whatChangesOnScreen": "With the correct flux, all three spec statements show green checkmarks; with the perturbed flux, the conservation statement turns red with a measured mass drift — the same bug from scene 2, now caught by a stated property."
+      },
+      "physicsChecks": [
+        "Toggle off: all spec lines green. Toggle on: exactly the conservation line goes red — the spec localizes the failure.",
+        "The spec panel contains no code, only mathematical statements; the code panel contains no math prose — the two-artifact structure is visually unambiguous.",
+        "Link B ('spec matches intent?') is visibly marked as unresolved, not silently green."
+      ]
+    },
+    {
+      "id": "proof-checking-asymmetry",
+      "conceptId": "proof-assistants-type-checking",
+      "part": "The new technology",
+      "title": "Proofs are hard to write but mechanical to check",
+      "teaches": "Proof assistants encode statements as types and proofs as programs; a small deterministic kernel checks validity with zero judgment and zero trust in the author.",
+      "requires": [
+        "spec-vs-code"
+      ],
+      "caption": "Scene 4 demanded a proof that the code satisfies the spec — but who checks a proof written by an untrustworthy author? A proof assistant: a small, audited program that accepts a proof only if every step follows mechanically from the rules, the way a compiler rejects a syntax error.",
+      "visualMetaphor": "A vertical proof of the mass-conservation spec for the shock-tube flux, written as a chain of ~8 steps ('flux out of cell i = flux into cell i+1', 'therefore the sum telescopes', ...). Each step feeds into a box labeled KERNEL — annotated 'a few thousand lines of audited code; no AI, no heuristics, no judgment'. Steps light up green one by one as the kernel walks the chain. A toggle corrupts step 5 (swaps a '+' for a '−' in the telescoping argument): the kernel halts at step 5, red, deterministically, every single time. Side annotation names the asymmetry: 'writing this proof took creativity; checking it is symbol matching — that asymmetry is why an unreliable author is tolerable.'",
+      "animatedVariable": {
+        "name": "proof integrity",
+        "control": "toggle",
+        "range": "valid proof ↔ one corrupted step",
+        "whatChangesOnScreen": "Valid: all 8 steps turn green and a 'PROOF ACCEPTED' seal appears. Corrupted: the kernel stops exactly at step 5 with a red rejection — no partial credit, no probability, same result on every re-run."
+      },
+      "physicsChecks": [
+        "The kernel's verdict is binary: full green seal or hard stop at the corrupted step — never a confidence score.",
+        "Re-running the check (a 're-check' button) gives the identical verdict, contrasting with scene 3's sampling.",
+        "The corrupted step is visually the same size as the others — a one-character flaw kills the whole proof."
+      ]
+    },
+    {
+      "id": "autoformalization-pipeline",
+      "conceptId": "autoformalization",
+      "part": "The new technology",
+      "title": "The consensus fix: have the LLM write both the code and its proof",
+      "teaches": "Autoformalization pairs an LLM-written implementation with an LLM-written proof, betting that the proof assistant's kernel filters out the LLM's unreliability.",
+      "requires": [
+        "llm-error-compounding",
+        "proof-checking-asymmetry"
+      ],
+      "caption": "Given a trustworthy checker, the obvious architecture writes itself: the LLM emits both the shock-tube solver and a machine-checkable proof, gated by scene 5's kernel. Step through the pipeline — an accepted proof means the code it describes provably satisfies the spec.",
+      "visualMetaphor": "A left-to-right pipeline diagram with a step-through control: [User request: 'solve the Sod shock tube'] → [LLM] which fans out into TWO separate artifacts stacked vertically: [CODE: solver.c] and [PROOF: conservation.lean] → both feed the [KERNEL] box from scene 5 → green seal → [SHIP]. Each step-press advances the highlight and shows the artifact being produced. Annotation on the fan-out: 'two artifacts, one author, generated separately' — drawn with a thin visible gap between the code box and the proof box, deliberately foreshadowed but not yet criticized. A footnote: 'this approach has real wins in pure mathematics, which is why it became the default.'",
+      "animatedVariable": {
+        "name": "pipeline stage",
+        "control": "buttons",
+        "range": "5 steps: request → LLM → code + proof → kernel check → ship",
+        "whatChangesOnScreen": "Each press highlights the next stage and materializes its artifact; on the happy path the kernel stamps green and the code ships."
+      },
+      "physicsChecks": [
+        "Code and proof are drawn as two distinct boxes with a visible seam between them — the seam exists before scene 7 attacks it.",
+        "The kernel box is identical to scene 5's, reinforcing that the checker itself is trustworthy.",
+        "The happy path ends in a green seal — the baseline is shown working before it is critiqued."
+      ]
+    },
+    {
+      "id": "misformalization-failure",
+      "conceptId": "misformalization",
+      "part": "The new technology",
+      "title": "A perfect proof of the wrong statement type-checks anyway",
+      "teaches": "Because code and proof are separate artifacts, the LLM can prove a flawless statement about code it didn't actually write — and the kernel cannot notice.",
+      "requires": [
+        "autoformalization-pipeline",
+        "silent-wrong-physics"
+      ],
+      "caption": "The seam from scene 6 tears open here: flip one sign in the shipped code, and the proof still describes the unflipped version, so the kernel stamps green. You ship scene 2's silently wrong shock tube with a formal seal of approval.",
+      "visualMetaphor": "The scene-6 pipeline, zoomed into the code/proof pair. Code panel shows the flux line 'F = ... - 0.5*a*(uR-uL)'; proof panel shows the corresponding step reasoning about the same expression. A toggle flips the code's '−' to '+' (a one-character LLM sampling slip, echoing scene 3's red tokens) while the proof panel — a separate artifact — keeps the '−'. Step the kernel: every proof step goes green, the seal appears. Below, the shock-tube plot from scene 2 re-renders with the flipped sign: wrong shock position, green seal floating above it. A bright annotation connects the two panels' mismatched characters: 'the kernel verified the proof; nothing ever compared the proof's subject to the shipped code.'",
+      "animatedVariable": {
+        "name": "sign in the shipped code (proof untouched)",
+        "control": "toggle",
+        "range": "code matches proof ↔ code has flipped sign",
+        "whatChangesOnScreen": "The code's operator flips red while the proof's stays unchanged; the kernel check still runs fully green; the simulation below shifts to the wrong shock position under an intact 'PROOF ACCEPTED' seal."
+      },
+      "physicsChecks": [
+        "With the flipped sign, every proof step is still green — the kernel verdict is unchanged from scene 6's happy path.",
+        "The mismatched characters ('+' in code, '−' in proof) are simultaneously visible and highlighted — the cause is on screen, not asserted.",
+        "The simulation plot under the green seal shows the same class of wrongness as scene 2 (displaced shock, smooth profile).",
+        "Toggling back restores agreement and correct physics, confirming the seam is the sole failure point."
+      ]
+    },
+    {
+      "id": "neurosymbolic-split",
+      "conceptId": "neurosymbolic-division-of-labor",
+      "part": "The new technology",
+      "title": "Lanyon shrinks the LLM's job to twenty lines of specification",
+      "teaches": "Lanyon assigns the LLM only the creative step — proposing a short formal spec in a domain-specific language — and hands all code and proof writing to deterministic symbolic algorithms.",
+      "requires": [
+        "misformalization-failure"
+      ],
+      "caption": "If the LLM is the unreliable link, Lanyon gives it the smallest possible job: a ~20-line specification in a DSL, never code or proof. The DSL is a compact formal language with conservation laws and discretization schemes built in as vocabulary.",
+      "visualMetaphor": "A two-column responsibility chart with a toggle between architectures. Column headers: NEURAL (dice icon: 'samples from a distribution — creative, fallible') and SYMBOLIC (gear icon: 'deterministic algorithms — zero creativity, zero sampling'). Under 'Autoformalization': code-writing, proof-writing, and spec-writing chips all sit in the NEURAL column; kernel-checking in SYMBOLIC. Toggle to 'Lanyon': every chip slides to SYMBOLIC except one — 'write the spec' — and the NEURAL column shrinks to a small box containing an actual ~20-line DSL spec for the Sod tube ('system: euler_1d; ic: sod(pL=1.0, pR=0.1); scheme: finite_volume; require: conserves(mass), stable, entropy_shock'). Annotation: 'each DSL keyword compresses decades of numerical-analysis expertise — the LLM composes vocabulary, it doesn't derive schemes.'",
+      "animatedVariable": {
+        "name": "architecture",
+        "control": "toggle",
+        "range": "autoformalization ↔ Lanyon",
+        "whatChangesOnScreen": "Task chips migrate from the neural to the symbolic column; the LLM's footprint visibly collapses from 'everything' to one 20-line spec box."
+      },
+      "quantitativeAnchor": "The LLM's entire output: tens of lines of DSL — roughly 20 lines for the full Sod shock-tube specification.",
+      "physicsChecks": [
+        "In the Lanyon configuration, exactly one chip remains in the neural column.",
+        "The DSL spec on screen is genuinely short (fits without scrolling) and names the scene-1 initial conditions (pL=1.0, pR=0.1).",
+        "The dice/gear icons make the sampling-vs-deterministic distinction visible, tying back to scene 3."
+      ]
+    },
+    {
+      "id": "correctness-by-construction",
+      "conceptId": "correctness-by-construction",
+      "part": "The new technology",
+      "title": "Code and proof are generated from one source, so they cannot disagree",
+      "teaches": "Lanyon's symbolic engine expands the single DSL spec into implementation and proof simultaneously — two projections of one object — and emits nothing at all if the spec can't be proven.",
+      "requires": [
+        "neurosymbolic-split",
+        "misformalization-failure"
+      ],
+      "caption": "Now the payoff: the symbolic engine expands that 20-line spec into the solver and its proof in one deterministic pass. There is no seam to tear because there was never a second artifact to drift — try to recreate scene 7's attack.",
+      "visualMetaphor": "Center: the DSL spec box from scene 8. From it, one expansion animation fans into two synchronized panels — CODE and PROOF — with matching elements literally tethered by drawn lines (the flux term in the spec connects to the '−' in the code AND the '−' in the proof simultaneously). Interaction 1: a disabled, greyed-out edit cursor over the code panel labeled 'no independent edit path exists — recreating scene 7 is structurally impossible; to change the code you must change the spec, which regenerates both.' Interaction 2 (the main control): toggle the spec's 'require: conserves(mass)' clause to a deliberately unprovable variant ('require: conserves(mass) with anti-diffusive flux'). The engine's output goes blank — no code, no proof, an explicit 'NOT PROVABLE → NOTHING EMITTED' state. Annotation: 'this is not testing after the fact; the erroneous artifact is never produced.'",
+      "animatedVariable": {
+        "name": "specification provability",
+        "control": "toggle",
+        "range": "provable spec ↔ unprovable spec clause",
+        "whatChangesOnScreen": "Provable: code and proof materialize together, tethered line by line, kernel seal green. Unprovable: both output panels go empty with 'NOTHING EMITTED' — no green seal, no unverified code, no silent failure mode."
+      },
+      "physicsChecks": [
+        "The code panel has no independent edit affordance — the scene-7 attack (edit code, keep proof) is visibly impossible, not merely discouraged.",
+        "With an unprovable spec, both panels are empty; at no point does code exist without its proof.",
+        "Tether lines connect each spec clause to its counterparts in both code and proof simultaneously — one source, two projections, visible.",
+        "The regenerated code with a provable spec reproduces scene 1's correct shock-tube physics."
+      ]
+    },
+    {
+      "id": "dsl-economics",
+      "conceptId": "dsl-compression-economics",
+      "part": "Why it beats existing tech",
+      "title": "Twenty LLM lines expand into tens of thousands of verified lines",
+      "teaches": "Because LLM cost scales with tokens generated and Lanyon's LLM emits only the spec, output volume is nearly free: symbolic expansion produces thousands of type-correct proof lines per second.",
+      "requires": [
+        "correctness-by-construction",
+        "llm-error-compounding"
+      ],
+      "caption": "With the engine doing the writing, cost stops scaling with output size. Drag the output size up: the top-end model's line climbs with every token, while Lanyon's LLM cost stays flat at one 20-line spec.",
+      "visualMetaphor": "A chart: x-axis 'lines of verified output' (100 to 50,000, log scale), y-axis 'expensive LLM tokens consumed'. Two curves: 'frontier model writes everything' rising linearly (and annotated with scene 3's compounding risk growing alongside — a secondary shaded band showing P(at least one error) approaching 1), and 'Lanyon' flat at spec size, annotated 'spec ≈ 20 lines regardless of output size'. A live counter panel demonstrates throughput: press play and watch a lines-of-proof odometer spin at thousands of lines per second while a kernel-seal icon stays green. Callout: the paper's claim — thousands of lines of type-correct proof per second, at a tiny fraction of a frontier model's token and compute cost.",
+      "animatedVariable": {
+        "name": "size of the requested simulation",
+        "control": "slider",
+        "range": "100 to 50,000 lines of output code+proof",
+        "whatChangesOnScreen": "The frontier-model cost curve and its error-probability band climb with the slider; Lanyon's cost line stays flat; the odometer readout shows expansion completing in under a second even at 50,000 lines."
+      },
+      "quantitativeAnchor": "Lanyon emits thousands of lines of type-correct, machine-verified proof per second, from an LLM footprint of only tens of lines of DSL.",
+      "physicsChecks": [
+        "Lanyon's LLM-token cost is constant across the entire slider range; the frontier curve is monotonically increasing.",
+        "The frontier curve's shaded error band grows with output size, consistent with scene 3's \\((1-ε)^N\\); Lanyon's output carries a green seal at every size.",
+        "At 50,000 lines the odometer implies sub-second-to-seconds generation, consistent with 'thousands of lines per second'."
+      ]
+    },
+    {
+      "id": "semantic-gap",
+      "conceptId": "syntactic-vs-semantic-correctness",
+      "part": "Why now",
+      "title": "The guarantee covers spec-to-code, not intent-to-spec",
+      "teaches": "Lanyon guarantees syntactic correctness — code and proof always match the spec — but whether the LLM's spec captures the user's intent remains an open problem.",
+      "requires": [
+        "correctness-by-construction",
+        "spec-vs-code"
+      ],
+      "caption": "Scene 4 defined correctness relative to a spec — but who checks the spec against your intent? Nudge the spec away from your request and watch every seal stay green: Lanyon flawlessly, provably solves the wrong problem.",
+      "visualMetaphor": "The full trust chain drawn as four boxes: [USER INTENT: 'Sod tube, pressure ratio 10:1'] →(link B: LLM formalization)→ [SPEC] →(link A: symbolic engine)→ [CODE + PROOF] → [RESULT]. Links A and everything downstream are welded shut with green padlocks labeled 'guaranteed by construction (scenes 8–9)'. Link B is a dashed line labeled 'open research problem: linguistics, psychology, agent design'. A slider drifts the spec's pressure ratio away from the request (10:1 down to 8:1): the padlocks stay green, the proof seal stays green, and the resulting shock-tube plot smoothly deviates from the intended one, with a 'provably correct answer to a different question' annotation growing as the drift grows. Predict-first prompt: 'will any seal turn red as the spec drifts?'",
+      "animatedVariable": {
+        "name": "spec drift from user intent",
+        "control": "slider",
+        "range": "pressure ratio in spec: 10:1 (matches intent) to 8:1 (drifted)",
+        "whatChangesOnScreen": "The spec's number visibly diverges from the user request; every downstream seal remains green; the simulated shock position and wave speeds shift accordingly — verified output, wrong problem."
+      },
+      "physicsChecks": [
+        "No seal or padlock ever turns red at any slider position — the guarantee is genuinely silent about link B.",
+        "The simulation output changes continuously and monotonically with spec drift, and matches intent exactly at 10:1.",
+        "Link B's dashed styling contrasts with link A's solid padlocked styling — the boundary of the guarantee is drawn, not narrated.",
+        "The claim shown is the paper's precise one: 'output always matches the specification' — strictly weaker than 'matches intent', and stated as such on screen."
+      ]
+    },
+    {
+      "id": "mission-critical-why-now",
+      "conceptId": "mission-critical-stakes",
+      "part": "Why now",
+      "title": "Verification, not generation, is now the bottleneck for critical code",
+      "teaches": "As AI floods aerospace, propulsion, and nuclear engineering with fast unverified code, provable correctness becomes the condition for adoption — which is why Lanyon targets exactly the PDE systems those fields simulate.",
+      "requires": [
+        "dsl-economics",
+        "semantic-gap"
+      ],
+      "caption": "Every system Lanyon targets — Euler gas dynamics, Maxwell's equations, magnetohydrodynamics for plasmas — is our shock tube's conservation law with more components, running inside rocket nozzles, satellite thrusters, and reactor designs. Slide code-generation speed forward and watch which pipeline stage becomes the wall.",
+      "visualMetaphor": "Left: three application cards, each pairing an equation family with a hardware silhouette and the shock-tube's \\(\\frac{∂u}{∂t} + \\frac{∂f(u)}{∂x} = 0\\) shape annotated inside it — 'Euler → rocket nozzles', 'Maxwell → satellite electrodynamics', 'MHD → plasma propulsion and fusion'. Each card notes the stake: 'a wrong run here doesn't fail a test — it certifies an unsafe design' (scene 2's green banner reappears as a small ghost icon). Right: a two-stage throughput diagram, GENERATION → HUMAN VERIFICATION, drawn as pipes. A slider labeled 'AI code-generation speed, 2020 → 2026' widens the generation pipe dramatically while the human-verification pipe stays fixed; a growing queue of unreviewed code piles up between them. A final toggle swaps in Lanyon's construction-time verification: the second pipe disappears entirely — verification is no longer a stage, and the queue drains.",
+      "animatedVariable": {
+        "name": "AI code-generation throughput over time",
+        "control": "slider",
+        "range": "2020 (human-speed) to 2026 (LLM-speed) code generation",
+        "whatChangesOnScreen": "The generation pipe widens, the fixed-width human-review pipe becomes the visible choke point, and the unverified-code queue grows; the Lanyon toggle removes the review stage and the backlog with it."
+      },
+      "physicsChecks": [
+        "The verification pipe's width does not change with the slider — only the queue grows, making the bottleneck's location unambiguous.",
+        "With the Lanyon toggle on, no queue exists at any slider position, because verification happens at construction (scene 9), not as a downstream stage.",
+        "All three application cards visibly share the scene-1 conservation-law structure, closing the loop with the running example."
+      ]
+    }
+  ]
+}
