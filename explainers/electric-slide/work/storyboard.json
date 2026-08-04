@@ -1,0 +1,357 @@
+{
+  "title": "How the Electric Stack Works",
+  "hook": "A camera drone contains a lithium battery, four magnet motors, a bank of transistor switches, and a fifty-cent computer. An EV, a robot arm, and a heat pump run on the same four parts. In 1990 those parts cost roughly 100× what they do today. This paper assembled the receipts: a 99% combined decline, about 12.6% per year, sustained for 35 years. The decline is not a calendar effect. Cost falls with cumulative units built. So whoever builds the units controls what goes electric next. We'll build the drone piece by piece, price it in 1990, and watch that price collapse.",
+  "parts": [
+    {
+      "title": "One machine, four parts",
+      "lede": "We build one concrete machine — a 1 kg camera quadcopter — from scratch: a force law, a motor, a battery, a switch, and a timer. Every electric product is a rearrangement of these four parts, and in 1990 they priced our drone out of existence."
+    },
+    {
+      "title": "The Electric Slide",
+      "lede": "Part 1 ended at a wall: in 1990 the drone's parts cost about $1,000 and the battery was too heavy to fly. This part shows the law that brought the same parts under $10 — and why that law runs on units built, not on years elapsed."
+    },
+    {
+      "title": "Head to head with combustion",
+      "lede": "Cheap parts explain why electric became possible; physics and system engineering explain why it wins. Here the stack goes up against its two rivals — the combustion engine, and the 'better' battery chemistry — with the paper's real numbers."
+    },
+    {
+      "title": "Who owns the curve",
+      "lede": "Part 2 showed cost falls with cumulative production. That has a sharp consequence: the knowledge that drives the curve is generated wherever the volume is built. This part follows that logic to the paper's ending — why China, which manufactures most of the stack, rationally gives AI away."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "one-force-law",
+      "conceptId": "lorentz-force-unification",
+      "part": "One machine, four parts",
+      "title": "A current in a magnetic field feels a sideways push — no heat required",
+      "teaches": "The Lorentz force \\(F = q(E + v×B)\\) means a current-carrying wire in a magnetic field is pushed directly, so electricity can produce motion without a combustion step.",
+      "requires": [],
+      "caption": "Our running example is a 1 kg camera quadcopter. Everything it does starts with one force law: a current — moving charge — in a magnetic field gets pushed sideways. Drag the current up and watch the force arrow grow in lockstep; flip the current and the push flips.",
+      "visualMetaphor": "A straight copper wire segment (10 cm, labeled L) passes between the poles of a permanent magnet; field lines B (0.5 T, arrows pointing across the gap) are drawn. A slider sets current I from −10 A to +10 A. The force arrow F = BIL is drawn perpendicular to both, with a live readout (at 5 A: F = 0.25 N). Corner inset: the quadcopter silhouette with one rotor highlighted, captioned 'this push, arranged in a circle, is thrust.' Predict prompt before touching the slider: 'if you reverse the current, which way does the push go?' A small legend gives one-line definitions: current = charge in motion; magnetic field = the influence of a magnet on moving charge.",
+      "animatedVariable": {
+        "name": "current I through the wire",
+        "control": "slider",
+        "range": "−10 A to +10 A",
+        "whatChangesOnScreen": "The force arrow's length scales linearly with |I| and its direction flips when I changes sign; the F = BIL readout updates."
+      },
+      "quantitativeAnchor": "B = 0.5 T, I = 5 A, L = 0.1 m gives F = BIL = 0.25 N, shown live on the readout.",
+      "physicsChecks": [
+        "Doubling I exactly doubles the force arrow length (linearity visible between two screenshots).",
+        "Reversing the sign of I reverses the force arrow's direction; at I = 0 the arrow vanishes.",
+        "The force arrow is always perpendicular to both the wire and the field lines.",
+        "Readout matches F = BIL for any slider position (0.25 N at 5 A)."
+      ]
+    },
+    {
+      "id": "motor-flipping-magnets",
+      "conceptId": "motor-as-switched-magnets",
+      "part": "One machine, four parts",
+      "title": "A motor is magnets flipping magnets, and the timing does all the work",
+      "teaches": "A motor is a rotor magnet spun by stator electromagnets whose polarity is flipped at exactly the right moment; input energy goes into the switching, the field does the pulling.",
+      "requires": [
+        "one-force-law"
+      ],
+      "caption": "The sideways push from scene 1 becomes rotation when you wrap the wire into coils and put a magnet on a shaft between them. It only works if you flip the coil polarity at the right instant. Before you touch the timing slider: what happens if the polarity never flips?",
+      "visualMetaphor": "Manipulable diagram: a bar magnet on a shaft (the rotor, labeled 'Nd₂Fe₁₄B — neodymium-iron-boron, 36 MGOe') sits between two copper coils (the stators; MGOe glossed as 'a unit of stored magnetic energy per volume — ferrite magnets manage 4'). N/S poles are color-coded and flip visibly. A 'flip timing' slider runs from 'never' through 'late' to 'on time'; a play button runs the motor. RPM gauge and an 'energy in' counter that ticks only when a flip fires. At 'never', the rotor swings and settles aligned with the stators. At 'late', it oscillates and stalls. At 'on time', RPM climbs continuously. Side label: the drone needs thrust greater than 2× its weight to maneuver, and only 36-MGOe-class magnets make the rotor light enough.",
+      "animatedVariable": {
+        "name": "flip timing of the stator polarity",
+        "control": "slider",
+        "range": "never → late → exactly at rotor alignment",
+        "whatChangesOnScreen": "Rotor behavior changes from settling (no flips) to oscillating (mistimed) to continuous acceleration (well-timed); the RPM gauge and energy counter respond."
+      },
+      "quantitativeAnchor": "Nd₂Fe₁₄B stores 36 MGOe vs ferrite's 4 — a 9× jump in magnetic energy density; well-timed switching takes real drone motors past 20,000 RPM at >95% efficiency.",
+      "physicsChecks": [
+        "With flips off, the rotor comes to rest aligned with the stator field — it never spins on its own.",
+        "The energy counter increments only on flip events, never while the rotor coasts.",
+        "Mistimed flips produce oscillation with RPM near zero; on-time flips produce monotonically rising RPM up to the 20,000+ RPM gauge region.",
+        "Stator pole colors visibly swap at each flip, so the cause of each acceleration kick is on screen."
+      ]
+    },
+    {
+      "id": "battery-long-way",
+      "conceptId": "battery-electrochemistry",
+      "part": "One machine, four parts",
+      "title": "A battery forces electrons the long way around — through the motor",
+      "teaches": "A lithium-ion cell separates a lattice that wants to shed electrons from one that wants them, with an electrolyte that passes only ions — so electrons must travel the external circuit as usable current.",
+      "requires": [
+        "motor-flipping-magnets"
+      ],
+      "caption": "Scene 2's coils need current, and the drone's cell supplies it. The electrolyte passes Li⁺ ions but not electrons, so every electron must detour through the motor coil to get home. Toggle charge and discharge and watch the ions rock between the two lattices while the coil spins.",
+      "visualMetaphor": "Cross-section of one cell wired to the scene-2 coil: left, a graphite lattice (the anode — the electrode that sheds electrons on discharge); right, a layered LiCoO₂ lattice (the cathode — the electrode that absorbs them); between them, the electrolyte, labeled 'passes Li⁺, blocks e⁻'. On discharge, Li⁺ dots slide out of the graphite layers, cross the electrolyte, and slot between the cathode layers ('intercalation: ions parking between lattice sheets, so the reaction runs in reverse'), while electron dots stream around the external wire and the motor spins. A callout crosses out a lump of metallic lithium: 'no lithium metal inside — plated lithium grows needle-like dendrites that short the cell; Yoshino's carbon host is what stopped the fires.' Energy-density ruler on the side: 70 Wh/kg (Whittingham, 1976) → 150 Wh/kg (Goodenough's 4 V LiCoO₂ cathode).",
+      "animatedVariable": {
+        "name": "charge / discharge direction",
+        "control": "toggle",
+        "range": "discharge ↔ charge",
+        "whatChangesOnScreen": "Li⁺ ions and external electrons reverse direction together; the motor spins on discharge and an external supply icon appears on charge."
+      },
+      "quantitativeAnchor": "Whittingham's 1976 cell: ~70 Wh/kg; Goodenough's LiCoO₂ cathode pushed cell voltage past 4 V and energy density to ~150 Wh/kg.",
+      "physicsChecks": [
+        "Electron dots appear only in the external wire — never crossing the electrolyte region — in both toggle states.",
+        "Toggling reverses both ion and electron flow simultaneously, and the motor arrow reverses/stops accordingly.",
+        "Total count of Li⁺ dots is conserved; they transfer between lattices rather than accumulating as metal.",
+        "The energy-density ruler shows 70 → 150 Wh/kg with the cathode swap labeled as the cause."
+      ]
+    },
+    {
+      "id": "switch-without-moving-parts",
+      "conceptId": "transistor-as-switch",
+      "part": "One machine, four parts",
+      "title": "The MOSFET switches the coil current with a voltage and no moving parts",
+      "teaches": "Replacing the mechanical relay's contacts with a field-controlled channel in silicon lets a near-zero-current gate voltage switch large currents millions of times per second without wear.",
+      "requires": [
+        "motor-flipping-magnets"
+      ],
+      "caption": "Scene 2's motor needs thousands of well-timed flips per second — push the frequency and watch the mechanical relay's wear counter climb. Toggle to the MOSFET: a gate voltage opens a conduction channel in doped silicon (silicon with trace impurities that set how easily it conducts), and nothing moves at all.",
+      "visualMetaphor": "Split diagram, toggle between two switches driving the scene-2 coil. Left: Joseph Henry's 1835 relay — a small control coil pulls a metal contact closed; each open/close draws a tiny arc, and a 'contact wear' counter climbs. Right: a MOSFET cross-section — gate electrode over an ultra-thin SiO₂ insulator; raising gate voltage shades in a conduction channel between source and drain; a gate-current readout pinned near 0. A switching-frequency slider (1 Hz → 100 kHz) drives whichever switch is selected: the relay's contacts blur, arc, and fail past a few hundred Hz (red X); the MOSFET keeps a clean square-wave current trace at 100 kHz. Footer stat: ~13 sextillion MOSFETs manufactured — likely the most-produced human artifact ever.",
+      "animatedVariable": {
+        "name": "switching frequency",
+        "control": "slider",
+        "range": "1 Hz to 100 kHz",
+        "whatChangesOnScreen": "The current waveform speeds up; the relay accumulates wear and fails above a few hundred Hz, while the MOSFET trace stays clean to 100 kHz."
+      },
+      "quantitativeAnchor": "Roughly 13 sextillion MOSFETs have been manufactured — the most-produced human artifact ever.",
+      "physicsChecks": [
+        "Relay wear counter increases monotonically with cycles and hits failure at high frequency; MOSFET wear counter stays at zero.",
+        "MOSFET gate-current readout is ≈ 0 in steady state while the switched drain current is large — the amplification is visible.",
+        "The conduction channel shading appears only when gate voltage is applied, showing the field, not motion, as the mechanism.",
+        "Both switches drive the same coil, so the current waveform's frequency matches the slider in either mode."
+      ]
+    },
+    {
+      "id": "mcu-times-the-flips",
+      "conceptId": "deterministic-embedded-compute",
+      "part": "One machine, four parts",
+      "title": "A fifty-cent microcontroller times the flips — that is what makes a quadcopter flyable",
+      "teaches": "A quadcopter has no control surfaces; it stays airborne only because a microcontroller re-times the MOSFET flips on all four motors hundreds of times per second, with hard deadlines.",
+      "requires": [
+        "switch-without-moving-parts",
+        "motor-flipping-magnets"
+      ],
+      "caption": "A quadcopter steers only by varying its four rotor speeds. So something must decide when each of scene 4's MOSFETs fires — hundreds of times per second, on a hard deadline. Before you drag the loop-rate slider down: how slow can the control loop get before hover fails?",
+      "visualMetaphor": "Left: the quadcopter hovering in a side view, tilting in response to a small wind-gust button. Right: its control loop drawn as a ring — IMU (inertial measurement unit: the accelerometer/gyro chip that senses tilt) → MCU (microcontroller: a small computer that must finish its loop by a deadline, every time) → four ESCs (electronic speed controllers: the MOSFET banks from scene 4, one per motor) → rotors → back to IMU. A slider sets loop rate from 10 Hz to 1 kHz. At 10 Hz the drone's tilt oscillation grows until it flips and falls; near 500 Hz and above it holds a steady hover and shrugs off the gust. A latency badge on the MCU reads 'guaranteed completion: 2 ms' and a note: 'a late answer breaks the loop — this is why AI chips play pilot, not reflexes; a GPU issues high-level commands, the MCU turns them into phase currents.'",
+      "animatedVariable": {
+        "name": "control loop rate",
+        "control": "slider",
+        "range": "10 Hz to 1 kHz",
+        "whatChangesOnScreen": "Tilt oscillation amplitude shrinks as loop rate rises; below a visible threshold the drone diverges and crashes, above it the hover is stable and gust recovery is fast."
+      },
+      "quantitativeAnchor": "An ARM Cortex-M4-class MCU costs $0.50–$30; a modern EV carries ~100 of them.",
+      "physicsChecks": [
+        "Oscillation amplitude decreases monotonically as loop rate increases; there is a visible crash threshold at low rates.",
+        "At maximum loop rate, the gust button produces a brief tilt that is corrected within a few animation frames.",
+        "The loop diagram highlights each stage in sequence at the current rate, so the cause (slow loop → stale corrections) is visible.",
+        "The MCU price tag ($0.50–$30) and the '~100 MCUs per EV' stat are displayed."
+      ]
+    },
+    {
+      "id": "the-1990-price-wall",
+      "conceptId": "electric-slide-composite",
+      "part": "One machine, four parts",
+      "title": "In 1990 the drone's parts cost about $1,000 — and the battery alone was too heavy to fly",
+      "teaches": "Every part of the drone existed in 1990; what killed it was the stack's price and the battery's weight, which is the limitation the paper's cost data explains.",
+      "requires": [
+        "one-force-law",
+        "motor-flipping-magnets",
+        "battery-long-way",
+        "switch-without-moving-parts",
+        "mcu-times-the-flips"
+      ],
+      "caption": "Price the bill of materials — the priced list of parts — at 1990 rates, when cells ran $7,500/kWh. The drone dies twice: about $1,000 in stack parts, and a 60 Wh battery weighing ~0.67 kg inside a 1 kg airframe. Flip between the cost view and the weight view to see both failures.",
+      "visualMetaphor": "A parts-ledger diagram of the drone with each component priced at 1990 rates: 60 Wh battery at $7,500/kWh = $450; 0.4 kW of motors at $204/kW = $82; 0.4 kW of inverter switching at $400/kW = $160; flight-control compute = hundreds of dollars. A toggle switches to the weight view: early cells at ~90 Wh/kg put 0.67 kg of battery in a 1 kg drone, and a thrust-to-weight gauge sits in the red below 2.0 with the label 'cannot maneuver.' Closing annotation, set apart: 'Nothing here needed inventing. It needed to get 100× cheaper. Part 2 shows the law that did it.'",
+      "animatedVariable": {
+        "name": "cost view / weight view",
+        "control": "toggle",
+        "range": "1990 cost ledger ↔ 1990 mass budget",
+        "whatChangesOnScreen": "The same parts diagram re-labels from dollars to kilograms; the thrust-to-weight gauge appears in the weight view, pinned in the red."
+      },
+      "quantitativeAnchor": "1990 prices: batteries $7,500/kWh, electromagnetic actuation $204/kW, inverters $400/kW — putting ~$1,000 of stack parts in a hobby drone.",
+      "physicsChecks": [
+        "Ledger line items sum correctly to the displayed total (~$1,000 excluding compute's 'hundreds' band).",
+        "The battery is visibly the largest single line item in the cost view.",
+        "In the weight view, battery mass at 90 Wh/kg for 60 Wh reads 0.67 kg and the thrust-to-weight gauge shows < 2.0 in red.",
+        "Per-unit 1990 rates ($7,500/kWh, $204/kW, $400/kW) are displayed exactly."
+      ]
+    },
+    {
+      "id": "wrights-law",
+      "conceptId": "learning-curve",
+      "part": "The Electric Slide",
+      "title": "Cost falls a fixed percentage per doubling of cumulative production, not per year",
+      "teaches": "Wright's law: manufacturing generates knowledge, so unit cost falls a roughly fixed fraction each time cumulative output doubles — time only matters insofar as units get built.",
+      "requires": [
+        "the-1990-price-wall"
+      ],
+      "caption": "Wright's law runs on units, not years: \\(C(x) = C_0 x^{-b}\\), so cost falls a fixed percentage each time cumulative production \\(x\\) doubles. Here \\(C_0\\) is the starting cost — scene 6's $7,500/kWh — and \\(b\\) sets the drop per doubling. Only while somebody keeps doubling does this compound into the paper's 12.6% annual decline, \\(C(t) ≈ C_0(1-r)^t\\) with \\(r = 0.126\\).",
+      "visualMetaphor": "An equation scene. Center: \\(C(t) ≈ C_0(1-r)^t\\) with every symbol labeled by a callout — \\(C_0\\): starting cost (e.g. $7,500/kWh); \\(r\\): annual decline rate, dimensionless, 0.125–0.23 for the four stack layers; \\(t\\): years, valid only while production keeps compounding. Beneath it, the underlying law in words: 'each doubling of cumulative units cuts cost by a fixed %.' A toggle switches the plot between two x-axes for the same battery data: cost vs calendar time (a curve whose steepness depends on demand) and cost vs cumulative units on log-log axes (a straight line). Side panel names the mechanism in three labels: yield fixes, tooling reuse, scale economies. A 'freeze production' annotation on the time view shows the curve going flat when cumulative output stops.",
+      "animatedVariable": {
+        "name": "x-axis of the cost plot",
+        "control": "toggle",
+        "range": "calendar time ↔ cumulative units (log-log)",
+        "whatChangesOnScreen": "The same data re-plots: wiggly and demand-dependent against time, a straight line against cumulative production."
+      },
+      "quantitativeAnchor": "Annual decline rates: batteries 12.5%, motors 12.5%, inverters 14.5%, embedded compute 23%.",
+      "physicsChecks": [
+        "On the log-log cumulative-units view, the data falls on a straight line.",
+        "On the time view, the 'freeze production' segment shows cost holding flat while time advances — cost does not fall on its own.",
+        "Every symbol in the equation has a visible label with meaning and units before any plot is shown.",
+        "The four layer rates (12.5%, 12.5%, 14.5%, 23%) are displayed."
+      ]
+    },
+    {
+      "id": "alpha-products",
+      "conceptId": "alpha-products",
+      "part": "The Electric Slide",
+      "title": "One killer product ignites each curve by buying the first volume",
+      "teaches": "Each stack layer stayed expensive until a single high-volume product created the demand that started its doublings — Sony's Handycam for cells, the 3.5-inch hard drive for neodymium magnets.",
+      "requires": [
+        "wrights-law"
+      ],
+      "caption": "Wright's law needs somebody to do the doubling, and for lithium cells that somebody was Sony's 1991 Handycam camcorder. Drag cumulative shipments and ride the cost point down the straight line from $7,500 to $2,010/kWh by 1999. Your drone's cells got cheap because camcorders bought the first billion.",
+      "visualMetaphor": "The log-log line from scene 7, now for Li-ion cells, with a cost point the reader drags along a 'cumulative cells shipped' slider; a Handycam icon pushes the point, and year markers appear as volume grows (1991: $7,500/kWh → 1999: $2,010/kWh, −73%). Below, three sibling tracks with their own igniter icons and one stat each: 3.5-inch hard drives needed NdFeB's 36 MGOe (vs ferrite's 4) to write ~10× denser bits, making Conner Peripherals the fastest-growing US manufacturer ever ($1.337B revenue by 1990); variable-speed motor drives sold on ~30% energy savings with sub-year paybacks; TI's $20 single-chip calculator IC vs Intel's $300–500 chipset. A banner annotation: 'invention → volume typically takes 10–20 years: MOSFET 1959 → Intel 4004 1971; LFP published 1997 → Blade battery 2020.'",
+      "animatedVariable": {
+        "name": "cumulative Li-ion cells shipped",
+        "control": "slider",
+        "range": "1991 pilot volumes → 1999 mass production",
+        "whatChangesOnScreen": "The cost point slides down the log-log line as cumulative volume grows; year markers and the $/kWh readout update from $7,500 toward $2,010."
+      },
+      "quantitativeAnchor": "Li-ion cells: $7,500/kWh in 1991 → $2,010/kWh by 1999, a 73% decline driven by camcorder volume.",
+      "physicsChecks": [
+        "The cost point moves only when cumulative shipments move — pausing the slider freezes the cost.",
+        "Slider endpoints reproduce $7,500/kWh and $2,010/kWh exactly (−73%).",
+        "The three sibling tracks each display their igniter product and one correct stat (36 vs 4 MGOe; $1.337B; $20 vs $300–500).",
+        "The 10–20-year invention-to-volume gap annotation is visible with both example pairs."
+      ]
+    },
+    {
+      "id": "the-99-percent-slide",
+      "conceptId": "electric-slide-composite",
+      "part": "The Electric Slide",
+      "title": "Since 1990 the whole stack has fallen 99% — re-price the drone year by year",
+      "teaches": "The four learning curves compound into a 99% composite decline (12.6%/yr) since 1990, and the drone's bill of materials crosses from impossible to trivial as the slider passes ~2010.",
+      "requires": [
+        "alpha-products",
+        "the-1990-price-wall"
+      ],
+      "caption": "Run all four curves at once against scene 6's ledger and drag the year past ~2010. The paper's declines since ~1990:\n- battery packs: −98.7% ($7,500/kWh → ~$50/kWh)\n- motors and actuation: −98.8% ($204/kW → $5/kW)\n- inverters — the banks of MOSFET switches that shape the motor current: −99.5% ($400/kW → ~$2/kW)\n- embedded compute: −99.9% per DMIPS, a standard benchmark unit of compute throughput",
+      "visualMetaphor": "Main chart: four cost curves indexed to 100 in 1990, plus a bold composite line, on a log y-axis; a year slider spans 1990–2030 (dashed projection past 2025 at the historical 12.6%/yr). Right panel: the scene-6 drone ledger re-prices live — at 2025 it reads roughly: battery $3, motors $2, inverter $0.80, MCU $0.50, total under $10. The drone icon is greyed out until both the cost total and the thrust-to-weight gauge (battery mass shrinking with rising Wh/kg) go green, near 2010. Along the timeline, small product markers light up as their own budgets close: camcorder 1991, laptop mid-90s, quadcopter ~2010, home battery, electric boat, humanoid actuator toward the dashed end. Predict prompt: 'set the year where you think the $50 drone becomes possible — then drag.'",
+      "animatedVariable": {
+        "name": "year",
+        "control": "slider",
+        "range": "1990 to 2030 (dashed projection after 2025)",
+        "whatChangesOnScreen": "All four curves and the composite trace down; the drone ledger re-prices; the drone and other product icons switch on as their budgets close."
+      },
+      "quantitativeAnchor": "Composite stack decline since 1990: 99%, i.e. 12.6% per year; endpoints $7,500→$50/kWh, $204→$5/kW, $400→$2/kW, −99.9% per DMIPS.",
+      "physicsChecks": [
+        "At 1990 the ledger matches scene 6 (~$1,000, thrust-to-weight in the red); at 2025 it totals under $10 with the gauge green.",
+        "All four curves decline monotonically; compute (23%/yr) is visibly the steepest, matching its −99.9% endpoint.",
+        "The drone icon activates only when both cost and weight conditions are met, near the 2010 mark.",
+        "Composite endpoints match −99% and the 12.6%/yr label."
+      ]
+    },
+    {
+      "id": "skip-the-heat-step",
+      "conceptId": "lorentz-force-unification",
+      "part": "Head to head with combustion",
+      "title": "Electric drivetrains skip the heat step, so 95% efficiency beats 30%",
+      "teaches": "Combustion must convert chemical energy to motion through heat and pays the heat-engine penalty; the electric path — chemistry → current → field → motion — never makes heat its intermediate, so no Carnot ceiling applies.",
+      "requires": [
+        "one-force-law",
+        "the-99-percent-slide"
+      ],
+      "caption": "Toggle the two energy paths — the 1990 nitro-engine RC aircraft versus the drone — and watch where each joule goes. The 95% figure doesn't cheat thermodynamics: the Carnot limit caps only heat engines, and the electric path (scene 1's force law) never turns its energy into heat on the way to motion.",
+      "visualMetaphor": "An energy-flow diagram (streams whose width equals power) with a toggle. Combustion side: fuel tank → 'burn: chemical → heat' → 'expand: heat → pressure → shaft', with a fat waste stream (60–75% rejected as exhaust and cooling heat) peeling off at the heat stage, tagged 'Carnot limit applies here: a heat engine's efficiency is capped by its temperatures'; shaft output stream reads 25–40%. Electric side: battery → current → 'field pulls rotor' → shaft, with a thin ~5% resistive-loss stream; output reads >95%. The 1990 baseline is named: a nitro (methanol-fueled) RC engine, the era's only way to fly a small aircraft. Predict prompt: 'before toggling — where do you think the combustion side loses most of its energy?'",
+      "animatedVariable": {
+        "name": "drivetrain type",
+        "control": "toggle",
+        "range": "nitro combustion engine ↔ electric stack",
+        "whatChangesOnScreen": "The energy streams re-route: the fat heat-rejection branch appears only on the combustion side; output stream width jumps from 25–40% to >95%."
+      },
+      "quantitativeAnchor": "Electric drivetrains: >95% efficient; combustion engines: 25–40%.",
+      "physicsChecks": [
+        "Stream widths conserve energy: input width equals output plus losses on both sides.",
+        "The dominant loss on the combustion side branches off at the heat stage, not at the shaft.",
+        "The Carnot annotation is attached only to the heat path, never to the electric path.",
+        "Electric losses total ≈5% and are labeled resistive."
+      ]
+    },
+    {
+      "id": "system-beats-component",
+      "conceptId": "cathode-tradeoff-lfp",
+      "part": "Head to head with combustion",
+      "title": "Pack engineering flipped which battery chemistry wins",
+      "teaches": "The failure math \\(P_{fail} = 1-(1-p)^N\\) punishes many-cell packs, and cell-to-pack engineering let cheap, fireproof LFP beat higher-density nickel chemistries at the system level.",
+      "requires": [
+        "battery-long-way",
+        "the-99-percent-slide"
+      ],
+      "caption": "Scale the drone's cells to a car: drag \\(N\\) to Tesla's 6,831 cells with \\(p\\), the chance any one cell fails, at 1-in-200,000, and \\(1-(1-p)^N\\) hits 3.34% of cars. Pack builders bet on fewer, bigger cells and won: ~80% of Chinese EVs now run LFP. LFP — lithium iron phosphate — is a cheaper, non-flammable chemistry.",
+      "visualMetaphor": "Left: a pack diagram of N small cylindrical cells (a random few flagged red at rate p) feeding a gauge of \\(P_{fail} = 1-(1-p)^N\\); a slider sweeps N from 100 to 7,000 with p fixed at 1/200,000, and at N = 6,831 the gauge reads 3.34% with a note 'Tesla's answer: a wire-bond fuse on every cell.' Predict prompt before dragging: 'guess the pack failure rate at 7,000 cells.' A toggle switches to the cell-to-pack/Blade layout: a handful of long flat LFP cells (glossed: lithium iron phosphate — cheap iron and phosphate, essentially fireproof, flat 3.2 V discharge, lower energy per kg) welded straight into the structure; N collapses, the gauge drops, and a bar chart compares pack-level energy density: LFP cell-to-pack ~160 Wh/kg vs NMC (nickel-manganese-cobalt, denser but costlier and thermally touchy) 180–200 Wh/kg, with volume utilization rising from ~40% to 60%+. Footer: 'the best chemistry by Wh/kg did not win; the best system did.'",
+      "animatedVariable": {
+        "name": "number of cells N in the pack",
+        "control": "slider",
+        "range": "100 to 7,000 cells (p fixed at 1/200,000)",
+        "whatChangesOnScreen": "The pack-failure gauge climbs with N per \\(1-(1-p)^N\\); the toggle to cell-to-pack collapses N and drops the gauge while the density bars appear."
+      },
+      "quantitativeAnchor": "\\(1-(0.999995)^{6831} ≈ 3.34\\%\\) of packs failing at Tesla's cell count; LFP cell-to-pack ~160 Wh/kg vs NMC's 180–200; ~80% of Chinese EVs run LFP.",
+      "physicsChecks": [
+        "The gauge is monotonically increasing in N and reads 3.34% at N = 6,831.",
+        "At small N the gauge approaches N·p (linear regime sanity check).",
+        "Toggling to cell-to-pack visibly reduces cell count and gauge value simultaneously.",
+        "Density bars show LFP ~160 below NMC 180–200 — the winner is not the taller bar, and the footer says why."
+      ]
+    },
+    {
+      "id": "factory-floor-learning",
+      "conceptId": "manufacturing-learning-loop",
+      "part": "Who owns the curve",
+      "title": "The learning behind the curve happens on the factory floor",
+      "teaches": "Wright's-law knowledge — yield fixes, system-level redesigns like the Blade — is generated by making things at volume, so a design-only firm loses the curve to whoever manufactures.",
+      "requires": [
+        "wrights-law",
+        "system-beats-component"
+      ],
+      "caption": "BYD's Blade pack — long LFP cells built straight into the pack, skipping modules — wasn't invented by the patent holder. A123 owned the LFP patents and died in 2012; BYD, which builds both batteries and cars, saw the pack-level fix. Cut the build-and-measure loop with the toggle and watch improvement flatline: Sony gained 50% energy density within three years of mass production, not before.",
+      "visualMetaphor": "A loop diagram: Design → Build at volume → Measure (yields, failures, field data) → Redesign → back to Build, with the knowledge glow originating at the Build/Measure nodes. A toggle sets the firm type. 'Design + manufacture' (BYD, Sony): the loop runs, an energy-density meter climbs (Sony: +50% within 3 years of starting mass production), and a 'system inventions' tray fills (Blade, cell-to-pack). 'Design only' (A123): the Build node is outsourced and greyed, the return arrow is severed, the meter flatlines, and a date stamp reads 'held the LFP patents; bankrupt 2012.' Side note: the loop also runs across neighboring firms — motor, inverter, and pack makers iterating down the street in Shenzhen/Ningde — which is why a specialist like CATL still sits inside the loop.",
+      "animatedVariable": {
+        "name": "firm type",
+        "control": "toggle",
+        "range": "design-only ↔ design + manufacture",
+        "whatChangesOnScreen": "The feedback arrow from factory to design is severed or restored; the improvement meter flatlines or climbs; the inventions tray empties or fills."
+      },
+      "quantitativeAnchor": "Sony improved Li-ion energy density 50% within three years of mass manufacturing; A123 held the LFP patents and went bankrupt in 2012.",
+      "physicsChecks": [
+        "With the loop cut, the improvement meter is flat over time; with it closed, the meter climbs — visible between two screenshots.",
+        "The knowledge glow originates at the Build/Measure nodes, not the Design node.",
+        "The design-only state shows the severed return arrow as the visible cause of the flatline.",
+        "Sony's +50%/3yr and A123's 2012 bankruptcy are both displayed."
+      ]
+    },
+    {
+      "id": "why-china-gives-ai-away",
+      "conceptId": "commoditize-the-complement",
+      "part": "Who owns the curve",
+      "title": "China owns energy and action, so it gives intelligence away",
+      "teaches": "Energy, intelligence, and action are complements — each worth more when the others are cheap — so a player owning two of the three rationally drives the price of the third to zero.",
+      "requires": [
+        "factory-floor-learning",
+        "the-99-percent-slide"
+      ],
+      "caption": "Scene 12's conclusion — the manufacturer owns the curve — means China's factories already own two of the three inputs every machine needs: energy (batteries) and action (motors, power electronics). The third is intelligence — deciding what to do: chips, models — and the three are complements, each worth more when the others are cheap, like printers and ink. Drag the price of intelligence toward zero and watch where the profit goes. If you owned the other two, you'd give intelligence away too — hence China's open-weight models, whose trained parameters are published free: strategy, not generosity.",
+      "visualMetaphor": "A triangle of three nodes — Energy, Intelligence, Action — with China's ownership shares stamped on two of them: Energy: 2.5× US electricity generation; Action: ~75% of Li-ion cells, 90%+ of neodymium magnets; Intelligence: the contested node. A slider sets the price of intelligence from 'closed and expensive' to 'open and free.' As it falls, demand for complete machines (drone icons multiplying, from scene 9's under-$10 stack) rises, and profit bars grow at the two owned nodes — labeled with the rule 'when one layer becomes a cheap commodity, profits migrate to the layers next to it.' Predict prompt: 'you own two of three complements — do you want the third expensive or free?' Closing annotations: the scene-7 warning that killing demand (e.g. cutting EV incentives) kills the curve; and the drone from scene 6 next to its final ledger — ~$1,000 in 1990, under $10 now, intelligence included free.",
+      "animatedVariable": {
+        "name": "price of intelligence",
+        "control": "slider",
+        "range": "closed and expensive → open and free",
+        "whatChangesOnScreen": "As intelligence gets cheaper, machine-demand icons multiply and profit bars at the Energy and Action nodes grow; the Intelligence node's own profit bar shrinks toward zero."
+      },
+      "quantitativeAnchor": "China: 2.5× US electricity generation, ~75% of global Li-ion cell production, 90%+ of neodymium magnet manufacturing.",
+      "physicsChecks": [
+        "Lowering the intelligence price monotonically raises profit bars at Energy and Action while shrinking Intelligence's own bar.",
+        "Ownership stamps match the anchors exactly (2.5×, ~75%, 90%+).",
+        "Machine-demand icons scale with intelligence cheapness, making the complement mechanism visible rather than asserted.",
+        "The final drone ledger shows ~$1,000 (1990) vs under $10 (today), closing the running example."
+      ]
+    }
+  ]
+}

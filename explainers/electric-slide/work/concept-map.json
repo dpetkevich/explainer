@@ -1,0 +1,125 @@
+{
+  "paper": {
+    "title": "The Electric Slide: The History, 99% Decline, and Future of the Electric Stack",
+    "authors": [
+      "Packy McCormick",
+      "Sam D'Amico"
+    ],
+    "oneSentenceClaim": "Every electric product is built from four parts: batteries, magnets and motors, power electronics, and small embedded computers. The combined cost of that stack has fallen 99% since 1990, so almost anything can now go electric. China manufactures most of the stack, which explains why it happily gives AI away.",
+    "category": "Computing"
+  },
+  "prerequisites": [
+    "Intro electromagnetism (fields, currents, induction at the level of a first E&M course)",
+    "Basic circuit theory: voltage, current, resistance, AC vs DC",
+    "Gen-chem redox: oxidation states, electronegativity, half-reactions",
+    "Exponentials and percent-per-year decay",
+    "Qualitative idea that doped silicon conducts controllably"
+  ],
+  "concepts": [
+    {
+      "id": "lorentz-force-unification",
+      "name": "Electricity and magnetism are one lever: F = q(E + v×B)",
+      "whyItMatters": "The entire Electric Stack is a machine for pointing this one force law at useful work — motion, heat, light, sound — which is why 'anything that can go electric will.'",
+      "coreMechanism": "Maxwell showed electric and magnetic fields are aspects of one field; Lorentz gave the force on a moving charge. A current is moving charge, so a field pushes a current-carrying wire — and a coil carrying current is itself a magnet you can switch on, off, and flip. Combustion converts chemical energy to motion through heat, paying a thermodynamic penalty; an electromagnetic system just steers fields toward lower-energy configurations, which is why motor drivetrains hit >95% efficiency while engines sit near 25–40%.",
+      "keyEquation": "\\vec{F} = q(\\vec{E} + \\vec{v}\\times\\vec{B})",
+      "misconception": "Electric drivetrains are not heat engines, so Carnot-style efficiency ceilings do not apply to them; the ~95% figure is not cheating thermodynamics.",
+      "foundational": true
+    },
+    {
+      "id": "motor-as-switched-magnets",
+      "name": "A motor is magnets flipping magnets, on a timer",
+      "whyItMatters": "Every layer of the stack maps onto one piece of this toy model, so understanding it is understanding why the four technologies are complements rather than a grab bag.",
+      "coreMechanism": "Put a permanent magnet on a shaft (rotor) between two magnets (stators); flip the stator polarities at exactly the right moment and attraction/repulsion spins the rotor — your input energy goes only into the switching, the field does the pulling. A real motor replaces hand-flipped magnets with copper-coil electromagnets, the rotor with a NdFeB magnet, the flipping hand with semiconductor switches firing thousands of times per second, and your eyes with position sensors feeding a microcontroller that times each flip. Result: 20,000+ RPM for years at >95% efficiency with precise torque control.",
+      "foundational": true
+    },
+    {
+      "id": "battery-electrochemistry",
+      "name": "Batteries: force electrons the long way around",
+      "whyItMatters": "The whole battery story — LCO, NMC, LFP, dendrite fires — is a series of tweaks to which lattice hosts the lithium, so this mechanism is the substrate for the chemistry trade-off that decided the EV market.",
+      "coreMechanism": "The anode material wants to shed electrons; the cathode wants to absorb them; the electrolyte between them passes Li⁺ ions but blocks electrons, so electrons must take the external circuit as usable current. Whittingham's 1976 trick, intercalation, slots Li⁺ ions between lattice layers so the reaction runs reversibly — ions rock between two host lattices instead of plating as metallic lithium, whose needle-like dendrites short the cell and cause fires. Lithium is the lightest metal with one loose outer electron, which is why it maximizes energy per kilogram (~70 Wh/kg in Whittingham's cell, ~150 Wh/kg once Goodenough's LiCoO₂ cathode pushed voltage past 4 V).",
+      "misconception": "A modern Li-ion cell contains no metallic lithium anode; Yoshino's replacement of lithium metal with a carbon host is precisely what stopped the explosions and made the technology commercial.",
+      "foundational": true
+    },
+    {
+      "id": "transistor-as-switch",
+      "name": "Electricity controlling electricity: relay → MOSFET",
+      "whyItMatters": "Flipping a motor's electromagnets thousands of times per second is impossible by hand or by mechanical contacts; the entire power-electronics and compute story descends from making the switch electronic.",
+      "coreMechanism": "Joseph Henry's 1835 relay let a weak current on an electromagnet close a switch carrying a strong current — amplification and remote control — but mechanical contacts arc and wear out. Atalla and Kahng's 1959 MOSFET replaced the moving part with a field: a gate voltage across an ultra-thin SiO₂ insulator opens or closes a conduction channel in silicon, drawing essentially zero steady current and switching up to millions of times per second. Roughly 13 sextillion MOSFETs have been manufactured — likely the most-produced human artifact ever — and both branches of the story (compute and power) start here.",
+      "foundational": true
+    },
+    {
+      "id": "learning-curve",
+      "name": "Learning curves: cost falls with cumulative production, not with time",
+      "whyItMatters": "The essay's predictive engine — 'the curves are destiny' — is just this mechanism applied to four technologies at once, so every claim about the electric future rides on it.",
+      "coreMechanism": "Manufacturing generates knowledge: yield fixes, process tweaks, tooling reuse, scale economies. So cost falls a roughly fixed percentage per doubling of cumulative output — batteries 12.5%/yr, motors 12.5%/yr, inverters 14.5%/yr, embedded compute 23%/yr. The curves become self-fulfilling: expected declines attract product designers, their products create demand, and demand funds the production volume that delivers the decline — the same two-sided feedback that sustained Moore's Law.",
+      "keyEquation": "C(t) \\approx C_0 (1-r)^{t}, \\quad r \\approx 0.125\\text{–}0.23 \\text{ per year}",
+      "misconception": "Costs don't fall on a calendar schedule; they fall because someone builds volume. Kill demand (e.g., cut EV incentives) and you kill the curve, which is the essay's core policy warning.",
+      "foundational": true
+    },
+    {
+      "id": "electric-slide-composite",
+      "name": "The Electric Slide: the stack got 99% cheaper since 1990",
+      "whyItMatters": "This is the paper's headline empirical claim, assembled for the first time from catalogs, teardowns, and reports: the LEGO kit for anything electric costs 1% of its 1990 price.",
+      "coreMechanism": "Since ~1990: battery packs fell 98.7% ($7,500/kWh pilot cells to ~$50/kWh Chinese cells), electromagnetic actuation fell 98.8% ($204/kW to $5/kW), VFD inverters fell 99.5% ($400/kW to ~$2/kW), and embedded compute per DMIPS fell 99.9%. Equal-weighting the four layers gives a composite decline of 99%, or 12.6% per year. The consequence is a moving feasibility frontier: every year, products whose bills of materials didn't close economically — drones, home batteries, humanoid actuators, electric boats — cross the threshold.",
+      "misconception": "Moore-style exponential cost curves are not a digital-only phenomenon; four physical-world technologies have quietly matched the pattern for 35 years, and people underestimate them for the same reason they kept underestimating solar."
+    },
+    {
+      "id": "alpha-products",
+      "name": "Alpha products: one killer application ignites each curve",
+      "whyItMatters": "This is the causal engine behind every cost curve in the essay, and the basis of its policy prescription: whoever generates demand controls where the learning happens.",
+      "coreMechanism": "Each layer sat expensive and niche until one product — usually an existing product with a flaw the new technology fixed — bought enough volume to start the curve. Sony's 1991 Handycam took Li-ion cells from $7,500/kWh to $2,010/kWh by 1999 (−73%). The 3.5\" hard drive needed neodymium's 36 MGOe (vs ferrite's 4) to write ~10× denser bits, making Conner Peripherals the fastest-growing US manufacturer ever ($1.337B revenue by 1990). VFD salesmen guaranteed ~30% energy savings with sub-year paybacks; TI's $20 single-chip calculator IC undercut Intel's $300–500 chipset. Demand → scale → cost decline → new use cases → more demand.",
+      "misconception": "Breakthroughs don't scale themselves: there is typically a 10–20 year gap between invention and volume (LFP published 1997, Blade battery 2020; MOSFET 1959, Intel 4004 1971), and the gap closes only when a product creates demand."
+    },
+    {
+      "id": "cathode-tradeoff-lfp",
+      "name": "The cathode trade-off: energy density vs. safety and cost, and how pack engineering flipped it",
+      "whyItMatters": "China's EV dominance rests on betting that LFP's weaknesses were pack-level problems, not chemistry-level ones — and being the ones building packs, they were positioned to prove it.",
+      "coreMechanism": "NMC/NCA cathodes deliver 150–260 Wh/kg but use expensive, thermally touchy nickel and cobalt; LFP (LiFePO₄) is dirt-cheap iron and phosphate, essentially fireproof, with a flat 3.2 V discharge — but caps at 170 mAh/g theoretical vs 274 for LCO and originally barely conducted (fixed by carbon coating and nano-scale particles). Tesla's small-cell path exposed the pack math: with 1-in-200,000 cell failures and 6,831 cells, 1−(0.999995)^{6831} ≈ 3.34% of Roadsters would fail, forcing a wire-bond fuse on every cell. CATL's cell-to-pack and BYD's Blade went the other way — few huge cells laser-welded straight into the structure — raising volume utilization from ~40% to 60%+ and LFP pack density to ~160 Wh/kg against NMC's 180–200, close enough that cheap-and-safe won: ~80% of Chinese EVs and nearly half of all EVs now run LFP.",
+      "keyEquation": "P_{\\text{pack fail}} = 1 - (1-p)^{N} \\;\\Rightarrow\\; 1-(0.999995)^{6831} \\approx 3.34\\%",
+      "misconception": "The 'best' chemistry by energy density does not automatically win; system-level cost, safety, and manufacturability can dominate, which is exactly why scientists thought Goodenough had lost a step when he published LFP in 1997."
+    },
+    {
+      "id": "neodymium-magnets",
+      "name": "Nd₂Fe₁₄B: why boron plus neodymium made motion cheap",
+      "whyItMatters": "Without a 10× jump in magnetic energy density, drones can't achieve flight-worthy thrust-to-weight and EV motors can't compete — and China makes 90%+ of these magnets.",
+      "coreMechanism": "A permanent magnet is scored on BHmax (stored magnetic energy per volume, in MGOe) and coercivity (resistance to demagnetization). Iron is cheap with huge saturation magnetization but magnetically soft; neodymium's three 4f electrons supply moment and anisotropy, but Nd–Fe compounds have the wrong crystal structure and decompose on heating. Boron stabilizes the Nd₂Fe₁₄B lattice — discovered independently and presented the same day in 1983 by Sagawa (Sumitomo, sintered, 36 MGOe, brittle) and Croat (GM, melt-spun, 14 MGOe, moldable). Grain-boundary dysprosium doping later raised the demagnetization temperature from ~80–100°C to >150°C for traction motors; Tesla's grain-boundary diffusion gets 2× the coercivity with 70% less Dy. For a drone, thrust-to-weight must exceed ~2.0, and only 36-MGOe-class magnets make motors light enough to clear it.",
+      "misconception": "Rare earths aren't rare — the US mines them and China mines only 70% — the chokepoint is refining and magnet manufacturing, capabilities the West sold (GM's Magnequench went to Chinese buyers for $70M and moved to Tianjin the day its 5-year stay-in-the-US clause expired)."
+    },
+    {
+      "id": "igbt-hybrid-switch",
+      "name": "The IGBT: MOSFET gate, bipolar body",
+      "whyItMatters": "The IGBT is what first let semiconductors switch industrial-scale current fast, unlocking variable-speed motors — the single largest energy-saving invention in history (73,000 TWh over 25 years).",
+      "coreMechanism": "Power switching faced a fork: BJTs carry tens of amps by flooding themselves with charge carriers but need continuous drive current and switch slowly; MOSFETs switch fast on voltage alone, but blocking high voltage requires a thick, lightly doped drift region whose resistance wastes 10–100× more power as heat. Baliga's 1980–82 insight at GE was to decouple input from output: a MOSFET gate controls a bipolar conduction path, and electron irradiation later fixed the switching speed. IGBTs enabled variable frequency drives: instead of running a grid-locked motor at fixed RPM and throttling the output (one foot on gas, one on brake), you synthesize AC at exactly the needed frequency — routinely cutting industrial motor energy use 30%+ with sub-year paybacks.",
+      "misconception": "Before power electronics, an AC motor's speed was set by the 60 Hz grid and its pole count — your fridge compressor cycling on and off at one fixed speed is a fossil of that constraint, not a design choice."
+    },
+    {
+      "id": "wide-bandgap-sic",
+      "name": "Wide bandgap: why SiC's 3.3 eV cascades into a cheaper whole car",
+      "whyItMatters": "The Model 3 proved that a component 3–5× more expensive can lower total system cost — the clearest single demonstration of why integrated design across the stack beats optimizing parts in isolation.",
+      "coreMechanism": "Bandgap is the energy needed to free an electron into conduction; silicon's 1.1 eV means breakdown at modest fields and 150°C. SiC's 3.3 eV gap gives ~10× the critical field, so the voltage-blocking drift region can be ~10× thinner, cutting on-resistance up to 100× — a plain MOSFET now handles what needed an IGBT, switching up to 100 kHz instead of 5–10 kHz with ~70% less heat and 300°C tolerance. In the Model 3 the cascade paid at every level: bare SiC dies mount straight onto the heat sink (no sealed modules, no liquid loop), the inverter shrank >50% and hit 98% efficiency (vs 94%), fast switching enabled precise field-weakening for the 97%-efficient IPM-SynRM motor, and the whole car came in 833 lbs lighter than a Model S for $35,000 less. Baliga's figure of merit predicted it: he expected SiC ~100× better than silicon; measurements showed 1,000–2,000×.",
+      "keyEquation": "\\text{BFOM} \\propto \\varepsilon\\,\\mu\\,E_c^{3}",
+      "misconception": "Judging a component swap by its unit price is the trap: SiC cost 3–5× more per part, but redesigning the system around its properties made the system cheaper — most incumbents waited for the part price to fall and got lapped."
+    },
+    {
+      "id": "deterministic-embedded-compute",
+      "name": "Deterministic control: why a drone flies without AI but AI can't fly a drone",
+      "whyItMatters": "This inverts the popular hierarchy: GPUs are the last piece of physical intelligence, not the first — without MCUs and DSPs running hard-real-time loops, AI has no way to make anything move.",
+      "coreMechanism": "In a drone, the battery's DC hits electronic speed controllers whose MOSFETs synthesize three-phase AC for each motor. A microcontroller (MCU) fuses IMU, GPS, and rotor-position data and runs supervisory logic; DSP logic does the heavy math — signal filtering, field-oriented control — thousands to millions of times per second with guaranteed completion times, because a late answer breaks the control loop. AI (a GPU/NPU) merely plays the pilot's role, issuing high-level commands the MCU translates into precise phase currents. ARM's Cortex-M4 (2010) merged MCU and DSP on one $0.50–$30 core; a modern EV carries ~100 such MCUs. Cost per DMIPS has fallen 99.9% since the TI calculator chips of the 1970s.",
+      "misconception": "This compute race isn't about the bleeding edge: MCUs don't need 3nm fabs, they need determinism — which is why China's open-source RISC-V push (>50% of global RISC-V shipments, mostly MCUs) can succeed without EUV lithography."
+    },
+    {
+      "id": "commoditize-the-complement",
+      "name": "Energy, intelligence, action — and why China gives intelligence away",
+      "whyItMatters": "This is the essay's framing thesis: China's open-weight AI strategy is rational precisely because it owns the other two complements, making America's closed-AI bet strategically incoherent.",
+      "coreMechanism": "Everything produced requires energy (potential to do work), intelligence (deciding what to do), and action (manipulating matter) — strong complements: each is worth more when the others are abundant. By Spolsky's rule, smart players commoditize their product's complements, and by Christensen's conservation of attractive profits, when one layer commoditizes, profits migrate to adjacent layers. China generates 2.5× US electricity, makes ~75% of Li-ion cells and 90%+ of neo magnets — it owns energy and action — so making intelligence free strengthens its position. Conversely, if America's advantage is high-value design and IP, building AI capable enough to matter packages and commoditizes exactly that advantage.",
+      "misconception": "Open-sourcing frontier models isn't ideological generosity or a sign of falling behind on chips; it is a deliberate move to zero out the one input China doesn't dominate."
+    },
+    {
+      "id": "manufacturing-learning-loop",
+      "name": "Making things teaches you how to make them better",
+      "whyItMatters": "This is the mechanism behind the essay's strategic conclusion: design leadership without manufacturing leadership decays, because the knowledge that improves designs is generated on the factory floor.",
+      "coreMechanism": "Production forces confrontation with variables research ignores: Sony improved Li-ion energy density 50% in three years only after mass-manufacturing began; A123 died holding the LFP patents because as a materials-only company it left pack design and battery management to customers and could never optimize the system; BYD, making batteries and cars, could bet on LFP and invent the Blade; Mitsubishi's drive engineers walked down the hall to the IGBT fab and iterated in weeks, not months. The loop also runs in ecosystems, not just firms — CATL thrives as a specialist because motor makers, inverter makers, and automakers sit down the street in Shenzhen/Ningde. The corollary is the essay's central claim: in the Electric Era, keeping the design and outsourcing the making is not a coherent position, because the outsourced party captures the learning curve.",
+      "misconception": "China's rise in this stack is not just theft plus cheap labor: none of the founding breakthroughs were Chinese, but the patient sequence — transitional products (buses before cars), government as first customer, rapid system-level iteration — turned licensed science into genuine systems innovation (Blade, cell-to-pack, 1,500V SiC)."
+    }
+  ]
+}
